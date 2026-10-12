@@ -19,3 +19,18 @@ M:System.Collections.Generic.Dictionary`2.GetEnumerator;순회 순서 비보장 
 P:System.Collections.Generic.Dictionary`2.Keys;순회 순서 비보장 (spec P2)
 P:System.Collections.Generic.Dictionary`2.Values;순회 순서 비보장 (spec P2)
 M:System.Collections.Generic.HashSet`1.GetEnumerator;순회 순서 비보장 (spec P2)
+M:System.String.Compare(System.String,System.String);문화권 의존 (spec C6). string.CompareOrdinal 또는 StringComparer.Ordinal
+M:System.String.Compare(System.String,System.String,System.Boolean);문화권 의존 (spec C6)
+M:System.String.CompareTo(System.String);문화권 의존 (spec C6). string.CompareOrdinal
+M:System.String.CompareTo(System.Object);문화권 의존 (spec C6). string.CompareOrdinal
+M:System.String.StartsWith(System.String);문화권 의존 (spec C6). StringComparison.Ordinal을 넘긴다
+M:System.String.EndsWith(System.String);문화권 의존 (spec C6). StringComparison.Ordinal을 넘긴다
+M:System.String.IndexOf(System.String);문화권 의존 (spec C6). StringComparison.Ordinal을 넘긴다
+M:System.String.IndexOf(System.String,System.Int32);문화권 의존 (spec C6). StringComparison.Ordinal을 넘긴다
+M:System.String.LastIndexOf(System.String);문화권 의존 (spec C6). StringComparison.Ordinal을 넘긴다
+M:System.String.ToLower;문화권 의존 (spec C6). ToLowerInvariant
+M:System.String.ToUpper;문화권 의존 (spec C6). ToUpperInvariant
+M:System.Collections.Generic.List`1.Sort;기본 비교자는 문자열에서 문화권 의존 (spec C6). 비교자를 넘긴다
+M:System.Linq.Enumerable.OrderBy``2(System.Collections.Generic.IEnumerable{``0},System.Func{``0,``1});기본 비교자는 문화권 의존 (spec C6). 비교자를 넘긴다
+M:System.Linq.Enumerable.OrderByDescending``2(System.Collections.Generic.IEnumerable{``0},System.Func{``0,``1});기본 비교자는 문화권 의존 (spec C6). 비교자를 넘긴다
+M:System.Linq.Enumerable.ThenBy``2(System.Linq.IOrderedEnumerable{``0},System.Func{``0,``1});기본 비교자는 문화권 의존 (spec C6). 비교자를 넘긴다
