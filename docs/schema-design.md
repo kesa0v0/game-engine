@@ -1,6 +1,6 @@
 # 스키마 설계
 
-spec이 스키마에 요구하는 것은 여러 절에 흩어져 있지만, 스키마를 **어떻게 선언하는지**는 비어 있다. 이 문서에서 그 설계를 하나씩 정하고, 끝나면 spec에 새 절로 옮긴다.
+spec이 스키마에 요구하는 것은 여러 절에 흩어져 있지만, 스키마를 **어떻게 선언하는지**는 비어 있다. 이 문서에서 그 설계를 하나씩 정하고, 결론은 spec의 해당 절에 옮긴다(5절). 이유·사례·비교는 이 문서에 남긴다.
 
 **상태 표기:** spec과 같다. ✅ 확정 · 🟡 잠정(추천안, 합의 전) · ❓ 미정.
 
@@ -116,10 +116,10 @@ PopGroup("SlumLaborers",
 
 | 사례 | 이전 표현 | B로 옮기면 | 걸리는 점 |
 |---|---|---|---|
-| QU 정착지 | `BlockDef { tags, selectionPriority, comps: [BuildingManager{baseMaxSlots}, PopHolder, ResourceStorage, Renderer, Inspectable, Interactable …] }` | `baseMaxSlots`는 `BuildingManager` 컴포넌트 안의 `const`(B′). 자원·건물 슬롯 점유는 컴포넌트(또는 `keyed` 행). `Renderer`/`Inspectable`/`Interactable`은 시뮬레이션 밖. | O4: 표현 데이터를 어디에 둘지 (2.5) |
+| QU 정착지 | `BlockDef { tags, selectionPriority, comps: [BuildingManager{baseMaxSlots}, PopHolder, ResourceStorage, Renderer, Inspectable, Interactable …] }` | `baseMaxSlots`는 `BuildingManager` 컴포넌트 안의 `const`(B′). 자원은 키 컴포넌트, 건물은 건물 쪽 Ref + `inverse`(3.3.2). `Renderer`/`Inspectable`/`Interactable`은 시뮬레이션 밖. | O4: 표현 데이터를 어디에 둘지 (2.5) |
 | TR 정당 | `PartyDef { availableActions, comps: [PartyController, VictoryPoint{startingPoints}, UnitPools] }` | `availableActions`는 Def 필드(Def 참조 리스트). `VictoryPoint.points`는 칼럼, 기본값 0. | 없음 |
-| WG 분쟁 목표 | `ConflictGoalDef { requiredSelections, upkeepCosts, successConditions, comps: [Owner, Progress{targetProgress: 10}] }` | `targetProgress`는 `Progress` 컴포넌트 안의 `const`, `Progress.value`는 칼럼(B′). 조건·효과 목록은 Def 필드에 리스트로 두는 대신 스크립트 함수가 된다. | 조건·효과를 Def 필드에 둘지 함수로 둘지 (3절) |
-| QU 스탯 | `StatDef { defaultBaseValue, minValue, maxValue }`, 엔티티는 `Prop_StatTracker` | `StatDef`는 데이터 전용 Def 타입. 엔티티의 스탯 값은 `derived` 필드 + 기여 행(S4). | `derived`의 선언 위치 (3절) |
+| WG 분쟁 목표 | `ConflictGoalDef { requiredSelections, upkeepCosts, successConditions, comps: [Owner, Progress{targetProgress: 10}] }` | `targetProgress`는 `Progress` 컴포넌트 안의 `const`, `Progress.value`는 칼럼(B′). 조건·효과 목록은 Def 필드에 리스트로 두는 대신 스크립트 함수가 된다. | 함수 값을 가진 Def 필드로 해결 (3.3.3) |
+| QU 스탯 | `StatDef { defaultBaseValue, minValue, maxValue }`, 엔티티는 `Prop_StatTracker` | `StatDef`는 데이터 전용 Def 타입. 엔티티의 스탯 값은 `derived` 필드 + 기여 행(S4). | `derived`의 식으로 해결 (3.3.1) |
 | WG 보병 | `Unit_Base.comps`에 `Unit_Infantry`가 `Renderer` 추가 | 자식 Def가 부모의 컴포넌트 기본값을 이름 키로 병합(S1). | 없음 |
 
 ### 2.5 표현 데이터 (O4)
@@ -156,7 +156,7 @@ P5에 따라 커널 스키마에는 UI·그래픽 타입이 없다. 이전에 De
 
 ### 2.6 결정
 - ✅ **Q1–Q3: B′.** 값의 종류는 `const`(불변 설정) · `derived`(계산 값, 쓰기 불가, 저장 안 함) · `field`(칼럼, 커맨드가 쓰고 저장됨) 셋이다. `const`는 Def 타입 바로 아래나 컴포넌트 안, `derived`·`field`는 컴포넌트 안에 둔다. 고르는 순서: 커맨드가 직접 써야 하면 `field` → 다른 값으로 계산되면 `derived` → 그 밖은 `const`. `const`·`derived` 대입은 로드 오류. 컴포넌트가 없는 Def 타입은 데이터 전용.
-- ✅ **`default_from`:** 칼럼의 기본값을 같은 컴포넌트의 다른 값(`const`·`derived`)에서 가져올 수 있다(현재값을 최대값으로 시작). 일반 식까지 허용할지는 3절.
+- ✅ **`default_from`:** 칼럼의 기본값을 같은 컴포넌트의 다른 값(`const`·`derived`)에서 가져올 수 있다(현재값을 최대값으로 시작). `default=`에 함수도 허용하고 `default_from`은 그 설탕(3.3.1 9항).
 - ✅ **Q4 읽기 순서:** 엔티티가 쓴 값 → Def가 준 기본값 → 컴포넌트 스키마 기본값.
 - ✅ **런타임 부착·분리:** Def에 없던 컴포넌트는 붙이고 뗄 수 있다(기본값은 스키마에서). Def에 원래 있던 컴포넌트는 뗄 수 없다(경로 검증 S3의 보장 유지).
 - ✅ **오버라이드 판정:** 쓰기가 일어나면 값이 Def 기본값과 같아도 오버라이드로 저장한다(값 비교 안 함). 이후 그 칼럼은 Def 패치를 따르지 않는다.
@@ -295,7 +295,7 @@ component("Health",
 
 남는 문제:
 - 🟡 **`field`가 `derived` 상한을 넘을 때**(버프 해제로 max 15 → 13, current는 15): `derived`는 쓸 수 없으므로 스스로 고치지 못한다. (a) settle 시점 `when` 반응으로 잘라낸다(저장값이 바뀜, Paradox 쪽), (b) 읽을 때 `min(current, max)`로 보인다(저장값 유지, 버프가 다시 붙으면 복원), (c) 게임이 고른다. `field`의 `max=`에 `derived` 이름을 줄 수 있게 할지와 함께 정한다.
-- 🟡 **컴프리헨션·제너레이터 식:** 위 예시는 현재 파서가 PAR002로 거부하는 `sum(r.value for r in ...)`를 피해 반복문으로 썼다. 제한 부분집합에 컴프리헨션을 넣을지는 파서 쪽에서 따로 정한다.
+- 🟡 **제너레이터 식:** spec S2는 컴프리헨션을 허용하고(S3 쿼리도 컴프리헨션) 제너레이터를 금지한다. 현재 파서는 컴프리헨션을 아직 구현하지 않아 PAR002를 낸다(구현 예정). 남는 것은 `sum(r.value for r in ...)` 같은 **제너레이터 식**이 "금지된 제너레이터"에 드는지다. 위 예시는 이를 피해 반복문으로 썼다. 파서에서 컴프리헨션을 구현할 때 정한다.
 
 #### 3.3.2 가변 길이 런타임 데이터와 `keyed`
 
@@ -365,7 +365,7 @@ WG 분쟁 목표(`successConditions`, `onSuccessEffects`, `onRegisterEffects`), 
   ```
 
 - ✅ **언제 부르는지는 그 Def 타입을 선언한 시스템 모드가 정한다**(예: 분쟁 모드가 `when` 하나로 각 목표의 `g.def.succeeded(g)`를 본다). 커널이 아는 것은 "Def 값으로 함수가 올 수 있다"뿐.
-- ✅ **확인용과 바꾸는 함수를 타입으로 나눈다.** 확인용(`Cond`·`Fn`)은 `derived`와 같은 순수 규칙(쓰기·RNG·`emit` 금지), `when`·`derived` 안에서 불려도 안전. 바꾸는 함수(`Action`)는 Flow 본문으로 실행되어 쓰기·`ask`·`rand()` 가능. 확인용 자리에 바꾸는 함수가 오면 로드 오류. 타입 이름은 `.pyi` 모양과 함께 확정.
+- ✅ **확인용과 바꾸는 함수를 자리의 타입으로 나눈다.** 함수 자체는 spec S2대로 한 종류이고 효과는 엔진이 자동 판정한다. 스키마는 그 자리에 어떤 효과의 함수가 와야 하는지를 선언한다. 확인용(`Cond`·`Fn`)은 `derived`와 같은 순수 규칙(쓰기·RNG·`emit` 금지), `when`·`derived` 안에서 불려도 안전. 바꾸는 함수(`Action`)는 Flow 본문으로 실행되어 쓰기·`ask`·`rand()` 가능. 확인용 자리에 바꾸는 함수가 오면 로드 오류. 타입 이름은 `.pyi` 모양과 함께 확정.
 - ✅ **확장 지점은 `list[Action]` + `merge="append"`.** 다른 모드가 남의 Def에 효과를 덧붙인다(Paradox `on_action`). 순서는 로드 순서.
 - 저장: Def는 세이브에 들어가지 않으므로 Def 안의 함수는 문제없다. 세이브되는 Flow 프레임이 함수를 가리킬 때만 이름으로(S7).
 - 따라 사라지는 것: `onRemoveEffects`의 표식 떼기는 기여 행의 "출처 제거" 수명(S4)이 맡는다. `requiredSelections`와 `^destroyTarget` 컨텍스트 맵은 커맨드 매개변수(`choose`)와 목표 엔티티의 Ref 칼럼이 된다.
@@ -375,7 +375,7 @@ WG 분쟁 목표(`successConditions`, `onSuccessEffects`, `onRegisterEffects`), 
 외부 값은 C# 확장(`ext.*`)이 등록한 칼럼 타입의 값이다(spec S2, X3). 스크립트에는 불투명 값으로 보이고, 확장의 함수와 `==`/`!=`로만 다룬다. 아래는 스키마와 Def에 적는 방법.
 
 1. **타입 이름은 확장 이름을 붙여 적는다:** `component("Location", pos=field(spatial.Point))`. 파이썬 타입 표기 그대로이고, 확장끼리 이름이 겹쳐도 충돌하지 않는다.
-2. **모드는 쓰는 확장을 `mod.py`에 선언한다:** `extensions = ["spatial"]`. 게임에 그 확장이 없으면 Def 줄마다가 아니라 모드 단위 오류 하나로 알린다.
+2. **모드는 쓰는 확장을 `mod.py`에 선언한다:** `Mod(id=..., extensions=["spatial"])`. 게임에 그 확장이 없으면 Def 줄마다가 아니라 모드 단위 오류 하나로 알린다.
 3. **Def 리터럴은 확장의 생성 함수로:** `Sector("Berlin", Location=Location(pos=spatial.point(3, 4)))`. 확장이 "로드 중에 불러도 되는 순수 생성 함수"를 등록하고, Def에서는 그것만 쓸 수 있다.
 4. **기본값:** 확장이 등록할 때 기본값을 주거나, 필드에 `default=` 또는 `optional=True`가 있어야 한다. 둘 다 없으면 로드 오류.
 5. **놓일 수 있는 자리:** `const`·`field`·`derived`(함수가 반환)·Def 리스트 안. 키 컴포넌트의 키로는 쓸 수 없다(3.3.2: 키는 Def와 Ref만).
@@ -395,10 +395,58 @@ def distance(a: Point, b: Point) -> fixed: ...
 
 #### 3.3.5 그 밖
 
-- 생성될 `.pyi`의 정확한 모양과 배치(모드별 파일인지, 전체 하나인지).
+- 생성될 `.pyi`의 배치는 4.3(모드마다 생성). 정확한 모양(파일 구성, `Cond`/`Action` 타입 이름)은 구현 때.
 
-## 4. 선언 시점과 확장 (예정)
-- 스키마 선언을 Def보다 먼저 모든 모드에서 모으는 단계가 필요한가
-- 다른 모드가 남의 Def 타입에 필드나 컴포넌트를 추가할 수 있는가, 그 경로(패치와의 관계)
+## 4. 선언 시점과 확장
 
-## 5. spec 반영 (예정)
+### 4.1 스키마 단계와 Def 단계 ✅
+
+파일을 순서대로 한 번만 실행하면 확장 결과가 로드 순서에 달린다.
+
+```
+모드 A: deftype("Unit", ...)
+모드 C: Unit("Scout", ...)                       # A에만 의존, B보다 먼저 로드
+모드 B: extend("Unit", components=["Morale"])    # Scout는 Morale 없이 만들어진다
+```
+
+- ✅ **두 단계로 나눈다.** (1) 모든 모드의 **스키마 파일**만 모드 순서대로 실행해 타입을 완성한다. (2) 그다음 모든 Def 파일을 실행한다. 이때 타입은 고정되어 있다.
+- 스키마 파일은 따로 둔다(예: 모드 폴더의 `schema/`). `derived` 함수처럼 스키마가 가리키는 함수도 스키마 파일에 둔다. `.pyi`는 1단계만 돌려 만들 수 있다.
+- 이전 엔진도 같은 구조였다: 모드 DLL 로드 → `TypeRegistry.Initialize()`가 `Def`/`Prop`/`Comp`/`ICondition`/`IEffect` 클래스 수집 → YAML Def 역직렬화. 차이는 1단계를 C# 클래스 대신 파이썬 스키마 파일이 맡는 것. 이전 엔진의 또 다른 2단계(프록시로 만든 뒤 `ResolveReferences`로 연결)는 새 파이프라인의 "연결" 단계(S1)에 해당한다.
+
+### 4.2 남의 타입 확장 ✅
+
+비교: Paradox는 Def 타입의 필드를 엔진이 정하고 모드가 늘릴 수 없다. RimWorld는 패치로 남의 ThingDef `comps`에 컴포넌트를 끼우거나 `DefModExtension`(추가 데이터 주머니)을 붙인다. Def 클래스 자체에 필드를 더하지는 못한다. 이전 엔진은 패치로 `comps`에 `Prop`을 끼우는 것만 가능했다.
+
+| 하려는 것 | 허용 | 방법 |
+|---|---|---|
+| 남의 Def 타입 전체에 내 컴포넌트 | ✅ | `extend("Unit", components=["Morale"])` |
+| 남의 특정 Def에 내 컴포넌트 | ✅ | Def 패치(S1) |
+| 남의 Def 타입에 `const` 추가 | ✅ | `extend("Resource", trade_value=const(fixed, default=0))`. 데이터 전용 Def 타입을 확장하는 유일한 길 |
+| 남의 컴포넌트에 칼럼 추가 | ❌ | 내 컴포넌트를 따로 만들어 붙인다(남의 컴포넌트 모양이 바뀌면 그 모드 코드가 깨질 수 있다) |
+| 남의 필드의 타입·범위 변경 | ❌ | 값은 Def 패치로 |
+
+- 같은 이름을 두 모드가 추가하면 두 모드 이름을 담은 로드 오류.
+
+### 4.3 보이는 범위와 `.pyi` ✅
+
+- ✅ **모드는 자기가 의존하는 모드의 것만 본다.** 범위는 `dependencies`(필수 의존)의 전이적 닫힘이다. `loadAfter`는 순서만 정하고 대상이 없을 수도 있으므로 범위에 들지 않는다. 이전 엔진의 `TypeRegistry`는 전역이라 의존하지 않은 모드의 타입도 쓸 수 있었다. 의존하지 않는 모드의 타입·필드·컴포넌트를 쓰면 로드 오류("B에 대한 의존을 선언하세요").
+- ✅ **`.pyi`는 모드마다 생성.** 그 모드 + 의존 모드들의 스키마와 확장만 담는다. "내 구성에서는 되는데 다른 모드 구성에서는 깨지는" 일을 구조로 막는다.
+- ❓ **선택적 의존**(`mod.py`의 `optional`, "B가 있으면 B의 기능을 쓴다")에서 B의 이름을 쓰는 방법은 이 규칙만으로는 표현되지 않는다. 열린 질문.
+
+## 5. spec 반영 (2026-10-13)
+
+결론만 spec에 옮겼다. 새 절을 만들지 않고 기존 절에 나눠 넣었다.
+
+| 이 문서 | spec |
+|---|---|
+| 2.6 값 세 종류(B′), 컴포넌트 유무 | S4 |
+| 3.1–3.2 함수 호출 방식 표기(🟡) | S2 |
+| 3.3.1 `derived`의 식 | S4 스탯 부품 |
+| 3.3.2 가변 길이 데이터, 키 컴포넌트, `order_by` | S4, S3 관계, S2 리스트·맵 표 |
+| 3.3.3 함수 값을 가진 Def 필드 | S2 함수 표 아래, 값 타입 |
+| 3.3.4 외부 값 표기 | S2 외부 값, X3, S1 매니페스트 |
+| 4.1 스키마 단계 | S1 ② |
+| 4.2 남의 타입 확장 | S4 |
+| 4.3 보이는 범위, `.pyi` 모드별 | S1 매니페스트 |
+
+spec에도 열린 채로 옮긴 것: `field`가 `derived` 상한을 넘을 때 · 키 줄 부착 지연 · 함수 자리 타입 이름 · 확장 인덱스 연결 · `optional` 의존 대상의 이름 쓰기 · 키 컴포넌트 줄 칼럼의 맵.
