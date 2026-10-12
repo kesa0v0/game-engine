@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <!-- Unity가 소스 패키지로 컴파일할 수 있게 C# 9로 고정 (spec P1a) -->
+    <LangVersion>9.0</LangVersion>
+    <RootNamespace>Kesa.Engine</RootNamespace>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+  </PropertyGroup>
+
+  <!-- 결정론을 C# 쪽에도 구조로 강제 (spec P2) -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <AdditionalFiles Include="BannedSymbols.txt" />
+    <ProjectReference Include="..\Kesa.Engine.Analyzers\Kesa.Engine.Analyzers.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kesa.Engine.Kernel.Tests" />
+  </ItemGroup>
+
+</Project>

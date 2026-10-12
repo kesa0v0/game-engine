@@ -1,0 +1,21 @@
+T:System.Single;부동소수점 금지 (spec P2). int 또는 fixed를 쓴다
+T:System.Double;부동소수점 금지 (spec P2). int 또는 fixed를 쓴다
+T:System.Decimal;fixed를 쓴다 (spec P2)
+T:System.Random;비시드 난수 금지 (spec P2). 커널 RNG를 쓴다
+T:System.Guid;무작위 id 금지 (spec X1). 상태 안의 카운터를 쓴다
+T:System.HashCode;프로세스마다 시드가 다르다 (spec C6). 커널 해시를 쓴다
+M:System.String.GetHashCode;프로세스마다 다르다 (spec C6). 커널 해시를 쓴다
+M:System.String.GetHashCode(System.StringComparison);프로세스마다 다르다 (spec C6)
+P:System.DateTime.Now;시스템 시계 금지 (spec S7)
+P:System.DateTime.UtcNow;시스템 시계 금지 (spec S7)
+P:System.DateTimeOffset.Now;시스템 시계 금지 (spec S7)
+P:System.DateTimeOffset.UtcNow;시스템 시계 금지 (spec S7)
+P:System.Environment.TickCount;시스템 시계 금지 (spec S7)
+P:System.Environment.TickCount64;시스템 시계 금지 (spec S7)
+T:System.Diagnostics.Stopwatch;시스템 시계 금지 (spec S7)
+T:System.Threading.Tasks.Parallel;단일 스레드 (spec S2 평가 모델)
+M:System.Threading.Tasks.Task.Run(System.Action);단일 스레드 (spec S2 평가 모델)
+M:System.Collections.Generic.Dictionary`2.GetEnumerator;순회 순서 비보장 (spec P2). 정렬하거나 순서 있는 컬렉션을 쓴다
+P:System.Collections.Generic.Dictionary`2.Keys;순회 순서 비보장 (spec P2)
+P:System.Collections.Generic.Dictionary`2.Values;순회 순서 비보장 (spec P2)
+M:System.Collections.Generic.HashSet`1.GetEnumerator;순회 순서 비보장 (spec P2)
