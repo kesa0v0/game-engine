@@ -386,7 +386,7 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         [Test]
-        public void ADefWhoseExpansionFailedLeavesItsPatchesPending()
+        public void AParentErrorDisablesTheDefsModAndPatchesOfThatDefDoNotRun()
         {
             Mod("core", schema: Schema, defs: "Unit(\"Scout\", parent=\"Nope\")\n");
             Mod("compat", defs: P("set", "move", "9"), extra: CoreDep);
