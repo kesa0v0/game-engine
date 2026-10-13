@@ -46,6 +46,37 @@ namespace Kesa.Engine.Loading
         /// <summary>식을 평가하는 동안 난 진단.</summary>
         public DiagnosticBag Bag { get; }
 
+        /// <summary>식을 평가하고 결과가 Def 값으로 쓸 수 있는 데이터인지 본다 (내장 이름·타입 표기 등이 값에 남지 않게).</summary>
+        public Value EvaluateData(Expr expr)
+        {
+            var value = Evaluate(expr);
+            CheckData(value, expr.Span);
+            return value;
+        }
+
+        private void CheckData(Value value, SourceSpan span)
+        {
+            switch (value)
+            {
+                case ListValue list:
+                    foreach (var item in list.Items) CheckData(item, span);
+                    return;
+                case DictValue dict:
+                    foreach (var item in dict.Items) CheckData(item.Value, item.Span);
+                    return;
+                case ComponentValue cv:
+                    foreach (var f in cv.Fields) CheckData(f.Value, f.Span);
+                    return;
+                case DefHandleValue _:
+                case CallableValue _:
+                case TypeRef _:
+                case MemberSpec _:
+                case GenericType _:
+                    throw _context.Fail(Codes.DefBadValue, "a " + value.KindName + " is not a value", span,
+                        hint: "an inherit expression must produce numbers, strings, lists, maps or component values");
+            }
+        }
+
         public Value Evaluate(Expr expr)
         {
             switch (expr)

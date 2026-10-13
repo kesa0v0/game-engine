@@ -264,6 +264,25 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(diags.Select(d => d.Code), Does.Contain(code), string.Join("\n", diags));
         }
 
+        [TestCase("names=[inherit.names[0]]")]
+        [TestCase("names=[Unit] + inherit.names")]
+        [TestCase("names=inherit.names + [Health]")]
+        [TestCase("label=inherit.label + str")]
+        public void AnInheritResultMustBeData(string field)
+        {
+            Expand("Unit(\"Base\", names=[\"a\"], label=\"x\")\nUnit(\"Scout\", parent=\"Base\", " + field + ")\n", out var diags);
+            Assert.That(diags, Is.Not.Empty);
+            Assert.That(diags.Select(d => d.Code), Has.None.EqualTo(Codes.InhNoValue));
+        }
+
+        [Test]
+        public void ABuiltInNameInsideAnInheritResultIsRejected()
+        {
+            Expand("Unit(\"Base\", names=[\"a\"])\nUnit(\"Scout\", parent=\"Base\", names=inherit.names + [Unit])\n", out var diags);
+            var d = diags.Single();
+            Assert.That((d.Code, d.Line), Is.EqualTo((Codes.DefBadValue, 4)));
+        }
+
         [Test]
         public void ABadInheritExpressionDisablesTheModAndPointsAtTheExpression()
         {

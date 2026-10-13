@@ -196,7 +196,7 @@ namespace Kesa.Engine.Loading
         }
 
         private static Value Evaluated(Value value, DeferredEvaluator evaluator) =>
-            value is DeferredValue deferred ? evaluator.Evaluate(deferred.Expr) : value;
+            value is DeferredValue deferred ? evaluator.EvaluateData(deferred.Expr) : value;
 
         private void ApplyComponent(ResolvedDef resolved, ComponentType component, DefField field, Value value,
             DeferredEvaluator evaluator)
