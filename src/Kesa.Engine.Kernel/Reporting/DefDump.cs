@@ -1,0 +1,186 @@
+using System.Collections.Generic;
+using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Loading;
+using Kesa.Engine.Schema;
+using Kesa.Engine.Script;
+
+namespace Kesa.Engine.Reporting
+{
+    /// <summary>
+    /// 최종 Def 덤프 + 필드별 출처 (spec S9 “왜?” 도구 1, spec-gaps G76). <c>abstract</c>를 포함한 모든 Def를 등록 순서로,
+    /// 값마다 최종 값·출처(직접/상속/패치/기본값)·처음 적은 위치·그 칸에 영향을 준 패치를 적용 순서로 낸다.
+    /// 구체 Def는 기본값까지 채운 동결본을, <c>abstract</c>는 상속을 펼친 값을 쓴다. 실패한 패치는 없다(G45).
+    /// </summary>
+    public static class DefDump
+    {
+        public const int Version = 1;
+
+        public static string ToJson(ContentLoadResult result)
+        {
+            var defs = new JsonArray();
+            foreach (var def in result.Expanded.Defs) defs.Add(new Writer(result).Def(def));
+            return new JsonObject().Add("version", JsonNode.Number(Version)).Add("defs", defs).ToText();
+        }
+
+        private sealed class Writer
+        {
+            private readonly ContentLoadResult _result;
+
+            public Writer(ContentLoadResult result) => _result = result;
+
+            public JsonNode Def(ResolvedDef def)
+            {
+                // 부모 쪽 패치부터 보이도록 뿌리 조상에서 이 Def까지
+                var chain = new List<ResolvedDef>();
+                for (var d = def; d != null; d = d.Parent) chain.Insert(0, d);
+
+                OrderedMap<ResolvedValue> consts = def.Consts;
+                OrderedMap<ResolvedComponent> components = def.Components;
+                if (_result.Frozen.TryGet(def.Id, out var frozen))
+                {
+                    consts = frozen.Consts;
+                    components = frozen.Components;
+                }
+
+                var constNodes = new JsonObject();
+                foreach (var name in consts.Keys)
+                {
+                    consts.TryGet(name, out var value);
+                    constNodes.Add(name, ValueEntry(value, chain, name));
+                }
+
+                var componentNodes = new JsonObject();
+                foreach (var name in components.Keys)
+                {
+                    components.TryGet(name, out var rc);
+                    componentNodes.Add(name, Component(rc, chain));
+                }
+
+                return new JsonObject()
+                    .Add("id", JsonNode.String(def.Id))
+                    .Add("type", JsonNode.String(def.Type.Name))
+                    .Add("mod", JsonNode.String(def.Mod))
+                    .Add("abstract", JsonNode.Bool(def.IsAbstract))
+                    .Add("parent", JsonNode.String(def.Record.Parent?.Name))
+                    .Add("consts", constNodes)
+                    .Add("components", componentNodes);
+            }
+
+            private JsonNode Component(ResolvedComponent rc, List<ResolvedDef> chain)
+            {
+                string name = rc.Component.Name;
+                var values = new JsonObject();
+                foreach (var member in rc.Members.Keys)
+                {
+                    rc.Members.TryGet(member, out var value);
+                    values.Add(member, ValueEntry(value, chain, name + "." + member));
+                }
+                var rows = new JsonObject();
+                foreach (var key in rc.Rows.Keys)
+                {
+                    rc.Rows.TryGet(key, out var row);
+                    var rowValues = new JsonObject();
+                    string rowPath = name + "['" + key + "']";
+                    foreach (var member in row.Members.Keys)
+                    {
+                        row.Members.TryGet(member, out var value);
+                        rowValues.Add(member, ValueEntry(value, chain, rowPath + "." + member));
+                    }
+                    rows.Add(key, new JsonObject()
+                        .Add("attachedBy", row.AttachedBy == null ? JsonNode.Null : Patch(row.AttachedBy))
+                        .Add("values", rowValues));
+                }
+                return new JsonObject()
+                    .Add("attachedBy", rc.AttachedBy == null ? JsonNode.Null : Patch(rc.AttachedBy))
+                    .Add("values", values)
+                    .Add("rows", rows);
+            }
+
+            private JsonNode ValueEntry(ResolvedValue value, List<ResolvedDef> chain, string path)
+            {
+                var patches = new JsonArray();
+                if (PatchPath.TryParse(path, out var parsed, out _))
+                {
+                    foreach (var def in chain)
+                        foreach (var entry in _result.PatchLog.ForField(def.Id, parsed)) patches.Add(Patch(entry));
+                }
+                return new JsonObject()
+                    .Add("value", Value(value.Value))
+                    .Add("origin", JsonNode.String(OriginName(value.Origin)))
+                    .Add("source", Source(value))
+                    .Add("patches", patches);
+            }
+
+            private static string OriginName(ValueOrigin origin)
+            {
+                switch (origin)
+                {
+                    case ValueOrigin.Own: return "own";
+                    case ValueOrigin.Inherited: return "inherited";
+                    case ValueOrigin.Patched: return "patched";
+                    default: return "default";
+                }
+            }
+
+            private static JsonNode Source(ResolvedValue value)
+            {
+                bool declared = value.Origin == ValueOrigin.Default; // 스키마 선언 위치만 안다
+                return new JsonObject()
+                    .Add("def", declared ? JsonNode.Null : JsonNode.String(value.Source.Id))
+                    .Add("mod", declared ? JsonNode.Null : JsonNode.String(value.Patch != null && value.Origin == ValueOrigin.Patched ? value.Patch.Mod : value.Source.Mod))
+                    .Add("file", JsonNode.String(value.Span.File))
+                    .Add("line", JsonNode.Number(value.Span.Line))
+                    .Add("col", JsonNode.Number(value.Span.Col));
+            }
+
+            private static JsonNode Patch(PatchLogEntry entry)
+            {
+                var call = entry.Call;
+                return new JsonObject()
+                    .Add("mod", JsonNode.String(entry.Mod))
+                    .Add("def", JsonNode.String(entry.TargetId))
+                    .Add("op", JsonNode.String(entry.Op.ToString().ToLowerInvariant()))
+                    .Add("path", JsonNode.String(entry.Path.Text))
+                    .Add("value", call.Value == null ? JsonNode.Null : Value(call.Value))
+                    .Add("status", JsonNode.String(entry.Status.ToString().ToLowerInvariant()))
+                    .Add("file", JsonNode.String(call.Span.File))
+                    .Add("line", JsonNode.Number(call.Span.Line))
+                    .Add("col", JsonNode.Number(call.Span.Col));
+            }
+
+            /// <summary>값 표현 (G76): <c>fixed</c>는 정밀도를 지키려고 문자열, 맵의 키는 모두 문자열.</summary>
+            private static JsonNode Value(Value value)
+            {
+                switch (value)
+                {
+                    case IntValue i: return JsonNode.Number(i.Value);
+                    case FixedValue f: return JsonNode.String(f.Value.ToString());
+                    case BoolValue b: return JsonNode.Bool(b.Value);
+                    case NoneValue _: return JsonNode.Null;
+                    case StrValue s: return JsonNode.String(s.Value);
+                    case ListValue list:
+                        var array = new JsonArray();
+                        foreach (var item in list.Items) array.Add(Value(item));
+                        return array;
+                    case DictValue dict:
+                        var obj = new JsonObject();
+                        foreach (var item in dict.Items)
+                        {
+                            string key = item.Key is StrValue ks ? ks.Value
+                                : item.Key is IntValue ki ? ki.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                                : item.Key.KindName;
+                            obj.Add(key, Value(item.Value));
+                        }
+                        return obj;
+                    case FunctionValue fn:
+                        return new JsonObject().Add("function", JsonNode.String(fn.Name));
+                    case ComponentValue cv:
+                        var fields = new JsonObject();
+                        foreach (var f in cv.Fields) fields.Add(f.Name, Value(f.Value));
+                        return new JsonObject().Add("component", JsonNode.String(cv.Component.Name)).Add("values", fields);
+                }
+                return JsonNode.String(value.KindName);
+            }
+        }
+    }
+}
