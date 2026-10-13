@@ -24,8 +24,9 @@ namespace Kesa.Engine.Tests.Loading
                 "component(\"Morale\", value=field(int, default=5))\n" +
                 "deftype(\"Resource\")\n" +
                 "component(\"Stock\", key=\"Resource\", amount=field(fixed, default=0))\n" +
+                "component(\"Skill\", key=\"Resource\", keys=\"listed\", level=field(int, default=0))\n" +
                 "deftype(\"Unit\",\n" +
-                "    components=[\"Health\", \"Stock\"],\n" +
+                "    components=[\"Health\", \"Stock\", \"Skill\"],\n" +
                 "    move=const(int, default=1),\n" +
                 "    tags=const(list[str]),\n" +
                 "    cost=const(dict[DefId[\"Resource\"], int]),\n" +
@@ -41,10 +42,10 @@ namespace Kesa.Engine.Tests.Loading
             return Load(out _);
         }
 
-        private PatchTarget Resolved(string path)
+        private PatchTarget Resolved(string path, string value = "1")
         {
             Core();
-            var result = Patch(path);
+            var result = Patch(path, value);
             var resolved = result.Resolved.SingleOrDefault();
             Assert.That(resolved, Is.Not.Null, "path " + path + " was not resolved");
             return resolved!.Target;
@@ -77,7 +78,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AListConstIsPatchedAsAWhole()
         {
-            Assert.That(Resolved("tags").ValueType!.Display, Is.EqualTo("list[str]"));
+            Assert.That(Resolved("tags", "[]").ValueType!.Display, Is.EqualTo("list[str]"));
         }
 
         [TestCase("cost.Wood", "Wood")]
@@ -95,7 +96,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void TheWholeMapHasNoEntry()
         {
-            var t = Resolved("cost");
+            var t = Resolved("cost", "{}");
             Assert.That(t.Entry, Is.Null);
             Assert.That(t.ValueType!.Display, Is.EqualTo("dict[DefId[\"Resource\"], int]"));
         }
@@ -103,24 +104,17 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void IntegerKeysFitIntegerMaps()
         {
-            var t = Resolved("table[3]");
+            var t = Resolved("table[3]", "'x'");
             Assert.That(t.ValueType!.Display, Is.EqualTo("str"));
             Assert.That(t.EntryKey!.Value.Number, Is.EqualTo(3));
         }
 
         [Test]
-        public void ATypeSlotComponentAsAWhole()
-        {
-            var t = Resolved("Health");
-            Assert.That((t.Kind, t.IsTypeSlot, t.Component!.Name), Is.EqualTo((PatchTargetKind.Component, true, "Health")));
-            Assert.That(t.ValueType, Is.Null);
-        }
-
-        [Test]
         public void ANonSlotComponentCanBeAttached()
         {
-            var t = Resolved("Morale");
-            Assert.That((t.Kind, t.IsTypeSlot), Is.EqualTo((PatchTargetKind.Component, false)));
+            var t = Resolved("Morale", "Morale(value=1)");
+            Assert.That((t.Kind, t.IsTypeSlot, t.Component!.Name), Is.EqualTo((PatchTargetKind.Component, false, "Morale")));
+            Assert.That(t.ValueType, Is.Null);
         }
 
         [TestCase("Health.base_max")]
@@ -143,7 +137,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void ARowOfAKeyedComponentNamesTheKeyDef()
         {
-            var t = Resolved("Stock.Wood");
+            var t = Resolved("Skill.Wood", "Skill(level=1)");
             Assert.That((t.Kind, t.RowKey, t.IsTypeSlot), Is.EqualTo((PatchTargetKind.Row, "Wood", true)));
             Assert.That(t.RowDef!.Type.Name, Is.EqualTo("Resource"));
         }

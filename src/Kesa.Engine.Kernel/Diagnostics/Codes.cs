@@ -69,5 +69,7 @@ namespace Kesa.Engine.Diagnostics
         public const string PatNeedsGuard = "PAT005";
         public const string PatBadField = "PAT006";
         public const string PatBadPathStep = "PAT007";
+        public const string PatBadOp = "PAT008";
+        public const string PatBadValue = "PAT009";
     }
 }

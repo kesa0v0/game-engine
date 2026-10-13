@@ -25,7 +25,9 @@ namespace Kesa.Engine.Loading
                     var record = CheckTarget(entry.Key, call, defs, visibility, stage);
                     if (record == null) continue;
                     var target = new PathResolver(entry.Key, call, record, defs, schema, visibility, stage).Resolve();
-                    if (target != null) resolved.Add(new ResolvedPatch(call, record, target));
+                    if (target == null) continue;
+                    var patch = new ResolvedPatch(call, record, target);
+                    if (PatchOperationCheck.Check(entry.Key, patch, stage)) resolved.Add(patch);
                 }
             }
             return resolved;
