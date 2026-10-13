@@ -214,6 +214,7 @@ namespace Kesa.Engine.Loading
                 environments[u.Manifest.Id] = new ModEnvironment(unit.Scope, builtins);
             }
             run.Expanded = InheritanceExpander.Expand(run.Defs, run.Schema, run.Visibility, mod => environments[mod], stage, run.Log, conflicted);
+            Linker.Check(run.Expanded, run.Defs, run.Schema, run.Visibility, id => units.Find(u => u.Manifest.Id == id)?.Manifest, stage);
 
             var failedBefore = new HashSet<string>(StringComparer.Ordinal);
             foreach (var u in units)

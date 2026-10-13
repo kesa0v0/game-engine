@@ -132,11 +132,12 @@ namespace Kesa.Engine.Tests.Loading
         public void KeyedComponentsAreMergedByRowThenByValue()
         {
             var defs = ExpandClean(
+                "Resource(\"Gold\")\n" +
                 "Unit(\"Base\", Stock={\"Wood\": Stock(amount=1.5), \"Iron\": Stock(amount=2.0)})\n" +
-                "Unit(\"Scout\", parent=\"Base\", Stock={\"Wood\": Stock(amount=3.0), \"Wood2\": Stock()})\n");
+                "Unit(\"Scout\", parent=\"Base\", Stock={\"Wood\": Stock(amount=3.0), \"Gold\": Stock()})\n");
             Assert.That(defs.TryGet("Scout", out var scout), Is.True);
             scout.Components.TryGet("Stock", out var stock);
-            Assert.That(stock.Rows.Keys, Is.EqualTo(new[] { "Wood", "Iron", "Wood2" }));
+            Assert.That(stock.Rows.Keys, Is.EqualTo(new[] { "Wood", "Iron", "Gold" }));
             stock.Rows.TryGet("Wood", out var wood);
             wood.Members.TryGet("amount", out var amount);
             Assert.That(((FixedValue)amount.Value).Value.Raw, Is.EqualTo(3_000_000L));
