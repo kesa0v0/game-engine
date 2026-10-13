@@ -11,13 +11,14 @@ namespace Kesa.Engine.Loading
     public sealed class ContentLoadResult
     {
         internal ContentLoadResult(IReadOnlyList<ModManifest> mods, IReadOnlyList<string> disabled, SchemaSet schema,
-            DefRegistry defs, IReadOnlyList<PatchCall> patches)
+            DefRegistry defs, IReadOnlyList<PatchCall> patches, IReadOnlyList<ResolvedPatch> resolved)
         {
             Mods = mods;
             Disabled = disabled;
             Schema = schema;
             Defs = defs;
             Patches = patches;
+            Resolved = resolved;
         }
 
         /// <summary>②까지 살아남은 모드 (로드 순서).</summary>
@@ -33,6 +34,9 @@ namespace Kesa.Engine.Loading
         /// ②b가 기록한 패치 호출 (spec-gaps G35). 살아남은 모드의 것만, 모드 로드 순서 → 호출 순서로. 아직 적용하지 않았다.
         /// </summary>
         public IReadOnlyList<PatchCall> Patches { get; }
+
+        /// <summary>③의 대상·경로 검사를 통과한 패치 호출과 그 대상 (<see cref="Patches"/>와 같은 순서). 아직 적용하지 않았다.</summary>
+        public IReadOnlyList<ResolvedPatch> Resolved { get; }
     }
 
     /// <summary>
@@ -86,7 +90,7 @@ namespace Kesa.Engine.Loading
                     mods.Add(u.Manifest);
                     patches.AddRange(u.Patches);
                 }
-                return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches);
+                return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved);
             }
         }
 
@@ -103,6 +107,9 @@ namespace Kesa.Engine.Loading
             public SchemaSet Schema { get; }
             public DefRegistry Defs { get; }
             public ModVisibility Visibility { get; }
+
+            /// <summary>③이 검사를 통과시킨 패치 (③을 돌린 뒤에 채워진다).</summary>
+            public IReadOnlyList<ResolvedPatch> Resolved { get; set; } = new List<ResolvedPatch>();
         }
 
         /// <summary>
@@ -175,7 +182,7 @@ namespace Kesa.Engine.Loading
             var mods = new List<KeyValuePair<ModManifest, IReadOnlyList<PatchCall>>>();
             foreach (var u in units)
                 if (!u.Failed) mods.Add(new KeyValuePair<ModManifest, IReadOnlyList<PatchCall>>(u.Manifest, u.Patches));
-            PatchResolver.Resolve(mods, run.Defs, run.Visibility, stage);
+            run.Resolved = PatchResolver.Resolve(mods, run.Defs, run.Schema, run.Visibility, stage);
 
             var failedBefore = new HashSet<string>(StringComparer.Ordinal);
             foreach (var u in units)

@@ -14,7 +14,7 @@ namespace Kesa.Engine.Tests.Loading
         private void Core() =>
             Mod("core",
                 schema: "component(\"Health\", hp=field(int, default=10))\n" +
-                        "deftype(\"Unit\", components=[\"Health\"])\n",
+                        "deftype(\"Unit\", components=[\"Health\"], x=const(int, default=0))\n",
                 defs: "Unit(\"Scout\")\nUnit(\"Base\", abstract=True)\n");
 
         private static string Patch(string target) => "patch.set(\"" + target + "\", \"x\", 1)\n";

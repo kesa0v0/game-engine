@@ -20,7 +20,11 @@ namespace Kesa.Engine.Tests.Loading
         // 패치 대상 Def "A"를 가진 모드. 패치하는 모드는 이 모드에 의존한다 (③이 대상을 검사한다)
         private const string CoreDep = ", dependencies=[\"core\"]";
 
-        private void Core() => Mod("core", schema: "deftype(\"Unit\")\n", defs: "Unit(\"A\")\n");
+        // 패치 경로 b, c, d가 있는 타입 (③이 경로를 스키마에서 검사한다)
+        private const string UnitSchema =
+            "deftype(\"Unit\", b=const(int, default=0), c=const(int, default=0), d=const(int, default=0))\n";
+
+        private void Core() => Mod("core", schema: UnitSchema, defs: "Unit(\"A\")\n");
 
         private static void AssertNoErrors(System.Collections.Generic.IReadOnlyList<Diagnostic> diags) =>
             Assert.That(diags.Where(d => d.Severity == Severity.Error), Is.Empty, string.Join("\n", diags));
@@ -106,7 +110,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void RequiredDependencyIsAlwaysLoadedInsideAGuard()
         {
-            Mod("base", schema: "deftype(\"Unit\")\n", defs: "Unit(\"A\")\n");
+            Mod("base", schema: UnitSchema, defs: "Unit(\"A\")\n");
             Mod("compat", defs: "if mod_loaded(\"base\"):\n" + PatchLine("b"), extra: ", dependencies=[\"base\"]");
             var result = LoadClean();
             Assert.That(result.Patches.Single().Guards, Is.EqualTo(new[] { "base" }));

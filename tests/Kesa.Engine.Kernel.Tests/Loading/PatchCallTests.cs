@@ -15,8 +15,16 @@ namespace Kesa.Engine.Tests.Loading
         // 패치 대상 Def를 가진 모드. 패치하는 모드는 이 모드에 의존한다 (③이 대상을 검사한다)
         private const string CoreDep = ", dependencies=[\"core\"]";
 
+        // 이 파일의 패치 경로(move, tags, Health.base_max, Morale, x, y, z, b, c)를 가진 타입
+        private const string UnitSchema =
+            "component(\"Health\", base_max=const(int, default=10))\n" +
+            "component(\"Morale\", value=field(int, default=5))\n" +
+            "deftype(\"Unit\", components=[\"Health\"], move=const(int, default=1), tags=const(list[str]),\n" +
+            "    x=const(int, default=0), y=const(int, default=0), z=const(int, default=0),\n" +
+            "    b=const(int, default=0), c=const(int, default=0))\n";
+
         private void Core(string id = "Scout") =>
-            Mod("core", schema: "deftype(\"Unit\")\n", defs: "Unit(\"" + id + "\")\n");
+            Mod("core", schema: UnitSchema, defs: "Unit(\"" + id + "\")\n");
 
         [Test]
         public void RecordsEveryOperationInCallOrder()

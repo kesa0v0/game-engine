@@ -67,5 +67,7 @@ namespace Kesa.Engine.Diagnostics
         public const string PatTargetNotFound = "PAT003";
         public const string PatTargetNotVisible = "PAT004";
         public const string PatNeedsGuard = "PAT005";
+        public const string PatBadField = "PAT006";
+        public const string PatBadPathStep = "PAT007";
     }
 }
