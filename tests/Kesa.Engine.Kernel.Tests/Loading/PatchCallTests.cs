@@ -12,15 +12,23 @@ namespace Kesa.Engine.Tests.Loading
     /// </summary>
     public class PatchCallTests : LoaderTestBase
     {
+        // 패치 대상 Def를 가진 모드. 패치하는 모드는 이 모드에 의존한다 (③이 대상을 검사한다)
+        private const string CoreDep = ", dependencies=[\"core\"]";
+
+        private void Core(string id = "Scout") =>
+            Mod("core", schema: "deftype(\"Unit\")\n", defs: "Unit(\"" + id + "\")\n");
+
         [Test]
         public void RecordsEveryOperationInCallOrder()
         {
+            Core();
             Mod("compat",
                 defs: "patch.set(\"Scout\", \"move\", 4)\n" +
                       "patch.add(\"Scout\", \"Health.base_max\", 2)\n" +
                       "patch.append(\"Scout\", \"tags\", [\"fast\"])\n" +
                       "patch.remove(\"Scout\", \"tags\", \"slow\")\n" +
-                      "patch.remove(\"Scout\", \"Morale\")\n");
+                      "patch.remove(\"Scout\", \"Morale\")\n",
+                extra: CoreDep);
             var result = LoadClean();
             var calls = result.Patches;
             Assert.That(calls.Select(c => c.Op),
@@ -41,8 +49,10 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void CallsAreInModLoadOrderThenCallOrder()
         {
-            Mod("omega", defs: "patch.set(\"A\", \"x\", 1)\npatch.set(\"A\", \"y\", 1)\n", extra: ", loadAfter=[\"alpha\"]");
-            Mod("alpha", defs: "patch.set(\"A\", \"z\", 1)\n");
+            Core("A");
+            Mod("omega", defs: "patch.set(\"A\", \"x\", 1)\npatch.set(\"A\", \"y\", 1)\n",
+                extra: ", loadAfter=[\"alpha\"]" + CoreDep);
+            Mod("alpha", defs: "patch.set(\"A\", \"z\", 1)\n", extra: CoreDep);
             var result = LoadClean();
             Assert.That(result.Patches.Select(c => c.Mod + ":" + c.Path.Text), Is.EqualTo(new[] { "alpha:z", "omega:x", "omega:y" }));
         }
@@ -50,8 +60,9 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void ADisabledModLeavesNoPatchCalls()
         {
-            Mod("bad", defs: "patch.set(\"A\", \"b\", 1)\nNope()\n");
-            Mod("good", defs: "patch.set(\"A\", \"c\", 1)\n");
+            Core("A");
+            Mod("bad", defs: "patch.set(\"A\", \"b\", 1)\nNope()\n", extra: CoreDep);
+            Mod("good", defs: "patch.set(\"A\", \"c\", 1)\n", extra: CoreDep);
             var result = Load(out var diags);
             Assert.That(diags.Single().Code, Is.EqualTo(Codes.EvlUnknownName));
             Assert.That(result.Patches.Select(c => c.Path.Text), Is.EqualTo(new[] { "c" }));

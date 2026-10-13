@@ -51,22 +51,77 @@ namespace Kesa.Engine.Loading
             var units = new List<ModUnit>();
             foreach (var m in order.Mods) units.Add(new ModUnit(m));
             var disabled = new SortedSet<string>(order.Disabled, StringComparer.Ordinal);
-            var visibility = new ModVisibility(order.Mods);
 
             // 파일 목록과 파싱. 모든 파일(②b 파일 포함)을 ②a 전에 파싱해 구문 오류가 있는 모드를 먼저 뺀다:
             // 그래야 ②a의 충돌 판정이 상대의 구문 오류가 어느 파일에 있는지에 따라 달라지지 않는다 (spec-gaps G28).
+            // 파싱 결과는 회차가 바뀌어도 그대로 쓴다.
             foreach (var u in units)
             {
                 ListFiles(modsRoot, u);
                 if (!u.Failed) ParseFiles(modsRoot, u);
+                u.KeepBaseState();
             }
+
+            // 파이프라인을 활성 모드 집합으로 돌린다. ③ 이후 단계에서 모드가 비활성화되면 그 모드와 의존 모드를 빼고
+            // ②a부터 다시 돌린다 (spec-gaps G49): 비활성화된 모드의 `extend`가 스키마에 남거나 이미 참으로 평가된
+            // `mod_loaded` 가드가 낡은 채로 남지 않게 한다. 집합이 줄어드는 방향이라 반복은 끝난다.
+            while (true)
+            {
+                foreach (var u in units) u.ResetRun();
+                var runDiagnostics = new DiagnosticBag();
+                var run = RunDefinitionStages(units, order, runDiagnostics);
+                if (ExcludeFailedAtPatchStage(units, run, runDiagnostics)) continue;
+
+                diagnostics.AddRange(runDiagnostics.ToSortedList());
+                var mods = new List<ModManifest>();
+                var patches = new List<PatchCall>();
+                foreach (var u in units)
+                {
+                    diagnostics.AddRange(u.Bag.ToSortedList());
+                    if (u.Failed)
+                    {
+                        disabled.Add(u.Manifest.Id);
+                        continue;
+                    }
+                    mods.Add(u.Manifest);
+                    patches.AddRange(u.Patches);
+                }
+                return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches);
+            }
+        }
+
+        /// <summary>②a·②b가 한 회차에 만든 것.</summary>
+        private sealed class DefinitionRun
+        {
+            public DefinitionRun(SchemaSet schema, DefRegistry defs, ModVisibility visibility)
+            {
+                Schema = schema;
+                Defs = defs;
+                Visibility = visibility;
+            }
+
+            public SchemaSet Schema { get; }
+            public DefRegistry Defs { get; }
+            public ModVisibility Visibility { get; }
+        }
+
+        /// <summary>
+        /// ②a(스키마 파일 실행과 타입 완성)와 ②b(Def 파일 실행과 Def 등록). 이전 회차에서 비활성화된 모드는 처음부터 실패로 본다.
+        /// 이 안의 실패는 G28의 고정점으로 푼다. <paramref name="runDiagnostics"/>는 이번 회차에만 속한 진단(MOD009)이다.
+        /// </summary>
+        private static DefinitionRun RunDefinitionStages(List<ModUnit> units, LoadOrder order, DiagnosticBag runDiagnostics)
+        {
+            var active = new List<ModManifest>();
+            foreach (var u in units)
+                if (!u.Excluded) active.Add(u.Manifest);
+            var visibility = new ModVisibility(active);
 
             // ②a 실행: 의존 대상이 먼저 실행되므로, 실패한 의존이 있으면 실행하지 않고 비활성화한다
             var declaredTypes = new HashSet<string>(StringComparer.Ordinal);
             var declaredComponents = new HashSet<string>(StringComparer.Ordinal);
             foreach (var u in units)
             {
-                if (u.Failed || FailDependents(u, units, diagnostics)) continue;
+                if (u.Failed || FailDependents(u, units, runDiagnostics)) continue;
                 var unit = u;
                 var builtins = new SchemaBuiltins(u.Schema,
                     name => declaredTypes.Contains(name) || unit.Schema.Types.Exists(t => t.Name == name),
@@ -78,13 +133,13 @@ namespace Kesa.Engine.Loading
             }
 
             // ②a 끝: 타입 완성. 실패한 모드를 빼고 다시 만든다 (고정점)
-            var schema = BuildSchema(units, visibility, diagnostics);
+            var schema = BuildSchema(units, visibility, runDiagnostics);
 
             // ②b 실행
             int survivorsBefore = CountSurvivors(units);
             foreach (var u in units)
             {
-                if (u.Failed || FailDependents(u, units, diagnostics)) continue;
+                if (u.Failed || FailDependents(u, units, runDiagnostics)) continue;
                 // mod_loaded: 설치되어 있고 지금까지 실패하지 않은 모드 (spec-gaps G8, G46)
                 var builtins = new DefBuiltins(schema, visibility, u.Manifest,
                     id => units.Exists(o => o.Manifest.Id == id && !o.Failed), u.Defs, u.Patches);
@@ -101,31 +156,47 @@ namespace Kesa.Engine.Loading
             }
 
             // ②b 끝: Def 등록 (고정점). 모드가 더 빠졌으면 스키마도 그 모드의 확장 없이 다시 만든다.
-            var defs = BuildDefs(units, visibility, order, diagnostics);
+            var defs = BuildDefs(units, visibility, order, runDiagnostics);
             if (CountSurvivors(units) != survivorsBefore)
             {
-                schema = BuildSchema(units, visibility, diagnostics);
+                schema = BuildSchema(units, visibility, runDiagnostics);
                 Rebind(defs, schema);
             }
+            return new DefinitionRun(schema, defs, visibility);
+        }
 
-            var mods = new List<ModManifest>();
-            var patches = new List<PatchCall>();
+        /// <summary>
+        /// ③: 기록한 패치 호출을 검사한다. 오류가 난 모드는 G28과 같은 규칙(자기 오류가 먼저, 충돌 오류는 그런 모드가 없을 때만)으로
+        /// 비활성화하고, 그 모드와 의존 모드를 다음 회차에서 뺀다 (G49). 뺀 모드가 있으면 true (다시 돌려야 함).
+        /// </summary>
+        private static bool ExcludeFailedAtPatchStage(List<ModUnit> units, DefinitionRun run, DiagnosticBag runDiagnostics)
+        {
+            var stage = new StageDiagnostics(SurvivorIds(units));
+            var mods = new List<KeyValuePair<ModManifest, IReadOnlyList<PatchCall>>>();
+            foreach (var u in units)
+                if (!u.Failed) mods.Add(new KeyValuePair<ModManifest, IReadOnlyList<PatchCall>>(u.Manifest, u.Patches));
+            PatchResolver.Resolve(mods, run.Defs, run.Visibility, stage);
+
+            var failedBefore = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var u in units)
+                if (u.Failed) failedBefore.Add(u.Manifest.Id);
+            if (!Settle(units, stage, runDiagnostics)) return false;
+
+            var dependencyFailures = runDiagnostics.ToSortedList();
             foreach (var u in units)
             {
-                diagnostics.AddRange(u.Bag.ToSortedList());
-                if (u.Failed)
-                {
-                    disabled.Add(u.Manifest.Id);
-                    continue;
-                }
-                mods.Add(u.Manifest);
-                patches.AddRange(u.Patches);
+                if (!u.Failed || failedBefore.Contains(u.Manifest.Id)) continue;
+                u.Exclude(dependencyFailures);
             }
-            return new ContentLoadResult(mods, new List<string>(disabled), schema, defs, patches);
+            return true;
         }
 
         private sealed class ModUnit
         {
+            private IReadOnlyList<Diagnostic> _baseDiagnostics = new List<Diagnostic>();
+            private bool _baseFailed;
+            private IReadOnlyList<Diagnostic>? _frozen;
+
             public ModUnit(ModManifest manifest)
             {
                 Manifest = manifest;
@@ -135,24 +206,62 @@ namespace Kesa.Engine.Loading
             public ModManifest Manifest { get; }
             public List<string> SchemaFiles { get; } = new List<string>();
             public List<string> DefFiles { get; } = new List<string>();
-            public ModScope Scope { get; } = new ModScope();
-            public ModSchema Schema { get; }
-            public List<DefRecord> Defs { get; } = new List<DefRecord>();
 
-            /// <summary>②b에서 기록한 <c>patch.*</c> 호출 (G35).</summary>
-            public List<PatchCall> Patches { get; } = new List<PatchCall>();
-
-            /// <summary>거짓인 <c>mod_loaded</c> 가드 안에서 건너뛴 패치 호출 (G38·G46), 모드 id 순.</summary>
-            public SortedDictionary<string, SkippedGuard> Skipped { get; } =
-                new SortedDictionary<string, SkippedGuard>(StringComparer.Ordinal);
-
-            /// <summary>파싱한 파일 (모드 폴더 기준 상대 경로 → 모듈).</summary>
+            /// <summary>파싱한 파일 (모드 폴더 기준 상대 경로 → 모듈). 회차가 바뀌어도 그대로다.</summary>
             public Dictionary<string, Module> Modules { get; } = new Dictionary<string, Module>(StringComparer.Ordinal);
 
+            // ---- 회차마다 새로 만드는 상태 (ResetRun) ----
+
+            public ModScope Scope { get; private set; } = new ModScope();
+            public ModSchema Schema { get; private set; }
+            public List<DefRecord> Defs { get; private set; } = new List<DefRecord>();
+
+            /// <summary>②b에서 기록한 <c>patch.*</c> 호출 (G35).</summary>
+            public List<PatchCall> Patches { get; private set; } = new List<PatchCall>();
+
+            /// <summary>거짓인 <c>mod_loaded</c> 가드 안에서 건너뛴 패치 호출 (G38·G46), 모드 id 순.</summary>
+            public SortedDictionary<string, SkippedGuard> Skipped { get; private set; } =
+                new SortedDictionary<string, SkippedGuard>(StringComparer.Ordinal);
+
             /// <summary>이 모드의 진단. 실행 중 진단은 모드별로 모았다가 끝에 한 번에 넘긴다.</summary>
-            public DiagnosticBag Bag { get; } = new DiagnosticBag();
+            public DiagnosticBag Bag { get; private set; } = new DiagnosticBag();
 
             public bool Failed { get; set; }
+
+            /// <summary>③ 이후 단계에서 비활성화되어 이후 회차에서 빠진 모드 (G49).</summary>
+            public bool Excluded { get; private set; }
+
+            /// <summary>파일 목록과 파싱을 마친 직후의 진단과 실패 여부를 기억한다.</summary>
+            public void KeepBaseState()
+            {
+                _baseDiagnostics = Bag.ToSortedList();
+                _baseFailed = Failed;
+            }
+
+            /// <summary>새 회차를 시작한다. 빠진 모드는 처음부터 실패이고 진단은 빠질 때 굳힌 것을 쓴다.</summary>
+            public void ResetRun()
+            {
+                Scope = new ModScope();
+                Schema = new ModSchema(Manifest.Id);
+                Defs = new List<DefRecord>();
+                Patches = new List<PatchCall>();
+                Skipped = new SortedDictionary<string, SkippedGuard>(StringComparer.Ordinal);
+                Bag = new DiagnosticBag();
+                Bag.AddRange(Excluded ? _frozen! : _baseDiagnostics);
+                Failed = Excluded || _baseFailed;
+            }
+
+            /// <summary>
+            /// 이 회차의 진단(과 의존 모드 때문에 비활성화되었다는 MOD009)을 굳히고 다음 회차에서 뺀다.
+            /// </summary>
+            public void Exclude(IReadOnlyList<Diagnostic> runDiagnostics)
+            {
+                var frozen = new List<Diagnostic>(Bag.ToSortedList());
+                foreach (var d in runDiagnostics)
+                    if (d.Mod == Manifest.Id && d.Code == Codes.ModDependencyFailed) frozen.Add(d);
+                _frozen = frozen;
+                Excluded = true;
+            }
         }
 
         /// <summary>

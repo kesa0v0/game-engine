@@ -64,5 +64,8 @@ namespace Kesa.Engine.Diagnostics
         // 패치 (spec S1 ③)
         public const string PatBadPath = "PAT001";
         public const string PatSkipped = "PAT002";
+        public const string PatTargetNotFound = "PAT003";
+        public const string PatTargetNotVisible = "PAT004";
+        public const string PatNeedsGuard = "PAT005";
     }
 }

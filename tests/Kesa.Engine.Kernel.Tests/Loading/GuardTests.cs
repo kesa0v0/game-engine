@@ -17,14 +17,20 @@ namespace Kesa.Engine.Tests.Loading
 
         private const string Both = ", optional=[\"banking\", \"scouts\"]";
 
+        // 패치 대상 Def "A"를 가진 모드. 패치하는 모드는 이 모드에 의존한다 (③이 대상을 검사한다)
+        private const string CoreDep = ", dependencies=[\"core\"]";
+
+        private void Core() => Mod("core", schema: "deftype(\"Unit\")\n", defs: "Unit(\"A\")\n");
+
         private static void AssertNoErrors(System.Collections.Generic.IReadOnlyList<Diagnostic> diags) =>
             Assert.That(diags.Where(d => d.Severity == Severity.Error), Is.Empty, string.Join("\n", diags));
 
         [Test]
         public void GuardRunsTheFirstTrueBranch()
         {
+            Core();
             Mod("scouts", defs: "\n");
-            Mod("compat", defs: ThreeWay, extra: Both);
+            Mod("compat", defs: ThreeWay, extra: Both + CoreDep);
             var result = Load(out var diags);
             AssertNoErrors(diags);
             var patch = result.Patches.Single();
@@ -40,7 +46,8 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void ElseRunsWhenNoGuardMatchesAndHasNoGuard()
         {
-            Mod("compat", defs: ThreeWay, extra: Both);
+            Core();
+            Mod("compat", defs: ThreeWay, extra: Both + CoreDep);
             var result = Load(out var diags);
             AssertNoErrors(diags);
             var patch = result.Patches.Single();
@@ -99,7 +106,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void RequiredDependencyIsAlwaysLoadedInsideAGuard()
         {
-            Mod("base", defs: "\n");
+            Mod("base", schema: "deftype(\"Unit\")\n", defs: "Unit(\"A\")\n");
             Mod("compat", defs: "if mod_loaded(\"base\"):\n" + PatchLine("b"), extra: ", dependencies=[\"base\"]");
             var result = LoadClean();
             Assert.That(result.Patches.Single().Guards, Is.EqualTo(new[] { "base" }));
@@ -108,11 +115,12 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void NestedGuardsAccumulateOutsideIn()
         {
+            Core();
             Mod("banking", defs: "\n");
             Mod("scouts", defs: "\n");
             Mod("compat",
                 defs: "if mod_loaded(\"banking\"):\n    if mod_loaded(\"scouts\"):\n    " + PatchLine("b") + PatchLine("c"),
-                extra: Both);
+                extra: Both + CoreDep);
             var result = LoadClean();
             Assert.That(result.Patches.Select(p => (p.Path.Text, string.Join(",", p.Guards))),
                 Is.EqualTo(new[] { ("b", "banking,scouts"), ("c", "banking") }));
