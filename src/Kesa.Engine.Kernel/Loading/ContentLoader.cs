@@ -11,7 +11,7 @@ namespace Kesa.Engine.Loading
     public sealed class ContentLoadResult
     {
         internal ContentLoadResult(IReadOnlyList<ModManifest> mods, IReadOnlyList<string> disabled, SchemaSet schema,
-            DefRegistry defs, IReadOnlyList<PatchCall> patches, IReadOnlyList<ResolvedPatch> resolved)
+            DefRegistry defs, IReadOnlyList<PatchCall> patches, IReadOnlyList<ResolvedPatch> resolved, PatchLog log)
         {
             Mods = mods;
             Disabled = disabled;
@@ -19,6 +19,7 @@ namespace Kesa.Engine.Loading
             Defs = defs;
             Patches = patches;
             Resolved = resolved;
+            PatchLog = log;
         }
 
         /// <summary>②까지 살아남은 모드 (로드 순서).</summary>
@@ -37,6 +38,9 @@ namespace Kesa.Engine.Loading
 
         /// <summary>③의 대상·경로 검사를 통과한 패치 호출과 그 대상 (<see cref="Patches"/>와 같은 순서). 아직 적용하지 않았다.</summary>
         public IReadOnlyList<ResolvedPatch> Resolved { get; }
+
+        /// <summary>패치 변경 이력 (spec-gaps G45). 모든 검사를 통과한 호출이 적용 순서대로 들어 있다.</summary>
+        public PatchLog PatchLog { get; }
     }
 
     /// <summary>
@@ -74,7 +78,7 @@ namespace Kesa.Engine.Loading
                 foreach (var u in units) u.ResetRun();
                 var runDiagnostics = new DiagnosticBag();
                 var run = RunDefinitionStages(units, order, runDiagnostics);
-                if (ExcludeFailedAtPatchStage(units, run, runDiagnostics)) continue;
+                if (ExcludeFailedAtPatchStage(units, run, order, runDiagnostics)) continue;
 
                 diagnostics.AddRange(runDiagnostics.ToSortedList());
                 var mods = new List<ModManifest>();
@@ -90,7 +94,8 @@ namespace Kesa.Engine.Loading
                     mods.Add(u.Manifest);
                     patches.AddRange(u.Patches);
                 }
-                return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved);
+                return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
+                    run.Log);
             }
         }
 
@@ -110,6 +115,9 @@ namespace Kesa.Engine.Loading
 
             /// <summary>③이 검사를 통과시킨 패치 (③을 돌린 뒤에 채워진다).</summary>
             public IReadOnlyList<ResolvedPatch> Resolved { get; set; } = new List<ResolvedPatch>();
+
+            /// <summary>③이 만든 변경 이력 (G45).</summary>
+            public PatchLog Log { get; set; } = new PatchLog(new List<ResolvedPatch>());
         }
 
         /// <summary>
@@ -176,13 +184,16 @@ namespace Kesa.Engine.Loading
         /// ③: 기록한 패치 호출을 검사한다. 오류가 난 모드는 G28과 같은 규칙(자기 오류가 먼저, 충돌 오류는 그런 모드가 없을 때만)으로
         /// 비활성화하고, 그 모드와 의존 모드를 다음 회차에서 뺀다 (G49). 뺀 모드가 있으면 true (다시 돌려야 함).
         /// </summary>
-        private static bool ExcludeFailedAtPatchStage(List<ModUnit> units, DefinitionRun run, DiagnosticBag runDiagnostics)
+        private static bool ExcludeFailedAtPatchStage(List<ModUnit> units, DefinitionRun run, LoadOrder order,
+            DiagnosticBag runDiagnostics)
         {
             var stage = new StageDiagnostics(SurvivorIds(units));
             var mods = new List<KeyValuePair<ModManifest, IReadOnlyList<PatchCall>>>();
             foreach (var u in units)
                 if (!u.Failed) mods.Add(new KeyValuePair<ModManifest, IReadOnlyList<PatchCall>>(u.Manifest, u.Patches));
             run.Resolved = PatchResolver.Resolve(mods, run.Defs, run.Schema, run.Visibility, stage);
+            PatchConflicts.Check(run.Resolved, order, stage);
+            run.Log = new PatchLog(run.Resolved);
 
             var failedBefore = new HashSet<string>(StringComparer.Ordinal);
             foreach (var u in units)

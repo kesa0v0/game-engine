@@ -28,6 +28,10 @@ namespace Kesa.Engine.Loading
             IReadOnlyList<SourceSpan>? related = null) =>
             _own[mod].Error(code, message, span, mod, hint, related);
 
+        public void Warning(string mod, string code, string message, SourceSpan span, string? hint = null,
+            IReadOnlyList<SourceSpan>? related = null) =>
+            _own[mod].Warning(code, message, span, mod, hint, related);
+
         /// <summary>다른 모드와의 충돌 때문에만 생긴 오류.</summary>
         public void ConflictError(string mod, string code, string message, SourceSpan span, string? hint = null,
             IReadOnlyList<SourceSpan>? related = null) =>
