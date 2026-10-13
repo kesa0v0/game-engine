@@ -39,6 +39,9 @@ namespace Kesa.Engine.Loading
         {
             var linker = new Linker(defs, schema, visibility, manifest, stage);
             foreach (var def in resolved.Defs) linker.CheckDef(def);
+            // 스키마가 선언한 기본값도 Def 값과 같은 규칙으로 본다. 책임은 선언한 모드다 (G73)
+            foreach (var decl in MemberDefaults.DeclaredDefaults(schema))
+                linker.CheckValue(MemberDefaults.DeclaredOrigin(decl), decl.Spec.Default!, decl.Spec.Type, decl.Span);
         }
 
         private void CheckDef(ResolvedDef def)

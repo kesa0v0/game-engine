@@ -219,7 +219,7 @@ namespace Kesa.Engine.Loading
             }
             run.Expanded = InheritanceExpander.Expand(run.Defs, run.Schema, run.Visibility, mod => environments[mod], stage, run.Log, conflicted);
             Linker.Check(run.Expanded, run.Defs, run.Schema, run.Visibility, id => units.Find(u => u.Manifest.Id == id)?.Manifest, stage);
-            Validator.Check(run.Expanded, run.Visibility, stage);
+            Validator.Check(run.Expanded, run.Schema, run.Visibility, stage);
 
             var failedBefore = new HashSet<string>(StringComparer.Ordinal);
             foreach (var u in units)

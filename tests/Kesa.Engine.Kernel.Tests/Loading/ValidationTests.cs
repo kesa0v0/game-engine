@@ -218,6 +218,38 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(result.Disabled, Does.Contain("core"));
         }
 
+        // ---- 스키마가 선언한 기본값 (G73) ----
+
+        [TestCase("n=const(int, default=1.5)", Codes.ValType)]
+        [TestCase("n=const(int, default=500, max=100)", Codes.ValRange)]
+        [TestCase("n=const(int, default=-1, min=0)", Codes.ValRange)]
+        [TestCase("n=const(list[int], default=[1, 99], max=9)", Codes.ValRange)]
+        [TestCase("home=const(DefId[\"Building\"], default=\"Nope\")", Codes.LnkNotFound)]
+        [TestCase("home=const(DefId[\"Building\"], default=\"Wall\")", Codes.LnkAbstract)]
+        [TestCase("home=const(DefId[\"Building\"], default=\"Wood\")", Codes.LnkWrongType)]
+        [TestCase("homes=const(list[DefId[\"Building\"]], default=[\"Hut\", \"Nope\"])", Codes.LnkNotFound)]
+        public void ASchemaDefaultIsCheckedLikeAValueAndBlamesTheDeclaringMod(string member, string code)
+        {
+            Mod("core", schema: "deftype(\"Resource\")\ndeftype(\"Building\")\n", defs: "Resource(\"Wood\")\nBuilding(\"Hut\")\nBuilding(\"Wall\", abstract=True)\n");
+            Mod("rules", schema: "extend(\"Resource\", " + member + ")\n", extra: CoreDep);
+            var result = Load(out var diags);
+            var d = diags.Single();
+            Assert.That((d.Code, d.Mod, d.Line), Is.EqualTo((code, "rules", 1)));
+            Assert.That(result.Disabled, Does.Contain("rules"));
+        }
+
+        [Test]
+        public void AValidSchemaDefaultPassesAndAComputedFieldDefaultIsLeftAlone()
+        {
+            Mod("core",
+                schema:
+                "deftype(\"Building\")\n" +
+                "component(\"Health\", base_max=const(int, default=10, min=1, max=100), current=field(int, default=lambda h: h.base_max // 2))\n" +
+                "deftype(\"Unit\", components=[\"Health\"], home=const(DefId[\"Building\"], default=\"Hut\"), marks=const(list[int], default=[1, 2], max=9))\n",
+                defs: "Building(\"Hut\")\nUnit(\"Scout\")\n");
+            Assert.That(LoadClean().Disabled, Is.Empty);
+        }
+
         // ---- 스키마 선언 ----
 
         [TestCase("component(\"C\", hp=const(str, min=1))\n", true)]

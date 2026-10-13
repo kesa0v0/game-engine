@@ -25,10 +25,12 @@ namespace Kesa.Engine.Loading
             _stage = stage;
         }
 
-        public static void Check(ResolvedDefs resolved, ModVisibility visibility, StageDiagnostics stage)
+        public static void Check(ResolvedDefs resolved, SchemaSet schema, ModVisibility visibility, StageDiagnostics stage)
         {
             var validator = new Validator(visibility, stage);
             foreach (var def in resolved.Defs) validator.CheckDef(def);
+            // 스키마가 선언한 기본값도 같은 타입·범위 규칙으로 본다. 책임은 선언한 모드다 (G73)
+            foreach (var decl in MemberDefaults.DeclaredDefaults(schema)) validator.CheckValue(MemberDefaults.DeclaredOrigin(decl), decl);
         }
 
         private void Report(string mod, string code, string message, SourceSpan span, string? hint = null)
