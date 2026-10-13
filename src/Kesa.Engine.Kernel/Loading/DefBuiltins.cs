@@ -108,6 +108,12 @@ namespace Kesa.Engine.Loading
                 var valueArg = r.Positional[2];
                 value = valueArg.Value;
                 valueSpan = valueArg.Span;
+                // 패치에는 부모라는 맥락이 없다: inherit 식은 거부한다 (G62)
+                if (ContainsDeferred(value))
+                {
+                    throw ctx.Fail(Codes.EvlUnsupported, "'inherit' cannot be used in a patch value", valueSpan,
+                        hint: "a patch has no parent; use patch.add to build on the current value");
+                }
                 // 컴포넌트 값(Morale(...))은 컴포넌트를 붙이는 값이다 (G44). 그 밖은 Def 값과 같은 데이터 검사
                 if (!(value is ComponentValue) && !CheckData(ctx, value, valueSpan)) throw new ScriptError();
             }
@@ -115,6 +121,29 @@ namespace Kesa.Engine.Loading
             _patchSink.Add(new PatchCall(op, _mod, _patchSink.Count, id, ArgReader.SpanOf(idArg), path,
                 ArgReader.SpanOf(pathArg), value, valueSpan, span, ctx.Guards.ToArray()));
             return NoneValue.Instance;
+        }
+
+        /// <summary>값 안(리스트·맵·컴포넌트 값의 인자까지)에 <c>inherit</c> 지연 값이 있는가.</summary>
+        private static bool ContainsDeferred(Value value)
+        {
+            switch (value)
+            {
+                case DeferredValue _:
+                    return true;
+                case ListValue list:
+                    foreach (var item in list.Items)
+                        if (ContainsDeferred(item)) return true;
+                    return false;
+                case DictValue dict:
+                    foreach (var item in dict.Items)
+                        if (ContainsDeferred(item.Value)) return true;
+                    return false;
+                case ComponentValue cv:
+                    foreach (var f in cv.Fields)
+                        if (ContainsDeferred(f.Value)) return true;
+                    return false;
+            }
+            return false;
         }
 
         /// <summary>

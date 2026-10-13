@@ -351,6 +351,20 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(Int(Const(r, "Base", "move")), Is.EqualTo(5));
         }
 
+        [TestCase("patch.set(\"Scout\", \"Morale\", Morale(value=inherit.move))\n")]
+        [TestCase("patch.set(\"Scout\", \"Skill.Wood\", Skill(level=inherit.move + 1))\n")]
+        [TestCase("patch.append(\"Scout\", \"tags\", [inherit.tags])\n")]
+        [TestCase("patch.set(\"Scout\", \"move\", inherit.move)\n")]
+        public void InheritIsRejectedInAPatchValue(string call)
+        {
+            var result = Run(call, out var diags);
+            var d = diags.Single();
+            Assert.That((d.Code, d.Mod, d.Line), Is.EqualTo((Codes.EvlUnsupported, "compat", 1)));
+            // 컴포넌트 생성자 안의 inherit는 G62가, 그 밖의 자리는 평가기 자체가 거부한다
+            if (call.Contains("Morale(") || call.Contains("Skill(")) Assert.That(d.Hint, Does.Contain("patch.add"));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "compat" }));
+        }
+
         // ---- 실패한 패치 (G60) ----
 
         [Test]
