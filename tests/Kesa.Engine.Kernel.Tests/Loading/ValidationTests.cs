@@ -106,13 +106,60 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         [Test]
-        public void AnExtensionTheDefsModCannotSeeIsNotRequiredOfIt()
+        public void AnExtensionTheDefsModCannotSeeIsNotRequiredOfItBecauseItHasADefault()
+        {
+            Mod("core", schema: Schema, defs: Wood + ScoutOk);
+            Mod("ext", schema: "extend(\"Unit\", weight=const(int, default=4))\n", extra: CoreDep);
+            var result = Load(out var diags);
+            Assert.That(diags, Is.Empty, string.Join("\n", diags));
+            Assert.That(result.Disabled, Is.Empty);
+            // 동결본에는 core의 Scout에도 weight가 기본값으로 채워진다 (G69·G74)
+            result.Frozen.TryGet("Scout", out var scout);
+            scout.Consts.TryGet("weight", out var weight);
+            Assert.That(((Kesa.Engine.Script.IntValue)weight.Value).Value, Is.EqualTo(4));
+        }
+
+        // ---- extend가 더한 값은 기본값이 있어야 한다 (G74) ----
+
+        [Test]
+        public void AnExtendedConstWithoutADefaultIsAnErrorOfTheExtendingMod()
         {
             Mod("core", schema: Schema, defs: Wood + ScoutOk);
             Mod("ext", schema: "extend(\"Unit\", weight=const(int))\n", extra: CoreDep);
             var result = Load(out var diags);
-            Assert.That(diags, Is.Empty, string.Join("\n", diags));
-            Assert.That(result.Disabled, Is.Empty);
+            var d = diags.Single();
+            Assert.That((d.Code, d.Mod, d.Line), Is.EqualTo((Codes.SchBadDeclaration, "ext", 1)));
+            Assert.That(d.Message, Does.Contain("weight").And.Contain("default"));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "ext" }));
+        }
+
+        [TestCase("extend(\"Unit\", tags2=const(list[str]), costs2=const(dict[str, int]))\n")]
+        [TestCase("extend(\"Unit\", flag=const(bool, default=False), name=const(str, default=\"\"))\n")]
+        public void CollectionsAndDefaultedConstsMayBeExtended(string extend)
+        {
+            Mod("core", schema: Schema, defs: Wood + ScoutOk);
+            Mod("ext", schema: extend, extra: CoreDep);
+            Assert.That(LoadClean().Disabled, Is.Empty);
+        }
+
+        [Test]
+        public void AComponentAttachedByAnotherModNeedsDefaultsForItsConsts()
+        {
+            Mod("core", schema: Schema, defs: Wood + ScoutOk);
+            Mod("ext", schema: "component(\"Armor\", plates=const(int))\nextend(\"Unit\", components=[\"Armor\"])\n", extra: CoreDep);
+            Load(out var diags);
+            var d = diags.Single();
+            Assert.That((d.Code, d.Mod), Is.EqualTo((Codes.SchBadDeclaration, "ext")));
+            Assert.That(d.Message, Does.Contain("Armor.plates"));
+        }
+
+        [Test]
+        public void AModMayExtendItsOwnTypeWithoutDefaults()
+        {
+            // 같은 모드의 Def는 모두 그 확장을 보므로 구멍이 생기지 않는다
+            Mod("core", schema: Schema + "extend(\"Unit\", weight=const(int))\n",
+                defs: Wood + "Unit(\"Scout\", move=3, weight=2, Health=Health(regen=1))\n");
+            Assert.That(LoadClean().Disabled, Is.Empty);
         }
 
         // ---- 타입 (G68) ----

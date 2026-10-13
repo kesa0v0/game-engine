@@ -155,6 +155,7 @@ namespace Kesa.Engine.Schema
                                 continue;
                             }
                             t.Components.Add(new ComponentSlot(c, ext.Mod, r.Span));
+                            if (ext.Mod != t.Mod) RequireDefaults(t, c, ext.Mod, r.Span);
                         }
 
                         foreach (var k in ext.Consts)
@@ -165,8 +166,29 @@ namespace Kesa.Engine.Schema
                                 continue;
                             }
                             t.Consts.Add(k);
+                            if (ext.Mod != t.Mod && NeedsDefault(k.Spec)) NoDefault(k.Mod, k.Span, "'" + k.Name + "' added to '" + t.Name + "'");
                         }
                     }
+                }
+            }
+
+            /// <summary>기본값이 없으면 필수가 되는 <c>const</c>인가: 리스트·맵은 비어 있는 것이 기본값이다 (spec-gaps G67).</summary>
+            private static bool NeedsDefault(MemberSpec spec) =>
+                spec.Kind == MemberKind.Const && spec.Default == null && !(spec.Type is ListTypeRef) && !(spec.Type is DictTypeRef);
+
+            private void NoDefault(string mod, SourceSpan span, string what)
+            {
+                Error(mod, Codes.SchBadDeclaration, what + " needs a default: other mods' Defs cannot see it, so nothing would fill it in",
+                    span, hint: "add default=... to the declaration (spec-gaps G74)");
+            }
+
+            /// <summary>다른 모드가 붙인 컴포넌트의 기본값 없는 <c>const</c> 멤버는 확장한 모드의 오류다 (G74).</summary>
+            private void RequireDefaults(DefType t, ComponentType c, string extMod, SourceSpan span)
+            {
+                foreach (var member in c.Members)
+                {
+                    if (NeedsDefault(member.Spec))
+                        NoDefault(extMod, span, "'" + c.Name + "." + member.Name + "' attached to '" + t.Name + "'");
                 }
             }
 
