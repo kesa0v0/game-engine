@@ -47,7 +47,7 @@ namespace Kesa.Engine.Tests.Loading
                 "      \"mod\": \"core\",\n" +
                 "      \"file\": \"core/defs/defs.py\",\n" +
                 "      \"line\": 2,\n" +
-                "      \"col\": 25,\n" +
+                "      \"col\": 21,\n" +
                 "      \"hint\": \"did you mean 'Wood'?\",\n" +
                 "      \"related\": []\n" +
                 "    }\n" +
