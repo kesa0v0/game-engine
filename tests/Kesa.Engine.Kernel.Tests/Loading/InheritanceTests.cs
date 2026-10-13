@@ -283,7 +283,7 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         [Test]
-        public void AParentFromAModTheChildDoesNotDependOnIsAnError()
+        public void AParentFromADependencyModIsFine()
         {
             Mod("core", schema: Schema, defs: Resources + "Unit(\"Base\")\n");
             Mod("addon", defs: "Unit(\"Scout\", parent=\"Base\")\n", extra: ", dependencies=[\"core\"]");
