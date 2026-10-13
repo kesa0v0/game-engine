@@ -9,7 +9,7 @@ namespace Kesa.Engine.Script
     /// 제한된 파이썬 부분집합의 파서 (spec S2).
     /// 원칙: 유효한 파이썬이 아닌 것은 받아들이지 않는다. 유효하지만 아직 지원하지 않는 구문은
     /// <see cref="Codes.ParUnsupported"/>로 거부하고 구문 오류와 구분한다.
-    /// 현재 단계(로딩 슬라이스)는 단순 문장(식, 대입)과 <c>def</c>의 머리부만 다룬다.
+    /// 현재 단계(로딩 슬라이스)는 단순 문장(식, 대입), <c>def</c>의 머리부, <c>if</c>/<c>elif</c>/<c>else</c>만 다룬다.
     /// </summary>
     public sealed class Parser
     {
@@ -140,6 +140,20 @@ namespace Kesa.Engine.Script
                 return;
             }
 
+            if (Cur.IsName("if"))
+            {
+                body.Add(ParseIf());
+                return;
+            }
+
+            if (Cur.IsName("elif") || Cur.IsName("else"))
+            {
+                _diagnostics.Error(Codes.ParSyntax, "'" + Cur.Text + "' without a matching 'if'", Cur.Span);
+                SkipToNewline();
+                if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                return;
+            }
+
             if (Cur.Kind == TokenKind.Name &&
                 (CompoundKeywords.Contains(Cur.Text) || (Cur.Text == "match" && IsSoftKeywordBlock())))
             {
@@ -147,6 +161,12 @@ namespace Kesa.Engine.Script
                 return;
             }
 
+            ParseSimpleLine(body);
+        }
+
+        /// <summary>세미콜론으로 나뉜 단순 문장들을 줄 끝까지 읽는다. 구문 오류는 보고하고 그 줄을 건너뛴다.</summary>
+        private void ParseSimpleLine(List<Stmt> body)
+        {
             try
             {
                 while (true)
@@ -170,6 +190,82 @@ namespace Kesa.Engine.Script
             {
                 SkipToNewline();
             }
+        }
+
+        /// <summary><c>if</c> / <c>elif</c>... / <c>else</c> 전체를 읽는다 (spec-gaps G46).</summary>
+        private Stmt ParseIf()
+        {
+            var start = Cur;
+            var branches = new List<IfBranch>();
+            List<Stmt>? orElse = null;
+            try
+            {
+                branches.Add(ParseIfBranch());
+                while (Cur.IsName("elif")) branches.Add(ParseIfBranch());
+                if (Cur.IsName("else"))
+                {
+                    Advance();
+                    Expect(":");
+                    orElse = ParseSuite();
+                }
+                return new IfStmt(branches, orElse, start.Span);
+            }
+            catch (ParseError)
+            {
+                // 오류 뒤에 이어지는 elif/else는 조용히 건너뛴다 (연쇄 오류를 내지 않는다)
+                SkipToNewline();
+                if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                while (Cur.IsName("elif") || Cur.IsName("else"))
+                {
+                    SkipToNewline();
+                    if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                }
+                return new UnsupportedStmt("if", start.Span);
+            }
+        }
+
+        private IfBranch ParseIfBranch()
+        {
+            var keyword = Advance();
+            var condition = ParseExpression();
+            Expect(":");
+            return new IfBranch(condition, ParseSuite(), keyword.Span);
+        }
+
+        /// <summary>
+        /// ':' 뒤의 블록: 같은 줄의 단순 문장들이거나, 줄바꿈 뒤 들여쓴 문장들. 들여쓴 블록 안에는 다시 <c>if</c>를 쓸 수 있다.
+        /// </summary>
+        private List<Stmt> ParseSuite()
+        {
+            var body = new List<Stmt>();
+            if (Cur.Kind != TokenKind.Newline)
+            {
+                ParseSimpleLine(body);
+                return body;
+            }
+
+            Advance();
+            if (Cur.Kind != TokenKind.Indent) throw Fail("expected an indented block", Cur.Span);
+            Advance();
+            while (Cur.Kind != TokenKind.Dedent && Cur.Kind != TokenKind.EndOfFile)
+            {
+                if (Cur.Kind == TokenKind.Newline)
+                {
+                    Advance();
+                    continue;
+                }
+
+                if (Cur.Kind == TokenKind.Indent)
+                {
+                    _diagnostics.Error(Codes.ParSyntax, "unexpected indent", Cur.Span);
+                    SkipBlock();
+                    continue;
+                }
+
+                ParseStatementLine(body);
+            }
+            if (Cur.Kind == TokenKind.Dedent) Advance();
+            return body;
         }
 
         /// <summary>

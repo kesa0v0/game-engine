@@ -65,7 +65,7 @@ namespace Kesa.Engine.Loading
                 var builtins = new SchemaBuiltins(u.Schema,
                     name => declaredTypes.Contains(name) || unit.Schema.Types.Exists(t => t.Name == name),
                     name => declaredComponents.Contains(name) || unit.Schema.Components.Exists(c => c.Name == name));
-                foreach (var file in u.SchemaFiles) Execute(u, file, builtins);
+                foreach (var file in u.SchemaFiles) Execute(u, file, builtins, allowConditions: false);
                 foreach (var t in u.Schema.Types) declaredTypes.Add(t.Name);
                 foreach (var c in u.Schema.Components) declaredComponents.Add(c.Name);
                 if (u.Bag.HasErrors) u.Failed = true;
@@ -79,7 +79,9 @@ namespace Kesa.Engine.Loading
             foreach (var u in units)
             {
                 if (u.Failed || FailDependents(u, units, diagnostics)) continue;
-                var builtins = new DefBuiltins(schema, visibility, u.Manifest.Id, u.Defs);
+                // mod_loaded: 설치되어 있고 지금까지 실패하지 않은 모드 (spec-gaps G8, G46)
+                var builtins = new DefBuiltins(schema, visibility, u.Manifest,
+                    id => units.Exists(o => o.Manifest.Id == id && !o.Failed), u.Defs);
                 foreach (var file in u.DefFiles) Execute(u, file, builtins);
                 if (u.Bag.HasErrors) u.Failed = true;
             }
@@ -212,8 +214,9 @@ namespace Kesa.Engine.Loading
             if (u.Bag.HasErrors) u.Failed = true;
         }
 
-        private static void Execute(ModUnit u, string relativePath, IBuiltins builtins) =>
-            new Interpreter(u.Scope, builtins, new CallContext(u.Manifest.Id, u.Bag)).Run(u.Modules[relativePath]);
+        private static void Execute(ModUnit u, string relativePath, IBuiltins builtins, bool allowConditions = true) =>
+            new Interpreter(u.Scope, builtins, new CallContext(u.Manifest.Id, u.Bag), allowConditions)
+                .Run(u.Modules[relativePath]);
 
         /// <summary>
         /// 필수 의존 중 실패한 모드가 있으면 이 모드를 비활성화한다 (MOD009). 로드 순서상 의존 대상이 앞에 있으므로

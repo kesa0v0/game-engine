@@ -105,7 +105,8 @@ namespace Kesa.Engine.Tests.Script
         // 유효한 파이썬이지만 아직 지원하지 않는 것은 구문 오류와 구분해 보고한다
         [TestCase("def f(x=1):\n    return x\n")]
         [TestCase("def f(*args):\n    pass\n")]
-        [TestCase("if x:\n    y = 1\n")]
+        [TestCase("for x in y:\n    pass\n")]
+        [TestCase("while x:\n    pass\n")]
         [TestCase("import os\n")]
         [TestCase("x = (1, 2)\n")]
         [TestCase("x = [i for i in y]\n")]
@@ -146,7 +147,60 @@ namespace Kesa.Engine.Tests.Script
         [Test]
         public void ParsingContinuesAfterUnsupportedBlock()
         {
-            var (module, _) = Parse("if x:\n    y = 1\nx = 2\n");
+            var (module, _) = Parse("while x:\n    y = 1\nx = 2\n");
+            Assert.That(module.Body.Last(), Is.InstanceOf<AssignStmt>());
+        }
+
+        // ---- if / elif / else (spec-gaps G46) ----
+
+        [Test]
+        public void IfElifElseWithIndentedBlocks()
+        {
+            var (module, diags) = Parse(
+                "if a(1):\n    f(1)\n    g(2)\nelif b():\n    h()\nelse:\n    k()\nx = 2\n");
+            Assert.That(diags, Is.Empty);
+            Assert.That(module.Body, Has.Count.EqualTo(2));
+            var ifs = (IfStmt)module.Body[0];
+            Assert.That(ifs.Branches, Has.Count.EqualTo(2));
+            Assert.That(ifs.Branches[0].Body, Has.Count.EqualTo(2));
+            Assert.That(ifs.Branches[1].Body, Has.Count.EqualTo(1));
+            Assert.That(ifs.OrElse, Has.Count.EqualTo(1));
+            Assert.That((ifs.Span.Line, ifs.Branches[1].Span.Line), Is.EqualTo((1, 4)));
+            Assert.That(module.Body[1], Is.InstanceOf<AssignStmt>());
+        }
+
+        [Test]
+        public void IfWithSameLineBlockAndNesting()
+        {
+            var (module, diags) = Parse("if a(): f()\nelse: g(); h()\nif a():\n    if b():\n        f()\n    g()\n");
+            Assert.That(diags, Is.Empty);
+            Assert.That(module.Body, Has.Count.EqualTo(2));
+            var first = (IfStmt)module.Body[0];
+            Assert.That(first.Branches[0].Body, Has.Count.EqualTo(1));
+            Assert.That(first.OrElse, Has.Count.EqualTo(2));
+            var outer = (IfStmt)module.Body[1];
+            Assert.That(outer.Branches[0].Body, Has.Count.EqualTo(2));
+            Assert.That(outer.Branches[0].Body[0], Is.InstanceOf<IfStmt>());
+        }
+
+        [TestCase("elif a():\n    f()\n")]
+        [TestCase("else:\n    f()\n")]
+        [TestCase("if a():\n    f()\nelse:\n    g()\nelse:\n    h()\n")]
+        [TestCase("if a()\n    f()\n")]
+        [TestCase("if a():\nf()\n")]
+        public void BrokenIfIsASyntaxError(string text)
+        {
+            var (_, diags) = Parse(text);
+            Assert.That(diags, Is.Not.Empty);
+            Assert.That(diags.Select(d => d.Code), Has.All.EqualTo(Codes.ParSyntax));
+        }
+
+        [Test]
+        public void ParsingContinuesAfterABrokenIfAndItsElseChain()
+        {
+            var (module, diags) = Parse("if :\n    f()\nelif b():\n    g()\nelse:\n    h()\nx = 2\n");
+            Assert.That(diags.Select(d => d.Code), Has.All.EqualTo(Codes.ParSyntax));
+            Assert.That(diags, Has.Count.EqualTo(1));
             Assert.That(module.Body.Last(), Is.InstanceOf<AssignStmt>());
         }
 

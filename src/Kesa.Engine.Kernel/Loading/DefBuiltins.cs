@@ -17,18 +17,53 @@ namespace Kesa.Engine.Loading
         private readonly string _mod;
         private readonly List<DefRecord> _sink;
         private readonly HashSet<string> _schemaNames = new HashSet<string>(SchemaBuiltins.AllNames, StringComparer.Ordinal);
+        private readonly ModManifest _manifest;
+        private readonly Func<string, bool> _isActive;
+        private readonly BuiltinFunction _modLoaded;
 
+        /// <param name="manifest">이 모드의 매니페스트 (<c>mod_loaded</c>가 선언된 모드만 받는다)</param>
+        /// <param name="isActive">지금 활성인 모드인가 (설치되어 있고 로드에 실패하지 않았음, spec-gaps G8)</param>
         /// <param name="sink">이 모드가 만든 Def를 실행 순서대로 모을 곳</param>
-        public DefBuiltins(SchemaSet schema, ModVisibility visibility, string mod, List<DefRecord> sink)
+        public DefBuiltins(SchemaSet schema, ModVisibility visibility, ModManifest manifest, Func<string, bool> isActive,
+            List<DefRecord> sink)
         {
             _schema = schema;
             _visibility = visibility;
-            _mod = mod;
+            _mod = manifest.Id;
+            _manifest = manifest;
+            _isActive = isActive;
             _sink = sink;
+            _modLoaded = new BuiltinFunction(Interpreter.ModLoadedName, ModLoaded);
+        }
+
+        /// <summary>
+        /// <c>mod_loaded("m")</c> (spec-gaps G46): m이 지금 활성이면 True. m은 이 모드의 <c>dependencies</c>나
+        /// <c>optional</c>에 선언된 모드여야 한다.
+        /// </summary>
+        private Value ModLoaded(CallContext ctx, SourceSpan span, IReadOnlyList<ArgValue> args)
+        {
+            var r = new ArgReader(ctx, Interpreter.ModLoadedName, span, args);
+            r.ExpectPositional(1, "mod_loaded(\"mod_id\")");
+            r.RejectRest(Array.Empty<string>());
+            var arg = r.Positional[0];
+            string id = r.String(arg, "the mod id");
+
+            var declared = new List<string>();
+            foreach (var d in _manifest.Dependencies) declared.Add(d.Id);
+            foreach (var o in _manifest.Optional) declared.Add(o.Id);
+            if (!declared.Contains(id))
+            {
+                throw ctx.Fail(Codes.EvlModNotDeclared,
+                    "mod '" + id + "' is not listed in dependencies or optional of mod '" + _mod + "'",
+                    ArgReader.SpanOf(arg),
+                    hint: Suggest.Hint(id, declared) ?? "declare it in optional=[...] in mod.py");
+            }
+            return _isActive(id) ? BoolValue.True : BoolValue.False;
         }
 
         public Value? Lookup(string name)
         {
+            if (name == Interpreter.ModLoadedName) return _modLoaded;
             if (_schema.TryGetType(name, out var t) && _visibility.CanSee(_mod, t.Mod)) return new DefConstructor(this, t);
             if (_schema.TryGetComponent(name, out var c) && _visibility.CanSee(_mod, c.Mod))
                 return new ComponentConstructor(c);
@@ -39,6 +74,7 @@ namespace Kesa.Engine.Loading
         {
             get
             {
+                yield return Interpreter.ModLoadedName;
                 foreach (var t in _schema.Types)
                     if (_visibility.CanSee(_mod, t.Mod)) yield return t.Name;
                 foreach (var c in _schema.Components)

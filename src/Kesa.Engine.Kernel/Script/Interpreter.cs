@@ -93,21 +93,28 @@ namespace Kesa.Engine.Script
     public sealed class Interpreter
     {
         public const string InheritName = "inherit";
+        public const string ModLoadedName = "mod_loaded";
+        public const string PatchName = "patch";
 
         private readonly ModScope _scope;
         private readonly IBuiltins _builtins;
         private readonly CallContext _context;
+        private readonly bool _allowConditions;
 
-        public Interpreter(ModScope scope, IBuiltins builtins, CallContext context)
+        /// <param name="allowConditions">false면 <c>if</c>를 거부한다 (스키마 파일, spec-gaps G46)</param>
+        public Interpreter(ModScope scope, IBuiltins builtins, CallContext context, bool allowConditions = true)
         {
             _scope = scope;
             _builtins = builtins;
             _context = context;
+            _allowConditions = allowConditions;
         }
 
-        public void Run(Module module)
+        public void Run(Module module) => RunBlock(module.Body);
+
+        private void RunBlock(IEnumerable<Stmt> body)
         {
-            foreach (var stmt in module.Body)
+            foreach (var stmt in body)
             {
                 try
                 {
@@ -124,6 +131,10 @@ namespace Kesa.Engine.Script
         {
             switch (stmt)
             {
+                case IfStmt ifs:
+                    ExecuteIf(ifs);
+                    return;
+
                 case ExprStmt es:
                     Evaluate(es.Expr);
                     return;
@@ -147,6 +158,85 @@ namespace Kesa.Engine.Script
             }
             throw _context.Fail(Codes.EvlUnsupported, "statement not supported at load time", stmt.Span);
         }
+
+        /// <summary>
+        /// <c>if</c>/<c>elif</c>/<c>else</c> (spec-gaps G46). 조건은 bool을 돌려주는 호출 하나다.
+        /// <c>mod_loaded</c>를 조건으로 쓰면 가드이고, 가드의 모든 가지(실행되지 않는 가지도)는 <c>patch.*</c> 호출과
+        /// 중첩된 <c>if</c>만 담을 수 있다: 설치 상태에 따라 Def나 이름이 있기도 없기도 하면 안 되기 때문이다.
+        /// 이 검사는 어느 가지가 실행되는지와 무관하게 하므로 <c>check</c>의 결과가 설치 상태와 무관하다.
+        /// </summary>
+        private void ExecuteIf(IfStmt ifs)
+        {
+            if (!_allowConditions)
+                throw _context.Fail(Codes.EvlUnsupported, "if statements are not supported in schema files", ifs.Span);
+            bool guarded = false;
+            foreach (var branch in ifs.Branches)
+                if (IsGuardCondition(branch.Condition)) guarded = true;
+            if (guarded && !CheckGuardBodies(ifs)) throw new ScriptError();
+
+            foreach (var branch in ifs.Branches)
+            {
+                if (!EvaluateCondition(branch.Condition)) continue;
+                RunBlock(branch.Body);
+                return;
+            }
+            if (ifs.OrElse != null) RunBlock(ifs.OrElse);
+        }
+
+        private bool EvaluateCondition(Expr condition)
+        {
+            if (!(condition is CallExpr))
+            {
+                throw _context.Fail(Codes.EvlBadCondition,
+                    "a load-time condition must be a call that returns a bool", condition.Span,
+                    hint: "write mod_loaded(\"other_mod\")");
+            }
+            var value = Evaluate(condition);
+            if (value is BoolValue b) return b.Value;
+            throw _context.Fail(Codes.EvlBadCondition, "a condition must be a bool, not " + value.KindName, condition.Span);
+        }
+
+        private static bool IsGuardCondition(Expr condition) =>
+            condition is CallExpr call && call.Callee is NameExpr name && name.Name == ModLoadedName;
+
+        private bool CheckGuardBodies(IfStmt ifs)
+        {
+            bool ok = true;
+            foreach (var branch in ifs.Branches) ok &= CheckGuardBody(branch.Body);
+            if (ifs.OrElse != null) ok &= CheckGuardBody(ifs.OrElse);
+            return ok;
+        }
+
+        private bool CheckGuardBody(IReadOnlyList<Stmt> body)
+        {
+            bool ok = true;
+            foreach (var stmt in body)
+            {
+                switch (stmt)
+                {
+                    case UnsupportedStmt _:
+                        break; // 파서가 이미 보고함
+                    case IfStmt nested:
+                        foreach (var branch in nested.Branches) ok &= CheckGuardBody(branch.Body);
+                        if (nested.OrElse != null) ok &= CheckGuardBody(nested.OrElse);
+                        break;
+                    case ExprStmt es when IsPatchCall(es.Expr):
+                        break;
+                    default:
+                        _context.Error(Codes.EvlGuardBody,
+                            "inside an 'if " + ModLoadedName + "(...)' block only patch.* calls and nested if statements are allowed",
+                            stmt.Span,
+                            hint: "move definitions and assignments outside the guard, so the mod's names do not depend on which mods are installed");
+                        ok = false;
+                        break;
+                }
+            }
+            return ok;
+        }
+
+        private static bool IsPatchCall(Expr expr) =>
+            expr is CallExpr call && call.Callee is AttributeExpr attr && attr.Target is NameExpr target &&
+            target.Name == PatchName;
 
         private void Bind(string name, Value value, SourceSpan span)
         {

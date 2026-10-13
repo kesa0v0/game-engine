@@ -93,6 +93,9 @@ namespace Kesa.Engine.Schema
 
         public (string Code, string Message)? Explain(string name)
         {
+            if (name == Interpreter.ModLoadedName)
+                return (Codes.SchModLoadedInSchemaFile,
+                    "mod_loaded() cannot be used in schema files: types must not depend on which mods are installed");
             if (_isDeclaredType(name))
                 return (Codes.SchDefInSchemaFile,
                     "Defs cannot be created in schema files; move '" + name + "(...)' to a Def file outside schema/");

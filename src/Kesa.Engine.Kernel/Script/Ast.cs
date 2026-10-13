@@ -248,6 +248,39 @@ namespace Kesa.Engine.Script
         public Expr? Returns { get; }
     }
 
+    /// <summary><c>if</c>/<c>elif</c>의 조건과 그 아래 블록.</summary>
+    public sealed class IfBranch
+    {
+        public IfBranch(Expr condition, IReadOnlyList<Stmt> body, SourceSpan span)
+        {
+            Condition = condition;
+            Body = body;
+            Span = span;
+        }
+
+        public Expr Condition { get; }
+        public IReadOnlyList<Stmt> Body { get; }
+
+        /// <summary><c>if</c>/<c>elif</c> 키워드의 위치.</summary>
+        public SourceSpan Span { get; }
+    }
+
+    /// <summary><c>if</c> / <c>elif</c>... / <c>else</c> (spec-gaps G46).</summary>
+    public sealed class IfStmt : Stmt
+    {
+        public IfStmt(IReadOnlyList<IfBranch> branches, IReadOnlyList<Stmt>? orElse, SourceSpan span) : base(span)
+        {
+            Branches = branches;
+            OrElse = orElse;
+        }
+
+        /// <summary>첫 가지가 <c>if</c>, 나머지가 <c>elif</c>.</summary>
+        public IReadOnlyList<IfBranch> Branches { get; }
+
+        /// <summary><c>else</c> 블록. 없으면 null.</summary>
+        public IReadOnlyList<Stmt>? OrElse { get; }
+    }
+
     /// <summary>이 단계에서 지원하지 않는 문장 (진단은 이미 보고됨).</summary>
     public sealed class UnsupportedStmt : Stmt
     {

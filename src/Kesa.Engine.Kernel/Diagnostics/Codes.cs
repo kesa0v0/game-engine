@@ -43,6 +43,9 @@ namespace Kesa.Engine.Diagnostics
         public const string EvlArguments = "EVL003";
         public const string EvlNameTaken = "EVL004";
         public const string EvlType = "EVL005";
+        public const string EvlBadCondition = "EVL006";
+        public const string EvlGuardBody = "EVL007";
+        public const string EvlModNotDeclared = "EVL008";
 
         public const string SchDuplicateName = "SCH001";
         public const string SchUnknownName = "SCH002";
@@ -51,6 +54,7 @@ namespace Kesa.Engine.Diagnostics
         public const string SchMemberConflict = "SCH005";
         public const string SchDefInSchemaFile = "SCH006";
         public const string SchSchemaInDefFile = "SCH007";
+        public const string SchModLoadedInSchemaFile = "SCH008";
 
         public const string DefDuplicateId = "DEF001";
         public const string DefUnknownField = "DEF002";

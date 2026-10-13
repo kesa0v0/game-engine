@@ -786,5 +786,143 @@ namespace Kesa.Engine.Tests.Loading
             Load(out var second);
             Assert.That(second.Select(d => d.ToString()), Is.EqualTo(first.Select(d => d.ToString())));
         }
+
+        // ---- if / mod_loaded 가드 (spec-gaps G46) ----
+        // patch.*는 아직 없다: 실행된 가지는 `patch.set(...)`가 EVL002("속성 접근 미지원")를 내므로 오류가 난 줄로 알 수 있다.
+
+        private const string PatchLine = "    patch.set(\"A\", \"b\", 1)\n";
+
+        private static string ThreeWay =>
+            "if mod_loaded(\"banking\"):\n" + PatchLine +
+            "elif mod_loaded(\"scouts\"):\n" + PatchLine +
+            "else:\n" + PatchLine;
+
+        [Test]
+        public void GuardRunsTheFirstTrueBranch()
+        {
+            Mod("scouts", defs: "\n");
+            Mod("compat", defs: ThreeWay, extra: ", optional=[\"banking\", \"scouts\"]");
+            Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.EvlUnsupported));
+            Assert.That((d.File, d.Line), Is.EqualTo(("compat/defs/defs.py", 4)));
+        }
+
+        [Test]
+        public void ElseRunsWhenNoGuardMatches()
+        {
+            Mod("compat", defs: ThreeWay, extra: ", optional=[\"banking\", \"scouts\"]");
+            Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.EvlUnsupported));
+            Assert.That(d.Line, Is.EqualTo(6));
+        }
+
+        [Test]
+        public void GuardOfAMissingModSkipsItsBodyWithoutChecking()
+        {
+            Mod("compat", defs: "if mod_loaded(\"banking\"):\n" + PatchLine, extra: ", optional=[\"banking\"]");
+            var result = LoadClean();
+            Assert.That(result.Mods.Select(m => m.Id), Is.EqualTo(new[] { "compat" }));
+        }
+
+        [Test]
+        public void InstalledButFailedOptionalModCountsAsNotLoaded()
+        {
+            // spec-gaps G8: 로드에 실패한 선택 모드는 없는 것으로 본다
+            Mod("banking", defs: "Nope(\"a\")\n");
+            Mod("compat", defs: "if mod_loaded(\"banking\"):\n" + PatchLine, extra: ", optional=[\"banking\"]");
+            var result = Load(out var diags);
+            Assert.That(diags.Select(d => d.Mod), Has.All.EqualTo("banking"));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "banking" }));
+            Assert.That(result.Mods.Select(m => m.Id), Is.EqualTo(new[] { "compat" }));
+        }
+
+        [Test]
+        public void RequiredDependencyIsAlwaysLoadedInsideAGuard()
+        {
+            Mod("base", defs: "\n");
+            Mod("compat", defs: "if mod_loaded(\"base\"):\n" + PatchLine, extra: ", dependencies=[\"base\"]");
+            Load(out var diags);
+            Assert.That(diags.Single().Line, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void ModLoadedNeedsAModDeclaredInTheManifest()
+        {
+            Mod("compat", defs: "if mod_loaded(\"extr\"):\n" + PatchLine, extra: ", optional=[\"extra\"]");
+            Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.EvlModNotDeclared));
+            Assert.That(d.Line, Is.EqualTo(1));
+            Assert.That(d.Hint, Does.Contain("extra"));
+        }
+
+        [TestCase("mod_loaded()", Codes.EvlArguments)]
+        [TestCase("mod_loaded(1)", Codes.EvlType)]
+        [TestCase("mod_loaded(\"a\", \"b\")", Codes.EvlArguments)]
+        [TestCase("mod_loaded(id=\"a\")", Codes.EvlArguments)]
+        public void BadModLoadedArguments(string call, string code)
+        {
+            Mod("compat", defs: "if " + call + ":\n" + PatchLine, extra: ", optional=[\"a\", \"b\"]");
+            Load(out var diags);
+            Assert.That(diags.Single().Code, Is.EqualTo(code));
+        }
+
+        [Test]
+        public void GuardBodiesAllowOnlyPatchCallsAndNestedIfs_WhateverIsInstalled()
+        {
+            // banking가 없어도 같은 오류가 나야 check의 결과가 설치 상태와 무관하다
+            Mod("compat",
+                defs: "if mod_loaded(\"banking\"):\n    x = 1\n    print(\"a\")\nelse:\n    y = 2\n",
+                extra: ", optional=[\"banking\"]");
+            var result = Load(out var diags);
+            Assert.That(diags.Select(d => (d.Code, d.Line)),
+                Is.EqualTo(new[] { (Codes.EvlGuardBody, 2), (Codes.EvlGuardBody, 3), (Codes.EvlGuardBody, 5) }));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "compat" }));
+        }
+
+        [Test]
+        public void NestedGuardsAreAllowed()
+        {
+            Mod("compat",
+                defs: "if mod_loaded(\"banking\"):\n    if mod_loaded(\"scouts\"):\n    " + PatchLine,
+                extra: ", optional=[\"banking\", \"scouts\"]");
+            LoadClean();
+        }
+
+        [Test]
+        public void ConditionMustBeACall()
+        {
+            Mod("compat", defs: "if True:\n" + PatchLine);
+            Load(out var diags);
+            Assert.That(diags.Single().Code, Is.EqualTo(Codes.EvlBadCondition));
+        }
+
+        [Test]
+        public void ModLoadedCannotBeUsedInSchemaFiles()
+        {
+            Mod("core", schema: "x = mod_loaded(\"core\")\n");
+            Load(out var diags);
+            Assert.That(diags.Single().Code, Is.EqualTo(Codes.SchModLoadedInSchemaFile));
+        }
+
+        [Test]
+        public void IfIsNotSupportedInSchemaFiles()
+        {
+            Mod("core", schema: "if mod_loaded(\"a\"):\n" + PatchLine, extra: ", optional=[\"a\"]");
+            Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.EvlUnsupported));
+            Assert.That(d.Message, Does.Contain("schema files"));
+        }
+
+        [Test]
+        public void ModLoadedIsABuiltInName()
+        {
+            Mod("core", defs: "mod_loaded = 1\n");
+            Load(out var diags);
+            Assert.That(diags.Single().Code, Is.EqualTo(Codes.EvlNameTaken));
+        }
     }
 }
