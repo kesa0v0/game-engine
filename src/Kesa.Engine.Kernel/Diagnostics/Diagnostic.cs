@@ -101,6 +101,10 @@ namespace Kesa.Engine.Diagnostics
             IReadOnlyList<SourceSpan>? related = null) =>
             _items.Add(new Diagnostic(code, Severity.Warning, message, mod, span, hint, related));
 
+        public void Info(string code, string message, SourceSpan span, string? mod = null, string? hint = null,
+            IReadOnlyList<SourceSpan>? related = null) =>
+            _items.Add(new Diagnostic(code, Severity.Info, message, mod, span, hint, related));
+
         public IReadOnlyList<Diagnostic> ToSortedList()
         {
             var copy = new List<Diagnostic>(_items);

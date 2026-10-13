@@ -11,12 +11,13 @@ namespace Kesa.Engine.Loading
     public sealed class ContentLoadResult
     {
         internal ContentLoadResult(IReadOnlyList<ModManifest> mods, IReadOnlyList<string> disabled, SchemaSet schema,
-            DefRegistry defs)
+            DefRegistry defs, IReadOnlyList<PatchCall> patches)
         {
             Mods = mods;
             Disabled = disabled;
             Schema = schema;
             Defs = defs;
+            Patches = patches;
         }
 
         /// <summary>②까지 살아남은 모드 (로드 순서).</summary>
@@ -27,6 +28,11 @@ namespace Kesa.Engine.Loading
 
         public SchemaSet Schema { get; }
         public DefRegistry Defs { get; }
+
+        /// <summary>
+        /// ②b가 기록한 패치 호출 (spec-gaps G35). 살아남은 모드의 것만, 모드 로드 순서 → 호출 순서로. 아직 적용하지 않았다.
+        /// </summary>
+        public IReadOnlyList<PatchCall> Patches { get; }
     }
 
     /// <summary>
@@ -81,8 +87,16 @@ namespace Kesa.Engine.Loading
                 if (u.Failed || FailDependents(u, units, diagnostics)) continue;
                 // mod_loaded: 설치되어 있고 지금까지 실패하지 않은 모드 (spec-gaps G8, G46)
                 var builtins = new DefBuiltins(schema, visibility, u.Manifest,
-                    id => units.Exists(o => o.Manifest.Id == id && !o.Failed), u.Defs);
+                    id => units.Exists(o => o.Manifest.Id == id && !o.Failed), u.Defs, u.Patches);
                 foreach (var file in u.DefFiles) Execute(u, file, builtins);
+                // 로드되지 않은 모드의 가드 안에서 건너뛴 패치는 조용히 사라지지 않게 알린다 (G38)
+                foreach (var skipped in u.Skipped)
+                {
+                    u.Bag.Info(Codes.PatSkipped,
+                        "mod '" + skipped.Key + "' is not loaded, so " + skipped.Value.Count + " patch call" +
+                        (skipped.Value.Count == 1 ? " was" : "s were") + " not applied",
+                        skipped.Value.First, u.Manifest.Id);
+                }
                 if (u.Bag.HasErrors) u.Failed = true;
             }
 
@@ -95,13 +109,19 @@ namespace Kesa.Engine.Loading
             }
 
             var mods = new List<ModManifest>();
+            var patches = new List<PatchCall>();
             foreach (var u in units)
             {
                 diagnostics.AddRange(u.Bag.ToSortedList());
-                if (u.Failed) disabled.Add(u.Manifest.Id);
-                else mods.Add(u.Manifest);
+                if (u.Failed)
+                {
+                    disabled.Add(u.Manifest.Id);
+                    continue;
+                }
+                mods.Add(u.Manifest);
+                patches.AddRange(u.Patches);
             }
-            return new ContentLoadResult(mods, new List<string>(disabled), schema, defs);
+            return new ContentLoadResult(mods, new List<string>(disabled), schema, defs, patches);
         }
 
         private sealed class ModUnit
@@ -118,6 +138,13 @@ namespace Kesa.Engine.Loading
             public ModScope Scope { get; } = new ModScope();
             public ModSchema Schema { get; }
             public List<DefRecord> Defs { get; } = new List<DefRecord>();
+
+            /// <summary>②b에서 기록한 <c>patch.*</c> 호출 (G35).</summary>
+            public List<PatchCall> Patches { get; } = new List<PatchCall>();
+
+            /// <summary>거짓인 <c>mod_loaded</c> 가드 안에서 건너뛴 패치 호출 (G38·G46), 모드 id 순.</summary>
+            public SortedDictionary<string, SkippedGuard> Skipped { get; } =
+                new SortedDictionary<string, SkippedGuard>(StringComparer.Ordinal);
 
             /// <summary>파싱한 파일 (모드 폴더 기준 상대 경로 → 모듈).</summary>
             public Dictionary<string, Module> Modules { get; } = new Dictionary<string, Module>(StringComparer.Ordinal);
@@ -215,7 +242,7 @@ namespace Kesa.Engine.Loading
         }
 
         private static void Execute(ModUnit u, string relativePath, IBuiltins builtins, bool allowConditions = true) =>
-            new Interpreter(u.Scope, builtins, new CallContext(u.Manifest.Id, u.Bag), allowConditions)
+            new Interpreter(u.Scope, builtins, new CallContext(u.Manifest.Id, u.Bag, u.Skipped), allowConditions)
                 .Run(u.Modules[relativePath]);
 
         /// <summary>

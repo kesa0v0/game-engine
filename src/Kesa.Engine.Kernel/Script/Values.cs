@@ -178,6 +178,12 @@ namespace Kesa.Engine.Script
             _body(context, span, args);
     }
 
+    /// <summary><c>x.name</c>을 받는 내장 값 (<c>patch.set</c> 등).</summary>
+    public interface IAttributeSource
+    {
+        Value GetAttribute(CallContext context, SourceSpan span, string name);
+    }
+
     /// <summary><c>x[...]</c>를 받는 내장 값 (타입 표기 <c>list[str]</c>, <c>Ref["X"]</c> 등).</summary>
     public interface ISubscriptable
     {

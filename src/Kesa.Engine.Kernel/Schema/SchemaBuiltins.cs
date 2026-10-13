@@ -93,6 +93,9 @@ namespace Kesa.Engine.Schema
 
         public (string Code, string Message)? Explain(string name)
         {
+            if (name == Interpreter.PatchName)
+                return (Codes.SchDefInSchemaFile,
+                    "patch.* calls belong in Def files; schema files only declare types");
             if (name == Interpreter.ModLoadedName)
                 return (Codes.SchModLoadedInSchemaFile,
                     "mod_loaded() cannot be used in schema files: types must not depend on which mods are installed");

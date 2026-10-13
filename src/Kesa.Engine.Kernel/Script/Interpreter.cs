@@ -10,17 +10,38 @@ namespace Kesa.Engine.Script
     {
     }
 
+    /// <summary><c>if mod_loaded("m")</c>가 거짓이라 실행하지 않은 가지 안의 <c>patch.*</c> 호출 수 (모드 m 하나당).</summary>
+    public sealed class SkippedGuard
+    {
+        public SkippedGuard(SourceSpan first) => First = first;
+
+        public int Count { get; internal set; }
+
+        /// <summary>처음 건너뛴 가지의 <c>if</c>/<c>elif</c> 위치.</summary>
+        public SourceSpan First { get; }
+    }
+
     /// <summary>내장 함수가 진단을 내는 통로. 진단에는 항상 실행 중인 모드가 붙는다.</summary>
     public sealed class CallContext
     {
-        public CallContext(string mod, DiagnosticBag diagnostics)
+        public CallContext(string mod, DiagnosticBag diagnostics, IDictionary<string, SkippedGuard>? skipped = null)
         {
             Mod = mod;
             Diagnostics = diagnostics;
+            Skipped = skipped ?? new SortedDictionary<string, SkippedGuard>(StringComparer.Ordinal);
         }
 
         public string Mod { get; }
         public DiagnosticBag Diagnostics { get; }
+
+        /// <summary>
+        /// 지금 실행 중인 가지가 참이라고 가정하는 모드들 (바깥 가드부터, spec-gaps G46).
+        /// <c>patch.*</c> 호출이 기록할 때 함께 저장한다.
+        /// </summary>
+        public List<string> Guards { get; } = new List<string>();
+
+        /// <summary>실행하지 않은 가드 가지의 패치 호출 수 (거짓인 모드 id별).</summary>
+        public IDictionary<string, SkippedGuard> Skipped { get; }
 
         public void Error(string code, string message, SourceSpan span, string? hint = null,
             IReadOnlyList<SourceSpan>? related = null) =>
@@ -176,11 +197,63 @@ namespace Kesa.Engine.Script
 
             foreach (var branch in ifs.Branches)
             {
-                if (!EvaluateCondition(branch.Condition)) continue;
-                RunBlock(branch.Body);
+                string? guardMod = GuardModOf(branch.Condition);
+                if (!EvaluateCondition(branch.Condition))
+                {
+                    // 거짓이라고 평가된 가드만 센다 (앞 가지가 참이어서 평가하지 않은 가지는 모른다)
+                    if (guardMod != null) CountSkipped(guardMod, branch);
+                    continue;
+                }
+
+                if (guardMod != null) _context.Guards.Add(guardMod);
+                try
+                {
+                    RunBlock(branch.Body);
+                }
+                finally
+                {
+                    if (guardMod != null) _context.Guards.RemoveAt(_context.Guards.Count - 1);
+                }
                 return;
             }
             if (ifs.OrElse != null) RunBlock(ifs.OrElse);
+        }
+
+        /// <summary><c>mod_loaded("m")</c> 조건이면 m (인자가 문자열 리터럴일 때만).</summary>
+        private static string? GuardModOf(Expr condition)
+        {
+            if (condition is CallExpr call && call.Callee is NameExpr name && name.Name == ModLoadedName &&
+                call.Arguments.Count == 1 && call.Arguments[0].Name == null &&
+                call.Arguments[0].Value is StringLiteral literal)
+                return literal.Value;
+            return null;
+        }
+
+        private void CountSkipped(string mod, IfBranch branch)
+        {
+            int n = CountPatchCalls(branch.Body);
+            if (n == 0) return;
+            if (!_context.Skipped.TryGetValue(mod, out var skipped))
+            {
+                skipped = new SkippedGuard(branch.Span);
+                _context.Skipped.Add(mod, skipped);
+            }
+            skipped.Count += n;
+        }
+
+        private static int CountPatchCalls(IReadOnlyList<Stmt> body)
+        {
+            int n = 0;
+            foreach (var stmt in body)
+            {
+                if (stmt is ExprStmt es && IsPatchCall(es.Expr)) n++;
+                else if (stmt is IfStmt nested)
+                {
+                    foreach (var branch in nested.Branches) n += CountPatchCalls(branch.Body);
+                    if (nested.OrElse != null) n += CountPatchCalls(nested.OrElse);
+                }
+            }
+            return n;
         }
 
         private bool EvaluateCondition(Expr condition)
@@ -272,6 +345,8 @@ namespace Kesa.Engine.Script
                 case AttributeExpr attr:
                     if (ContainsInherit(attr))
                         throw _context.Fail(Codes.EvlUnsupported, "'inherit' can only be used in a Def field value", attr.Span);
+                    var owner = Evaluate(attr.Target);
+                    if (owner is IAttributeSource source) return source.GetAttribute(_context, attr.Span, attr.Name);
                     throw _context.Fail(Codes.EvlUnsupported, "attribute access is not supported at load time yet", attr.Span);
                 case BinaryExpr bin:
                     throw _context.Fail(Codes.EvlUnsupported, "operator '" + bin.Op + "' is not supported at load time yet",

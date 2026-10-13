@@ -20,12 +20,15 @@ namespace Kesa.Engine.Loading
         private readonly ModManifest _manifest;
         private readonly Func<string, bool> _isActive;
         private readonly BuiltinFunction _modLoaded;
+        private readonly PatchNamespace _patch;
+        private readonly List<PatchCall> _patchSink;
 
         /// <param name="manifest">이 모드의 매니페스트 (<c>mod_loaded</c>가 선언된 모드만 받는다)</param>
         /// <param name="isActive">지금 활성인 모드인가 (설치되어 있고 로드에 실패하지 않았음, spec-gaps G8)</param>
         /// <param name="sink">이 모드가 만든 Def를 실행 순서대로 모을 곳</param>
+        /// <param name="patchSink">이 모드의 <c>patch.*</c> 호출을 실행 순서대로 모을 곳</param>
         public DefBuiltins(SchemaSet schema, ModVisibility visibility, ModManifest manifest, Func<string, bool> isActive,
-            List<DefRecord> sink)
+            List<DefRecord> sink, List<PatchCall> patchSink)
         {
             _schema = schema;
             _visibility = visibility;
@@ -33,7 +36,85 @@ namespace Kesa.Engine.Loading
             _manifest = manifest;
             _isActive = isActive;
             _sink = sink;
+            _patchSink = patchSink;
             _modLoaded = new BuiltinFunction(Interpreter.ModLoadedName, ModLoaded);
+            _patch = new PatchNamespace(this);
+        }
+
+        /// <summary><c>patch</c>: <c>set</c>/<c>add</c>/<c>append</c>/<c>remove</c>를 속성으로 가진 이름 (spec-gaps G34).</summary>
+        private sealed class PatchNamespace : Value, IAttributeSource
+        {
+            private static readonly string[] Names = { "set", "add", "append", "remove" };
+            private readonly Dictionary<string, BuiltinFunction> _functions = new Dictionary<string, BuiltinFunction>();
+
+            public PatchNamespace(DefBuiltins owner)
+            {
+                var ops = new[] { PatchOp.Set, PatchOp.Add, PatchOp.Append, PatchOp.Remove };
+                for (int i = 0; i < ops.Length; i++)
+                {
+                    var op = ops[i];
+                    string name = Names[i];
+                    _functions.Add(name, new BuiltinFunction(Interpreter.PatchName + "." + name,
+                        (ctx, span, args) => owner.RecordPatch(op, name, ctx, span, args)));
+                }
+            }
+
+            public override string KindName => "patch";
+
+            public Value GetAttribute(CallContext context, SourceSpan span, string name)
+            {
+                if (_functions.TryGetValue(name, out var f)) return f;
+                throw context.Fail(Codes.EvlUnknownName, "patch has no function '" + name + "'", span,
+                    hint: Suggest.Hint(name, Names) ?? "use patch.set, patch.add, patch.append or patch.remove");
+            }
+        }
+
+        /// <summary>
+        /// <c>patch.set/add/append(Def id, 경로, 값)</c>, <c>patch.remove(Def id, 경로[, 원소나 키])</c>를 기록만 한다 (G35).
+        /// 여기서는 호출 모양만 본다: 인자 개수·종류, 경로 문법(G47), 값이 데이터인지.
+        /// 대상 Def와 경로가 있는지, 필드 종류에 허용된 연산인지, 값의 모양은 ③에서 본다 (G39·G42).
+        /// </summary>
+        private Value RecordPatch(PatchOp op, string name, CallContext ctx, SourceSpan span, IReadOnlyList<ArgValue> args)
+        {
+            string callee = Interpreter.PatchName + "." + name;
+            var r = new ArgReader(ctx, callee, span, args);
+            r.RejectRest(Array.Empty<string>());
+            int min = op == PatchOp.Remove ? 2 : 3;
+            if (r.Positional.Count < min || r.Positional.Count > 3)
+            {
+                string usage = op == PatchOp.Remove
+                    ? callee + "(\"Def\", \"path\") or " + callee + "(\"Def\", \"path\", element_or_key)"
+                    : callee + "(\"Def\", \"path\", value)";
+                throw ctx.Fail(Codes.EvlArguments, callee + "() got " + r.Positional.Count + " positional arguments",
+                    r.Positional.Count > 3 ? r.Positional[3].Span : span, hint: "write " + usage);
+            }
+
+            var idArg = r.Positional[0];
+            string id = r.String(idArg, "the Def id");
+            if (id.Length == 0) throw ctx.Fail(Codes.EvlArguments, "the Def id must not be empty", idArg.Span);
+
+            var pathArg = r.Positional[1];
+            string pathText = r.String(pathArg, "the path");
+            if (!PatchPath.TryParse(pathText, out var path, out string error))
+            {
+                throw ctx.Fail(Codes.PatBadPath, "invalid patch path \"" + pathText + "\": " + error, ArgReader.SpanOf(pathArg),
+                    hint: "write Component.field, or Field['key with dots'] / Field[3] for map keys");
+            }
+
+            Value? value = null;
+            var valueSpan = span;
+            if (r.Positional.Count == 3)
+            {
+                var valueArg = r.Positional[2];
+                value = valueArg.Value;
+                valueSpan = valueArg.Span;
+                // 컴포넌트 값(Morale(...))은 컴포넌트를 붙이는 값이다 (G44). 그 밖은 Def 값과 같은 데이터 검사
+                if (!(value is ComponentValue) && !CheckData(ctx, value, valueSpan)) throw new ScriptError();
+            }
+
+            _patchSink.Add(new PatchCall(op, _mod, _patchSink.Count, id, ArgReader.SpanOf(idArg), path,
+                ArgReader.SpanOf(pathArg), value, valueSpan, span, ctx.Guards.ToArray()));
+            return NoneValue.Instance;
         }
 
         /// <summary>
@@ -64,6 +145,7 @@ namespace Kesa.Engine.Loading
         public Value? Lookup(string name)
         {
             if (name == Interpreter.ModLoadedName) return _modLoaded;
+            if (name == Interpreter.PatchName) return _patch;
             if (_schema.TryGetType(name, out var t) && _visibility.CanSee(_mod, t.Mod)) return new DefConstructor(this, t);
             if (_schema.TryGetComponent(name, out var c) && _visibility.CanSee(_mod, c.Mod))
                 return new ComponentConstructor(c);
@@ -75,6 +157,7 @@ namespace Kesa.Engine.Loading
             get
             {
                 yield return Interpreter.ModLoadedName;
+                yield return Interpreter.PatchName;
                 foreach (var t in _schema.Types)
                     if (_visibility.CanSee(_mod, t.Mod)) yield return t.Name;
                 foreach (var c in _schema.Components)
