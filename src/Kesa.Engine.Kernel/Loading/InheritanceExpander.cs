@@ -166,7 +166,8 @@ namespace Kesa.Engine.Loading
             {
                 if (k.Name != field.Name) continue;
                 var value = Evaluated(field.Value, evaluator);
-                if (k.Spec.Merge == MergeMode.Append && value is ListValue own &&
+                // inherit 식의 결과는 부모 값을 이미 포함한 전체 값이다 (G59)
+                if (k.Spec.Merge == MergeMode.Append && !(field.Value is DeferredValue) && value is ListValue own &&
                     resolved.Consts.TryGet(k.Name, out var inherited) && inherited.Origin == ValueOrigin.Inherited &&
                     inherited.Value is ListValue baseList)
                 {

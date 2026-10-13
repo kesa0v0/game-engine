@@ -92,6 +92,19 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         [Test]
+        public void AnInheritExpressionOnAnAppendFieldIsTheWholeValue()
+        {
+            var defs = ExpandClean(
+                "Unit(\"Base\", tags=[\"a\"])\n" +
+                "Unit(\"Scout\", parent=\"Base\", tags=inherit.tags + [\"fast\"])\n" +
+                "Unit(\"Archer\", parent=\"Base\", tags=[\"z\"] + inherit.tags)\n");
+            string Items(string id) =>
+                string.Join(",", ((ListValue)Const(defs, id, "tags").Value).Items.Select(i => ((StrValue)i).Value));
+            Assert.That(Items("Scout"), Is.EqualTo("a,fast"));
+            Assert.That(Items("Archer"), Is.EqualTo("z,a"));
+        }
+
+        [Test]
         public void ComponentsAreMergedValueByValue()
         {
             var defs = ExpandClean(
