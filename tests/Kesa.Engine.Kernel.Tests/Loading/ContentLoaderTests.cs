@@ -46,7 +46,7 @@ namespace Kesa.Engine.Tests.Loading
                 "        flat += r.value\n" +
                 "    return h.base_max + flat\n" +
                 "\n" +
-                "deftype(\"Need\", label=const(TextKey))\n" +
+                "deftype(\"Need\", label=const(TextKey, default=\"\"))\n" +
                 "component(\"Health\",\n" +
                 "    base_max=const(int, default=10, min=1),\n" +
                 "    max=derived(int, health_max),\n" +
@@ -56,7 +56,7 @@ namespace Kesa.Engine.Tests.Loading
                 "deftype(\"Resource\")\n" +
                 "component(\"Stock\", key=\"Resource\", amount=field(fixed, default=0))\n" +
                 "deftype(\"PopGroup\",\n" +
-                "    label=const(TextKey),\n" +
+                "    label=const(TextKey, default=\"\"),\n" +
                 "    population=const(int, default=1),\n" +
                 "    needs=const(dict[DefId[\"Need\"], fixed]),\n" +
                 "    tags=const(list[str], merge=\"append\"),\n" +
@@ -242,7 +242,7 @@ namespace Kesa.Engine.Tests.Loading
                 "component(\"InPile\", pile=ref(\"Pile\", inverse=\"cards\", order_by=\"pos\"), pos=field(int, default=0))\n" +
                 "deftype(\"ConflictGoal\", succeeded=const(Cond[\"ConflictGoal\"]),\n" +
                 "    on_success=const(list[Action[\"ConflictGoal\"]], merge=\"append\"))\n" +
-                "deftype(\"Card\", label=const(TextKey), components=[\"InPile\"])\n",
+                "deftype(\"Card\", label=const(TextKey, default=\"\"), components=[\"InPile\"])\n",
                 defs:
                 "def take(g: ConflictGoal):\n    pass\n" +
                 "def done(g: ConflictGoal) -> bool:\n    return True\n" +
@@ -436,9 +436,9 @@ namespace Kesa.Engine.Tests.Loading
         public void ConflictPartnerThatFailsOnItsOwnDoesNotTakeTheOtherModDown(string extraSchema)
         {
             Mod("core", schema: "deftype(\"Resource\")\n", defs: "Resource(\"Food\")\n");
-            Mod("a", schema: "extend(\"Resource\", trade_value=const(fixed))\n" + extraSchema,
+            Mod("a", schema: "extend(\"Resource\", trade_value=const(fixed, default=0))\n" + extraSchema,
                 defs: "Resource(\"Gold\")\n", extra: ", dependencies=[\"core\"]");
-            Mod("b", schema: "extend(\"Resource\", trade_value=const(int))\n",
+            Mod("b", schema: "extend(\"Resource\", trade_value=const(int, default=0))\n",
                 defs: "Resource(\"Gold\")\n", extra: ", dependencies=[\"core\"]");
             var result = Load(out var diags);
             Assert.That(result.Disabled, Is.EqualTo(new[] { "a" }));
@@ -505,7 +505,7 @@ namespace Kesa.Engine.Tests.Loading
         private const string UnitSchema =
             "def hmax(h: Health) -> int:\n    return h.base_max\n" +
             "component(\"Health\", base_max=const(int, default=10), max=derived(int, hmax), current=field(int))\n" +
-            "deftype(\"Unit\", label=const(TextKey), tags=const(list[str]), components=[\"Health\"])\n";
+            "deftype(\"Unit\", label=const(TextKey, default=\"\"), tags=const(list[str]), components=[\"Health\"])\n";
 
         [Test]
         public void UnknownDefFieldSuggestsAName()

@@ -190,7 +190,7 @@ namespace Kesa.Engine.Loading
         }
 
         /// <summary>값이 타입 자리에 올 수 없으면 이유, 올 수 있으면 null. <c>int</c> → <c>fixed</c>는 허용한다 (G48).</summary>
-        private static string? Mismatch(TypeRef type, Value value)
+        internal static string? Mismatch(TypeRef type, Value value)
         {
             switch (type)
             {

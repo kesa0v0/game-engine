@@ -19,7 +19,7 @@ namespace Kesa.Engine.Tests.Loading
             "    components=[\"Stock\"],\n" +
             "    cost=const(dict[DefId[\"Resource\"], int]),\n" +
             "    builds=const(list[DefId[\"Building\"]]),\n" +
-            "    home=const(DefId[\"Building\"]),\n" +
+            "    home=const(DefId[\"Building\"], default=\"Hut\"),\n" +
             "    groups=const(dict[str, list[DefId[\"Resource\"]]]),\n" +
             ")\n";
 

@@ -21,9 +21,9 @@ namespace Kesa.Engine.Tests.Loading
             "deftype(\"Unit\",\n" +
             "    components=[\"Health\", \"Stock\", \"Skill\"],\n" +
             "    move=const(int, default=1),\n" +
-            "    ratio=const(fixed),\n" +
+            "    ratio=const(fixed, default=0),\n" +
             "    speed=const(fixed, default=1.5),\n" +
-            "    label=const(str),\n" +
+            "    label=const(str, default=\"\"),\n" +
             "    tags=const(list[str]),\n" +
             "    cost=const(dict[DefId[\"Resource\"], int]),\n" +
             "    table=const(dict[int, str]),\n" +
@@ -33,9 +33,17 @@ namespace Kesa.Engine.Tests.Loading
             "Resource(\"Wood\")\nResource(\"Iron\")\n" +
             "Unit(\"Scout\", move=4, tags=[\"a\", \"b\"], cost={\"Wood\": 2}, table={1: \"x\"}, Health=Health(base_max=12))\n";
 
-        private ContentLoadResult Run(string patches, out IReadOnlyList<Diagnostic> diags, string defs = DefaultDefs)
+        // ratio에 default가 없는 스키마: add의 기준값이 없는 경우를 만든다. 필수 값이 비어도 되도록 Def는 abstract
+        private static readonly string NoRatioDefault = Schema.Replace("ratio=const(fixed, default=0)", "ratio=const(fixed)");
+
+        private const string TemplateDefs =
+            "Resource(\"Wood\")\nResource(\"Iron\")\n" +
+            "Unit(\"Scout\", abstract=True, move=4, tags=[\"a\", \"b\"], cost={\"Wood\": 2}, table={1: \"x\"})\n";
+
+        private ContentLoadResult Run(string patches, out IReadOnlyList<Diagnostic> diags, string defs = DefaultDefs,
+            string? schema = null)
         {
-            Mod("core", schema: Schema, defs: defs);
+            Mod("core", schema: schema ?? Schema, defs: defs);
             Mod("compat", defs: patches, extra: CoreDep);
             return Load(out diags);
         }
@@ -118,7 +126,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AddWithoutAnyValueIsAnErrorSuggestingSet()
         {
-            var result = Run(P("add", "ratio", "1"), out var diags);
+            var result = Run(P("add", "ratio", "1"), out var diags, TemplateDefs, NoRatioDefault);
             var d = diags.Single();
             Assert.That((d.Code, d.Mod, d.Line), Is.EqualTo((Codes.PatNoBase, "compat", 1)));
             Assert.That(d.Hint, Does.Contain("patch.set"));
@@ -379,7 +387,8 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void SeveralFailuresInOneDefAreAllReported()
         {
-            Run(P("remove", "tags", "\"zzz\"") + P("remove", "cost", "\"Iron\"") + P("add", "ratio", "1"), out var diags);
+            Run(P("remove", "tags", "\"zzz\"") + P("remove", "cost", "\"Iron\"") + P("add", "ratio", "1"), out var diags, TemplateDefs,
+                NoRatioDefault);
             Assert.That(diags.Select(d => d.Code), Is.EquivalentTo(new[] { Codes.PatNoTarget, Codes.PatNoTarget, Codes.PatNoBase }));
         }
 

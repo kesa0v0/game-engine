@@ -28,7 +28,7 @@ namespace Kesa.Engine.Tests.Loading
                 "    speed=const(fixed, default=1.0),\n" +
                 "    flag=const(bool, default=False),\n" +
                 "    name=const(str, default=\"\"),\n" +
-                "    label=const(TextKey),\n" +
+                "    label=const(TextKey, default=\"\"),\n" +
                 "    tags=const(list[str]),\n" +
                 "    cost=const(dict[DefId[\"Resource\"], int]),\n" +
                 "    table=const(dict[int, str]),\n" +

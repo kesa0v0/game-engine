@@ -3,7 +3,7 @@ namespace Kesa.Engine.Diagnostics
     /// <summary>
     /// 진단 코드. 잠정 체계: 영역 접두사 + 세 자리 번호 (spec-gaps G6).
     /// LEX = 렉서, PAR = 파서, MOD = 모드 매니페스트·정렬, LOD = 콘텐츠 파일 목록, EVL = 로드 시점 평가,
-    /// SCH = 스키마 단계(②a), DEF = Def 등록(②b), PAT = 패치(③), INH = 상속 펼치기(④), LNK = 링크(⑤).
+    /// SCH = 스키마 단계(②a), DEF = Def 등록(②b), PAT = 패치(③), INH = 상속 펼치기(④), LNK = 링크(⑤), VAL = 검증(⑥).
     /// </summary>
     public static class Codes
     {
@@ -94,5 +94,10 @@ namespace Kesa.Engine.Diagnostics
         public const string LnkWrongType = "LNK002";
         public const string LnkNotVisible = "LNK003";
         public const string LnkAbstract = "LNK004";
+
+        // 검증 (spec S1 ⑥)
+        public const string ValMissing = "VAL001";
+        public const string ValType = "VAL002";
+        public const string ValRange = "VAL003";
     }
 }

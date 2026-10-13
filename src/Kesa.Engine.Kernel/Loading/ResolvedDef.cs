@@ -93,9 +93,12 @@ namespace Kesa.Engine.Loading
         public OrderedMap<ResolvedValue> Members { get; } = new OrderedMap<ResolvedValue>();
         public OrderedMap<ResolvedRow> Rows { get; } = new OrderedMap<ResolvedRow>();
 
+        /// <summary>패치가 붙인 컴포넌트면 그 패치 (타입에 붙은 컴포넌트는 null).</summary>
+        public PatchLogEntry? AttachedBy { get; internal set; }
+
         internal ResolvedComponent CloneInherited()
         {
-            var copy = new ResolvedComponent(Component);
+            var copy = new ResolvedComponent(Component) { AttachedBy = AttachedBy };
             foreach (var k in Members.Keys)
             {
                 Members.TryGet(k, out var v);
@@ -117,9 +120,12 @@ namespace Kesa.Engine.Loading
 
         public OrderedMap<ResolvedValue> Members { get; } = new OrderedMap<ResolvedValue>();
 
+        /// <summary>패치가 붙인 줄이면 그 패치.</summary>
+        public PatchLogEntry? AttachedBy { get; internal set; }
+
         internal ResolvedRow CloneInherited()
         {
-            var copy = new ResolvedRow();
+            var copy = new ResolvedRow { AttachedBy = AttachedBy };
             foreach (var k in Members.Keys)
             {
                 Members.TryGet(k, out var v);

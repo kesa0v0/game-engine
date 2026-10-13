@@ -402,12 +402,28 @@ namespace Kesa.Engine.Schema
         {
             var arg = r.Take(name);
             if (arg == null) return null;
-            if (!(spec.Type is PrimitiveTypeRef p) || !p.IsNumeric)
-                throw ctx.Fail(Codes.SchBadDeclaration, name + "= needs an int or fixed type, not " + spec.Type.Display,
-                    arg.Span);
+            if (!HoldsNumbers(spec.Type))
+            {
+                throw ctx.Fail(Codes.SchBadDeclaration,
+                    name + "= needs an int or fixed type (or a list or map of them), not " + spec.Type.Display, arg.Span);
+            }
             if (!(arg.Value is IntValue) && !(arg.Value is FixedValue))
                 throw ctx.Fail(Codes.EvlType, name + " must be a number, not " + arg.Value.KindName, arg.Span);
             return arg.Value;
+        }
+
+        /// <summary>
+        /// <c>min</c>/<c>max</c>를 줄 수 있는 타입: 숫자이거나, 숫자를 원소·값으로 갖는 리스트·맵이다 (spec-gaps G68).
+        /// </summary>
+        private static bool HoldsNumbers(TypeRef type)
+        {
+            switch (type)
+            {
+                case PrimitiveTypeRef p: return p.IsNumeric;
+                case ListTypeRef list: return HoldsNumbers(list.Element);
+                case DictTypeRef dict: return HoldsNumbers(dict.Value);
+            }
+            return false;
         }
 
         /// <summary>함수 값은 Def(const)에만 둔다 (spec S2).</summary>

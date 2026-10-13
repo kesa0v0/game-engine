@@ -106,7 +106,7 @@ namespace Kesa.Engine.Loading
                     "Def '" + def.Id + "' already has component '" + component.Name + "'", call.PathSpan,
                     hint: "patch its values one by one, for example " + component.Name + ".<value>");
             }
-            var attached = new ResolvedComponent(component);
+            var attached = new ResolvedComponent(component) { AttachedBy = entry };
             SetMembers(attached.Members, (ComponentValue)call.Value!, entry, def);
             def.Components.Set(component.Name, attached);
         }
@@ -140,7 +140,7 @@ namespace Kesa.Engine.Loading
                     "Def '" + def.Id + "' already has row '" + key + "' of '" + component.Name + "'", call.PathSpan,
                     hint: "patch its values one by one, for example " + component.Name + "." + key + ".<value>");
             }
-            var row = new ResolvedRow();
+            var row = new ResolvedRow { AttachedBy = entry };
             SetMembers(row.Members, (ComponentValue)call.Value!, entry, def);
             container.Rows.Set(key, row);
         }

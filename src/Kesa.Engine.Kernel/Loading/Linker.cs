@@ -113,22 +113,10 @@ namespace Kesa.Engine.Loading
 
         private void CheckId(ResolvedValue origin, string id, string typeName, SourceSpan literal, SourceSpan fallback)
         {
-            string mod;
-            IReadOnlyList<string> guards;
-            SourceSpan span;
-            if (origin.Patch != null)
-            {
-                mod = origin.Patch.Mod;
-                guards = origin.Patch.Call.Guards;
-                span = literal.File.Length > 0 ? literal : origin.Patch.Call.ValueSpan;
-            }
-            else
-            {
-                mod = origin.Source.Mod;
-                guards = Array.Empty<string>();
-                span = literal.File.Length > 0 ? literal : fallback;
-            }
-            if (span.File.Length == 0) span = origin.Source.Span;
+            var blame = ValueBlame.Of(origin, literal, fallback);
+            string mod = blame.Mod;
+            var guards = blame.Guards;
+            var span = blame.Span;
 
             void Fail(string code, string message, string? hint = null, IReadOnlyList<SourceSpan>? related = null)
             {

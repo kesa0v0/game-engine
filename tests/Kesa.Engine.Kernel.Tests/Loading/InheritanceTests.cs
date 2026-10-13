@@ -19,8 +19,8 @@ namespace Kesa.Engine.Tests.Loading
             "deftype(\"Unit\",\n" +
             "    components=[\"Health\", \"Stock\"],\n" +
             "    move=const(int, default=1),\n" +
-            "    ratio=const(fixed),\n" +
-            "    label=const(str),\n" +
+            "    ratio=const(fixed, default=0),\n" +
+            "    label=const(str, default=\"\"),\n" +
             "    tags=const(list[str], merge=\"append\"),\n" +
             "    names=const(list[str]),\n" +
             "    cost=const(dict[DefId[\"Resource\"], int]),\n" +
