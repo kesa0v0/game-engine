@@ -130,7 +130,11 @@ namespace Kesa.Engine.Tests.Loading
         public void AValueOfANonSlotComponentIsResolvedByType()
         {
             // 붙어 있는지는 ④가 판정한다. ③은 컴포넌트와 값 이름이 스키마에 있는지만 본다
-            var t = Resolved("Morale.value");
+            Core();
+            Mod("compat",
+                defs: "patch.set(\"Scout\", \"Morale\", Morale(value=1))\npatch.set(\"Scout\", \"Morale.value\", 2)\n",
+                extra: CoreDep);
+            var t = Load(out _).Resolved[1].Target;
             Assert.That((t.Kind, t.IsTypeSlot), Is.EqualTo((PatchTargetKind.Member, false)));
         }
 

@@ -200,7 +200,7 @@ namespace Kesa.Engine.Loading
             foreach (var u in units)
                 if (!u.Failed) mods.Add(new KeyValuePair<ModManifest, IReadOnlyList<PatchCall>>(u.Manifest, u.Patches));
             run.Resolved = PatchResolver.Resolve(mods, run.Defs, run.Schema, run.Visibility, stage);
-            PatchConflicts.Check(run.Resolved, order, stage);
+            var conflicted = PatchConflicts.Check(run.Resolved, order, stage);
             run.Log = new PatchLog(run.Resolved);
 
             // ④ 상속 펼치기. 오류는 ③과 같은 통로로 모아 모드를 함께 정산한다
@@ -213,7 +213,7 @@ namespace Kesa.Engine.Loading
                     id => units.Exists(o => o.Manifest.Id == id && !o.Failed), new List<DefRecord>(), new List<PatchCall>());
                 environments[u.Manifest.Id] = new ModEnvironment(unit.Scope, builtins);
             }
-            run.Expanded = InheritanceExpander.Expand(run.Defs, run.Schema, run.Visibility, mod => environments[mod], stage);
+            run.Expanded = InheritanceExpander.Expand(run.Defs, run.Schema, run.Visibility, mod => environments[mod], stage, run.Log, conflicted);
 
             var failedBefore = new HashSet<string>(StringComparer.Ordinal);
             foreach (var u in units)

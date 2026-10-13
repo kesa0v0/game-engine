@@ -14,6 +14,9 @@ namespace Kesa.Engine.Loading
 
         /// <summary>부모 Def에서 물려받았다.</summary>
         Inherited,
+
+        /// <summary>어느 모드의 패치가 마지막으로 바꿨다 (<see cref="ResolvedValue.Patch"/>).</summary>
+        Patched,
     }
 
     /// <summary>
@@ -22,13 +25,19 @@ namespace Kesa.Engine.Loading
     /// </summary>
     public sealed class ResolvedValue
     {
-        internal ResolvedValue(Value value, ValueOrigin origin, DefRecord source, SourceSpan span)
+        internal ResolvedValue(Value value, ValueOrigin origin, DefRecord source, SourceSpan span, PatchLogEntry? patch = null)
         {
             Value = value;
             Origin = origin;
             Source = source;
             Span = span;
+            Patch = patch;
         }
+
+        /// <summary>
+        /// 이 값을 마지막으로 바꾼 패치. 패치가 바꾼 값을 자식이 물려받아도 남는다 (그때 <see cref="Origin"/>은 Inherited).
+        /// </summary>
+        public PatchLogEntry? Patch { get; }
 
         /// <summary>평가가 끝난 데이터 값 (<see cref="DeferredValue"/>는 남지 않는다).</summary>
         public Value Value { get; }
@@ -40,7 +49,7 @@ namespace Kesa.Engine.Loading
         public SourceSpan Span { get; }
 
         internal ResolvedValue AsInherited() =>
-            Origin == ValueOrigin.Inherited ? this : new ResolvedValue(Value, ValueOrigin.Inherited, Source, Span);
+            Origin == ValueOrigin.Inherited ? this : new ResolvedValue(Value, ValueOrigin.Inherited, Source, Span, Patch);
     }
 
     /// <summary>적힌 순서를 지키는 이름 → 값 맵. 순회 순서가 결정적이어야 해서 Dictionary를 직접 순회하지 않는다.</summary>

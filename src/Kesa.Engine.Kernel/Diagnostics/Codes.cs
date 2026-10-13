@@ -74,6 +74,14 @@ namespace Kesa.Engine.Diagnostics
         public const string PatConflict = "PAT010";
         public const string PatOverridden = "PAT011";
 
+        // 패치 적용 (spec S1 ④, 값에 의존하는 검사)
+        public const string PatNoComponent = "PAT012";
+        public const string PatAlreadyThere = "PAT013";
+        public const string PatNoTarget = "PAT014";
+        public const string PatNoBase = "PAT015";
+        public const string PatKeyExists = "PAT016";
+        public const string PatOutOfRange = "PAT017";
+
         // 상속 펼치기 (spec S1 ④)
         public const string InhParentNotFound = "INH001";
         public const string InhParentType = "INH002";

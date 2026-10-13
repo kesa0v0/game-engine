@@ -6,7 +6,14 @@ namespace Kesa.Engine.Loading
     /// <summary>패치 항목의 처리 상태. ③은 Pending으로 만들고 ④가 적용하면서 채운다.</summary>
     public enum PatchStatus
     {
+        /// <summary>아직 적용하지 않았다 (③ 직후, 또는 대상 Def의 상속 펼치기가 실패해 적용에 닿지 못함).</summary>
         Pending,
+
+        /// <summary>④가 적용했다.</summary>
+        Applied,
+
+        /// <summary>적용하려다 값에 의존하는 검사에서 실패해 건너뛰었다 (오류가 보고됨, G60).</summary>
+        Failed,
     }
 
     /// <summary>

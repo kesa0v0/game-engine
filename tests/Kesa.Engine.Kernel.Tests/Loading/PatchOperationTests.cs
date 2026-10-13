@@ -33,7 +33,8 @@ namespace Kesa.Engine.Tests.Loading
                 "    cost=const(dict[DefId[\"Resource\"], int]),\n" +
                 "    table=const(dict[int, str]),\n" +
                 ")\n",
-                defs: "Resource(\"Wood\")\nResource(\"core.Iron\")\nUnit(\"Scout\")\n");
+                defs: "Resource(\"Wood\")\nResource(\"core.Iron\")\n" +
+                      "Unit(\"Scout\", tags=[\"slow\"], cost={\"Wood\": 2}, table={1: \"x\"})\n");
         }
 
         private ContentLoadResult Run(string call)
@@ -59,26 +60,35 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("patch.append(\"Scout\", \"tags\", [\"fast\"])")]
         [TestCase("patch.remove(\"Scout\", \"tags\", \"slow\")")]
         [TestCase("patch.set(\"Scout\", \"cost\", {\"Wood\": 1})")]
-        [TestCase("patch.append(\"Scout\", \"cost\", {\"Wood\": 2, \"core.Iron\": 1})")]
+        [TestCase("patch.append(\"Scout\", \"cost\", {\"core.Iron\": 1})")]
         [TestCase("patch.remove(\"Scout\", \"cost\", \"Wood\")")]
         [TestCase("patch.set(\"Scout\", \"cost.Wood\", 3)")]
         [TestCase("patch.add(\"Scout\", \"cost.Wood\", 1)")]
         [TestCase("patch.set(\"Scout\", \"table[3]\", \"x\")")]
-        [TestCase("patch.append(\"Scout\", \"table\", {1: \"a\"})")]
+        [TestCase("patch.append(\"Scout\", \"table\", {2: \"a\"})")]
         [TestCase("patch.remove(\"Scout\", \"table\", 1)")]
         [TestCase("patch.set(\"Scout\", \"Health.base_max\", 5)")]
         [TestCase("patch.add(\"Scout\", \"Health.base_max\", 1)")]
         [TestCase("patch.add(\"Scout\", \"Health.current\", 1)")]
         [TestCase("patch.set(\"Scout\", \"Morale\", Morale(value=7))")]
-        [TestCase("patch.remove(\"Scout\", \"Morale\")")]
         [TestCase("patch.set(\"Scout\", \"Skill.Wood\", Skill(level=1))")]
-        [TestCase("patch.remove(\"Scout\", \"Skill.Wood\")")]
         [TestCase("patch.add(\"Scout\", \"Stock['core.Iron'].amount\", 1)")]
-        [TestCase("patch.set(\"Scout\", \"Morale.value\", 1)")]
         public void AllowedOperation(string call)
         {
             var result = Run(call);
             Assert.That(result.Resolved, Has.Count.EqualTo(1), string.Join("\n", result.Disabled));
+            Assert.That(result.Disabled, Is.Empty);
+        }
+
+        [TestCase("patch.remove(\"Scout\", \"Morale\")")]
+        [TestCase("patch.set(\"Scout\", \"Morale.value\", 1)")]
+        [TestCase("patch.remove(\"Scout\", \"Skill.Wood\")")]
+        public void AllowedOperationOnAComponentAttachedBefore(string call)
+        {
+            // 떼거나 그 안의 값을 바꾸려면 먼저 붙어 있어야 한다 (④가 본다, G44)
+            var result = Run("patch.set(\"Scout\", \"Morale\", Morale(value=3))\n" +
+                             "patch.set(\"Scout\", \"Skill.Wood\", Skill(level=1))\n" + call);
+            Assert.That(result.Resolved, Has.Count.EqualTo(3), string.Join("\n", result.Disabled));
             Assert.That(result.Disabled, Is.Empty);
         }
 

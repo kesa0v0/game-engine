@@ -24,7 +24,7 @@ namespace Kesa.Engine.Tests.Loading
             "    b=const(int, default=0), c=const(int, default=0))\n";
 
         private void Core(string id = "Scout") =>
-            Mod("core", schema: UnitSchema, defs: "Unit(\"" + id + "\")\n");
+            Mod("core", schema: UnitSchema, defs: "Unit(\"" + id + "\", tags=[\"slow\"])\n");
 
         [Test]
         public void RecordsEveryOperationInCallOrder()
@@ -35,22 +35,23 @@ namespace Kesa.Engine.Tests.Loading
                       "patch.add(\"Scout\", \"Health.base_max\", 2)\n" +
                       "patch.append(\"Scout\", \"tags\", [\"fast\"])\n" +
                       "patch.remove(\"Scout\", \"tags\", \"slow\")\n" +
+                      "patch.set(\"Scout\", \"Morale\", Morale(value=1))\n" +
                       "patch.remove(\"Scout\", \"Morale\")\n",
                 extra: CoreDep);
             var result = LoadClean();
             var calls = result.Patches;
             Assert.That(calls.Select(c => c.Op),
-                Is.EqualTo(new[] { PatchOp.Set, PatchOp.Add, PatchOp.Append, PatchOp.Remove, PatchOp.Remove }));
-            Assert.That(calls.Select(c => c.Index), Is.EqualTo(new[] { 0, 1, 2, 3, 4 }));
-            Assert.That(calls.Select(c => c.Span.Line), Is.EqualTo(new[] { 1, 2, 3, 4, 5 }));
+                Is.EqualTo(new[] { PatchOp.Set, PatchOp.Add, PatchOp.Append, PatchOp.Remove, PatchOp.Set, PatchOp.Remove }));
+            Assert.That(calls.Select(c => c.Index), Is.EqualTo(new[] { 0, 1, 2, 3, 4, 5 }));
+            Assert.That(calls.Select(c => c.Span.Line), Is.EqualTo(new[] { 1, 2, 3, 4, 5, 6 }));
             Assert.That(calls.Select(c => c.Path.Text),
-                Is.EqualTo(new[] { "move", "Health.base_max", "tags", "tags", "Morale" }));
+                Is.EqualTo(new[] { "move", "Health.base_max", "tags", "tags", "Morale", "Morale" }));
             Assert.That(calls.Select(c => c.TargetId), Has.All.EqualTo("Scout"));
             Assert.That(calls.Select(c => c.Mod), Has.All.EqualTo("compat"));
             Assert.That(((IntValue)calls[0].Value!).Value, Is.EqualTo(4));
             Assert.That(calls[2].Value, Is.InstanceOf<ListValue>());
             Assert.That(((StrValue)calls[3].Value!).Value, Is.EqualTo("slow"));
-            Assert.That(calls[4].Value, Is.Null);
+            Assert.That(calls[5].Value, Is.Null);
             Assert.That(calls.Select(c => c.Guards), Has.All.Empty);
         }
 

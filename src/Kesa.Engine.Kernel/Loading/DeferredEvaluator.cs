@@ -218,15 +218,17 @@ namespace Kesa.Engine.Loading
                 throw _context.Fail(Codes.DefUnknownField, "component '" + componentName + "' has no value '" + memberName + "'",
                     span, hint: Suggest.Hint(memberName, names));
             }
-            if (_parent.Components.TryGet(componentName, out var resolvedComponent) &&
-                resolvedComponent.Members.TryGet(memberName, out var resolved))
-                return resolved.Value;
-            if (member.Spec.Default != null && _parent.Components.Contains(componentName)) return member.Spec.Default;
+            // 타입에 붙은 컴포넌트는 모든 Def가 가지므로, 부모가 적지 않았어도 기본값은 있다
+            OrderedMap<ResolvedValue>? members = null;
+            if (_parent.Components.TryGet(componentName, out var resolvedComponent))
+            {
+                members = resolvedComponent.Members;
+                if (members.TryGet(memberName, out var resolved)) return resolved.Value;
+            }
+            var fallback = MemberDefaults.Of(component, member, members);
+            if (fallback != null) return fallback;
             throw _context.Fail(Codes.InhNoValue,
-                _parent.Components.Contains(componentName)
-                    ? "parent '" + _parent.Id + "' has no value for '" + componentName + "." + memberName + "'"
-                    : "parent '" + _parent.Id + "' does not have component '" + componentName + "'",
-                span);
+                "parent '" + _parent.Id + "' has no value for '" + componentName + "." + memberName + "'", span);
         }
 
         // ---- 산술 ----

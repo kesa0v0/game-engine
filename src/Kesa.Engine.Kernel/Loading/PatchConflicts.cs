@@ -11,8 +11,10 @@ namespace Kesa.Engine.Loading
     internal static class PatchConflicts
     {
         /// <param name="patches">③의 앞선 검사를 통과한 호출 (모드 로드 순서, 호출 순서)</param>
-        public static void Check(IReadOnlyList<ResolvedPatch> patches, LoadOrder order, StageDiagnostics stage)
+        /// <returns>충돌 오류가 난 (모드, 대상 Def) 쌍. <see cref="ConflictKey"/>로 만든 키다</returns>
+        public static HashSet<string> Check(IReadOnlyList<ResolvedPatch> patches, LoadOrder order, StageDiagnostics stage)
         {
+            var conflicted = new HashSet<string>(System.StringComparer.Ordinal);
             // 같은 Def를 가리키는 호출끼리 묶는다 (부모와 자식 Def 사이의 순서는 ④의 상속이 정한다, G50)
             var byTarget = new Dictionary<string, List<ResolvedPatch>>(System.StringComparer.Ordinal);
             var targets = new List<string>();
@@ -33,14 +35,16 @@ namespace Kesa.Engine.Loading
                 var reported = new HashSet<string>(System.StringComparer.Ordinal);
                 for (int i = 0; i < list.Count; i++)
                 {
-                    for (int j = i + 1; j < list.Count; j++) CheckPair(list[i].Call, list[j].Call, order, stage, reported);
+                    for (int j = i + 1; j < list.Count; j++) CheckPair(list[i].Call, list[j].Call, order, stage, reported, conflicted);
                 }
             }
+            return conflicted;
         }
 
         /// <param name="a">앞선 호출 (로드 순서상 먼저)</param>
         /// <param name="b">뒤따르는 호출</param>
-        private static void CheckPair(PatchCall a, PatchCall b, LoadOrder order, StageDiagnostics stage, HashSet<string> reported)
+        private static void CheckPair(PatchCall a, PatchCall b, LoadOrder order, StageDiagnostics stage, HashSet<string> reported,
+            HashSet<string> conflicted)
         {
             if (!Overlaps(a.Path, b.Path)) return;
 
@@ -79,11 +83,15 @@ namespace Kesa.Engine.Loading
             string message = "mods '" + a.Mod + "' and '" + b.Mod + "' both patch '" + a.TargetId + "' (" +
                              Describe(a) + " at " + a.Span + ", " + Describe(b) + " at " + b.Span +
                              ") and have no load order between them";
+            conflicted.Add(ConflictKey(a.Mod, a.TargetId));
+            conflicted.Add(ConflictKey(b.Mod, b.TargetId));
             stage.ConflictError(a.Mod, Codes.PatConflict, message, a.Span, hint: "declare loadAfter in one of the two mods",
                 related: new[] { b.Span });
             stage.ConflictError(b.Mod, Codes.PatConflict, message, b.Span, hint: "declare loadAfter in one of the two mods",
                 related: new[] { a.Span });
         }
+
+        public static string ConflictKey(string mod, string defId) => mod + "\n" + defId;
 
         private static bool Overlaps(PatchPath a, PatchPath b) => a.IsPrefixOf(b) || b.IsPrefixOf(a);
 

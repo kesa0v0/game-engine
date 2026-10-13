@@ -26,7 +26,8 @@ namespace Kesa.Engine.Tests.Loading
                 "    tags=const(list[str]),\n" +
                 "    cost=const(dict[DefId[\"Resource\"], int]),\n" +
                 ")\n",
-                defs: "Resource(\"Wood\")\nResource(\"Iron\")\nUnit(\"Scout\")\nUnit(\"Archer\")\n");
+                defs: "Resource(\"Wood\")\nResource(\"Iron\")\n" +
+                      "Unit(\"Scout\", tags=[\"a\", \"b\"], cost={\"Wood\": 1, \"Iron\": 1})\nUnit(\"Archer\")\n");
         }
 
         private void Alpha(string defs) => Mod("alpha", defs: defs, extra: ", " + CoreDep);
@@ -139,7 +140,7 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("set", "move", "1", "add", "move", "2", false)]
         [TestCase("set", "cost", "{}", "set", "cost.Wood", "1", false)]
         [TestCase("remove", "tags", "'a'", "set", "tags", "[]", false)]
-        [TestCase("set", "tags", "[]", "remove", "tags", "'a'", false)]
+        [TestCase("set", "tags", "['a']", "remove", "tags", "'a'", false)]
         [TestCase("add", "move", "1", "add", "move", "2", false)]
         public void OnlyASetThatReplacesEarlierWorkIsWarned(string op1, string path1, string v1, string op2, string path2, string v2,
             bool warns)
@@ -199,7 +200,7 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(log.Entries.Select(e => e.Sequence), Is.EqualTo(new[] { 0, 1, 2, 3 }));
             Assert.That(log.Entries.Select(e => e.Mod + ":" + e.Path.Text),
                 Is.EqualTo(new[] { "alpha:move", "alpha:Health.base_max", "omega:move", "omega:move" }));
-            Assert.That(log.Entries.Select(e => e.Status), Has.All.EqualTo(PatchStatus.Pending));
+            Assert.That(log.Entries.Select(e => e.Status), Has.All.EqualTo(PatchStatus.Applied));
             Assert.That(log.ForDef("Scout").Select(e => e.Sequence), Is.EqualTo(new[] { 0, 1, 2 }));
             Assert.That(log.ForDef("Archer").Select(e => e.Mod), Is.EqualTo(new[] { "omega" }));
             Assert.That(log.ForDef("Nothing"), Is.Empty);

@@ -12,7 +12,7 @@ namespace Kesa.Engine.Tests.Loading
     public class InheritanceTests : LoaderTestBase
     {
         private const string Schema =
-            "component(\"Health\", base_max=const(int, default=10), regen=const(int, default=0))\n" +
+            "component(\"Health\", base_max=const(int, default=10), regen=const(int, default=0), current=field(int))\n" +
             "component(\"Stock\", key=\"Resource\", amount=field(fixed, default=0))\n" +
             "deftype(\"Resource\")\n" +
             "deftype(\"Building\")\n" +
@@ -246,7 +246,7 @@ namespace Kesa.Engine.Tests.Loading
 
         [TestCase("Unit(\"Scout\", move=inherit.move)\n", Codes.InhNoParent)]
         [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", names=inherit.names + [\"x\"])\n", Codes.InhNoValue)]
-        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", Health=Health(base_max=inherit.Health.base_max))\n",
+        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", Health=Health(current=inherit.Health.current))\n",
             Codes.InhNoValue)]
         [TestCase("Unit(\"Base\", Health=Health())\nUnit(\"Scout\", parent=\"Base\", move=inherit.mvoe + 1)\n", Codes.DefUnknownField)]
         [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", move=inherit.Health + 1)\n", Codes.EvlUnsupported)]

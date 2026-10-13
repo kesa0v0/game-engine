@@ -19,24 +19,28 @@ namespace Kesa.Engine.Loading
         private readonly ModVisibility _visibility;
         private readonly Func<string, ModEnvironment> _environment;
         private readonly StageDiagnostics _stage;
+        private readonly PatchLog _log;
+        private readonly PatchApplier _patcher;
 
         private readonly Dictionary<string, ResolvedDef?> _done = new Dictionary<string, ResolvedDef?>(StringComparer.Ordinal);
         private readonly List<DefRecord> _active = new List<DefRecord>();
 
         private InheritanceExpander(DefRegistry defs, SchemaSet schema, ModVisibility visibility,
-            Func<string, ModEnvironment> environment, StageDiagnostics stage)
+            Func<string, ModEnvironment> environment, StageDiagnostics stage, PatchLog log, HashSet<string> conflicted)
         {
             _defs = defs;
             _schema = schema;
             _visibility = visibility;
             _environment = environment;
             _stage = stage;
+            _log = log;
+            _patcher = new PatchApplier(stage, conflicted);
         }
 
         public static ResolvedDefs Expand(DefRegistry defs, SchemaSet schema, ModVisibility visibility,
-            Func<string, ModEnvironment> environment, StageDiagnostics stage)
+            Func<string, ModEnvironment> environment, StageDiagnostics stage, PatchLog log, HashSet<string> conflicted)
         {
-            var expander = new InheritanceExpander(defs, schema, visibility, environment, stage);
+            var expander = new InheritanceExpander(defs, schema, visibility, environment, stage, log, conflicted);
             var result = new ResolvedDefs();
             foreach (var record in defs.Defs)
             {
@@ -142,7 +146,11 @@ namespace Kesa.Engine.Loading
             }
             foreach (var d in evaluator.Bag.ToSortedList())
                 _stage.Error(record.Mod, d.Code, d.Message, d.Span, d.Hint, d.Related);
-            return failed || evaluator.Bag.HasErrors ? null : resolved;
+            if (failed || evaluator.Bag.HasErrors) return null;
+
+            // 이 Def의 패치를 적용한다. 자식은 이 결과를 물려받고 inherit도 이 값을 읽는다 (G50·G55)
+            _patcher.Apply(resolved, _log.ForDef(record.Id));
+            return resolved;
         }
 
         private static void CopyInherited(ResolvedDef parent, ResolvedDef child)
