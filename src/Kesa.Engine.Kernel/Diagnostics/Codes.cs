@@ -3,7 +3,7 @@ namespace Kesa.Engine.Diagnostics
     /// <summary>
     /// 진단 코드. 잠정 체계: 영역 접두사 + 세 자리 번호 (spec-gaps G6).
     /// LEX = 렉서, PAR = 파서, MOD = 모드 매니페스트·정렬, LOD = 콘텐츠 파일 목록, EVL = 로드 시점 평가,
-    /// SCH = 스키마 단계(②a), DEF = Def 등록(②b), PAT = 패치(③).
+    /// SCH = 스키마 단계(②a), DEF = Def 등록(②b), PAT = 패치(③), INH = 상속 펼치기(④).
     /// </summary>
     public static class Codes
     {
@@ -73,5 +73,12 @@ namespace Kesa.Engine.Diagnostics
         public const string PatBadValue = "PAT009";
         public const string PatConflict = "PAT010";
         public const string PatOverridden = "PAT011";
+
+        // 상속 펼치기 (spec S1 ④)
+        public const string InhParentNotFound = "INH001";
+        public const string InhParentType = "INH002";
+        public const string InhCycle = "INH003";
+        public const string InhNoParent = "INH004";
+        public const string InhNoValue = "INH005";
     }
 }

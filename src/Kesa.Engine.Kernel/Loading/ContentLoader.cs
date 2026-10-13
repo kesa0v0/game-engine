@@ -11,8 +11,10 @@ namespace Kesa.Engine.Loading
     public sealed class ContentLoadResult
     {
         internal ContentLoadResult(IReadOnlyList<ModManifest> mods, IReadOnlyList<string> disabled, SchemaSet schema,
-            DefRegistry defs, IReadOnlyList<PatchCall> patches, IReadOnlyList<ResolvedPatch> resolved, PatchLog log)
+            DefRegistry defs, IReadOnlyList<PatchCall> patches, IReadOnlyList<ResolvedPatch> resolved, PatchLog log,
+            ResolvedDefs expanded)
         {
+            Expanded = expanded;
             Mods = mods;
             Disabled = disabled;
             Schema = schema;
@@ -41,6 +43,9 @@ namespace Kesa.Engine.Loading
 
         /// <summary>패치 변경 이력 (spec-gaps G45). 모든 검사를 통과한 호출이 적용 순서대로 들어 있다.</summary>
         public PatchLog PatchLog { get; }
+
+        /// <summary>④가 상속을 펼친 Def들 (spec-gaps G52). 패치는 아직 반영하지 않았다.</summary>
+        public ResolvedDefs Expanded { get; }
     }
 
     /// <summary>
@@ -95,7 +100,7 @@ namespace Kesa.Engine.Loading
                     patches.AddRange(u.Patches);
                 }
                 return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
-                    run.Log);
+                    run.Log, run.Expanded);
             }
         }
 
@@ -118,6 +123,9 @@ namespace Kesa.Engine.Loading
 
             /// <summary>③이 만든 변경 이력 (G45).</summary>
             public PatchLog Log { get; set; } = new PatchLog(new List<ResolvedPatch>());
+
+            /// <summary>④가 상속을 펼친 Def들 (G52).</summary>
+            public ResolvedDefs Expanded { get; set; } = new ResolvedDefs();
         }
 
         /// <summary>
@@ -194,6 +202,18 @@ namespace Kesa.Engine.Loading
             run.Resolved = PatchResolver.Resolve(mods, run.Defs, run.Schema, run.Visibility, stage);
             PatchConflicts.Check(run.Resolved, order, stage);
             run.Log = new PatchLog(run.Resolved);
+
+            // ④ 상속 펼치기. 오류는 ③과 같은 통로로 모아 모드를 함께 정산한다
+            var environments = new Dictionary<string, ModEnvironment>(StringComparer.Ordinal);
+            foreach (var u in units)
+            {
+                if (u.Failed) continue;
+                var unit = u;
+                var builtins = new DefBuiltins(run.Schema, run.Visibility, u.Manifest,
+                    id => units.Exists(o => o.Manifest.Id == id && !o.Failed), new List<DefRecord>(), new List<PatchCall>());
+                environments[u.Manifest.Id] = new ModEnvironment(unit.Scope, builtins);
+            }
+            run.Expanded = InheritanceExpander.Expand(run.Defs, run.Schema, run.Visibility, mod => environments[mod], stage);
 
             var failedBefore = new HashSet<string>(StringComparer.Ordinal);
             foreach (var u in units)
