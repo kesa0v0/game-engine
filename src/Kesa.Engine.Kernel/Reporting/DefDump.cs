@@ -125,12 +125,15 @@ namespace Kesa.Engine.Reporting
             private static JsonNode Source(ResolvedValue value)
             {
                 bool declared = value.Origin == ValueOrigin.Default; // 스키마 선언 위치만 안다
+                // 책임 모드와 위치는 오류와 같은 규칙이다 (G64): 패치가 바꾼 값이면 패치 모드, 아니면 처음 적은 모드
+                var blame = ValueBlame.Of(value, SourceSpan.None, value.Span);
+                var span = declared ? value.Span : blame.Span;
                 return new JsonObject()
-                    .Add("def", declared ? JsonNode.Null : JsonNode.String(value.Source.Id))
-                    .Add("mod", declared ? JsonNode.Null : JsonNode.String(value.Patch != null && value.Origin == ValueOrigin.Patched ? value.Patch.Mod : value.Source.Mod))
-                    .Add("file", JsonNode.String(value.Span.File))
-                    .Add("line", JsonNode.Number(value.Span.Line))
-                    .Add("col", JsonNode.Number(value.Span.Col));
+                    .Add("def", declared ? JsonNode.Null : JsonNode.String(value.Patch?.TargetId ?? value.Source.Id))
+                    .Add("mod", declared ? JsonNode.Null : JsonNode.String(blame.Mod))
+                    .Add("file", JsonNode.String(span.File))
+                    .Add("line", JsonNode.Number(span.Line))
+                    .Add("col", JsonNode.Number(span.Col));
             }
 
             private static JsonNode Patch(PatchLogEntry entry)

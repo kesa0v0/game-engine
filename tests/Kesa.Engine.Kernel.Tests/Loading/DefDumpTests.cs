@@ -100,6 +100,18 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         [Test]
+        public void AnInheritedValueThatTheParentsPatchChangedNamesThePatchingMod()
+        {
+            // Scout는 move를 자기가 패치하지 않고 Base의 패치된 값을 물려받는다
+            var json = Dump("patch.set(\"Base\", \"move\", 5)\n");
+            int scout = json.IndexOf("\"id\": \"Scout\"", System.StringComparison.Ordinal);
+            string scoutPart = json.Substring(scout);
+            Assert.That(scoutPart, Does.Contain("\"value\": 5,\n          \"origin\": \"inherited\",\n          \"source\": {\n" +
+                                                "            \"def\": \"Base\",\n            \"mod\": \"addon\",\n" +
+                                                "            \"file\": \"addon/defs/defs.py\""));
+        }
+
+        [Test]
         public void AttachedComponentsAndRowsShowTheirPatch()
         {
             var json = Dump("patch.set(\"Scout\", \"Skill.Wood\", Skill(level=4))\n");
