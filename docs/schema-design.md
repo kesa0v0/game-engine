@@ -93,7 +93,7 @@ component("Wealth", amount=field(fixed, default=0))
 deftype("PopGroup",
     label=const(TextKey),
     population=const(int, default=1),
-    needs=const(dict[Ref["Need"], fixed]),    # Def 값이므로 맵 허용 (O6)
+    needs=const(dict[DefId["Need"], fixed]),  # Def 값이므로 맵 허용 (O6)
     components=["Wealth", "Health"],
 )
 
@@ -212,7 +212,7 @@ component("Owner",    faction=ref("Faction", optional=True))
 deftype("Unit",
     label=const(TextKey),
     tags=const(list[str], merge="append"),
-    upkeep=const(dict[Ref["Resource"], fixed]),
+    upkeep=const(dict[DefId["Resource"], fixed]),
     components=["Health", "Location", "Owner"],
 )
 
@@ -228,8 +228,9 @@ def Move(unit: Ref[Unit], dest: Ref[Sector]):
 ```
 
 - **`const(타입, ...)` / `field(타입, ...)` / `derived(타입, ...)`:** 값의 종류(2.6 B′)를 이름으로 드러낸다. 타입은 파이썬 타입 표기 그대로(`int`, `fixed`, `str`, `TextKey`, `list[str]`, `dict[K, V]`). 매개변수 어노테이션과 같은 표기라 배울 것이 하나다. 기본값·범위·병합은 키워드(`default=`, `default_from=`, `min=`/`max=`, `merge=`). 범위는 P2의 저장 폭도 정한다. `merge=`는 Def 상속 병합 규칙이라 `const`에만 의미가 있다.
-- **`ref("X", inverse=..., optional=...)`:** Ref 칼럼 전용(S3 표기 그대로). 대상은 문자열이라 선언 순서와 무관하다. Def 필드가 다른 Def를 가리킬 때는 `const(Ref["X"])`.
-- **스키마 안에서 다른 타입 이름은 문자열로**(`Ref["Resource"]`): 스텁이 만들어지기 전에도 편집기가 이름을 몰라 오류를 내지 않는다.
+- **`ref("X", inverse=..., optional=...)`:** 엔티티 Ref 칼럼 전용(S3 표기 그대로). 대상은 문자열이라 선언 순서와 무관하다. 대상은 컴포넌트를 가진(엔티티가 되는) 타입이어야 한다.
+- **참조 타입은 둘이고 자리와 무관하게 뜻이 같다**(spec-gaps G32): `Ref["X"]`는 X의 **엔티티**, `DefId["X"]`는 X의 **Def**(id). Def 필드가 다른 Def를 가리킬 때는 `const(DefId["X"])`, 런타임 칼럼이 Def를 담을 때는 `field(DefId["X"])`(예: 지금 만드는 레시피). `const` 안에는 `Ref`가 올 수 없다(로드 시점에 엔티티가 없음). 엔티티 칼럼은 `ref(...)` 하나로만 선언한다(`field(Ref["X"])`는 로드 오류).
+- **스키마 안에서 다른 타입 이름은 문자열로**(`DefId["Resource"]`): 스텁이 만들어지기 전에도 편집기가 이름을 몰라 오류를 내지 않는다.
 - **컴포넌트 값은 `Health(base_max=12)`** 모양. dict(`{"base_max": 12}`)도 검사되지만 오류 메시지가 덜 구체적이었다(실험 A).
 - Def id는 첫 위치 인자 문자열. 스텁의 `Literal[...]`로 자동완성된다.
 
@@ -259,6 +260,7 @@ class Sector:
 
 - 스텁은 `type` 문을 쓰므로 엔진이 함께 생성하는 `pyrightconfig.json`(또는 VS Code 설정)에 `pythonVersion = 3.12` 이상을 둔다.
 - 편집기에서 `Ref[X]`는 `X`와 구분되지 않는다. optional Ref는 스텁에서 `X | None`이 되어 None 검사를 강제한다(확인 필요).
+- `DefId[X]`는 X의 Def id 문자열(`Literal["Bread", ...]`)로 보여야 한다(spec S2 "Def 참조는 문자열 + `Literal`"). 커맨드 매개변수에 모더가 `DefId[Recipe]`로 적었을 때 이를 어떻게 펼칠지는 `.pyi` 구현 때 정한다.
 ### 3.3 남은 질문
 
 #### 3.3.1 `derived`의 식 ✅

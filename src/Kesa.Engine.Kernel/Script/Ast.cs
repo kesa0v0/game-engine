@@ -118,14 +118,22 @@ namespace Kesa.Engine.Script
 
     public sealed class IndexExpr : Expr
     {
-        public IndexExpr(Expr target, Expr index, SourceSpan span) : base(span)
+        public IndexExpr(Expr target, IReadOnlyList<Expr> indices, SourceSpan span) : base(span)
         {
             Target = target;
-            Index = index;
+            Indices = indices;
         }
 
         public Expr Target { get; }
-        public Expr Index { get; }
+
+        /// <summary>첫 번째 인덱스.</summary>
+        public Expr Index => Indices[0];
+
+        /// <summary>
+        /// 쉼표로 나뉜 인덱스들 (<c>dict[K, V]</c>). 파이썬에서는 튜플 하나지만 튜플 값은 없으므로,
+        /// 둘 이상은 타입 표기에서만 받고 값 인덱싱에서는 평가기가 거부한다.
+        /// </summary>
+        public IReadOnlyList<Expr> Indices { get; }
     }
 
     public sealed class UnaryExpr : Expr
@@ -190,6 +198,54 @@ namespace Kesa.Engine.Script
         /// <summary>"=" 또는 복합 대입 연산자 ("+=" 등).</summary>
         public string Op { get; }
         public Expr Value { get; }
+    }
+
+    public sealed class Parameter
+    {
+        public Parameter(string name, Expr? annotation, SourceSpan span)
+        {
+            Name = name;
+            Annotation = annotation;
+            Span = span;
+        }
+
+        public string Name { get; }
+        public Expr? Annotation { get; }
+        public SourceSpan Span { get; }
+    }
+
+    /// <summary>
+    /// <c>lambda params: body</c>. 본문은 식 하나라 끝까지 파싱한다. 로딩 단계는 <c>def</c>처럼 값으로 묶기만 하고
+    /// 호출하지 않는다 (spec-gaps G33).
+    /// </summary>
+    public sealed class LambdaExpr : Expr
+    {
+        public LambdaExpr(IReadOnlyList<Parameter> parameters, Expr body, SourceSpan span) : base(span)
+        {
+            Parameters = parameters;
+            Body = body;
+        }
+
+        public IReadOnlyList<Parameter> Parameters { get; }
+        public Expr Body { get; }
+    }
+
+    /// <summary>
+    /// <c>def name(params) -> ret:</c>. 지금은 머리부만 읽고 본문은 건너뛴다: 로딩 단계는 함수를
+    /// 값으로 묶기만 하고 호출하지 않는다 (spec-gaps G17). 본문은 식 언어 단계에서 파싱한다.
+    /// </summary>
+    public sealed class FunctionDef : Stmt
+    {
+        public FunctionDef(string name, IReadOnlyList<Parameter> parameters, Expr? returns, SourceSpan span) : base(span)
+        {
+            Name = name;
+            Parameters = parameters;
+            Returns = returns;
+        }
+
+        public string Name { get; }
+        public IReadOnlyList<Parameter> Parameters { get; }
+        public Expr? Returns { get; }
     }
 
     /// <summary>이 단계에서 지원하지 않는 문장 (진단은 이미 보고됨).</summary>

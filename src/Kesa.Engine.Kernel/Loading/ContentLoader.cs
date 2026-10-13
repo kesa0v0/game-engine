@@ -1,0 +1,438 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Schema;
+using Kesa.Engine.Script;
+
+namespace Kesa.Engine.Loading
+{
+    /// <summary>②의 결과: 완성된 스키마와 등록된 Def.</summary>
+    public sealed class ContentLoadResult
+    {
+        internal ContentLoadResult(IReadOnlyList<ModManifest> mods, IReadOnlyList<string> disabled, SchemaSet schema,
+            DefRegistry defs)
+        {
+            Mods = mods;
+            Disabled = disabled;
+            Schema = schema;
+            Defs = defs;
+        }
+
+        /// <summary>②까지 살아남은 모드 (로드 순서).</summary>
+        public IReadOnlyList<ModManifest> Mods { get; }
+
+        /// <summary>①과 ②에서 비활성화된 모드 id (서수 순). 이유는 진단에 있다.</summary>
+        public IReadOnlyList<string> Disabled { get; }
+
+        public SchemaSet Schema { get; }
+        public DefRegistry Defs { get; }
+    }
+
+    /// <summary>
+    /// 스키마·정의 단계 (spec S1 ②).
+    /// ②a: 모든 모드의 스키마 파일(<c>use</c> 목록 중 <see cref="SchemaFolder"/> 아래)만 모드 순서대로 실행해 타입을 완성한다.
+    /// ②b: 그다음 나머지 파일(Def 파일)을 실행해 Def를 등록만 한다. 이때 타입은 고정이다 (schema-design 4.1).
+    /// 실패한 모드는 통째로 비활성화하고 그 모드에 필수로 의존하는 모드도 비활성화한다 (spec S1 오류 정책).
+    /// </summary>
+    public static class ContentLoader
+    {
+        /// <summary>이 폴더 아래 파일은 스키마 파일이다 (spec-gaps G16).</summary>
+        public const string SchemaFolder = "schema/";
+
+        public static ContentLoadResult Load(string modsRoot, LoadOrder order, DiagnosticBag diagnostics)
+        {
+            var units = new List<ModUnit>();
+            foreach (var m in order.Mods) units.Add(new ModUnit(m));
+            var disabled = new SortedSet<string>(order.Disabled, StringComparer.Ordinal);
+            var visibility = new ModVisibility(order.Mods);
+
+            // 파일 목록과 파싱. 모든 파일(②b 파일 포함)을 ②a 전에 파싱해 구문 오류가 있는 모드를 먼저 뺀다:
+            // 그래야 ②a의 충돌 판정이 상대의 구문 오류가 어느 파일에 있는지에 따라 달라지지 않는다 (spec-gaps G28).
+            foreach (var u in units)
+            {
+                ListFiles(modsRoot, u);
+                if (!u.Failed) ParseFiles(modsRoot, u);
+            }
+
+            // ②a 실행: 의존 대상이 먼저 실행되므로, 실패한 의존이 있으면 실행하지 않고 비활성화한다
+            var declaredTypes = new HashSet<string>(StringComparer.Ordinal);
+            var declaredComponents = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var u in units)
+            {
+                if (u.Failed || FailDependents(u, units, diagnostics)) continue;
+                var unit = u;
+                var builtins = new SchemaBuiltins(u.Schema,
+                    name => declaredTypes.Contains(name) || unit.Schema.Types.Exists(t => t.Name == name),
+                    name => declaredComponents.Contains(name) || unit.Schema.Components.Exists(c => c.Name == name));
+                foreach (var file in u.SchemaFiles) Execute(u, file, builtins);
+                foreach (var t in u.Schema.Types) declaredTypes.Add(t.Name);
+                foreach (var c in u.Schema.Components) declaredComponents.Add(c.Name);
+                if (u.Bag.HasErrors) u.Failed = true;
+            }
+
+            // ②a 끝: 타입 완성. 실패한 모드를 빼고 다시 만든다 (고정점)
+            var schema = BuildSchema(units, visibility, diagnostics);
+
+            // ②b 실행
+            int survivorsBefore = CountSurvivors(units);
+            foreach (var u in units)
+            {
+                if (u.Failed || FailDependents(u, units, diagnostics)) continue;
+                var builtins = new DefBuiltins(schema, visibility, u.Manifest.Id, u.Defs);
+                foreach (var file in u.DefFiles) Execute(u, file, builtins);
+                if (u.Bag.HasErrors) u.Failed = true;
+            }
+
+            // ②b 끝: Def 등록 (고정점). 모드가 더 빠졌으면 스키마도 그 모드의 확장 없이 다시 만든다.
+            var defs = BuildDefs(units, visibility, order, diagnostics);
+            if (CountSurvivors(units) != survivorsBefore)
+            {
+                schema = BuildSchema(units, visibility, diagnostics);
+                Rebind(defs, schema);
+            }
+
+            var mods = new List<ModManifest>();
+            foreach (var u in units)
+            {
+                diagnostics.AddRange(u.Bag.ToSortedList());
+                if (u.Failed) disabled.Add(u.Manifest.Id);
+                else mods.Add(u.Manifest);
+            }
+            return new ContentLoadResult(mods, new List<string>(disabled), schema, defs);
+        }
+
+        private sealed class ModUnit
+        {
+            public ModUnit(ModManifest manifest)
+            {
+                Manifest = manifest;
+                Schema = new ModSchema(manifest.Id);
+            }
+
+            public ModManifest Manifest { get; }
+            public List<string> SchemaFiles { get; } = new List<string>();
+            public List<string> DefFiles { get; } = new List<string>();
+            public ModScope Scope { get; } = new ModScope();
+            public ModSchema Schema { get; }
+            public List<DefRecord> Defs { get; } = new List<DefRecord>();
+
+            /// <summary>파싱한 파일 (모드 폴더 기준 상대 경로 → 모듈).</summary>
+            public Dictionary<string, Module> Modules { get; } = new Dictionary<string, Module>(StringComparer.Ordinal);
+
+            /// <summary>이 모드의 진단. 실행 중 진단은 모드별로 모았다가 끝에 한 번에 넘긴다.</summary>
+            public DiagnosticBag Bag { get; } = new DiagnosticBag();
+
+            public bool Failed { get; set; }
+        }
+
+        /// <summary>
+        /// <c>use</c> 목록을 파일 목록으로 편다. <c>use_all("dir/")</c>는 그 아래 모든 <c>.py</c>를 하위 폴더까지
+        /// 상대 경로의 서수 순으로 (spec-gaps G18). 이미 나온 파일은 다시 넣지 않는다.
+        /// 경로가 <see cref="SchemaFolder"/>로 시작하면 스키마 파일, 아니면 Def 파일이고 각각 목록 순서를 지킨다.
+        /// </summary>
+        private static void ListFiles(string modsRoot, ModUnit u)
+        {
+            string modDir = Path.Combine(modsRoot, u.Manifest.Directory);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var use in u.Manifest.Uses)
+            {
+                var files = new List<string>();
+                if (use.Kind == UseKind.File)
+                {
+                    files.Add(use.Path);
+                }
+                else
+                {
+                    string dir = Path.Combine(modDir, use.Path.Replace('/', Path.DirectorySeparatorChar));
+                    if (!Directory.Exists(dir)) continue; // ①에서 보고됨
+                    foreach (var f in Directory.GetFiles(dir, "*.py", SearchOption.AllDirectories))
+                    {
+                        string rel = Path.GetRelativePath(modDir, f).Replace(Path.DirectorySeparatorChar, '/');
+                        if (rel == ModDiscovery.ManifestFileName) continue;
+                        if (!rel.EndsWith(".py", StringComparison.Ordinal)) continue; // "*.py"는 ".pyi"도 잡는다
+                        files.Add(rel);
+                    }
+                    files.Sort(StringComparer.Ordinal);
+                }
+
+                foreach (var rel in files)
+                {
+                    if (rel == ModDiscovery.ManifestFileName)
+                    {
+                        u.Bag.Error(Codes.LodBadUse, "mod.py cannot be listed in use()", use.Span, u.Manifest.Id);
+                        continue;
+                    }
+                    if (!seen.Add(rel)) continue;
+                    if (!rel.StartsWith(SchemaFolder, StringComparison.Ordinal) &&
+                        rel.StartsWith(SchemaFolder, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 대소문자를 무시하는 파일 시스템에서만 다르게 동작하지 않도록 (G7과 같은 이유)
+                        u.Bag.Error(Codes.LodBadUse, "the schema folder must be named exactly 'schema/'", use.Span,
+                            u.Manifest.Id, hint: "rename '" + rel.Substring(0, SchemaFolder.Length) + "' to 'schema/'");
+                        continue;
+                    }
+                    if (rel.StartsWith(SchemaFolder, StringComparison.Ordinal)) u.SchemaFiles.Add(rel);
+                    else u.DefFiles.Add(rel);
+                }
+            }
+            if (u.Bag.HasErrors) u.Failed = true;
+        }
+
+        /// <summary>
+        /// 모드의 모든 파일을 읽고 파싱한다. 하나라도 읽기·구문 오류가 있으면 모드는 실패이고 어떤 파일도 실행하지 않는다:
+        /// 모드는 어차피 비활성화되고, 실행하면 뒤따르는 오류만 늘어난다.
+        /// </summary>
+        private static void ParseFiles(string modsRoot, ModUnit u)
+        {
+            var all = new List<string>(u.SchemaFiles);
+            all.AddRange(u.DefFiles);
+            foreach (var relativePath in all)
+            {
+                string path = Path.Combine(modsRoot, u.Manifest.Directory,
+                    relativePath.Replace('/', Path.DirectorySeparatorChar));
+                string file = u.Manifest.Directory + "/" + relativePath;
+                string text;
+                try
+                {
+                    text = File.ReadAllText(path, System.Text.Encoding.UTF8);
+                }
+                catch (IOException e)
+                {
+                    u.Bag.Error(Codes.LodBadUse, "cannot read file: " + e.Message, new SourceSpan(file, 0, 0),
+                        u.Manifest.Id);
+                    continue;
+                }
+
+                var parseBag = new DiagnosticBag();
+                u.Modules[relativePath] = Parser.Parse(text, file, parseBag);
+                foreach (var d in parseBag.ToSortedList())
+                    u.Bag.Add(new Diagnostic(d.Code, d.Severity, d.Message, u.Manifest.Id, d.Span, d.Hint, d.Related));
+            }
+            if (u.Bag.HasErrors) u.Failed = true;
+        }
+
+        private static void Execute(ModUnit u, string relativePath, IBuiltins builtins) =>
+            new Interpreter(u.Scope, builtins, new CallContext(u.Manifest.Id, u.Bag)).Run(u.Modules[relativePath]);
+
+        /// <summary>
+        /// 필수 의존 중 실패한 모드가 있으면 이 모드를 비활성화한다 (MOD009). 로드 순서상 의존 대상이 앞에 있으므로
+        /// 순서대로 부르면 전이적으로 퍼진다.
+        /// </summary>
+        private static bool FailDependents(ModUnit u, List<ModUnit> units, DiagnosticBag diagnostics)
+        {
+            if (u.Failed) return true;
+            foreach (var dep in u.Manifest.Dependencies)
+            {
+                foreach (var other in units)
+                {
+                    if (other.Manifest.Id != dep.Id || !other.Failed) continue;
+                    diagnostics.Error(Codes.ModDependencyFailed,
+                        "mod '" + u.Manifest.Id + "' was disabled because its dependency '" + dep.Id + "' failed to load",
+                        dep.Span, mod: u.Manifest.Id);
+                    u.Failed = true;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 스키마를 다시 만들었으면 Def가 새 타입 객체를 가리키게 한다. 남은 Def의 타입과 컴포넌트는 남은 모드의 것이므로
+        /// (실패한 모드의 것을 쓰는 모드는 함께 실패) 이름으로 항상 찾을 수 있다.
+        /// </summary>
+        private static void Rebind(DefRegistry defs, SchemaSet schema)
+        {
+            foreach (var record in defs.Defs)
+            {
+                for (var r = record; r != null; r = r.Replaced)
+                {
+                    schema.TryGetType(r.Type.Name, out var type);
+                    r.Type = type;
+                    foreach (var f in r.Fields) Rebind(f.Value, schema);
+                }
+            }
+        }
+
+        private static void Rebind(Value value, SchemaSet schema)
+        {
+            switch (value)
+            {
+                case ComponentValue cv:
+                    schema.TryGetComponent(cv.Component.Name, out var component);
+                    cv.Component = component;
+                    foreach (var f in cv.Fields) Rebind(f.Value, schema);
+                    break;
+                case DictValue dict:
+                    foreach (var item in dict.Items) Rebind(item.Value, schema);
+                    break;
+                case ListValue list:
+                    foreach (var item in list.Items) Rebind(item, schema);
+                    break;
+            }
+        }
+
+        private static int CountSurvivors(List<ModUnit> units)
+        {
+            int n = 0;
+            foreach (var u in units)
+                if (!u.Failed) n++;
+            return n;
+        }
+
+        /// <summary>
+        /// 살아남은 모드로 스키마를 만든다. 오류가 난 모드는 실패시키고 의존 모드도 빼고 다시 만든다.
+        /// 실패한 모드의 진단만 확정하고, 살아남은 모드의 진단은 마지막 회차의 것을 쓴다.
+        /// </summary>
+        private static SchemaSet BuildSchema(List<ModUnit> units, ModVisibility visibility, DiagnosticBag diagnostics)
+        {
+            while (true)
+            {
+                var stage = new StageDiagnostics(SurvivorIds(units));
+                var mods = new List<ModSchema>();
+                foreach (var u in units)
+                    if (!u.Failed) mods.Add(u.Schema);
+                var schema = SchemaBuilder.Build(mods, visibility, stage);
+                if (!Settle(units, stage, diagnostics)) return schema;
+            }
+        }
+
+        private static List<string> SurvivorIds(List<ModUnit> units)
+        {
+            var ids = new List<string>();
+            foreach (var u in units)
+                if (!u.Failed) ids.Add(u.Manifest.Id);
+            return ids;
+        }
+
+        /// <summary>Def를 로드 순서대로 등록한다. 고정점은 <see cref="BuildSchema"/>와 같다.</summary>
+        private static DefRegistry BuildDefs(List<ModUnit> units, ModVisibility visibility, LoadOrder order,
+            DiagnosticBag diagnostics)
+        {
+            while (true)
+            {
+                var stage = new StageDiagnostics(SurvivorIds(units));
+                var registry = new DefRegistry();
+                foreach (var u in units)
+                {
+                    if (u.Failed) continue;
+                    foreach (var record in u.Defs) Register(registry, record, visibility, order, stage);
+                }
+                if (!Settle(units, stage, diagnostics)) return registry;
+            }
+        }
+
+        /// <summary>
+        /// 회차 결과를 반영한다. 자기 오류가 있는 모드를 먼저 실패시키고, 그런 모드가 없을 때만 충돌 오류가 있는 모드를
+        /// 실패시킨다 (spec-gaps G28). 실패시킨 모드가 있으면 그 진단을 확정하고 의존 모드도 실패시킨 뒤 true.
+        /// 없으면 살아남은 모드의 진단(경고 등)을 확정하고 false.
+        /// </summary>
+        private static bool Settle(List<ModUnit> units, StageDiagnostics stage, DiagnosticBag diagnostics)
+        {
+            bool anyFailed = false;
+            foreach (bool conflictsOnly in new[] { false, true })
+            {
+                foreach (var u in units)
+                {
+                    if (u.Failed) continue;
+                    string id = u.Manifest.Id;
+                    if (!(conflictsOnly ? stage.HasConflictErrors(id) : stage.HasOwnErrors(id))) continue;
+                    u.Failed = true;
+                    anyFailed = true;
+                    u.Bag.AddRange(stage.All(id));
+                }
+                if (anyFailed) break;
+            }
+            if (!anyFailed)
+            {
+                foreach (var u in units)
+                    if (!u.Failed) u.Bag.AddRange(stage.All(u.Manifest.Id));
+                return false;
+            }
+            foreach (var u in units) FailDependents(u, units, diagnostics);
+            return true;
+        }
+
+        /// <summary>
+        /// Def 하나를 등록한다. 중복 id는 오류이고, 의도적 교체는 <c>override=True</c> (spec S1).
+        /// Def id는 타입과 무관하게 전역에서 하나다 (spec-gaps G19).
+        /// </summary>
+        private static void Register(DefRegistry registry, DefRecord record, ModVisibility visibility, LoadOrder order,
+            StageDiagnostics stage)
+        {
+            void Error(DefRecord at, string code, string message, string? hint = null, IReadOnlyList<SourceSpan>? related = null) =>
+                stage.Error(at.Mod, code, message, at.Span, hint, related);
+            void ConflictError(DefRecord at, string code, string message, string? hint = null,
+                IReadOnlyList<SourceSpan>? related = null) =>
+                stage.ConflictError(at.Mod, code, message, at.Span, hint, related);
+
+            if (!registry.TryGet(record.Id, out var existing))
+            {
+                if (record.IsOverride)
+                {
+                    Error(record, Codes.DefBadOverride, "override=True but there is no Def '" + record.Id + "' to replace",
+                        hint: Suggest.Hint(record.Id, registry.Ids) ?? "remove override=True to define a new Def");
+                    return;
+                }
+                registry.Add(record);
+                return;
+            }
+
+            var at = new[] { existing.Span };
+
+            // 이 id의 원래 정의. 이미 교체되었어도 판정은 원래 주인을 기준으로 한다
+            var original = existing;
+            while (original.Replaced != null) original = original.Replaced;
+            bool ownDef = original.Mod == record.Mod || existing.Mod == record.Mod;
+
+            if (!record.IsOverride)
+            {
+                bool canReplace = !ownDef && visibility.CanSee(record.Mod, original.Mod);
+                string message = "Def id '" + record.Id + "' is already defined" +
+                                 (ownDef ? "" : " by mod '" + original.Mod + "'");
+                if (ownDef || canReplace)
+                {
+                    Error(record, Codes.DefDuplicateId, message, hint: canReplace ? "add override=True to replace it" : null,
+                        related: new[] { original.Span });
+                    return;
+                }
+                // 서로 의존하지 않는 두 모드: 어느 쪽이 맞는지 근거가 없으므로 둘 다 오류
+                ConflictError(record, Codes.DefDuplicateId, message, related: new[] { original.Span });
+                ConflictError(original, Codes.DefDuplicateId,
+                    "Def id '" + record.Id + "' is also defined by mod '" + record.Mod + "'", related: new[] { record.Span });
+                return;
+            }
+
+            if (ownDef)
+            {
+                Error(record, Codes.DefBadOverride, "a mod cannot override its own Def '" + record.Id + "'", related: at);
+                return;
+            }
+            if (!visibility.CanSee(record.Mod, original.Mod))
+            {
+                Error(record, Codes.SchNotVisible,
+                    "Def '" + record.Id + "' belongs to mod '" + original.Mod + "', which mod '" + record.Mod +
+                    "' does not depend on", hint: "add \"" + original.Mod + "\" to dependencies in mod.py", related: at);
+                return;
+            }
+            if (existing.Type != record.Type)
+            {
+                Error(record, Codes.DefBadOverride,
+                    "an override must keep the type: '" + record.Id + "' is a " + existing.Type.Name + ", not a " +
+                    record.Type.Name, related: at);
+                return;
+            }
+            // 두 모드가 같은 Def를 교체: 순서 관계가 선언되어 있으면 나중이 이기고, 아니면 둘 다 오류 (set 충돌과 같은 규칙)
+            if (existing.IsOverride && existing.Mod != record.Mod && !order.IsOrdered(existing.Mod, record.Mod))
+            {
+                string message = "Def '" + record.Id + "' is overridden by both mod '" + existing.Mod + "' and mod '" +
+                                 record.Mod + "', which have no load order between them";
+                ConflictError(record, Codes.DefBadOverride, message, hint: "declare loadAfter in one of them", related: at);
+                ConflictError(existing, Codes.DefBadOverride, message, hint: "declare loadAfter in one of them",
+                    related: new[] { record.Span });
+                return;
+            }
+            registry.Replace(record);
+        }
+    }
+}

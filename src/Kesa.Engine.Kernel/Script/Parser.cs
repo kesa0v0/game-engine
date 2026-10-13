@@ -9,7 +9,7 @@ namespace Kesa.Engine.Script
     /// 제한된 파이썬 부분집합의 파서 (spec S2).
     /// 원칙: 유효한 파이썬이 아닌 것은 받아들이지 않는다. 유효하지만 아직 지원하지 않는 구문은
     /// <see cref="Codes.ParUnsupported"/>로 거부하고 구문 오류와 구분한다.
-    /// 현재 단계(로딩 슬라이스)는 단순 문장(식, 대입)만 다룬다.
+    /// 현재 단계(로딩 슬라이스)는 단순 문장(식, 대입)과 <c>def</c>의 머리부만 다룬다.
     /// </summary>
     public sealed class Parser
     {
@@ -29,6 +29,8 @@ namespace Kesa.Engine.Script
         {
             "=", "+=", "-=", "*=", "/=", "//=", "%=", "**=", "&=", "|=", "^=", "<<=", ">>=", "@=",
         };
+
+        public static bool IsKeyword(string name) => Keywords.Contains(name);
 
         private readonly IReadOnlyList<Token> _tokens;
         private readonly string _file;
@@ -132,6 +134,12 @@ namespace Kesa.Engine.Script
                 return;
             }
 
+            if (Cur.IsName("def"))
+            {
+                body.Add(ParseFunctionDef());
+                return;
+            }
+
             if (Cur.Kind == TokenKind.Name &&
                 (CompoundKeywords.Contains(Cur.Text) || (Cur.Text == "match" && IsSoftKeywordBlock())))
             {
@@ -162,6 +170,86 @@ namespace Kesa.Engine.Script
             {
                 SkipToNewline();
             }
+        }
+
+        /// <summary>
+        /// <c>def</c>의 머리부를 읽고 본문은 건너뛴다. 매개변수는 이름과 어노테이션만 지원한다
+        /// (기본값, <c>*args</c>, <c>/</c> 등은 미지원).
+        /// </summary>
+        private Stmt ParseFunctionDef()
+        {
+            var keyword = Advance();
+            try
+            {
+                var name = Cur;
+                if (name.Kind != TokenKind.Name || Keywords.Contains(name.Text))
+                    throw Fail("expected function name after 'def'" + Describe(name), name.Span);
+                Advance();
+                Expect("(");
+                var parameters = ParseParameters(")", allowAnnotations: true);
+                Expect(")");
+
+                Expr? returns = Accept("->") ? ParseExpression() : null;
+                Expect(":");
+
+                // 본문: 같은 줄의 단순 문장이거나 들여쓴 블록
+                if (Cur.Kind == TokenKind.Newline)
+                {
+                    Advance();
+                    if (Cur.Kind != TokenKind.Indent) throw Fail("expected an indented block", Cur.Span);
+                    SkipBlock();
+                }
+                else
+                {
+                    SkipToNewline();
+                }
+                return new FunctionDef(name.Text, parameters, returns, keyword.Span);
+            }
+            catch (ParseError)
+            {
+                SkipToNewline();
+                if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                return new UnsupportedStmt("def", keyword.Span);
+            }
+        }
+
+        /// <summary>
+        /// 매개변수 목록을 <paramref name="close"/> 앞까지 읽는다 (<c>def</c>는 <c>)</c>, 람다는 <c>:</c>).
+        /// 이름과 (def만) 어노테이션을 지원하고, 기본값·<c>*args</c>·<c>/</c> 등은 미지원으로 보고한다.
+        /// </summary>
+        private List<Parameter> ParseParameters(string close, bool allowAnnotations)
+        {
+            var parameters = new List<Parameter>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            while (!Cur.IsOp(close))
+            {
+                if (Cur.IsOp("*") || Cur.IsOp("**") || Cur.IsOp("/"))
+                {
+                    _diagnostics.Error(Codes.ParUnsupported, "'" + Cur.Text + "' in parameter lists is not supported",
+                        Cur.Span);
+                    while (!Cur.IsOp(",") && !Cur.IsOp(close) && Cur.Kind != TokenKind.Newline &&
+                           Cur.Kind != TokenKind.EndOfFile) Advance();
+                }
+                else
+                {
+                    var p = Cur;
+                    if (p.Kind != TokenKind.Name || Keywords.Contains(p.Text))
+                        throw Fail("expected parameter name" + Describe(p), p.Span);
+                    Advance();
+                    Expr? annotation = allowAnnotations && Accept(":") ? ParseExpression() : null;
+                    if (Cur.IsOp("="))
+                    {
+                        _diagnostics.Error(Codes.ParUnsupported, "default parameter values are not supported", Cur.Span);
+                        Advance();
+                        ParseExpression();
+                    }
+                    if (!seen.Add(p.Text))
+                        _diagnostics.Error(Codes.ParSyntax, "duplicate parameter name: " + p.Text, p.Span);
+                    parameters.Add(new Parameter(p.Text, annotation, p.Span));
+                }
+                if (!Accept(",")) break;
+            }
+            return parameters;
         }
 
         private Stmt SkipUnsupportedCompound()
@@ -268,10 +356,11 @@ namespace Kesa.Engine.Script
         {
             if (Cur.IsName("lambda"))
             {
+                // lambda params: body. 람다에는 어노테이션이 없고, 본문은 조건식을 포함한 식 하나다.
                 var t = Advance();
-                _diagnostics.Error(Codes.ParUnsupported, "lambda is not supported yet", t.Span);
-                SkipExpressionTail();
-                return new UnsupportedExpr("lambda", t.Span);
+                var parameters = ParseParameters(":", allowAnnotations: false);
+                Expect(":");
+                return new LambdaExpr(parameters, ParseExpression(), t.Span);
             }
 
             var expr = ParseOr();
@@ -464,19 +553,22 @@ namespace Kesa.Engine.Script
                     var open = Advance();
                     if (Cur.IsOp(":") || Cur.IsOp("]"))
                         throw Fail("expected index expression" + Describe(Cur), Cur.Span);
-                    var index = ParseExpression();
+                    var indices = new List<Expr> { ParseExpression() };
                     if (Cur.IsOp(":"))
                     {
                         _diagnostics.Error(Codes.ParUnsupported, "slices are not supported", Cur.Span);
                         while (!Cur.IsOp("]") && Cur.Kind != TokenKind.EndOfFile && Cur.Kind != TokenKind.Newline) Advance();
                     }
-                    else if (Cur.IsOp(","))
+                    else
                     {
-                        _diagnostics.Error(Codes.ParUnsupported, "tuple indexes are not supported", Cur.Span);
-                        while (!Cur.IsOp("]") && Cur.Kind != TokenKind.EndOfFile && Cur.Kind != TokenKind.Newline) Advance();
+                        while (Accept(","))
+                        {
+                            if (Cur.IsOp("]")) break;
+                            indices.Add(ParseExpression());
+                        }
                     }
                     Expect("]");
-                    expr = new IndexExpr(expr, index, open.Span);
+                    expr = new IndexExpr(expr, indices, open.Span);
                 }
                 else
                 {

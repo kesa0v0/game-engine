@@ -95,6 +95,31 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(codes, Does.Not.Contain(Codes.ModMissingDependency));
         }
 
+        // 대소문자를 무시하는 파일 시스템(Windows)에서도 결과가 같아야 한다 (G7)
+        [TestCase("use(\"Defs/units.py\")\n", "did you mean 'defs/units.py'?")]
+        [TestCase("use(\"defs/Units.py\")\n", "did you mean 'defs/units.py'?")]
+        [TestCase("use_all(\"DEFS/\")\n", "did you mean 'defs'?")]
+        public void UsePathWithWrongCaseIsAnError(string uses, string hint)
+        {
+            Write("a/mod.py", "Mod(id=\"a\")\n" + uses);
+            Write("a/defs/units.py", "");
+            var bag = new DiagnosticBag();
+            var mods = ModDiscovery.Discover(_root, bag).Mods;
+            Assert.That(mods, Is.Empty);
+            var d = bag.ToSortedList().Single();
+            Assert.That((d.Code, d.Hint), Is.EqualTo((Codes.ModBadManifest, hint)));
+        }
+
+        [Test]
+        public void UsePathWithExactCaseIsAccepted()
+        {
+            Write("a/mod.py", "Mod(id=\"a\")\nuse(\"defs/units.py\")\nuse_all(\"defs/\")\nuse_all(\"defs\")\n");
+            Write("a/defs/units.py", "");
+            var bag = new DiagnosticBag();
+            Assert.That(ModDiscovery.Discover(_root, bag).Mods, Has.Count.EqualTo(1));
+            Assert.That(bag.Count, Is.Zero);
+        }
+
         [Test]
         public void MissingUseTargetIsAnError()
         {

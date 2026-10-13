@@ -83,19 +83,67 @@ namespace Kesa.Engine.Loading
             return null;
         }
 
+        /// <summary>
+        /// <c>use</c> 경로가 대소문자까지 정확히 있는지 본다. 대소문자만 다르면 오류다: 대소문자를 무시하는 파일 시스템에서만
+        /// 통과하면 같은 모드가 기계마다 다르게 로드된다 (spec-gaps G7).
+        /// </summary>
         private static void CheckUses(string dir, ModManifest manifest, DiagnosticBag diagnostics)
         {
             foreach (var use in manifest.Uses)
             {
-                string full = Path.Combine(dir, use.Path.Replace('/', Path.DirectorySeparatorChar));
-                bool exists = use.Kind == UseKind.File ? File.Exists(full) : Directory.Exists(full);
-                if (!exists)
+                string what = use.Kind == UseKind.File ? "file" : "folder";
+                string? actual = FindOnDisk(dir, use.Path, use.Kind == UseKind.File);
+                if (actual == null)
+                {
+                    diagnostics.Error(Codes.ModBadManifest, what + " not found: '" + use.Path + "'", use.Span,
+                        mod: manifest.Id);
+                }
+                else if (actual != use.Path)
                 {
                     diagnostics.Error(Codes.ModBadManifest,
-                        (use.Kind == UseKind.File ? "file" : "folder") + " not found: '" + use.Path + "'",
-                        use.Span, mod: manifest.Id);
+                        what + " '" + use.Path + "' differs in letter case from the one on disk", use.Span,
+                        mod: manifest.Id, hint: "did you mean '" + actual + "'?");
                 }
             }
+        }
+
+        /// <summary>
+        /// 상대 경로(<c>/</c> 구분)를 한 단계씩 디스크의 이름과 맞춰 실제 이름의 경로를 돌려준다. 단계마다 정확히 같은 이름을
+        /// 먼저 찾고, 없으면 대소문자만 다른 이름(서수 순 첫째)을 쓴다. 어느 쪽도 없으면 null.
+        /// </summary>
+        private static string? FindOnDisk(string dir, string relativePath, bool isFile)
+        {
+            var segments = relativePath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            var actual = new List<string>();
+            string current = dir;
+            for (int i = 0; i < segments.Length; i++)
+            {
+                bool last = i == segments.Length - 1;
+                if (!Directory.Exists(current)) return null;
+                var entries = last && isFile ? Directory.GetFiles(current) : Directory.GetDirectories(current);
+                var names = new List<string>();
+                foreach (var e in entries) names.Add(Path.GetFileName(e));
+                names.Sort(StringComparer.Ordinal);
+
+                string? match = null;
+                foreach (var n in names)
+                {
+                    if (string.Equals(n, segments[i], StringComparison.Ordinal)) match = n;
+                }
+                if (match == null)
+                {
+                    foreach (var n in names)
+                    {
+                        if (!string.Equals(n, segments[i], StringComparison.OrdinalIgnoreCase)) continue;
+                        match = n;
+                        break;
+                    }
+                }
+                if (match == null) return null;
+                actual.Add(match);
+                current = Path.Combine(current, match);
+            }
+            return string.Join("/", actual);
         }
     }
 }

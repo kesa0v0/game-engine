@@ -103,13 +103,16 @@ namespace Kesa.Engine.Tests.Script
         }
 
         // 유효한 파이썬이지만 아직 지원하지 않는 것은 구문 오류와 구분해 보고한다
-        [TestCase("def f():\n    return 1\nx = 2\n")]
+        [TestCase("def f(x=1):\n    return x\n")]
+        [TestCase("def f(*args):\n    pass\n")]
         [TestCase("if x:\n    y = 1\n")]
         [TestCase("import os\n")]
         [TestCase("x = (1, 2)\n")]
         [TestCase("x = [i for i in y]\n")]
         [TestCase("x = {1, 2}\n")]
-        [TestCase("x = lambda: 1\n")]
+        [TestCase("x = lambda x=1: x\n")]
+        [TestCase("x = lambda *a: 1\n")]
+        [TestCase("x = lambda g: a if g else b\n")]
         [TestCase("x = a if b else c\n")]
         [TestCase("x = a < b < c\n")]
         [TestCase("x: int = 1\n")]
@@ -143,8 +146,67 @@ namespace Kesa.Engine.Tests.Script
         [Test]
         public void ParsingContinuesAfterUnsupportedBlock()
         {
-            var (module, _) = Parse("def f():\n    return 1\nx = 2\n");
+            var (module, _) = Parse("if x:\n    y = 1\nx = 2\n");
             Assert.That(module.Body.Last(), Is.InstanceOf<AssignStmt>());
+        }
+
+        [Test]
+        public void FunctionDefHeaderIsParsedAndBodySkipped()
+        {
+            var (module, diags) = Parse(
+                "def health_max(h: Health) -> int:\n    for r in contribs(h, \"max\"):\n        pass\n    return 1\nx = 2\n" +
+                "def g(a, b,): return a\n");
+            Assert.That(diags, Is.Empty);
+            Assert.That(module.Body, Has.Count.EqualTo(3));
+            var f = (FunctionDef)module.Body[0];
+            Assert.That(f.Name, Is.EqualTo("health_max"));
+            Assert.That(f.Parameters.Select(p => p.Name), Is.EqualTo(new[] { "h" }));
+            Assert.That(((NameExpr)f.Parameters[0].Annotation!).Name, Is.EqualTo("Health"));
+            Assert.That(((NameExpr)f.Returns!).Name, Is.EqualTo("int"));
+            Assert.That(module.Body[1], Is.InstanceOf<AssignStmt>());
+            Assert.That(((FunctionDef)module.Body[2]).Parameters.Select(p => p.Name), Is.EqualTo(new[] { "a", "b" }));
+        }
+
+        [Test]
+        public void LambdaIsParsedWithItsBody()
+        {
+            var (module, diags) = Parse(
+                "f = lambda g: g.Progress.value >= g.Progress.target\n" +
+                "Unit(\"A\", default=lambda: 1, k=lambda a, b: a + b)\n");
+            Assert.That(diags, Is.Empty);
+            var f = (LambdaExpr)((AssignStmt)module.Body[0]).Value;
+            Assert.That(f.Parameters.Select(p => p.Name), Is.EqualTo(new[] { "g" }));
+            Assert.That(((BinaryExpr)f.Body).Op, Is.EqualTo(">="));
+            var call = (CallExpr)((ExprStmt)module.Body[1]).Expr;
+            Assert.That(((LambdaExpr)call.Arguments[1].Value).Parameters, Is.Empty);
+            Assert.That(((LambdaExpr)call.Arguments[2].Value).Parameters.Select(p => p.Name), Is.EqualTo(new[] { "a", "b" }));
+        }
+
+        [TestCase("x = lambda x, x: 1\n")]
+        [TestCase("x = lambda x 1\n")]
+        public void BadLambdaIsASyntaxError(string text)
+        {
+            var (_, diags) = Parse(text);
+            Assert.That(diags.Select(d => d.Code), Does.Contain(Codes.ParSyntax));
+        }
+
+        [TestCase("def (x):\n    pass\n")]
+        [TestCase("def f(x):\npass\n")]
+        [TestCase("def f(x, x):\n    pass\n")]
+        public void BadFunctionDefIsASyntaxError(string text)
+        {
+            var (_, diags) = Parse(text);
+            Assert.That(diags.Select(d => d.Code), Does.Contain(Codes.ParSyntax));
+        }
+
+        [Test]
+        public void SubscriptWithSeveralIndexes()
+        {
+            var (module, diags) = Parse("t = dict[Ref[\"Resource\"], fixed]\n");
+            Assert.That(diags, Is.Empty);
+            var index = (IndexExpr)((AssignStmt)module.Body.Single()).Value;
+            Assert.That(index.Indices, Has.Count.EqualTo(2));
+            Assert.That(index.Indices[0], Is.InstanceOf<IndexExpr>());
         }
 
         [Test]
