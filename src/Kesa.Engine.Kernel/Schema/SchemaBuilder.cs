@@ -233,6 +233,14 @@ namespace Kesa.Engine.Schema
                     {
                         CheckTypeNames(member.Spec.Type, member.Mod);
                         CheckComponentMember(c, member);
+                        // keys="all"은 키 타입 Def마다 줄이 있고 아무도 그 줄을 다 쓰지 않으니 기본값이 채워야 한다 (G77)
+                        if (c.IsKeyed && c.KeyKind == KeyKind.Def && c.Keys == KeysMode.All && NeedsDefault(member.Spec))
+                        {
+                            Error(member.Mod, Codes.SchBadDeclaration,
+                                "'" + c.Name + "." + member.Name + "' needs a default: every " + c.Key!.Name +
+                                " has a '" + c.Name + "' row, and nobody writes all of them",
+                                member.Span, hint: "add default=... or use keys=\"listed\" (spec-gaps G77)");
+                        }
                     }
                 }
                 foreach (var t in _set.Types)

@@ -36,6 +36,25 @@ namespace Kesa.Engine.Loading
 
         /// <summary>이 Def가 가진 컴포넌트 (타입에 붙은 것은 항상 있다).</summary>
         public OrderedMap<ResolvedComponent> Components { get; } = new OrderedMap<ResolvedComponent>();
+
+        internal DefSet? Owner { get; set; }
+
+        /// <summary>
+        /// 키 컴포넌트의 줄을 읽는다 (spec-gaps G77). 적힌 줄이면 그 줄이고, <c>keys="all"</c>이면 키 타입의 구체 Def마다 줄이 있으므로
+        /// 적히지 않은 줄은 기본값으로 채운 줄을 돌려준다. <c>keys="listed"</c>의 없는 줄과 유효하지 않은 키는 false다.
+        /// </summary>
+        public bool TryGetRow(string componentName, string key, out ResolvedRow row)
+        {
+            row = null!;
+            if (!Components.TryGet(componentName, out var rc)) return false;
+            var component = rc.Component;
+            if (!component.IsKeyed || component.KeyKind != KeyKind.Def) return false;
+            if (rc.Rows.TryGet(key, out row)) return true;
+            if (component.Keys != KeysMode.All || Owner == null || !Owner.TryGet(key, out var keyDef) || keyDef.Type != component.Key)
+                return false;
+            row = DefSet.DefaultRow(Source, component);
+            return true;
+        }
     }
 
     /// <summary>
@@ -67,10 +86,19 @@ namespace Kesa.Engine.Loading
             {
                 if (def.IsAbstract) continue;
                 var frozen = Freeze(def);
+                frozen.Owner = set;
                 set._byId.Add(frozen.Id, frozen);
                 set._list.Add(frozen);
             }
             return set;
+        }
+
+        /// <summary>적히지 않은 줄(<c>keys="all"</c>)의 기본값 줄: <c>const</c> 멤버만 스키마 기본값으로 채운다 (G77).</summary>
+        internal static ResolvedRow DefaultRow(ResolvedDef def, ComponentType component)
+        {
+            var row = new ResolvedRow();
+            FillMembers(def, component, null, row.Members);
+            return row;
         }
 
         private static FrozenDef Freeze(ResolvedDef def)

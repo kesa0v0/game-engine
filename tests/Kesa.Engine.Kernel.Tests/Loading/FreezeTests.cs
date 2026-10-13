@@ -123,6 +123,82 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(none.Rows.Keys, Is.Empty);
         }
 
+        // ---- keys="all" 줄 읽기 (G77) ----
+
+        private const string AllSchema =
+            "deftype(\"Resource\")\n" +
+            "deftype(\"Tool\")\n" +
+            "component(\"Stock\", key=\"Resource\", amount=const(int, default=7), note=field(str))\n" +
+            "component(\"Skill\", key=\"Resource\", keys=\"listed\", level=const(int, default=1))\n" +
+            "deftype(\"Unit\", components=[\"Stock\", \"Skill\"])\n";
+
+        private const string AllDefs =
+            "Resource(\"Wood\")\nResource(\"Iron\")\nResource(\"Gem\", abstract=True)\nTool(\"Axe\")\n" +
+            "Unit(\"Scout\", Stock={\"Iron\": Stock(amount=2)}, Skill={\"Wood\": Skill()})\n";
+
+        [Test]
+        public void AKeysAllRowThatWasNotWrittenIsReadAsAFilledDefaultRow()
+        {
+            Mod("core", schema: AllSchema, defs: AllDefs);
+            var set = LoadClean().Frozen;
+            set.TryGet("Scout", out var scout);
+
+            Assert.That(scout.TryGetRow("Stock", "Iron", out var written), Is.True);
+            written.Members.TryGet("amount", out var two);
+            Assert.That((((IntValue)two.Value).Value, two.Origin), Is.EqualTo((2L, ValueOrigin.Own)));
+
+            Assert.That(scout.TryGetRow("Stock", "Wood", out var implicitRow), Is.True);
+            implicitRow.Members.TryGet("amount", out var seven);
+            Assert.That((((IntValue)seven.Value).Value, seven.Origin), Is.EqualTo((7L, ValueOrigin.Default)));
+            Assert.That(implicitRow.Members.Contains("note"), Is.False);
+
+            // 저장은 적힌 줄뿐이다
+            scout.Components.TryGet("Stock", out var stock);
+            Assert.That(stock.Rows.Keys, Is.EqualTo(new[] { "Iron" }));
+        }
+
+        [TestCase("Gem")]    // abstract는 가리킬 수 없다
+        [TestCase("Axe")]    // 다른 타입
+        [TestCase("Nope")]   // 없는 Def
+        public void OnlyAConcreteDefOfTheKeyTypeHasAnImplicitRow(string key)
+        {
+            Mod("core", schema: AllSchema, defs: AllDefs);
+            LoadClean().Frozen.TryGet("Scout", out var scout);
+            Assert.That(scout.TryGetRow("Stock", key, out _), Is.False);
+        }
+
+        [Test]
+        public void AKeysListedRowThatWasNotWrittenIsAbsent()
+        {
+            Mod("core", schema: AllSchema, defs: AllDefs);
+            LoadClean().Frozen.TryGet("Scout", out var scout);
+            Assert.That(scout.TryGetRow("Skill", "Wood", out _), Is.True);
+            Assert.That(scout.TryGetRow("Skill", "Iron", out _), Is.False);
+            Assert.That(scout.TryGetRow("Nope", "Wood", out _), Is.False);
+        }
+
+        [Test]
+        public void AKeysAllConstWithoutADefaultIsASchemaError()
+        {
+            Mod("core", schema: "deftype(\"Resource\")\ncomponent(\"Stock\", key=\"Resource\", amount=const(int))\ndeftype(\"Unit\", components=[\"Stock\"])\n");
+            var result = Load(out var diags);
+            var d = diags.Single();
+            Assert.That((d.Code, d.Mod, d.Line), Is.EqualTo((Kesa.Engine.Diagnostics.Codes.SchBadDeclaration, "core", 2)));
+            Assert.That(d.Message, Does.Contain("Stock.amount"));
+            Assert.That(d.Hint, Does.Contain("listed"));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
+        }
+
+        [TestCase("component(\"Stock\", key=\"Resource\", keys=\"listed\", amount=const(int))\n")]
+        [TestCase("component(\"Stock\", key=\"Resource\", amount=const(int, default=0), tags=const(list[str]))\n")]
+        public void KeysListedAndDefaultedOrCollectionConstsAreFine(string component)
+        {
+            Mod("core", schema: "deftype(\"Resource\")\n" + component + "deftype(\"Unit\", components=[\"Stock\"])\n",
+                defs: "Resource(\"Wood\")\nUnit(\"Scout\", Stock={\"Wood\": Stock(" +
+                      (component.Contains("listed") ? "amount=1" : "") + ")})\n");
+            Assert.That(LoadClean().Disabled, Is.Empty);
+        }
+
         [Test]
         public void AComponentAttachedByAPatchIsFrozenWithItsDefaults()
         {
