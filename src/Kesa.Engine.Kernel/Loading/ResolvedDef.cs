@@ -17,6 +17,9 @@ namespace Kesa.Engine.Loading
 
         /// <summary>어느 모드의 패치가 마지막으로 바꿨다 (<see cref="ResolvedValue.Patch"/>).</summary>
         Patched,
+
+        /// <summary>값이 없어 스키마 <c>default</c>(리스트·맵은 빈 컬렉션)로 채웠다 (동결본에만 있다, G69).</summary>
+        Default,
     }
 
     /// <summary>

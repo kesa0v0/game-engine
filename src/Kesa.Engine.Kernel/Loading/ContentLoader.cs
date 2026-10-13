@@ -12,9 +12,10 @@ namespace Kesa.Engine.Loading
     {
         internal ContentLoadResult(IReadOnlyList<ModManifest> mods, IReadOnlyList<string> disabled, SchemaSet schema,
             DefRegistry defs, IReadOnlyList<PatchCall> patches, IReadOnlyList<ResolvedPatch> resolved, PatchLog log,
-            ResolvedDefs expanded)
+            ResolvedDefs expanded, DefSet frozen)
         {
             Expanded = expanded;
+            Frozen = frozen;
             Mods = mods;
             Disabled = disabled;
             Schema = schema;
@@ -46,6 +47,9 @@ namespace Kesa.Engine.Loading
 
         /// <summary>④가 상속을 펼친 Def들 (spec-gaps G52). 패치는 아직 반영하지 않았다.</summary>
         public ResolvedDefs Expanded { get; }
+
+        /// <summary>동결된 Def 집합 (spec-gaps G69·G70): 검증을 마친 최종 값, 기본값까지 채움, `abstract` 제외.</summary>
+        public DefSet Frozen { get; }
     }
 
     /// <summary>
@@ -100,7 +104,7 @@ namespace Kesa.Engine.Loading
                     patches.AddRange(u.Patches);
                 }
                 return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
-                    run.Log, run.Expanded);
+                    run.Log, run.Expanded, DefSet.Freeze(run.Expanded));
             }
         }
 
