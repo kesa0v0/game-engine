@@ -43,7 +43,22 @@ namespace Kesa.Engine.Script
             Add("len", Len);
             Add("range", Range);
             Add("sum", Sum);
+            table.Add(TextName, new PureBuiltin(TextName, Text));
             return table;
+        }
+
+        /// <summary>메시지 값을 만드는 내장 (spec-gaps G113).</summary>
+        public const string TextName = "text";
+
+        /// <summary><c>text("키", 이름=값, ...)</c>: 위치 인자는 키 하나, 나머지는 이름 있는 인자다.</summary>
+        private static Value Text(IReadOnlyList<Value> args, IReadOnlyDictionary<string, Value> keywords)
+        {
+            Arity(TextName, args, 1);
+            if (!(args[0] is StrValue key))
+                throw PureOps.TypeError("text() takes the text key as a str, not " + args[0].KindName);
+            var copy = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+            foreach (var pair in keywords) copy[pair.Key] = pair.Value;
+            return new TextValue(key.Value, copy);
         }
 
         private static void Arity(string name, IReadOnlyList<Value> args, int count)

@@ -180,6 +180,7 @@ namespace Kesa.Engine.Script
                     case ClosureValue c:
                         return CallFunction(c.Function, c.Captured, c.CapturedLocals, positional, keywords, site);
                     case PureBuiltin b:
+                        if (b.KeywordBody != null) return b.KeywordBody(positional, keywords);
                         if (keywords.Count > 0) throw Fail(Codes.RunScript, b.Name + "() does not take keyword arguments");
                         return b.Body(positional);
                 }
@@ -257,29 +258,26 @@ namespace Kesa.Engine.Script
                 }
             }
 
-            /// <summary>파이썬 호출처럼 인자를 모두 왼쪽부터 평가한 뒤 조건의 참/거짓(G104)을 본다.</summary>
+            /// <summary>
+            /// <c>require(조건, text("키", ...))</c>: 조건의 참/거짓(G104)을 보고, 메시지는 조건이 거짓일 때만 평가한다
+            /// (파이썬 <c>assert</c>의 메시지와 같다, G113). 통과한 <c>require</c>의 키는 리터럴로 적혔을 때만 있다.
+            /// 위치 인자가 둘이고 키워드 인자가 없다는 것은 로드 시점에 보았다.
+            /// </summary>
             private RequireOutcome Require(CallExpr call, Frame frame)
             {
                 try
                 {
                     Tick();
-                    Value? condition = null;
-                    Value? key = null;
-                    var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
-                    foreach (var arg in call.Arguments)
+                    var condition = Eval(call.Arguments[0].Value, frame);
+                    if (PureOps.Truthy(condition))
+                        return new RequireOutcome(RequireStatus.Passed, LiteralKey(call), null, call.Span);
+                    var message = Eval(call.Arguments[1].Value, frame);
+                    if (!(message is TextValue text))
                     {
-                        var value = Eval(arg.Value, frame);
-                        if (arg.Name != null) args[arg.Name] = value;
-                        else if (condition == null) condition = value;
-                        else key = value;
+                        throw Fail(Codes.RunType, "the message of require() must be a text(...) value, not " + message.KindName,
+                            "write require(condition, text(\"msg.key\", name=value, ...))");
                     }
-                    if (!(key is StrValue text))
-                    {
-                        throw Fail(Codes.RunType, "the message key of require() must be a str, not " + key!.KindName,
-                            "write require(condition, \"msg.key\", ...)");
-                    }
-                    var status = PureOps.Truthy(condition!) ? RequireStatus.Passed : RequireStatus.Failed;
-                    return new RequireOutcome(status, text.Value, args, call.Span);
+                    return new RequireOutcome(RequireStatus.Failed, text.Key, text.Args, call.Span);
                 }
                 catch (ScriptRuntimeException e)
                 {
@@ -288,15 +286,19 @@ namespace Kesa.Engine.Script
                 }
             }
 
-            private static string? LiteralKey(CallExpr call)
+            /// <summary>
+            /// 평가하지 않은 메시지의 키: <c>text("키", ...)</c>로 적혀 있고 그 <c>text</c>가 내장일 때만 (모드가 덮어썼으면 모른다).
+            /// </summary>
+            private string? LiteralKey(CallExpr call)
             {
-                int positional = 0;
-                foreach (var arg in call.Arguments)
-                {
-                    if (arg.Name != null) continue;
-                    if (positional++ == 1) return arg.Value is StringLiteral s ? s.Value : null;
-                }
-                return null;
+                if (call.Arguments.Count < 2 || !(call.Arguments[1].Value is CallExpr text) ||
+                    !(text.Callee is NameExpr name) || name.Name != PureBuiltins.TextName ||
+                    _owner._globals.Lookup(_stack[_stack.Count - 1].Function.Mod, PureBuiltins.TextName) != null ||
+                    _stack[_stack.Count - 1].LocalNames.Contains(PureBuiltins.TextName))
+                    return null;
+                return text.Arguments.Count > 0 && text.Arguments[0].Name == null && text.Arguments[0].Value is StringLiteral s
+                    ? s.Value
+                    : null;
             }
 
             /// <summary>재귀를 검사하고 인자를 매개변수에 묶은 새 프레임을 만든다 (스택에는 아직 넣지 않는다).</summary>

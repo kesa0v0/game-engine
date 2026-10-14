@@ -112,18 +112,28 @@ namespace Kesa.Engine.Script
                 }
             }
 
-            /// <summary><c>require(조건, "메시지 키", 이름=값, ...)</c>: 위치 인자는 정확히 둘이다.</summary>
+            /// <summary><c>require(조건, text("키", 이름=값, ...))</c>: 위치 인자 둘, 키워드 인자 없음 (G113).</summary>
             private void CheckRequire(CallExpr call)
             {
-                int positional = 0;
+                const string usage = "write require(condition, text(\"msg.key\", name=value, ...))";
                 foreach (var arg in call.Arguments)
-                    if (arg.Name == null) positional++;
-                if (positional != 2)
+                {
+                    if (arg.Name == null) continue;
+                    _context.Error(Codes.CmdPreconditions, "require() takes no keyword arguments", arg.Span,
+                        "message arguments go inside text(...): " + usage);
+                    return;
+                }
+                if (call.Arguments.Count != 2)
                 {
                     _context.Error(Codes.CmdPreconditions,
-                        "require() takes a condition and a message key, got " + positional + " positional argument" +
-                        (positional == 1 ? "" : "s"), call.Span,
-                        "write require(condition, \"msg.key\", name=value, ...)");
+                        "require() takes a condition and a message, got " + call.Arguments.Count + " argument" +
+                        (call.Arguments.Count == 1 ? "" : "s"), call.Span, usage);
+                    return;
+                }
+                if (call.Arguments[1].Value is StringLiteral key)
+                {
+                    _context.Error(Codes.CmdPreconditions, "the message of require() must be a text(...) value",
+                        key.Span, "write text(\"" + key.Value + "\")");
                 }
             }
 

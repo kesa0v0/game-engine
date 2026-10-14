@@ -24,10 +24,10 @@ namespace Kesa.Engine.Tests.Runtime
             "def Fortify(unit):\n" +
             "    with preconditions:\n" +
             "        c = unit.Location.city\n" +
-            "        require(c is not None, \"msg.not_in_city\", unit=unit)\n" +
+            "        require(c is not None, text(\"msg.not_in_city\", unit=unit))\n" +
             "        w = c.Walls.walls\n" +
-            "        require(w < 5, \"msg.walls_full\", walls=w)\n" +
-            "        require(unit.Moves.left > 0, \"msg.no_moves\", left=unit.Moves.left)\n" +
+            "        require(w < 5, text(\"msg.walls_full\", walls=w))\n" +
+            "        require(unit.Moves.left > 0, text(\"msg.no_moves\", left=unit.Moves.left))\n" +
             "    return c\n" +
             "@command\n" +
             "def Rest(unit):\n" +
@@ -35,9 +35,32 @@ namespace Kesa.Engine.Tests.Runtime
             "@command\n" +
             "def Buggy(unit):\n" +
             "    with preconditions:\n" +
-            "        require(unit.Moves.nope > 0, \"msg.first\")\n" +
-            "        require(False, \"msg.second\")\n" +
-            "    return 0\n";
+            "        require(unit.Moves.nope > 0, text(\"msg.first\"))\n" +
+            "        require(False, text(\"msg.second\"))\n" +
+            "    return 0\n" +
+            "@command\n" +
+            "def Lazy(unit):\n" +
+            "    with preconditions:\n" +
+            "        c = unit.Location.city\n" +
+            "        require(c is None or c.Walls.walls < 5, text(\"msg.walls_full\", walls=c.Walls.walls))\n" +
+            "    return 0\n" +
+            "@command\n" +
+            "def NotText(unit):\n" +
+            "    with preconditions:\n" +
+            "        m = \"msg.plain\"\n" +
+            "        require(False, m)\n" +
+            "    return 0\n" +
+            "@command\n" +
+            "def Spin(unit):\n" +
+            "    with preconditions:\n" +
+            "        require(False, text(\"msg.first\"))\n" +
+            "        n = spin()\n" +
+            "    return 0\n" +
+            "def spin():\n" +
+            "    t = 0\n" +
+            "    for i in range(100000):\n" +
+            "        t += i\n" +
+            "    return t\n";
 
         private World _world = null!;
         private EntityId _scout;
@@ -71,9 +94,36 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(report.Passed, Is.True);
             Assert.That(report.Command, Is.EqualTo("banking.Fortify"));
             Assert.That(Statuses(report), Is.EqualTo(new[] { RequireStatus.Passed, RequireStatus.Passed, RequireStatus.Passed }));
+            // 통과한 require는 메시지를 평가하지 않는다: 키는 리터럴에서, 인자는 없다 (G113)
             Assert.That(report.Requires[1].MessageKey, Is.EqualTo("msg.walls_full"));
-            Assert.That(((IntValue)report.Requires[1].Args["walls"]).Value, Is.EqualTo(1));
+            Assert.That(report.Requires[1].Args, Is.Empty);
             Assert.That(report.Requires[1].Span.Line, Is.EqualTo(9));
+        }
+
+        [Test]
+        public void TheMessageIsEvaluatedOnlyWhenTheConditionFails()
+        {
+            // 도시가 없으면 조건이 참이라 메시지(c.Walls.walls)를 평가하지 않는다 (파이썬 assert와 같음, G113)
+            Assert.That(Check("banking.Lazy").Passed, Is.True);
+            PutInTown(walls: 7);
+            var failure = Check("banking.Lazy").Failures.Single();
+            Assert.That(((IntValue)failure.Args["walls"]).Value, Is.EqualTo(7));
+        }
+
+        [Test]
+        public void TheMessageMustBeATextValue()
+        {
+            var e = Assert.Throws<WorldException>(() => Check("banking.NotText"))!;
+            Assert.That(e.Code, Is.EqualTo(Codes.RunType));
+            Assert.That(e.Message, Does.Contain("the message of require() must be a text(...) value, not str"));
+        }
+
+        [Test]
+        public void BudgetErrorsAreScriptErrorsEvenAfterAFailure()
+        {
+            // 앞에 실패가 있어도 단계 예산 초과는 앞 조건에 기대서 생긴 오류가 아니다 (G110 보강)
+            var e = Assert.Throws<WorldException>(() => Check("banking.Spin"))!;
+            Assert.That(e.Code, Is.EqualTo(Codes.RunBudget));
         }
 
         [Test]
@@ -94,7 +144,7 @@ namespace Kesa.Engine.Tests.Runtime
             var report = Check("banking.Fortify");
             Assert.That(Statuses(report),
                 Is.EqualTo(new[] { RequireStatus.Failed, RequireStatus.NotEvaluated, RequireStatus.Passed }));
-            Assert.That(report.Requires[1].MessageKey, Is.EqualTo("msg.walls_full"));
+            Assert.That(report.Requires[1].MessageKey, Is.EqualTo("msg.walls_full")); // 평가 안 됨도 리터럴 키는 있다
             Assert.That(report.Requires[1].Args, Is.Empty);
             Assert.That(report.Failures.Select(f => f.MessageKey), Is.EqualTo(new[] { "msg.not_in_city" }));
             // 엔티티 인자는 저장 가능한 값(EntityValue)으로 나온다

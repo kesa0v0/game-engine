@@ -147,9 +147,40 @@ namespace Kesa.Engine.Script
             Body = body;
         }
 
+        /// <summary>키워드 인자도 받는 내장 (<c>text("키", n=3)</c>).</summary>
+        public PureBuiltin(string name, Func<IReadOnlyList<Value>, IReadOnlyDictionary<string, Value>, Value> body)
+        {
+            Name = name;
+            KeywordBody = body;
+            Body = positional => body(positional, new SortedDictionary<string, Value>(StringComparer.Ordinal));
+        }
+
         public string Name { get; }
         public Func<IReadOnlyList<Value>, Value> Body { get; }
 
+        /// <summary>키워드 인자를 받으면 있다. 없으면 키워드 인자는 오류다.</summary>
+        public Func<IReadOnlyList<Value>, IReadOnlyDictionary<string, Value>, Value>? KeywordBody { get; }
+
         public override string KindName => "built-in function";
+    }
+
+    /// <summary>
+    /// 화면에 나갈 메시지: 텍스트 키와 이름 있는 인자 (<c>text("msg.walls_full", walls=3)</c>, spec S2 텍스트 키 타입·X4 P1,
+    /// spec-gaps G113). 번역은 하지 않는다: 키와 인자만 들고 다니고 화면이 번역한다.
+    /// </summary>
+    public sealed class TextValue : Value
+    {
+        public TextValue(string key, IReadOnlyDictionary<string, Value> args)
+        {
+            Key = key;
+            Args = args;
+        }
+
+        public string Key { get; }
+
+        /// <summary>인자 (이름 서수 순).</summary>
+        public IReadOnlyDictionary<string, Value> Args { get; }
+
+        public override string KindName => "text";
     }
 }

@@ -63,7 +63,7 @@ namespace Kesa.Engine.Tests.Loading
             Mod("core", schema: "component(\"Moves\", left=field(int, default=1))\n" +
                                 "deftype(\"Unit\", components=[\"Moves\"])\ndeftype(\"City\", components=[\"Moves\"])\n",
                 defs: "@command(free=True)\ndef Move(unit: Ref[Unit], dest: Ref[City]):\n" +
-                      "    with preconditions:\n        require(unit.Moves.left > 0, \"msg.no_moves\")\n    return 0\n");
+                      "    with preconditions:\n        require(unit.Moves.left > 0, text(\"msg.no_moves\"))\n    return 0\n");
             var result = LoadClean();
             Assert.That(result.Commands.Keys, Is.EqualTo(new[] { "core.Move" }));
         }
@@ -72,30 +72,34 @@ namespace Kesa.Engine.Tests.Loading
         public void PreconditionLocalsAreVisibleInTheBody()
         {
             Mod("core", defs: "@command\ndef Move(u):\n    with preconditions:\n        c = u + 1\n" +
-                              "        require(c > 0, \"msg.neg\", c=c)\n    return c\n");
+                              "        require(c > 0, text(\"msg.neg\", c=c))\n    return c\n");
             LoadClean();
         }
 
-        [TestCase("@command\ndef f(u):\n    x = 1\n    with preconditions:\n        require(u, \"m\")\n    return x\n",
+        [TestCase("@command\ndef f(u):\n    x = 1\n    with preconditions:\n        require(u, text(\"m\"))\n    return x\n",
             "'with' can only be the first statement of a @command function")]
-        [TestCase("def f(u):\n    with preconditions:\n        require(u, \"m\")\n    return 0\n",
+        [TestCase("def f(u):\n    with preconditions:\n        require(u, text(\"m\"))\n    return 0\n",
             "'with' can only be the first statement of a @command function")]
-        [TestCase("@command\ndef f(u):\n    if u:\n        with preconditions:\n            require(u, \"m\")\n    return 0\n",
+        [TestCase("@command\ndef f(u):\n    if u:\n        with preconditions:\n            require(u, text(\"m\"))\n    return 0\n",
             "'with' can only be the first statement of a @command function")]
-        [TestCase("@command\ndef f(u):\n    with other:\n        require(u, \"m\")\n    return 0\n",
+        [TestCase("@command\ndef f(u):\n    with other:\n        require(u, text(\"m\"))\n    return 0\n",
             "a command can only open 'with preconditions:'")]
         [TestCase("@command\ndef f(u):\n    with preconditions:\n        x = 1\n        x += 1\n    return 0\n",
             "'with preconditions:' can only hold require(...) calls and 'name = value' assignments")]
-        [TestCase("@command\ndef f(u):\n    with preconditions:\n        if u:\n            require(u, \"m\")\n    return 0\n",
+        [TestCase("@command\ndef f(u):\n    with preconditions:\n        if u:\n            require(u, text(\"m\"))\n    return 0\n",
             "'with preconditions:' can only hold require(...) calls and 'name = value' assignments")]
         [TestCase("@command\ndef f(u):\n    with preconditions:\n        print(u)\n    return 0\n",
             "'with preconditions:' can only hold require(...) calls and 'name = value' assignments")]
-        [TestCase("@command\ndef f(u):\n    require(u, \"m\")\n    return 0\n",
+        [TestCase("@command\ndef f(u):\n    require(u, text(\"m\"))\n    return 0\n",
             "require() can only be used as a statement inside 'with preconditions:'")]
-        [TestCase("@command\ndef f(u):\n    with preconditions:\n        x = require(u, \"m\")\n    return 0\n",
+        [TestCase("@command\ndef f(u):\n    with preconditions:\n        x = require(u, text(\"m\"))\n    return 0\n",
             "require() can only be used as a statement inside 'with preconditions:'")]
         [TestCase("@command\ndef f(u):\n    with preconditions:\n        require(u)\n    return 0\n",
-            "require() takes a condition and a message key, got 1 positional argument")]
+            "require() takes a condition and a message, got 1 argument")]
+        [TestCase("@command\ndef f(u):\n    with preconditions:\n        require(u, text(\"m\"), n=1)\n    return 0\n",
+            "require() takes no keyword arguments")]
+        [TestCase("@command\ndef f(u):\n    with preconditions:\n        require(u, \"msg.old_form\")\n    return 0\n",
+            "the message of require() must be a text(...) value")]
         [TestCase("with preconditions:\n    x = 1\n",
             "'with' can only be the first statement of a @command function")]
         public void PreconditionsPlacementAndContentAreChecked(string defs, string message)
