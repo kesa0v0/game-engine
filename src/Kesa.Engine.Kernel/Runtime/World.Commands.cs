@@ -146,7 +146,8 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>
         /// 인자를 매개변수 타입과 대조한다. 문제는 모두 <paramref name="rejections"/>에 모은다 (매개변수 순서, 남는 인자는 이름순).
-        /// 돌려주는 맵은 맞춘 값이다: <c>fixed</c> 자리의 <c>int</c>는 올린다 (G95).
+        /// 돌려주는 맵은 맞춘 값이다: <c>fixed</c> 자리의 <c>int</c>는 올리고 (G95), 빠진 인자는 기본값으로 채운다 (G116).
+        /// 커맨드 로그에 남길 전체 인자가 이것이다.
         /// </summary>
         private SortedDictionary<string, Value> CheckArguments(CommandDecl decl, IReadOnlyDictionary<string, Value> args,
             List<ArgumentRejection> rejections)
@@ -158,6 +159,12 @@ namespace Kesa.Engine.Runtime
                 known.Add(p.Name);
                 if (!args.TryGetValue(p.Name, out var value))
                 {
+                    // 빠진 인자는 기본값으로 채운다. 로드 때 타입에 맞춰 둔 값이다 (G116)
+                    if (p.Default != null)
+                    {
+                        result[p.Name] = p.Default;
+                        continue;
+                    }
                     rejections.Add(new ArgumentRejection(p.Name, p.Name, ArgumentProblem.Missing, p.Type.Display,
                         decl.Id + " is missing the argument '" + p.Name + "' (" + p.Type.Display + ")"));
                     continue;

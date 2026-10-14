@@ -68,6 +68,12 @@ namespace Kesa.Engine.Tests.Runtime
             "          escort: Ref[Unit] | None):\n" +
             "    with preconditions:\n" +
             "        require(rate > 0, text(\"msg.rate\"))\n" +
+            "    return 0\n" +
+            "@command\n" +
+            "def Wait(unit: Ref[Unit], turns: int = 2, pace: fixed = 1):\n" +
+            "    with preconditions:\n" +
+            "        require(turns <= 2, text(\"msg.too_long\", turns=turns))\n" +
+            "        require(pace == 1, text(\"msg.pace\"))\n" +
             "    return 0\n";
 
         private World _world = null!;
@@ -278,6 +284,17 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(r[2].Message, Is.EqualTo("'goods[\"Wood\"]' must be int, not fixed (a fixed value is not turned into an int)"));
             Assert.That(r[3].Message, Does.EndWith("a Unit, not a City"));
             Assert.That(r.All(x => x.Parameter == "goods" || x.Parameter == "path"));
+        }
+
+        [Test]
+        public void MissingArgumentsWithDefaultsAreFilledIn()
+        {
+            // turns=2(기본값), pace=1(fixed로 올린 기본값)으로 채워져 둘 다 통과 (G116)
+            Assert.That(Check("banking.Wait").Passed, Is.True);
+
+            var report = _world.CheckPreconditions("banking.Wait",
+                new Dictionary<string, Value> { ["unit"] = new EntityValue(_scout), ["turns"] = new IntValue(5) });
+            Assert.That(((IntValue)report.Failures.Single().Args["turns"]).Value, Is.EqualTo(5));
         }
 
         [TestCase("rate", "bool")]

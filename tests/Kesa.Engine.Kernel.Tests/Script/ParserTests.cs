@@ -153,6 +153,33 @@ namespace Kesa.Engine.Tests.Script
             Assert.That(module.Body.Last(), Is.InstanceOf<AssignStmt>());
         }
 
+        [Test]
+        public void DecoratedFunctionsKeepTheirDefaultValues()
+        {
+            // 기본값은 커맨드(데코레이터가 붙은 def)에만 (spec-gaps G116)
+            var (module, diags) = Parse("@command\ndef f(a: int, b: int = -1, c: str = \"x\"):\n    pass\n");
+            Assert.That(diags, Is.Empty);
+            var def = (FunctionDef)module.Body[0];
+            Assert.That(def.Parameters.Select(p => p.Default == null), Is.EqualTo(new[] { true, false, false }));
+            Assert.That(def.Parameters[1].Default, Is.InstanceOf<UnaryExpr>());
+        }
+
+        [Test]
+        public void AParameterWithoutADefaultCannotFollowOneWithADefault()
+        {
+            var (_, diags) = Parse("@command\ndef f(a: int = 1, b: int):\n    pass\n");
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.ParSyntax));
+            Assert.That(d.Message, Is.EqualTo("parameter 'b' without a default follows one with a default"));
+        }
+
+        [Test]
+        public void PlainFunctionDefaultsPointAtCommands()
+        {
+            var (_, diags) = Parse("def f(x=1):\n    return x\n");
+            Assert.That(diags.Single().Message, Is.EqualTo("default parameter values are only supported on @command functions"));
+        }
+
         [TestCase("@\ndef f():\n    pass\nx = 2\n")]
         [TestCase("@command x\ndef f():\n    pass\nx = 2\n")]
         [TestCase("@command\nx = 2\n")]

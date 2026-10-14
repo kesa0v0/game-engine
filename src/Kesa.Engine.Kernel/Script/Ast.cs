@@ -217,16 +217,20 @@ namespace Kesa.Engine.Script
 
     public sealed class Parameter
     {
-        public Parameter(string name, Expr? annotation, SourceSpan span)
+        public Parameter(string name, Expr? annotation, SourceSpan span, Expr? @default = null)
         {
             Name = name;
             Annotation = annotation;
             Span = span;
+            Default = @default;
         }
 
         public string Name { get; }
         public Expr? Annotation { get; }
         public SourceSpan Span { get; }
+
+        /// <summary><c>= 값</c>. <c>@command</c> 함수에만 있다 (spec-gaps G116).</summary>
+        public Expr? Default { get; }
     }
 
     /// <summary>

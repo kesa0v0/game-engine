@@ -1,5 +1,6 @@
 using System.Linq;
 using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Script;
 using NUnit.Framework;
 
 namespace Kesa.Engine.Tests.Loading
@@ -194,6 +195,61 @@ namespace Kesa.Engine.Tests.Loading
             Load(out var diags);
             var d = diags.Single(x => x.Code == Codes.CmdParameterType);
             Assert.That(d.Message, Is.EqualTo("'int' is this mod's own name, so it cannot be used as a type here"));
+        }
+
+        // ---- 기본값 (G116) ----
+
+        [Test]
+        public void DefaultsAreLiteralsFittedToTheType()
+        {
+            Mod("core", schema: TypesSchema,
+                defs: "Resource(\"Iron\")\n" +
+                      "@command\ndef Trade(n: int = -2, rate: fixed = 3, loud: bool = False, what: DefId[Resource] = \"Iron\",\n" +
+                      "          path: list[int] = [1, 2], goods: dict[str, int] = {\"a\": 1}, escort: Ref[Unit] | None = None,\n" +
+                      "          unit: Ref[Unit] | None = None):\n" +
+                      "    return 0\n");
+            var ps = LoadClean().Commands["core.Trade"].Parameters;
+            Assert.That(((IntValue)ps[0].Default!).Value, Is.EqualTo(-2));
+            Assert.That(ps[1].Default, Is.InstanceOf<FixedValue>()); // G95: fixed 자리의 int는 올린다
+            Assert.That(((FixedValue)ps[1].Default!).Value.Raw, Is.EqualTo(3 * Kesa.Engine.Numerics.Fixed.Scale));
+            Assert.That(((StrValue)ps[3].Default!).Value, Is.EqualTo("Iron"));
+            Assert.That(((ListValue)ps[4].Default!).Items, Has.Count.EqualTo(2));
+            Assert.That(ps[6].Default, Is.SameAs(NoneValue.Instance));
+        }
+
+        [TestCase("n: int = 1.5", "the default of 'n' must be int, not fixed")]
+        [TestCase("n: int = \"1\"", "the default of 'n' must be int, not str")]
+        [TestCase("n: int = None", "the default of 'n' is None, but its type int does not allow None")]
+        [TestCase("u: Ref[Unit] = None", "the default of 'u' is None, but its type Ref[\"Unit\"] does not allow None")]
+        [TestCase("u: Ref[Unit] | None = \"Scout\"", "the default of 'u' cannot be written as a literal: an entity default can only be None")]
+        [TestCase("n: int = 1 + 1", "a default parameter value must be a literal")]
+        [TestCase("n: int = LIMIT", "a default parameter value must be a literal")]
+        [TestCase("p: list[int] = [1, \"a\"]", "the default of 'p' must be int, not str")]
+        [TestCase("g: dict[str, int] = {\"a\": 1, \"a\": 2}", "the key \"a\" is written twice")]
+        public void BadDefaultsAreLoadErrors(string parameter, string message)
+        {
+            Mod("core", schema: TypesSchema, defs: "LIMIT = 3\n@command\ndef Move(" + parameter + "):\n    return 0\n");
+            var result = Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.CmdParameterType));
+            Assert.That(d.Message, Is.EqualTo(message));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
+        }
+
+        [TestCase("\"Irom\"", Codes.LnkNotFound, "there is no Resource 'Irom'")]
+        [TestCase("\"Scout\"", Codes.LnkWrongType, "'Scout' is a Unit, but a Resource is expected here")]
+        [TestCase("\"Ore\"", Codes.LnkAbstract, "'Ore' is abstract: a template cannot be referenced")]
+        public void DefIdDefaultsAreLinkedLikeDefValues(string id, string code, string message)
+        {
+            Mod("core", schema: TypesSchema,
+                defs: "Resource(\"Iron\")\nResource(\"Ore\", abstract=True)\nUnit(\"Scout\")\n" +
+                      "@command\ndef Mine(what: DefId[Resource] = " + id + "):\n    return 0\n");
+            var result = Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(code));
+            Assert.That(d.Message, Is.EqualTo(message));
+            Assert.That(d.Span.Line, Is.EqualTo(5)); // 리터럴의 위치
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
         }
 
         [Test]

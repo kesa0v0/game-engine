@@ -271,7 +271,11 @@ namespace Kesa.Engine.Loading
                 environments[u.Manifest.Id] = new ModEnvironment(unit.Scope, builtins);
             }
             run.Expanded = InheritanceExpander.Expand(run.Defs, run.Schema, run.Visibility, mod => environments[mod], stage, run.Log, conflicted);
-            Linker.Check(run.Expanded, run.Defs, run.Schema, run.Visibility, id => units.Find(u => u.Manifest.Id == id)?.Manifest, stage);
+            var commands = new List<CommandDecl>();
+            foreach (var u in units)
+                if (!u.Failed) commands.AddRange(u.Functions.Commands);
+            Linker.Check(run.Expanded, run.Defs, run.Schema, run.Visibility, id => units.Find(u => u.Manifest.Id == id)?.Manifest, stage,
+                commands);
             Validator.Check(run.Expanded, run.Schema, run.Visibility, stage);
 
             var failedBefore = new HashSet<string>(StringComparer.Ordinal);

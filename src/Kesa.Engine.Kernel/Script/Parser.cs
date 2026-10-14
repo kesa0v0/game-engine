@@ -395,7 +395,8 @@ namespace Kesa.Engine.Script
                     throw Fail("expected function name after 'def'" + Describe(name), name.Span);
                 Advance();
                 Expect("(");
-                var parameters = ParseParameters(")", allowAnnotations: true);
+                var parameters = ParseParameters(")", allowAnnotations: true,
+                    allowDefaults: decorators != null && decorators.Count > 0);
                 Expect(")");
 
                 Expr? returns = Accept("->") ? ParseExpression() : null;
@@ -426,12 +427,14 @@ namespace Kesa.Engine.Script
 
         /// <summary>
         /// 매개변수 목록을 <paramref name="close"/> 앞까지 읽는다 (<c>def</c>는 <c>)</c>, 람다는 <c>:</c>).
-        /// 이름과 (def만) 어노테이션을 지원하고, 기본값·<c>*args</c>·<c>/</c> 등은 미지원으로 보고한다.
+        /// 이름과 (def만) 어노테이션을 지원한다. 기본값은 데코레이터가 붙은 def(커맨드)에만 받고(G116, 무엇이 허용되는지는
+        /// 로더가 본다), 그 밖의 기본값과 <c>*args</c>·<c>/</c> 등은 미지원으로 보고한다.
         /// </summary>
-        private List<Parameter> ParseParameters(string close, bool allowAnnotations)
+        private List<Parameter> ParseParameters(string close, bool allowAnnotations, bool allowDefaults = false)
         {
             var parameters = new List<Parameter>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
+            bool sawDefault = false;
             while (!Cur.IsOp(close))
             {
                 if (Cur.IsOp("*") || Cur.IsOp("**") || Cur.IsOp("/"))
@@ -448,15 +451,24 @@ namespace Kesa.Engine.Script
                         throw Fail("expected parameter name" + Describe(p), p.Span);
                     Advance();
                     Expr? annotation = allowAnnotations && Accept(":") ? ParseExpression() : null;
+                    Expr? @default = null;
                     if (Cur.IsOp("="))
                     {
-                        _diagnostics.Error(Codes.ParUnsupported, "default parameter values are not supported", Cur.Span);
-                        Advance();
-                        ParseExpression();
+                        var equals = Advance();
+                        var value = ParseExpression();
+                        if (allowDefaults) @default = value;
+                        else
+                            _diagnostics.Error(Codes.ParUnsupported,
+                                "default parameter values are only supported on @command functions", equals.Span,
+                                hint: "spec-gaps G116");
                     }
+                    if (@default != null) sawDefault = true;
+                    else if (sawDefault && allowDefaults)
+                        _diagnostics.Error(Codes.ParSyntax, "parameter '" + p.Text + "' without a default follows one with a default",
+                            p.Span, hint: "move the parameters with defaults to the end, as in Python");
                     if (!seen.Add(p.Text))
                         _diagnostics.Error(Codes.ParSyntax, "duplicate parameter name: " + p.Text, p.Span);
-                    parameters.Add(new Parameter(p.Text, annotation, p.Span));
+                    parameters.Add(new Parameter(p.Text, annotation, p.Span, @default));
                 }
                 if (!Accept(",")) break;
             }

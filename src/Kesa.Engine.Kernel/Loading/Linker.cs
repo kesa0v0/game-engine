@@ -35,13 +35,24 @@ namespace Kesa.Engine.Loading
         }
 
         public static void Check(ResolvedDefs resolved, DefRegistry defs, SchemaSet schema, ModVisibility visibility,
-            Func<string, ModManifest?> manifest, StageDiagnostics stage)
+            Func<string, ModManifest?> manifest, StageDiagnostics stage, IReadOnlyList<CommandDecl>? commands = null)
         {
             var linker = new Linker(defs, schema, visibility, manifest, stage);
             foreach (var def in resolved.Defs) linker.CheckDef(def);
             // 스키마가 선언한 기본값도 Def 값과 같은 규칙으로 본다. 책임은 선언한 모드다 (G73)
             foreach (var decl in MemberDefaults.DeclaredDefaults(schema))
                 linker.CheckValue(MemberDefaults.DeclaredOrigin(decl), decl.Spec.Default!, decl.Spec.Type, decl.Span);
+            // 커맨드 매개변수의 기본값도 같다. 책임은 커맨드를 쓴 모드다 (G116)
+            if (commands == null) return;
+            foreach (var command in commands)
+            foreach (var p in command.Parameters)
+            {
+                if (p.Default == null) continue;
+                string mod = command.Mod;
+                linker.CheckValue((literal, fallback) =>
+                        new ValueBlame(mod, literal.File.Length > 0 ? literal : fallback, Array.Empty<string>()),
+                    p.Default, p.Type, p.Span);
+            }
         }
 
         private void CheckDef(ResolvedDef def)
@@ -90,33 +101,42 @@ namespace Kesa.Engine.Loading
             CheckId(origin, key, component.Key.Name, SourceSpan.None, origin.Span);
         }
 
-        private void CheckValue(ResolvedValue origin, Value value, TypeRef type, SourceSpan fallback)
+        private void CheckValue(ResolvedValue origin, Value value, TypeRef type, SourceSpan fallback) =>
+            CheckValue((literal, at) => ValueBlame.Of(origin, literal, at), value, type, fallback);
+
+        /// <param name="blame">리터럴 위치와 대신 쓸 위치로 책임 모드와 위치를 정한다</param>
+        private void CheckValue(Func<SourceSpan, SourceSpan, ValueBlame> blame, Value value, TypeRef type, SourceSpan fallback)
         {
             switch (type)
             {
                 case DefIdTypeRef d:
-                    if (value is StrValue s) CheckId(origin, s.Value, d.Target.Name, s.Origin, fallback);
+                    if (value is StrValue s) CheckId(blame(s.Origin, fallback), s.Value, d.Target.Name);
+                    return;
+                case OptionalTypeRef optional:
+                    CheckValue(blame, value, optional.Inner, fallback);
                     return;
                 case ListTypeRef list:
                     if (value is ListValue items)
-                        foreach (var item in items.Items) CheckValue(origin, item, list.Element, fallback);
+                        foreach (var item in items.Items) CheckValue(blame, item, list.Element, fallback);
                     return;
                 case DictTypeRef dict:
                     if (value is DictValue map)
                     {
                         foreach (var item in map.Items)
                         {
-                            CheckValue(origin, item.Key, dict.Key, item.Span);
-                            CheckValue(origin, item.Value, dict.Value, item.Span);
+                            CheckValue(blame, item.Key, dict.Key, item.Span);
+                            CheckValue(blame, item.Value, dict.Value, item.Span);
                         }
                     }
                     return;
             }
         }
 
-        private void CheckId(ResolvedValue origin, string id, string typeName, SourceSpan literal, SourceSpan fallback)
+        private void CheckId(ResolvedValue origin, string id, string typeName, SourceSpan literal, SourceSpan fallback) =>
+            CheckId(ValueBlame.Of(origin, literal, fallback), id, typeName);
+
+        private void CheckId(ValueBlame blame, string id, string typeName)
         {
-            var blame = ValueBlame.Of(origin, literal, fallback);
             string mod = blame.Mod;
             var guards = blame.Guards;
             var span = blame.Span;

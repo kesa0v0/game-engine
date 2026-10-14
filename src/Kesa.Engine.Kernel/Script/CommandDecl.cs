@@ -39,15 +39,21 @@ namespace Kesa.Engine.Script
     /// <summary>커맨드 매개변수 하나: 이름과 타입 (spec-gaps G114).</summary>
     public sealed class CommandParameter
     {
-        public CommandParameter(string name, TypeRef type, SourceSpan span)
+        public CommandParameter(string name, TypeRef type, SourceSpan span, Value? @default = null)
         {
             Name = name;
             Type = type;
             Span = span;
+            Default = @default;
         }
 
         public string Name { get; }
         public TypeRef Type { get; }
         public SourceSpan Span { get; }
+
+        /// <summary>
+        /// 기본값 (G116). 리터럴을 타입에 맞춘 값이고(<c>fixed</c> 자리의 int는 올림) 제출 때 빠진 인자를 채운다. 없으면 null.
+        /// </summary>
+        public Value? Default { get; }
     }
 }

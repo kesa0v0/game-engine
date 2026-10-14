@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Numerics;
 using Kesa.Engine.Schema;
 using Kesa.Engine.Script;
 
@@ -31,10 +34,180 @@ namespace Kesa.Engine.Loading
                         continue;
                     }
                     var type = new Reader(schema, visibility, scope, context, command.Mod).Type(p.Annotation);
-                    if (type == null) ok = false;
-                    else parameters.Add(new CommandParameter(p.Name, type, p.Span));
+                    if (type == null)
+                    {
+                        ok = false;
+                        continue;
+                    }
+                    Value? @default = null;
+                    if (p.Default != null)
+                    {
+                        var literal = Defaults.Literal(p.Default, context);
+                        @default = literal == null ? null : Defaults.Fit(p.Name, type, literal, p.Default.Span, context);
+                        if (@default == null)
+                        {
+                            ok = false;
+                            continue;
+                        }
+                    }
+                    parameters.Add(new CommandParameter(p.Name, type, p.Span, @default));
                 }
                 if (ok) command.Parameters = parameters;
+            }
+        }
+
+        /// <summary>기본값: 리터럴만 읽고 매개변수 타입에 맞춘다 (G116). <c>DefId</c>의 존재는 ⑤ 링크가 본다.</summary>
+        private static class Defaults
+        {
+            private const string LiteralHint =
+                "a default must be a number, a string, True/False, None, or a list/dict of those (spec-gaps G116)";
+
+            public static Value? Literal(Expr expr, CallContext context)
+            {
+                switch (expr)
+                {
+                    case IntLiteral i: return new IntValue(i.Value);
+                    case FixedLiteral f: return new FixedValue(f.Value);
+                    case StringLiteral s: return new StrValue(s.Value, s.Span);
+                    case BoolLiteral b: return b.Value ? BoolValue.True : BoolValue.False;
+                    case NoneLiteral _: return NoneValue.Instance;
+                    case UnaryExpr u when (u.Op == "-" || u.Op == "+") && (u.Operand is IntLiteral || u.Operand is FixedLiteral):
+                        if (u.Op == "+") return Literal(u.Operand, context);
+                        return u.Operand is IntLiteral n
+                            ? new IntValue(-n.Value)
+                            : (Value)new FixedValue(Fixed.FromRaw(-((FixedLiteral)u.Operand).Value.Raw));
+                    case ListExpr list:
+                    {
+                        var items = new List<Value>(list.Items.Count);
+                        foreach (var item in list.Items)
+                        {
+                            var v = Literal(item, context);
+                            if (v == null) return null;
+                            items.Add(v);
+                        }
+                        return new ListValue(items);
+                    }
+                    case DictExpr dict:
+                    {
+                        var entries = new List<DictItem>(dict.Entries.Count);
+                        foreach (var entry in dict.Entries)
+                        {
+                            var key = Literal(entry.Key, context);
+                            if (key == null) return null;
+                            var value = Literal(entry.Value, context);
+                            if (value == null) return null;
+                            foreach (var other in entries)
+                            {
+                                if (SameKey(other.Key, key))
+                                {
+                                    context.Error(Codes.CmdParameterType, "the key " + Show(key) + " is written twice",
+                                        entry.Key.Span, related: new[] { other.Span });
+                                    return null;
+                                }
+                            }
+                            entries.Add(new DictItem(key, value, entry.Key.Span));
+                        }
+                        return new DictValue(entries);
+                    }
+                }
+                context.Error(Codes.CmdParameterType, "a default parameter value must be a literal", expr.Span, LiteralHint);
+                return null;
+            }
+
+            private static bool SameKey(Value a, Value b) =>
+                (a is StrValue sa && b is StrValue sb && sa.Value == sb.Value) ||
+                (a is IntValue ia && b is IntValue ib && ia.Value == ib.Value);
+
+            private static string Show(Value v) =>
+                v is StrValue s ? "\"" + s.Value + "\""
+                : v is IntValue i ? i.Value.ToString(CultureInfo.InvariantCulture)
+                : v.KindName;
+
+            /// <summary>리터럴 값을 타입에 맞춘다. 맞지 않으면 오류를 내고 null.</summary>
+            public static Value? Fit(string parameter, TypeRef type, Value value, SourceSpan span, CallContext context,
+                TypeRef? declared = null)
+            {
+                string shown = (declared ?? type).Display;
+
+                Value? Fail(string message, string? hint = null)
+                {
+                    context.Error(Codes.CmdParameterType, "the default of '" + parameter + "' " + message, span, hint);
+                    return null;
+                }
+
+                if (value is NoneValue && !(type is OptionalTypeRef))
+                    return Fail("is None, but its type " + shown + " does not allow None", "write the type as " + shown + " | None");
+
+                switch (type)
+                {
+                    case OptionalTypeRef optional:
+                        return value is NoneValue ? value : Fit(parameter, optional.Inner, value, span, context, type);
+
+                    case PrimitiveTypeRef primitive:
+                        if (ReferenceEquals(primitive, PrimitiveTypeRef.Fixed))
+                        {
+                            if (value is FixedValue) return value;
+                            if (value is IntValue i)
+                            {
+                                try
+                                {
+                                    return new FixedValue(Fixed.FromRaw(checked(i.Value * Fixed.Scale)));
+                                }
+                                catch (OverflowException)
+                                {
+                                    return Fail("is too large for a fixed value");
+                                }
+                            }
+                        }
+                        else if (ReferenceEquals(primitive, PrimitiveTypeRef.Int))
+                        {
+                            if (value is IntValue) return value;
+                            if (value is FixedValue)
+                                return Fail("must be int, not fixed", "a fixed value is not turned into an int (spec-gaps G95)");
+                        }
+                        else if (ReferenceEquals(primitive, PrimitiveTypeRef.Bool) && value is BoolValue) return value;
+                        else if (ReferenceEquals(primitive, PrimitiveTypeRef.Str) && value is StrValue) return value;
+                        break;
+
+                    case EntityRefTypeRef _:
+                        return Fail("cannot be written as a literal: an entity default can only be None",
+                            "use " + shown + " | None = None");
+
+                    case DefIdTypeRef _:
+                        if (value is StrValue) return value;
+                        break;
+
+                    case ListTypeRef list:
+                        if (value is ListValue items)
+                        {
+                            var fitted = new List<Value>(items.Items.Count);
+                            foreach (var item in items.Items)
+                            {
+                                var v = Fit(parameter, list.Element, item, span, context);
+                                if (v == null) return null;
+                                fitted.Add(v);
+                            }
+                            return new ListValue(fitted);
+                        }
+                        break;
+
+                    case DictTypeRef dict:
+                        if (value is DictValue map)
+                        {
+                            var fitted = new List<DictItem>(map.Items.Count);
+                            foreach (var item in map.Items)
+                            {
+                                var k = Fit(parameter, dict.Key, item.Key, item.Span, context);
+                                if (k == null) return null;
+                                var v = Fit(parameter, dict.Value, item.Value, item.Span, context);
+                                if (v == null) return null;
+                                fitted.Add(new DictItem(k, v, item.Span));
+                            }
+                            return new DictValue(fitted);
+                        }
+                        break;
+                }
+                return Fail("must be " + shown + ", not " + value.KindName);
             }
         }
 
