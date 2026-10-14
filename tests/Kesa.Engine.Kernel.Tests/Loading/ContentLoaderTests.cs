@@ -685,7 +685,7 @@ namespace Kesa.Engine.Tests.Loading
         public void ModFailingInDefStageTakesItsExtensionsWithIt()
         {
             Mod("core", schema: "component(\"Health\", hp=field(int))\n" +
-                                "component(\"Skill\", key=\"Unit\", level=field(int))\n" +
+                                "component(\"Skill\", key=\"Unit\", level=field(int, default=0))\n" +
                                 "deftype(\"Unit\", components=[\"Health\", \"Skill\"])\n",
                 defs: "Unit(\"Scout\", Health=Health(hp=3), Skill={\"Scout\": Skill(level=1)})\n");
             Mod("morale", schema: "component(\"Morale\")\nextend(\"Unit\", components=[\"Morale\"])\n",

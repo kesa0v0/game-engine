@@ -128,7 +128,7 @@ namespace Kesa.Engine.Tests.Loading
         private const string AllSchema =
             "deftype(\"Resource\")\n" +
             "deftype(\"Tool\")\n" +
-            "component(\"Stock\", key=\"Resource\", amount=const(int, default=7), note=field(str))\n" +
+            "component(\"Stock\", key=\"Resource\", amount=const(int, default=7), note=field(str, default=\"\"))\n" +
             "component(\"Skill\", key=\"Resource\", keys=\"listed\", level=const(int, default=1))\n" +
             "deftype(\"Unit\", components=[\"Stock\", \"Skill\"])\n";
 

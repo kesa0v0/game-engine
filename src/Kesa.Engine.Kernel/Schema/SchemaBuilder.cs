@@ -176,6 +176,23 @@ namespace Kesa.Engine.Schema
             private static bool NeedsDefault(MemberSpec spec) =>
                 spec.Kind == MemberKind.Const && spec.Default == null && !(spec.Type is ListTypeRef) && !(spec.Type is DictTypeRef);
 
+            /// <summary><c>keys="all"</c> 줄의 런타임 칸이 생성 순간 없이 값을 가질 수 없는 이유. 문제없으면 null (G89·G93).</summary>
+            private static string? RowWithoutCreation(MemberSpec spec)
+            {
+                switch (spec.Kind)
+                {
+                    case MemberKind.Field:
+                        if (spec.DefaultFrom != null) return "uses default_from";
+                        if (spec.Default is Script.FunctionValue) return "uses a function default";
+                        if (spec.Default == null) return "has no default";
+                        return null;
+                    case MemberKind.Ref:
+                        return spec.Optional ? null : "is a required ref";
+                    default:
+                        return null;
+                }
+            }
+
             private void NoDefault(string mod, SourceSpan span, string what)
             {
                 Error(mod, Codes.SchBadDeclaration, what + " needs a default: other mods' Defs cannot see it, so nothing would fill it in",
@@ -240,6 +257,18 @@ namespace Kesa.Engine.Schema
                                 "'" + c.Name + "." + member.Name + "' needs a default: every " + c.Key!.Name +
                                 " has a '" + c.Name + "' row, and nobody writes all of them",
                                 member.Span, hint: "add default=... or use keys=\"listed\" (spec-gaps G77)");
+                        }
+                        // 그 줄은 아무도 만들지 않으니 생성 순간이 없다: 런타임 칸도 고정 기본값이 있어야 한다 (G89·G93)
+                        if (c.IsKeyed && c.KeyKind == KeyKind.Def && c.Keys == KeysMode.All)
+                        {
+                            string? problem = RowWithoutCreation(member.Spec);
+                            if (problem != null)
+                            {
+                                Error(member.Mod, Codes.SchBadDeclaration,
+                                    "'" + c.Name + "." + member.Name + "' " + problem + ": rows of a keys=\"all\" component " +
+                                    "are never created, so the value must be a fixed default",
+                                    member.Span, hint: "use keys=\"listed\" to create rows explicitly (spec-gaps G89, G93)");
+                            }
                         }
                     }
                 }

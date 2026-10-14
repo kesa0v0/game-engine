@@ -3,7 +3,8 @@ namespace Kesa.Engine.Diagnostics
     /// <summary>
     /// 진단 코드. 잠정 체계: 영역 접두사 + 세 자리 번호 (spec-gaps G6).
     /// LEX = 렉서, PAR = 파서, MOD = 모드 매니페스트·정렬, LOD = 콘텐츠 파일 목록, EVL = 로드 시점 평가,
-    /// SCH = 스키마 단계(②a), DEF = Def 등록(②b), PAT = 패치(③), INH = 상속 펼치기(④), LNK = 링크(⑤), VAL = 검증(⑥).
+    /// SCH = 스키마 단계(②a), DEF = Def 등록(②b), PAT = 패치(③), INH = 상속 펼치기(④), LNK = 링크(⑤), VAL = 검증(⑥),
+    /// RUN = 런타임 월드.
     /// </summary>
     public static class Codes
     {
@@ -99,5 +100,18 @@ namespace Kesa.Engine.Diagnostics
         public const string ValMissing = "VAL001";
         public const string ValType = "VAL002";
         public const string ValRange = "VAL003";
+
+        // 런타임 월드 (spec S4, spec-gaps G86~G93)
+        public const string RunUnknownName = "RUN001";
+        public const string RunDeadEntity = "RUN002";
+        public const string RunNotWritable = "RUN003";
+        public const string RunNotComputed = "RUN004";
+        public const string RunType = "RUN005";
+        public const string RunRange = "RUN006";
+        public const string RunMissingValue = "RUN007";
+        public const string RunNoComponent = "RUN008";
+        public const string RunNoRow = "RUN009";
+        public const string RunDeadRef = "RUN010";
+        public const string RunNotEntity = "RUN011";
     }
 }
