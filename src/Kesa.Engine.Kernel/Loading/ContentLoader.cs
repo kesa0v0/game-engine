@@ -214,6 +214,7 @@ namespace Kesa.Engine.Loading
                 var builtins = new DefBuiltins(schema, visibility, u.Manifest,
                     id => units.Exists(o => o.Manifest.Id == id && !o.Failed), u.Defs, u.Patches);
                 foreach (var file in u.DefFiles) Execute(u, file, builtins);
+                CheckFunctionNames(u, builtins);
                 // 로드되지 않은 모드의 가드 안에서 건너뛴 패치는 조용히 사라지지 않게 알린다 (G38)
                 foreach (var skipped in u.Skipped)
                 {
@@ -300,6 +301,10 @@ namespace Kesa.Engine.Loading
             // ---- 회차마다 새로 만드는 상태 (ResetRun) ----
 
             public ModScope Scope { get; private set; } = new ModScope();
+
+            /// <summary>이 모드가 정의한 로직 함수와 최상위 이름 (G108).</summary>
+            public ModFunctions Functions { get; private set; } = new ModFunctions();
+
             public ModSchema Schema { get; private set; }
             public List<DefRecord> Defs { get; private set; } = new List<DefRecord>();
 
@@ -329,6 +334,7 @@ namespace Kesa.Engine.Loading
             public void ResetRun()
             {
                 Scope = new ModScope();
+                Functions = new ModFunctions();
                 Schema = new ModSchema(Manifest.Id);
                 Defs = new List<DefRecord>();
                 Patches = new List<PatchCall>();
@@ -438,8 +444,17 @@ namespace Kesa.Engine.Loading
         }
 
         private static void Execute(ModUnit u, string relativePath, IBuiltins builtins, bool allowConditions = true) =>
-            new Interpreter(u.Scope, builtins, new CallContext(u.Manifest.Id, u.Bag, u.Skipped), allowConditions)
+            new Interpreter(u.Scope, builtins, new CallContext(u.Manifest.Id, u.Bag, u.Skipped, u.Functions), allowConditions)
                 .Run(u.Modules[relativePath]);
+
+        /// <summary>
+        /// 모드의 모든 파일을 실행한 뒤 함수 본문의 이름을 본다 (spec-gaps G108). 스키마 파일의 함수가 Def 파일의 이름을
+        /// 써도 되므로 ②b 끝에서 한다. 로드 시점 이름(<c>field</c>, <c>patch</c>, Def 생성자 등)은 따로 안내한다.
+        /// </summary>
+        private static void CheckFunctionNames(ModUnit u, DefBuiltins builtins) =>
+            FunctionNameChecker.Check(u.Functions, u.Scope,
+                name => name == Interpreter.InheritName || builtins.Lookup(name) != null || builtins.Explain(name) != null,
+                new CallContext(u.Manifest.Id, u.Bag));
 
         /// <summary>
         /// 필수 의존 중 실패한 모드가 있으면 이 모드를 비활성화한다 (MOD009). 로드 순서상 의존 대상이 앞에 있으므로

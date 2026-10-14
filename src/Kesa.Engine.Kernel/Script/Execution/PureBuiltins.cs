@@ -14,6 +14,20 @@ namespace Kesa.Engine.Script
         /// <summary>내장 함수가 한 번에 펼칠 수 있는 범위의 크기 (반복 문장은 단계 예산으로 막는다).</summary>
         private const long MaxMaterializedRange = 100_000;
 
+        /// <summary>기여 행을 읽는 내장 함수 (G98). 월드가 있어야 하므로 런타임(<c>World</c>)이 이 이름으로 더한다.</summary>
+        public const string ContribsName = "contribs";
+
+        /// <summary>
+        /// 실행 중 함수 본문에서 보이는 내장 이름 전체: <see cref="Create"/>의 이름과 <see cref="ContribsName"/>.
+        /// 로드 시점 이름 검사(G108)가 실행기와 같은 목록을 쓰도록 여기 한 곳에 둔다.
+        /// </summary>
+        public static IReadOnlyList<string> RuntimeNames => new List<string>(RuntimeNameSet);
+
+        private static readonly SortedSet<string> RuntimeNameSet =
+            new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName };
+
+        public static bool IsRuntimeName(string name) => RuntimeNameSet.Contains(name);
+
         public static SortedDictionary<string, Value> Create()
         {
             var table = new SortedDictionary<string, Value>(StringComparer.Ordinal);

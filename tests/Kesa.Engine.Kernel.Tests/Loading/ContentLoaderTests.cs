@@ -544,6 +544,72 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
         }
 
+        // ---- 함수 본문의 이름 검사 (spec-gaps G108) ----
+
+        [Test]
+        public void TypoInAFunctionBodyIsALoadErrorEvenInABranchThatNeverRuns()
+        {
+            Mod("core", schema: "BONUS = 3\n" +
+                                "def f(h) -> int:\n    total = h\n    if total:\n        return totl + BONUS\n    return 0\n");
+            var result = Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.EvlUnknownName));
+            Assert.That(d.Message, Is.EqualTo("name 'totl' is not defined"));
+            Assert.That(d.Hint, Is.EqualTo("did you mean 'total'?"));
+            Assert.That(d.Span.Line, Is.EqualTo(5));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
+        }
+
+        [Test]
+        public void FunctionBodiesSeeParametersLocalsLaterGlobalsAndRuntimeBuiltins()
+        {
+            // LIMIT은 Def 파일에서, 함수보다 나중에 정의된다. 속성 이름(h.Armor.bonus)은 이름 검사 대상이 아니다
+            Mod("core",
+                schema: "def f(h) -> int:\n" +
+                        "    s = h.Armor.bonus\n" +
+                        "    for i in range(3):\n" +
+                        "        s += i + later\n" +
+                        "    later = 1\n" +
+                        "    g = lambda x: (lambda y: x + y + s)(LIMIT)\n" +
+                        "    return clamp(g(h), 0, LIMIT) + len(contribs(h, \"max\")) + helper(h)\n" +
+                        "def helper(h) -> int:\n    return floor(h / 2)\n",
+                defs: "LIMIT = 10\n");
+            Load(out var diags);
+            Assert.That(diags.Where(d => d.Severity == Severity.Error), Is.Empty, string.Join("\n", diags));
+        }
+
+        [TestCase("def f(h) -> int:\n    return field\n", "field")]
+        [TestCase("def f(h) -> int:\n    return C(hp=1)\ncomponent(\"C\", hp=field(int, default=0))\n", "C")]
+        [TestCase("def f(h) -> int:\n    patch.set(\"X\", \"n\", 1)\n    return 1\n", "patch")]
+        [TestCase("def f(h) -> int:\n    return int(h)\n", "int")]
+        public void LoadTimeNamesInAFunctionBodyAreExplained(string schema, string name)
+        {
+            Mod("core", schema: schema);
+            var result = Load(out var diags);
+            var d = diags.Single(x => x.Code == Codes.EvlUnknownName);
+            Assert.That(d.Message, Is.EqualTo("'" + name + "' is only available while content files load, not inside a logic function"));
+            Assert.That(d.Hint, Does.Contain("contribs"));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
+        }
+
+        [Test]
+        public void TopLevelLambdaBodiesAreChecked()
+        {
+            Mod("core", schema: "component(\"C\", hp=field(int, default=0), m=derived(int, lambda c: c.hp + hpp))\n");
+            Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.EvlUnknownName));
+            Assert.That(d.Message, Is.EqualTo("name 'hpp' is not defined"));
+        }
+
+        [Test]
+        public void AFailedTopLevelAssignmentDoesNotCascadeIntoFunctionBodies()
+        {
+            Mod("core", schema: "X = nope\ndef f(h) -> int:\n    return X\n");
+            Load(out var diags);
+            Assert.That(diags.Select(d => d.Message), Is.EqualTo(new[] { "unknown name 'nope'" }));
+        }
+
         [Test]
         public void TypeAnnotationsMayUseTheUnionOperator()
         {

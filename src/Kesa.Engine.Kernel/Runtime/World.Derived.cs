@@ -31,7 +31,7 @@ namespace Kesa.Engine.Runtime
         private IReadOnlyDictionary<string, Value> RuntimeBuiltins()
         {
             var table = PureBuiltins.Create();
-            table.Add("contribs", new PureBuiltin("contribs", ContribsBuiltin));
+            table.Add(PureBuiltins.ContribsName, new PureBuiltin(PureBuiltins.ContribsName, ContribsBuiltin));
             return table;
         }
 
