@@ -9,7 +9,9 @@ namespace Kesa.Engine.Script
     /// 제한된 파이썬 부분집합의 파서 (spec S2).
     /// 원칙: 유효한 파이썬이 아닌 것은 받아들이지 않는다. 유효하지만 아직 지원하지 않는 구문은
     /// <see cref="Codes.ParUnsupported"/>로 거부하고 구문 오류와 구분한다.
-    /// 현재 단계(로딩 슬라이스)는 단순 문장(식, 대입), <c>def</c>의 머리부, <c>if</c>/<c>elif</c>/<c>else</c>만 다룬다.
+    /// 지금 읽는 문장: 식, 대입, <c>def</c>(본문 포함), <c>if</c>/<c>elif</c>/<c>else</c>, <c>for</c>, <c>return</c>,
+    /// <c>pass</c>, <c>break</c>, <c>continue</c>, 조건식 (spec-gaps G102). 함수 밖의 <c>return</c>과 반복 밖의
+    /// <c>break</c>/<c>continue</c>는 파이썬에서도 오류라 구문 오류다.
     /// </summary>
     public sealed class Parser
     {
@@ -22,7 +24,7 @@ namespace Kesa.Engine.Script
 
         private static readonly HashSet<string> CompoundKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
-            "def", "if", "elif", "else", "for", "while", "with", "class", "try", "except", "finally", "async",
+            "def", "if", "elif", "else", "while", "with", "class", "try", "except", "finally", "async",
         };
 
         private static readonly HashSet<string> AssignOps = new HashSet<string>(StringComparer.Ordinal)
@@ -36,6 +38,8 @@ namespace Kesa.Engine.Script
         private readonly string _file;
         private readonly DiagnosticBag _diagnostics;
         private int _pos;
+        private int _functionDepth;
+        private int _loopDepth;
 
         private Parser(IReadOnlyList<Token> tokens, string file, DiagnosticBag diagnostics)
         {
@@ -143,6 +147,12 @@ namespace Kesa.Engine.Script
             if (Cur.IsName("if"))
             {
                 body.Add(ParseIf());
+                return;
+            }
+
+            if (Cur.IsName("for"))
+            {
+                body.Add(ParseFor());
                 return;
             }
 
@@ -269,11 +279,78 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary>
-        /// <c>def</c>의 머리부를 읽고 본문은 건너뛴다. 매개변수는 이름과 어노테이션만 지원한다
-        /// (기본값, <c>*args</c>, <c>/</c> 등은 미지원).
+        /// <c>for 이름 in 식:</c> 블록. 풀어 받기(<c>for k, v in</c>)와 <c>else</c> 절은 미지원으로 보고한다.
+        /// </summary>
+        private Stmt ParseFor()
+        {
+            var keyword = Advance();
+            try
+            {
+                var target = Cur;
+                if (target.IsOp("(") || target.IsOp("[") || target.IsOp("*"))
+                {
+                    _diagnostics.Error(Codes.ParUnsupported, "unpacking in a 'for' target is not supported", target.Span);
+                    SkipToNewline();
+                    if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                    return new UnsupportedStmt("for", keyword.Span);
+                }
+                if (target.Kind != TokenKind.Name || Keywords.Contains(target.Text))
+                    throw Fail("expected a loop variable after 'for'" + Describe(target), target.Span);
+                Advance();
+                if (Cur.IsOp(","))
+                {
+                    _diagnostics.Error(Codes.ParUnsupported, "unpacking in a 'for' target is not supported", Cur.Span);
+                    SkipToNewline();
+                    if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                    return new UnsupportedStmt("for", keyword.Span);
+                }
+                if (!Cur.IsName("in")) throw Fail("expected 'in'" + Describe(Cur), Cur.Span);
+                Advance();
+                var iterable = ParseExpression();
+                Expect(":");
+
+                List<Stmt> body;
+                _loopDepth++;
+                try
+                {
+                    body = ParseSuite();
+                }
+                finally
+                {
+                    _loopDepth--;
+                }
+
+                if (Cur.IsName("else"))
+                {
+                    _diagnostics.Error(Codes.ParUnsupported, "'else' on a 'for' loop is not supported", Cur.Span);
+                    SkipToNewline();
+                    if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                }
+                return new ForStmt(new NameExpr(target.Text, target.Span), iterable, body, keyword.Span);
+            }
+            catch (ParseError)
+            {
+                SkipToNewline();
+                if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                return new UnsupportedStmt("for", keyword.Span);
+            }
+        }
+
+        /// <summary>
+        /// <c>def</c>의 머리부와 본문. 매개변수는 이름과 어노테이션만 지원한다 (기본값, <c>*args</c>, <c>/</c> 등은 미지원).
+        /// 함수 안의 <c>def</c>는 미지원이다 (spec-gaps G102).
         /// </summary>
         private Stmt ParseFunctionDef()
         {
+            if (_functionDepth > 0)
+            {
+                _diagnostics.Error(Codes.ParUnsupported, "function definitions inside functions are not supported", Cur.Span);
+                var nested = Cur;
+                SkipToNewline();
+                if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                return new UnsupportedStmt("def", nested.Span);
+            }
+
             var keyword = Advance();
             try
             {
@@ -288,18 +365,20 @@ namespace Kesa.Engine.Script
                 Expr? returns = Accept("->") ? ParseExpression() : null;
                 Expect(":");
 
-                // 본문: 같은 줄의 단순 문장이거나 들여쓴 블록
-                if (Cur.Kind == TokenKind.Newline)
+                List<Stmt> body;
+                int savedLoopDepth = _loopDepth;
+                _functionDepth++;
+                _loopDepth = 0;
+                try
                 {
-                    Advance();
-                    if (Cur.Kind != TokenKind.Indent) throw Fail("expected an indented block", Cur.Span);
-                    SkipBlock();
+                    body = ParseSuite();
                 }
-                else
+                finally
                 {
-                    SkipToNewline();
+                    _functionDepth--;
+                    _loopDepth = savedLoopDepth;
                 }
-                return new FunctionDef(name.Text, parameters, returns, keyword.Span);
+                return new FunctionDef(name.Text, parameters, returns, body, keyword.Span);
             }
             catch (ParseError)
             {
@@ -409,6 +488,38 @@ namespace Kesa.Engine.Script
         private Stmt ParseSimpleStatement()
         {
             var start = Cur;
+            if (start.Kind == TokenKind.Name)
+            {
+                switch (start.Text)
+                {
+                    case "pass":
+                        Advance();
+                        return new PassStmt(start.Span);
+
+                    case "break":
+                    case "continue":
+                        if (_loopDepth == 0)
+                            throw Fail("'" + start.Text + "' outside a loop", start.Span);
+                        Advance();
+                        return start.Text == "break" ? (Stmt)new BreakStmt(start.Span) : new ContinueStmt(start.Span);
+
+                    case "return":
+                        if (_functionDepth == 0)
+                            throw Fail("'return' outside a function", start.Span);
+                        Advance();
+                        if (Cur.Kind == TokenKind.Newline || Cur.Kind == TokenKind.EndOfFile || Cur.IsOp(";"))
+                            return new ReturnStmt(null, start.Span);
+                        var returned = ParseExpression();
+                        if (Cur.IsOp(","))
+                        {
+                            _diagnostics.Error(Codes.ParUnsupported, "returning several values is not supported", Cur.Span);
+                            while (Cur.Kind != TokenKind.Newline && Cur.Kind != TokenKind.EndOfFile && !Cur.IsOp(";")) Advance();
+                            return new UnsupportedStmt("return", start.Span);
+                        }
+                        return new ReturnStmt(returned, start.Span);
+                }
+            }
+
             if (start.Kind == TokenKind.Name && Keywords.Contains(start.Text) &&
                 start.Text != "True" && start.Text != "False" && start.Text != "None" &&
                 start.Text != "not" && start.Text != "lambda" && start.Text != "await")
@@ -462,13 +573,12 @@ namespace Kesa.Engine.Script
             var expr = ParseOr();
             if (Cur.IsName("if"))
             {
-                var t = Advance();
-                _diagnostics.Error(Codes.ParUnsupported, "conditional expressions are not supported yet", t.Span);
-                ParseOr();
+                Advance();
+                var condition = ParseOr();
                 if (!Cur.IsName("else")) throw Fail("expected 'else' in conditional expression" + Describe(Cur), Cur.Span);
                 Advance();
-                ParseExpression();
-                return new UnsupportedExpr("if-else", expr.Span);
+                var whenFalse = ParseExpression();
+                return new ConditionalExpr(condition, expr, whenFalse, expr.Span);
             }
             return expr;
         }

@@ -493,6 +493,8 @@ namespace Kesa.Engine.Script
                     return false;
                 case UnaryExpr u: return ContainsInherit(u.Operand);
                 case BinaryExpr b: return ContainsInherit(b.Left) || ContainsInherit(b.Right);
+                case ConditionalExpr c:
+                    return ContainsInherit(c.Condition) || ContainsInherit(c.WhenTrue) || ContainsInherit(c.WhenFalse);
                 case ListExpr l:
                     foreach (var x in l.Items)
                         if (ContainsInherit(x)) return true;

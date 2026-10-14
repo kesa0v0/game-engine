@@ -502,6 +502,19 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
         }
 
+        // 함수 본문을 읽게 된 뒤에도 최상위 콘텐츠 파일에서는 반복·조건식·return이 로드 오류로 남는다 (spec-gaps G102)
+        [TestCase("for x in [1]:\n    pass\n", Codes.EvlUnsupported)]
+        [TestCase("T(\"A\", n=1 if True else 2)\n", Codes.EvlUnsupported)]
+        [TestCase("return 1\n", Codes.ParSyntax)]
+        [TestCase("break\n", Codes.ParSyntax)]
+        [TestCase("if mod_loaded(\"other\"):\n    for x in [1]:\n        pass\n", Codes.EvlGuardBody)]
+        public void FunctionOnlyStatementsAtTheTopLevelOfADefFileAreErrors(string defs, string code)
+        {
+            Mod("core", schema: "deftype(\"T\", n=const(int, default=0))\n", defs: defs);
+            Load(out var diags);
+            Assert.That(diags.Select(d => d.Code), Does.Contain(code), string.Join("\n", diags));
+        }
+
         // ---- Def 등록 ----
 
         private const string UnitSchema =

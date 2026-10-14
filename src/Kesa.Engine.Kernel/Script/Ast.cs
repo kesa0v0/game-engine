@@ -164,6 +164,21 @@ namespace Kesa.Engine.Script
         public Expr Right { get; }
     }
 
+    /// <summary><c>참일때 if 조건 else 거짓일때</c>.</summary>
+    public sealed class ConditionalExpr : Expr
+    {
+        public ConditionalExpr(Expr condition, Expr whenTrue, Expr whenFalse, SourceSpan span) : base(span)
+        {
+            Condition = condition;
+            WhenTrue = whenTrue;
+            WhenFalse = whenFalse;
+        }
+
+        public Expr Condition { get; }
+        public Expr WhenTrue { get; }
+        public Expr WhenFalse { get; }
+    }
+
     /// <summary>파싱은 되었지만 이 단계에서 지원하지 않는 식 (진단은 이미 보고됨).</summary>
     public sealed class UnsupportedExpr : Expr
     {
@@ -231,21 +246,61 @@ namespace Kesa.Engine.Script
     }
 
     /// <summary>
-    /// <c>def name(params) -> ret:</c>. 지금은 머리부만 읽고 본문은 건너뛴다: 로딩 단계는 함수를
-    /// 값으로 묶기만 하고 호출하지 않는다 (spec-gaps G17). 본문은 식 언어 단계에서 파싱한다.
+    /// <c>def name(params) -> ret:</c>와 본문. 로딩 단계는 함수를 값으로 묶기만 하고 호출하지 않으며,
+    /// 본문은 순수 함수 실행기가 실행한다 (spec-gaps G17을 G102가 대체).
     /// </summary>
     public sealed class FunctionDef : Stmt
     {
-        public FunctionDef(string name, IReadOnlyList<Parameter> parameters, Expr? returns, SourceSpan span) : base(span)
+        public FunctionDef(string name, IReadOnlyList<Parameter> parameters, Expr? returns,
+            IReadOnlyList<Stmt> body, SourceSpan span) : base(span)
         {
             Name = name;
             Parameters = parameters;
             Returns = returns;
+            Body = body;
         }
 
         public string Name { get; }
         public IReadOnlyList<Parameter> Parameters { get; }
         public Expr? Returns { get; }
+        public IReadOnlyList<Stmt> Body { get; }
+    }
+
+    /// <summary><c>return</c> 또는 <c>return 식</c> (함수 본문에서만).</summary>
+    public sealed class ReturnStmt : Stmt
+    {
+        public ReturnStmt(Expr? value, SourceSpan span) : base(span) => Value = value;
+        public Expr? Value { get; }
+    }
+
+    /// <summary><c>for 이름 in 식:</c>. 대상은 이름 하나다 (풀어 받기와 <c>else</c> 절은 아직 없음, spec-gaps G102).</summary>
+    public sealed class ForStmt : Stmt
+    {
+        public ForStmt(NameExpr target, Expr iterable, IReadOnlyList<Stmt> body, SourceSpan span) : base(span)
+        {
+            Target = target;
+            Iterable = iterable;
+            Body = body;
+        }
+
+        public NameExpr Target { get; }
+        public Expr Iterable { get; }
+        public IReadOnlyList<Stmt> Body { get; }
+    }
+
+    public sealed class PassStmt : Stmt
+    {
+        public PassStmt(SourceSpan span) : base(span) { }
+    }
+
+    public sealed class BreakStmt : Stmt
+    {
+        public BreakStmt(SourceSpan span) : base(span) { }
+    }
+
+    public sealed class ContinueStmt : Stmt
+    {
+        public ContinueStmt(SourceSpan span) : base(span) { }
     }
 
     /// <summary><c>if</c>/<c>elif</c>의 조건과 그 아래 블록.</summary>

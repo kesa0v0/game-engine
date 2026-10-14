@@ -105,7 +105,11 @@ namespace Kesa.Engine.Tests.Script
         // 유효한 파이썬이지만 아직 지원하지 않는 것은 구문 오류와 구분해 보고한다
         [TestCase("def f(x=1):\n    return x\n")]
         [TestCase("def f(*args):\n    pass\n")]
-        [TestCase("for x in y:\n    pass\n")]
+        [TestCase("for k, v in y:\n    pass\n")]
+        [TestCase("for (a, b) in y:\n    pass\n")]
+        [TestCase("for x in y:\n    pass\nelse:\n    pass\n")]
+        [TestCase("def f():\n    def g():\n        pass\n")]
+        [TestCase("def f():\n    return 1, 2\n")]
         [TestCase("while x:\n    pass\n")]
         [TestCase("import os\n")]
         [TestCase("x = (1, 2)\n")]
@@ -113,8 +117,6 @@ namespace Kesa.Engine.Tests.Script
         [TestCase("x = {1, 2}\n")]
         [TestCase("x = lambda x=1: x\n")]
         [TestCase("x = lambda *a: 1\n")]
-        [TestCase("x = lambda g: a if g else b\n")]
-        [TestCase("x = a if b else c\n")]
         [TestCase("x = a < b < c\n")]
         [TestCase("x: int = 1\n")]
         [TestCase("f(*args)\n")]
@@ -205,7 +207,7 @@ namespace Kesa.Engine.Tests.Script
         }
 
         [Test]
-        public void FunctionDefHeaderIsParsedAndBodySkipped()
+        public void FunctionDefHeaderAndBodyAreParsed()
         {
             var (module, diags) = Parse(
                 "def health_max(h: Health) -> int:\n    for r in contribs(h, \"max\"):\n        pass\n    return 1\nx = 2\n" +
@@ -217,8 +219,88 @@ namespace Kesa.Engine.Tests.Script
             Assert.That(f.Parameters.Select(p => p.Name), Is.EqualTo(new[] { "h" }));
             Assert.That(((NameExpr)f.Parameters[0].Annotation!).Name, Is.EqualTo("Health"));
             Assert.That(((NameExpr)f.Returns!).Name, Is.EqualTo("int"));
+            Assert.That(f.Body, Has.Count.EqualTo(2));
+            Assert.That(f.Body[0], Is.InstanceOf<ForStmt>());
+            Assert.That(((ForStmt)f.Body[0]).Body.Single(), Is.InstanceOf<PassStmt>());
+            Assert.That(((ReturnStmt)f.Body[1]).Value, Is.InstanceOf<IntLiteral>());
             Assert.That(module.Body[1], Is.InstanceOf<AssignStmt>());
-            Assert.That(((FunctionDef)module.Body[2]).Parameters.Select(p => p.Name), Is.EqualTo(new[] { "a", "b" }));
+            var g = (FunctionDef)module.Body[2];
+            Assert.That(g.Parameters.Select(p => p.Name), Is.EqualTo(new[] { "a", "b" }));
+            Assert.That(((ReturnStmt)g.Body.Single()).Value, Is.InstanceOf<NameExpr>());
+        }
+
+        // schema-design 3.3.1의 대표 예제가 진단 없이 읽혀야 한다
+        [Test]
+        public void HealthMaxExampleFromTheSchemaDesignParsesCleanly()
+        {
+            var (module, diags) = Parse(
+                "def health_max(h: Health) -> int:\n" +
+                "    flat = 0\n" +
+                "    pct = 0\n" +
+                "    for r in contribs(h, \"max\"):\n" +
+                "        if r.op == \"add\":\n" +
+                "            flat += r.value\n" +
+                "        elif r.op == \"pct\":\n" +
+                "            pct += r.value\n" +
+                "    return clamp(floor((h.base_max + flat) * (1 + pct / 100)), 1, 9999)\n");
+            Assert.That(diags, Is.Empty);
+            var f = (FunctionDef)module.Body.Single();
+            Assert.That(f.Body.Select(s => s.GetType()), Is.EqualTo(new[]
+            {
+                typeof(AssignStmt), typeof(AssignStmt), typeof(ForStmt), typeof(ReturnStmt),
+            }));
+            var loop = (ForStmt)f.Body[2];
+            Assert.That(loop.Target.Name, Is.EqualTo("r"));
+            var branches = ((IfStmt)loop.Body.Single()).Branches;
+            Assert.That(branches, Has.Count.EqualTo(2));
+            Assert.That(((AssignStmt)branches[0].Body.Single()).Op, Is.EqualTo("+="));
+        }
+
+        [Test]
+        public void ConditionalExpressionIsParsed()
+        {
+            var (module, diags) = Parse("x = a if b else c if d else e\ny = lambda g: 1 if g else 2\n");
+            Assert.That(diags, Is.Empty);
+            var x = (ConditionalExpr)((AssignStmt)module.Body[0]).Value;
+            Assert.That(x.Condition, Is.InstanceOf<NameExpr>());
+            Assert.That(x.WhenFalse, Is.InstanceOf<ConditionalExpr>());
+            var lambda = (LambdaExpr)((AssignStmt)module.Body[1]).Value;
+            Assert.That(lambda.Body, Is.InstanceOf<ConditionalExpr>());
+        }
+
+        [Test]
+        public void BreakAndContinueAreAllowedInsideLoops()
+        {
+            var (module, diags) = Parse(
+                "def f(xs):\n    for x in xs:\n        if x:\n            break\n        continue\n    return\n");
+            Assert.That(diags, Is.Empty);
+            var f = (FunctionDef)module.Body.Single();
+            Assert.That(((ReturnStmt)f.Body[1]).Value, Is.Null);
+            var loop = (ForStmt)f.Body[0];
+            Assert.That(loop.Body[1], Is.InstanceOf<ContinueStmt>());
+        }
+
+        [TestCase("return 1\n")]
+        [TestCase("if a:\n    return\n")]
+        [TestCase("break\n")]
+        [TestCase("def f():\n    break\n")]
+        [TestCase("def f():\n    for x in y:\n        pass\n    continue\n")]
+        [TestCase("for x in y\n    pass\n")]
+        [TestCase("for x y:\n    pass\n")]
+        [TestCase("for in y:\n    pass\n")]
+        public void MisplacedControlFlowIsASyntaxError(string text)
+        {
+            var (_, diags) = Parse(text);
+            Assert.That(diags, Is.Not.Empty);
+            Assert.That(diags.Select(d => d.Code), Has.All.EqualTo(Codes.ParSyntax));
+        }
+
+        [Test]
+        public void LoopDepthDoesNotLeakOutOfAFunction()
+        {
+            var (_, diags) = Parse("for x in y:\n    pass\ndef f():\n    break\n");
+            Assert.That(diags.Select(d => d.Code), Has.All.EqualTo(Codes.ParSyntax));
+            Assert.That(diags, Has.Count.EqualTo(1));
         }
 
         [Test]
