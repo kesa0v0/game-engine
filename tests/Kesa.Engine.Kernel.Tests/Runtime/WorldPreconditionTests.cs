@@ -21,7 +21,7 @@ namespace Kesa.Engine.Tests.Runtime
         private const string Defs =
             "City(\"Town\")\nUnit(\"Scout\")\n" +
             "@command(free=True)\n" +
-            "def Fortify(unit):\n" +
+            "def Fortify(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
             "        c = unit.Location.city\n" +
             "        require(c is not None, text(\"msg.not_in_city\", unit=unit))\n" +
@@ -30,28 +30,28 @@ namespace Kesa.Engine.Tests.Runtime
             "        require(unit.Moves.left > 0, text(\"msg.no_moves\", left=unit.Moves.left))\n" +
             "    return c\n" +
             "@command\n" +
-            "def Rest(unit):\n" +
+            "def Rest(unit: Ref[Unit]):\n" +
             "    return 0\n" +
             "@command\n" +
-            "def Buggy(unit):\n" +
+            "def Buggy(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
             "        require(unit.Moves.nope > 0, text(\"msg.first\"))\n" +
             "        require(False, text(\"msg.second\"))\n" +
             "    return 0\n" +
             "@command\n" +
-            "def Lazy(unit):\n" +
+            "def Lazy(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
             "        c = unit.Location.city\n" +
             "        require(c is None or c.Walls.walls < 5, text(\"msg.walls_full\", walls=c.Walls.walls))\n" +
             "    return 0\n" +
             "@command\n" +
-            "def NotText(unit):\n" +
+            "def NotText(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
             "        m = \"msg.plain\"\n" +
             "        require(False, m)\n" +
             "    return 0\n" +
             "@command\n" +
-            "def Spin(unit):\n" +
+            "def Spin(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
             "        require(False, text(\"msg.first\"))\n" +
             "        n = spin()\n" +

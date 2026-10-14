@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Schema;
 
 namespace Kesa.Engine.Script
 {
@@ -25,6 +28,26 @@ namespace Kesa.Engine.Script
         public bool Free { get; }
 
         /// <summary><c>@command</c> 데코레이터의 위치.</summary>
+        public SourceSpan Span { get; }
+
+        /// <summary>
+        /// 어노테이션을 푼 매개변수 (G114). ②b 끝에서 채운다. 어노테이션이 틀린 커맨드는 모드와 함께 빠지므로 로드 결과에서는 늘 있다.
+        /// </summary>
+        public IReadOnlyList<CommandParameter> Parameters { get; internal set; } = Array.Empty<CommandParameter>();
+    }
+
+    /// <summary>커맨드 매개변수 하나: 이름과 타입 (spec-gaps G114).</summary>
+    public sealed class CommandParameter
+    {
+        public CommandParameter(string name, TypeRef type, SourceSpan span)
+        {
+            Name = name;
+            Type = type;
+            Span = span;
+        }
+
+        public string Name { get; }
+        public TypeRef Type { get; }
         public SourceSpan Span { get; }
     }
 }

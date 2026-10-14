@@ -84,6 +84,16 @@ namespace Kesa.Engine.Schema
         public override string Display => "DefId[\"" + Target.Name + "\"]";
     }
 
+    /// <summary>
+    /// <c>T | None</c>: None 또는 T. 커맨드 매개변수에만 쓴다 (spec-gaps G114). 스키마의 칼럼은 <c>optional=True</c>로 적는다.
+    /// </summary>
+    public sealed class OptionalTypeRef : TypeRef
+    {
+        public OptionalTypeRef(TypeRef inner) => Inner = inner;
+        public TypeRef Inner { get; }
+        public override string Display => Inner.Display + " | None";
+    }
+
     public enum FunctionSlotKind
     {
         /// <summary>확인용(순수) 함수 자리.</summary>

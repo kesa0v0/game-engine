@@ -222,6 +222,8 @@ namespace Kesa.Engine.Loading
                     id => units.Exists(o => o.Manifest.Id == id && !o.Failed), u.Defs, u.Patches);
                 foreach (var file in u.DefFiles) Execute(u, file, builtins);
                 CheckFunctionNames(u, builtins);
+                CommandSignatures.Resolve(u.Functions.Commands, schema, visibility, u.Scope,
+                    new CallContext(u.Manifest.Id, u.Bag));
                 // 로드되지 않은 모드의 가드 안에서 건너뛴 패치는 조용히 사라지지 않게 알린다 (G38)
                 foreach (var skipped in u.Skipped)
                 {
