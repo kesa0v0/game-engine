@@ -12,8 +12,10 @@ namespace Kesa.Engine.Loading
     {
         internal ContentLoadResult(IReadOnlyList<ModManifest> mods, IReadOnlyList<string> disabled, SchemaSet schema,
             DefRegistry defs, IReadOnlyList<PatchCall> patches, IReadOnlyList<ResolvedPatch> resolved, PatchLog log,
-            ResolvedDefs expanded, DefSet frozen, DefinitionSnapshot firstRound)
+            ResolvedDefs expanded, DefSet frozen, DefinitionSnapshot firstRound,
+            IReadOnlyDictionary<string, ModScope> scopes)
         {
+            Scopes = scopes;
             FirstRound = firstRound;
             Expanded = expanded;
             Frozen = frozen;
@@ -57,6 +59,12 @@ namespace Kesa.Engine.Loading
         /// 편집기용 추정일 뿐이고 로드의 판정은 아니다.
         /// </summary>
         public DefinitionSnapshot FirstRound { get; }
+
+        /// <summary>
+        /// 살아남은 모드별 최상위 이름 공간(모드 id → 이름들). 런타임에 함수 본문이 같은 모드의 함수·상수를 찾는 데 쓴다
+        /// (spec-gaps G105).
+        /// </summary>
+        public IReadOnlyDictionary<string, ModScope> Scopes { get; }
     }
 
     /// <summary>한 회차의 ②a·②b가 남긴 것: 살아남은 모드(로드 순서), 완성된 스키마, 등록된 Def.</summary>
@@ -117,6 +125,7 @@ namespace Kesa.Engine.Loading
                 diagnostics.AddRange(runDiagnostics.ToSortedList());
                 var mods = new List<ModManifest>();
                 var patches = new List<PatchCall>();
+                var scopes = new SortedDictionary<string, ModScope>(StringComparer.Ordinal);
                 foreach (var u in units)
                 {
                     diagnostics.AddRange(u.Bag.ToSortedList());
@@ -127,9 +136,10 @@ namespace Kesa.Engine.Loading
                     }
                     mods.Add(u.Manifest);
                     patches.AddRange(u.Patches);
+                    scopes.Add(u.Manifest.Id, u.Scope);
                 }
                 return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
-                    run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound);
+                    run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound, scopes);
             }
         }
 

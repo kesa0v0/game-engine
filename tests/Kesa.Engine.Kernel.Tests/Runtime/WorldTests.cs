@@ -92,13 +92,14 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
-        public void ConstAndDerivedCannotBeWrittenAndDerivedIsNotComputedYet()
+        public void ConstAndDerivedCannotBeWritten()
         {
             NewWorld();
             var scout = Unit();
             Fails(() => _world.Set(scout, M("Health", "base_max"), new IntValue(1)), Codes.RunNotWritable);
             Fails(() => _world.Set(scout, M("Unit", "label"), new StrValue("x")), Codes.RunNotWritable);
-            Fails(() => _world.Get(scout, M("Health", "max")), Codes.RunNotComputed);
+            Fails(() => _world.Set(scout, M("Health", "max"), new IntValue(1)), Codes.RunNotWritable);
+            Assert.That(Int(_world.Get(scout, M("Health", "max"))), Is.EqualTo(12)); // derived는 읽을 때 계산한다
         }
 
         // ---- 쓰기 검사 (G92) ----

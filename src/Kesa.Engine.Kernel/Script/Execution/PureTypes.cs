@@ -51,6 +51,12 @@ namespace Kesa.Engine.Script
         Value GetItem(Value key);
     }
 
+    /// <summary><c>for x in value</c>로 돌 수 있는 런타임 값 (키 컴포넌트의 키들 등). 시작 시점의 목록을 돌려준다.</summary>
+    public interface IRuntimeIterable
+    {
+        IReadOnlyList<Value> Iterate();
+    }
+
     /// <summary>값 동등 비교를 스스로 정하는 값 (엔티티 id 등). 그 밖의 값은 참조 동등이다.</summary>
     public interface IValueEquality
     {

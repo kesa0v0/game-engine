@@ -20,7 +20,7 @@ namespace Kesa.Engine.Runtime
     /// </list>
     /// 내부 저장 방식은 약속이 아니다(S4): 지금은 엔티티마다 바뀐 값만 맵으로 둔다.
     /// </summary>
-    public sealed class World
+    public sealed partial class World
     {
         private readonly DefSet _defs;
         private readonly SchemaSet _schema;
@@ -37,12 +37,18 @@ namespace Kesa.Engine.Runtime
 
         private static readonly Dictionary<MemberDecl, Value> NoValues = new Dictionary<MemberDecl, Value>();
 
-        public World(ContentLoadResult loaded) : this(loaded.Frozen, loaded.Schema) { }
+        public const int DefaultStepBudget = 100000;
 
-        public World(DefSet defs, SchemaSet schema)
+        public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget)
+            : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget) { }
+
+        public World(DefSet defs, SchemaSet schema, IReadOnlyDictionary<string, ModScope>? scopes = null,
+            int stepBudget = DefaultStepBudget)
         {
             _defs = defs;
             _schema = schema;
+            _scopes = scopes ?? new SortedDictionary<string, ModScope>(StringComparer.Ordinal);
+            _stepBudget = stepBudget;
         }
 
         // ---- 이름 풀기 ----
@@ -173,6 +179,7 @@ namespace Kesa.Engine.Runtime
             }
             var component = NotKeyed(member);
             Require(entity, component);
+            if (member.Kind == MemberKind.Derived) return ReadDerivedTop(entity, component, null, member.Member);
             return Read(member.Display, component, member.Member, DefMembers(entity, component), entity.Values);
         }
 
@@ -345,6 +352,7 @@ namespace Kesa.Engine.Runtime
             var component = KeyedMember(member);
             var row = FindRow(entity, component, key, out var defRow, out var record);
             if (!row) throw NoRow(id, component, key);
+            if (member.Kind == MemberKind.Derived) return ReadDerivedTop(entity, component, key, member.Member);
             return Read(member.Display + "[" + key + "]", component, member.Member, defRow?.Members,
                 record?.Values ?? NoValues);
         }

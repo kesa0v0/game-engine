@@ -14,9 +14,9 @@ namespace Kesa.Engine.Script
         /// <summary>내장 함수가 한 번에 펼칠 수 있는 범위의 크기 (반복 문장은 단계 예산으로 막는다).</summary>
         private const long MaxMaterializedRange = 100_000;
 
-        public static Dictionary<string, Value> Create()
+        public static SortedDictionary<string, Value> Create()
         {
-            var table = new Dictionary<string, Value>(StringComparer.Ordinal);
+            var table = new SortedDictionary<string, Value>(StringComparer.Ordinal);
             void Add(string name, Func<IReadOnlyList<Value>, Value> body) => table.Add(name, new PureBuiltin(name, body));
 
             Add("floor", a => Rounding("floor", a, FixedMath.Floor));

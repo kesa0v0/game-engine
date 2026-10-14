@@ -29,7 +29,7 @@ namespace Kesa.Engine.Tests.Script
 
         private static (PureEvaluator Evaluator, Func<string, Value> Function) Build(
             string source, int budget = PureEvaluator.DefaultStepBudget,
-            Action<Dictionary<string, Value>, Func<PureEvaluator>>? extend = null)
+            Action<SortedDictionary<string, Value>, Func<PureEvaluator>>? extend = null)
         {
             var bag = new DiagnosticBag();
             var module = Parser.Parse(source, "t.py", bag);

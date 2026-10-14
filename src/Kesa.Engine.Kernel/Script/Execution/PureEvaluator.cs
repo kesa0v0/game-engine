@@ -297,6 +297,11 @@ namespace Kesa.Engine.Script
                         count = range.Count;
                         at = i => new IntValue(range.At(i));
                         break;
+                    case IRuntimeIterable iterable2:
+                        var items = iterable2.Iterate();
+                        count = items.Count;
+                        at = i => items[(int)i];
+                        break;
                     default:
                         throw Fail(Codes.RunScript, "'" + iterable.KindName + "' is not iterable",
                             "loop over a list, a dict or range(...)");
