@@ -25,8 +25,30 @@ namespace Kesa.Engine.Runtime
         /// <summary>지금 계산 중인 <c>derived</c>들 (바깥부터). 같은 값을 다시 읽으면 순환이다 (G100).</summary>
         private readonly List<string> _computing = new List<string>();
 
+        /// <summary>지금 진행 중인 최상위 함수 실행의 단계 계량기. 그 안의 중첩 실행이 같은 예산을 나눠 쓴다 (G101).</summary>
+        private StepMeter? _meter;
+
         private PureEvaluator Evaluator =>
             _evaluator ??= new PureEvaluator(new ScopeGlobals(_scopes), RuntimeBuiltins(), _stepBudget);
+
+        /// <summary>
+        /// 함수를 실행한다. 가장 바깥 실행(<c>derived</c> 읽기나 생성 순간의 기본값 하나)이 예산 하나를 열고,
+        /// 그 안에서 읽힌 다른 <c>derived</c>는 남은 단계를 이어서 쓴다 (G101: 최상위 계산 하나마다 예산 하나).
+        /// </summary>
+        private Value RunFunction(FunctionValue function, Value self)
+        {
+            var span = function.Definition?.Span ?? function.Lambda!.Span;
+            bool outermost = _meter == null;
+            if (outermost) _meter = new StepMeter(_stepBudget);
+            try
+            {
+                return Evaluator.Run(function, new[] { self }, span, _meter);
+            }
+            finally
+            {
+                if (outermost) _meter = null;
+            }
+        }
 
         private IReadOnlyDictionary<string, Value> RuntimeBuiltins()
         {
@@ -50,12 +72,16 @@ namespace Kesa.Engine.Runtime
             }
         }
 
+        /// <summary>흔적에서 중첩 <c>derived</c> 읽기의 경계 줄.</summary>
+        private const string ReadingPrefix = "reading ";
+
         private static WorldException ToWorldException(ScriptRuntimeException e, string computing)
         {
             var text = new StringBuilder();
             text.Append("computing ").Append(computing).Append(": ").Append(e.Message);
             if (e.Span.Line > 0) text.Append(" (at ").Append(e.Span).Append(')');
-            foreach (var step in e.Trace) text.Append("\n  in ").Append(step);
+            foreach (var step in e.Trace)
+                text.Append(step.StartsWith(ReadingPrefix, StringComparison.Ordinal) ? "\n  " : "\n  in ").Append(step);
             return new WorldException(e.Code, text.ToString(), e.Hint);
         }
 
@@ -86,9 +112,14 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var self = new ComponentView(this, new EntityId(entity.Id), component, row);
-                var span = function.Definition?.Span ?? function.Lambda!.Span;
-                var result = Evaluator.Run(function, new Value[] { self }, span);
+                var result = RunFunction(function, self);
                 return CheckDerivedResult(component.Name + "." + member.Name, member, result);
+            }
+            catch (ScriptRuntimeException e) when (_computing.Count > 1)
+            {
+                // 다른 계산 안에서 읽힌 값이면 흔적에 경계를 남긴다. 바깥 함수의 프레임은 바깥 실행이 덧붙인다
+                e.AddTrace(ReadingPrefix + label);
+                throw;
             }
             finally
             {
@@ -211,9 +242,7 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var self = new ComponentView(this, new EntityId(entity.Id), item.Component, item.Row);
-                var span = function.Definition?.Span ?? function.Lambda!.Span;
-                var result = Evaluator.Run(function, new Value[] { self }, span);
-                return result;
+                return RunFunction(function, self);
             }
             finally
             {
@@ -282,7 +311,11 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>키 컴포넌트 전체: 키로 줄 하나를 꼬집는다 (<c>h.Skill.Medicine</c>, <c>h.Skill[s]</c>, <c>for s in h.Skill</c>).</summary>
-        private sealed class RowsView : ComponentViewBase, IRuntimeAttributes, IRuntimeIndexable, IRuntimeIterable
+        /// <remarks>
+        /// 파이썬 <c>dict</c>처럼 <c>len</c>은 줄 수, <c>k in h.Skill</c>은 그 키의 줄이 있는가, 비면 거짓이다 (G104).
+        /// 컴포넌트가 붙어 있는지는 <c>h.Skill is not None</c>으로 따로 묻는다.
+        /// </remarks>
+        private sealed class RowsView : ComponentViewBase, IRuntimeAttributes, IRuntimeIndexable, IRuntimeCollection
         {
             private readonly World _world;
             private readonly EntityId _id;
@@ -300,18 +333,25 @@ namespace Kesa.Engine.Runtime
             public Value GetAttribute(string name) =>
                 Guard(() => _world.RowOrNone(_id, _component, RowKey.Def(name)));
 
-            public Value GetItem(Value key)
+            public Value GetItem(Value key) => Guard(() => _world.RowOrNone(_id, _component, KeyOf(key)));
+
+            public IReadOnlyList<Value> Iterate() => Guard(() => _world.RowKeyValues(_id, _component));
+
+            public int Size() => Iterate().Count;
+
+            /// <summary>그 키의 줄이 있는가. 없는 Def id는 <c>h.Skill[k]</c>처럼 "혹시 …?" 오류다 (오타가 조용히 False가 되지 않게).</summary>
+            public bool ContainsKey(Value key) => Guard(() => _world.HasRowKey(_id, _component, KeyOf(key)));
+
+            private RowKey KeyOf(Value key)
             {
                 switch (key)
                 {
-                    case StrValue s: return Guard(() => _world.RowOrNone(_id, _component, RowKey.Def(s.Value)));
-                    case IEntityReference r: return Guard(() => _world.RowOrNone(_id, _component, RowKey.Entity(r.EntityId)));
+                    case StrValue s: return RowKey.Def(s.Value);
+                    case IEntityReference r: return RowKey.Entity(r.EntityId);
                 }
                 throw new ScriptRuntimeException(Codes.RunType,
                     "'" + _component.Name + "' rows are keyed by " + _component.Key!.Name + ", not " + key.KindName);
             }
-
-            public IReadOnlyList<Value> Iterate() => Guard(() => _world.RowKeyValues(_id, _component));
         }
 
         private Value EntityAttribute(EntityId id, string name)
@@ -417,6 +457,9 @@ namespace Kesa.Engine.Runtime
             if (!FindRow(entity, component, key, out _, out _)) return NoneValue.Instance;
             return new ComponentView(this, id, component, key);
         }
+
+        private bool HasRowKey(EntityId id, ComponentType component, RowKey key) =>
+            FindRow(Record(id), component, key, out _, out _);
 
         private IReadOnlyList<Value> RowKeyValues(EntityId id, ComponentType component)
         {

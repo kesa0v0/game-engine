@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Numerics;
 
@@ -31,7 +32,7 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary>
-        /// 파이썬의 참/거짓 판정 (spec-gaps G104): <c>None</c>, <c>False</c>, 0, 0.0, 빈 문자열·리스트·맵·<c>range</c>는 거짓이고
+        /// 파이썬의 참/거짓 판정 (spec-gaps G104): <c>None</c>, <c>False</c>, 0, 0.0, 빈 문자열·리스트·맵·<c>range</c>·줄 묶음은 거짓이고
         /// 그 밖(엔티티 Ref와 호스트 값 포함)은 참이다.
         /// </summary>
         public static bool Truthy(Value v)
@@ -46,6 +47,7 @@ namespace Kesa.Engine.Script
                 case ListValue l: return l.Items.Count > 0;
                 case DictValue d: return d.Items.Count > 0;
                 case RangeValue r: return r.Count > 0;
+                case IRuntimeCollection c: return c.Size() > 0;
             }
             return true;
         }
@@ -230,10 +232,12 @@ namespace Kesa.Engine.Script
                     throw TypeError("'in <str>' needs a str on the left, not " + item.KindName);
                 case RangeValue range:
                     if (!(item is IntValue n)) return false;
-                    if (!FixedMath.TrySubtract(n.Value, range.Start, out long diff)) return false;
-                    if (diff % range.Step != 0) return false;
-                    long index = diff / range.Step;
+                    // 큰 정수로 센다: long으로는 long.MinValue % -1 같은 경우가 .NET 예외를 낸다
+                    var diff = new BigInteger(n.Value) - range.Start;
+                    if (!(diff % range.Step).IsZero) return false;
+                    var index = diff / range.Step;
                     return index >= 0 && index < range.Count;
+                case IRuntimeCollection collection: return collection.ContainsKey(item);
             }
             throw TypeError("argument of type " + container.KindName + " is not iterable");
         }

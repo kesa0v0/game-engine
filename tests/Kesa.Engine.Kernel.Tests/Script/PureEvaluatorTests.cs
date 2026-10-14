@@ -131,6 +131,12 @@ namespace Kesa.Engine.Tests.Script
         [TestCase("'ab' in 'cabd'", "True")]
         [TestCase("4 in range(0, 10, 2)", "True")]
         [TestCase("5 in range(0, 10, 2)", "False")]
+        [TestCase("-3 in range(0, -5, -1)", "True")]
+        [TestCase("-5 in range(0, -5, -1)", "False")]
+        // long 끝 값: 예전에는 .NET 예외(OverflowException)가 새거나, 차가 long을 넘으면 무조건 False였다
+        [TestCase("(-9223372036854775807 - 1) in range(0, -5, -1)", "False")]
+        [TestCase("9223372036854775804 in range(-9223372036854775807 - 1, 9223372036854775807, 4)", "True")]
+        [TestCase("9223372036854775805 in range(-9223372036854775807 - 1, 9223372036854775807, 4)", "False")]
         [TestCase("None is None", "True")]
         [TestCase("1 is not None", "True")]
         [TestCase("'a' + 'b'", "ab")]
@@ -218,6 +224,11 @@ namespace Kesa.Engine.Tests.Script
         [TestCase("sum([1, 0.5])", "1.5")]
         [TestCase("sum(range(5))", "10")]
         [TestCase("sum([])", "0")]
+        // 파이썬과 같은 sum(묶음, start) (G97 보강)
+        [TestCase("sum([1, 2], 10)", "13")]
+        [TestCase("sum([1, 2], 0.5)", "3.5")]
+        [TestCase("sum([], 0.5)", "0.5")]
+        [TestCase("sum(range(3), 1)", "4")]
         public void Builtins(string expression, string expected) => Assert.That(Eval(expression), Is.EqualTo(expected));
 
         [TestCase("clamp(1, 9, 1)")]
@@ -229,6 +240,10 @@ namespace Kesa.Engine.Tests.Script
         [TestCase("range(1, 5, 0)")]
         [TestCase("floor(1, 2)")]
         [TestCase("sum(range(1000000))")]
+        [TestCase("sum(1, 2)")]
+        [TestCase("sum([1], 'a')")]
+        [TestCase("sum([1], 2, 3)")]
+        [TestCase("sum()")]
         public void BuiltinMisuseIsAnError(string expression) => Assert.That(EvalFails(expression).Code, Is.AnyOf(Codes.RunScript, Codes.RunArithmetic));
 
         // ---- 문장 ----

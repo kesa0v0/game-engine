@@ -20,7 +20,8 @@ namespace Kesa.Engine.Script
     /// 읽기만 하고(대입은 지역 변수뿐), 평가 노드마다 단계를 세어 한 번의 <see cref="Run"/>이
     /// 예산을 넘으면 오류를 낸다(G101). 함수 호출 체인에 같은 함수가 다시 나오면 재귀 오류다(G102).
     /// 오류는 <see cref="ScriptRuntimeException"/>이고 오류가 난 식의 위치와 호출 흔적이 붙는다.
-    /// 호스트가 읽기 도중 다시 <see cref="Run"/>을 불러도 된다: 호출마다 단계와 호출 체인이 새로 시작한다.
+    /// 호스트가 읽기 도중 다시 <see cref="Run"/>을 불러도 된다: 호출 체인은 새로 시작하고, 단계는 넘겨준
+    /// <see cref="StepMeter"/>가 있으면 이어서 센다.
     /// </summary>
     public sealed class PureEvaluator
     {
@@ -39,10 +40,13 @@ namespace Kesa.Engine.Script
             _budget = stepBudget;
         }
 
-        /// <summary>함수 값(<c>def</c>나 람다)을 위치 인자로 부른다.</summary>
-        public Value Run(Value function, IReadOnlyList<Value> args, SourceSpan callSite = default)
+        /// <summary>
+        /// 함수 값(<c>def</c>나 람다)을 위치 인자로 부른다. <paramref name="meter"/>가 없으면 이 실행만의 예산을 새로 주고,
+        /// 있으면 그 계량기의 남은 단계를 쓴다 (최상위 읽기 하나에 예산 하나, G101).
+        /// </summary>
+        public Value Run(Value function, IReadOnlyList<Value> args, SourceSpan callSite = default, StepMeter? meter = null)
         {
-            var session = new Session(this);
+            var session = new Session(this, meter ?? new StepMeter(_budget));
             try
             {
                 return session.Invoke(function, args, new SortedDictionary<string, Value>(StringComparer.Ordinal), callSite);
@@ -101,10 +105,14 @@ namespace Kesa.Engine.Script
         {
             private readonly PureEvaluator _owner;
             private readonly List<Frame> _stack = new List<Frame>();
-            private int _steps;
+            private readonly StepMeter _meter;
             private Value _returned = NoneValue.Instance;
 
-            public Session(PureEvaluator owner) => _owner = owner;
+            public Session(PureEvaluator owner, StepMeter meter)
+            {
+                _owner = owner;
+                _meter = meter;
+            }
 
             // ---- 오류 ----
 
@@ -113,26 +121,34 @@ namespace Kesa.Engine.Script
             private ScriptRuntimeException Fail(string code, string message, string? hint = null) =>
                 new ScriptRuntimeException(code, message, hint);
 
+            /// <summary>
+            /// 이 실행 단위의 프레임을 오류의 흔적에 한 번 덧붙인다. 위치가 아직 없으면 이 식이 오류 위치다.
+            /// 이미 있으면 오류는 안쪽 실행(이 식이 읽은 다른 <c>derived</c>)에서 났으므로, 이 식의 위치는 가장 안쪽
+            /// 프레임에 "at …"으로 붙여 어디서 읽었는지 남긴다.
+            /// </summary>
             private void Attach(ScriptRuntimeException e, SourceSpan span)
             {
-                e.Span = span;
-                var trace = new List<string>();
+                if (ReferenceEquals(e.TracedBy, this)) return;
+                e.TracedBy = this;
+                bool nested = HasSpan(e);
+                if (!nested) e.Span = span;
                 for (int i = _stack.Count - 1; i >= 0; i--)
                 {
                     var frame = _stack[i];
-                    trace.Add(frame.CallSite.Line > 0
-                        ? frame.Function.Name + " (called at " + frame.CallSite + ")"
-                        : frame.Function.Name);
+                    string line = frame.Function.Name;
+                    if (nested && i == _stack.Count - 1) line += " at " + span;
+                    if (frame.CallSite.Line > 0) line += " (called at " + frame.CallSite + ")";
+                    e.AddTrace(line);
                 }
-                e.Trace = trace;
             }
 
             private void Tick()
             {
-                if (++_steps > _owner._budget)
+                if (++_meter.Used > _meter.Budget)
                 {
-                    throw Fail(Codes.RunBudget, "the function used more than " + _owner._budget + " evaluation steps",
-                        "a loop may be too large or endless");
+                    throw Fail(Codes.RunBudget, "the function used more than " + _meter.Budget + " evaluation steps",
+                        "a loop may be too large or endless; the budget is shared by everything one read computes, " +
+                        "including the derived values it reads");
                 }
             }
 
@@ -251,7 +267,7 @@ namespace Kesa.Engine.Script
                     Tick();
                     return ExecCore(stmt, frame);
                 }
-                catch (ScriptRuntimeException e) when (!HasSpan(e))
+                catch (ScriptRuntimeException e)
                 {
                     Attach(e, stmt.Span);
                     throw;
@@ -367,7 +383,7 @@ namespace Kesa.Engine.Script
                     Tick();
                     return EvalCore(expr, frame);
                 }
-                catch (ScriptRuntimeException e) when (!HasSpan(e))
+                catch (ScriptRuntimeException e)
                 {
                     Attach(e, expr.Span);
                     throw;

@@ -143,8 +143,9 @@ namespace Kesa.Engine.Script
                 case ListValue list: return new IntValue(list.Items.Count);
                 case DictValue dict: return new IntValue(dict.Items.Count);
                 case RangeValue range: return new IntValue(range.Count);
+                case IRuntimeCollection collection: return new IntValue(collection.Size());
             }
-            throw PureOps.TypeError("len() needs a list, dict or range, not " + args[0].KindName);
+            throw PureOps.TypeError("len() needs a list, dict, range or component rows, not " + args[0].KindName);
         }
 
         private static Value Range(IReadOnlyList<Value> args)
@@ -172,10 +173,16 @@ namespace Kesa.Engine.Script
             return new RangeValue(start, step, (long)count);
         }
 
+        /// <summary>파이썬과 같은 <c>sum(묶음, start=0)</c>: 첫 인자는 리스트나 range, 둘째는 시작값(수)이다.</summary>
         private static Value Sum(IReadOnlyList<Value> args)
         {
-            var items = Operands("sum", args);
-            Value total = new IntValue(0);
+            if (args.Count < 1 || args.Count > 2)
+                throw PureOps.TypeError("sum() takes a list and an optional start value, got " + args.Count + " arguments");
+            if (!(args[0] is ListValue) && !(args[0] is RangeValue))
+                throw PureOps.TypeError("sum() needs a list or range, not " + args[0].KindName,
+                    "write sum([a, b]) to add separate values");
+            var items = Operands("sum", new[] { args[0] });
+            Value total = args.Count == 2 ? NumberArg("sum", args[1]) : new IntValue(0);
             foreach (var item in items) total = PureOps.Arithmetic("+", total, NumberArg("sum", item));
             return total;
         }

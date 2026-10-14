@@ -27,7 +27,7 @@ namespace Kesa.Engine.Tests.Runtime
             "component(\"Health\", base_max=const(int, default=10), max=derived(int, health_max),\n" +
             "    src=derived(int, lambda h: 1 if who(h) else 0), plain=field(int, default=0))\n" +
             "component(\"Skill\", key=\"SkillDef\", level=field(int, default=1),\n" +
-            "    eff=derived(int, lambda s: floor(s.level + sum(contribs(s, \"eff\")[0].value, 0) if contribs(s, \"eff\") else s.level)))\n" +
+            "    eff=derived(int, lambda s: floor(s.level + contribs(s, \"eff\")[0].value if contribs(s, \"eff\") else s.level)))\n" +
             "component(\"Badcall\", x=derived(int, lambda b: len(contribs(b, \"nope\"))))\n" +
             "deftype(\"SkillDef\")\n" +
             "deftype(\"Unit\", components=[\"Health\", \"Skill\", \"Badcall\"])\n" +

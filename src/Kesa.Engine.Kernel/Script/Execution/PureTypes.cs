@@ -10,11 +10,12 @@ namespace Kesa.Engine.Script
     /// </summary>
     public sealed class ScriptRuntimeException : Exception
     {
+        private readonly List<string> _trace = new List<string>();
+
         public ScriptRuntimeException(string code, string message, string? hint = null) : base(message)
         {
             Code = code;
             Hint = hint;
-            Trace = Array.Empty<string>();
         }
 
         public string Code { get; }
@@ -23,11 +24,33 @@ namespace Kesa.Engine.Script
         /// <summary>오류가 난 식의 위치. 아직 모르면 <see cref="SourceSpan.None"/>.</summary>
         public SourceSpan Span { get; internal set; }
 
-        /// <summary>호출 흔적: 안쪽 함수부터 "이름 (호출한 위치)".</summary>
-        public IReadOnlyList<string> Trace { get; internal set; }
+        /// <summary>
+        /// 호출 흔적, 안쪽부터: "이름 (호출한 위치)"와, 다른 <c>derived</c>를 읽다가 난 오류면 그 경계의 "reading …"과
+        /// 바깥 함수들 (G105 보강). 실행 단위마다 자기 프레임을 한 번씩 덧붙인다.
+        /// </summary>
+        public IReadOnlyList<string> Trace => _trace;
+
+        /// <summary>마지막으로 프레임을 덧붙인 실행 단위 (같은 실행 안에서 거듭 붙이지 않게).</summary>
+        internal object? TracedBy { get; set; }
+
+        internal void AddTrace(string line) => _trace.Add(line);
 
         public override string ToString() =>
             Code + ": " + Message + (Span.Line > 0 ? " at " + Span : "") + (Hint == null ? "" : " (" + Hint + ")");
+    }
+
+    /// <summary>
+    /// 평가 단계 계량기 (spec-gaps G101). 실행 하나가 새로 만들어 쓰고, 호스트가 최상위 읽기 하나 동안 같은 계량기를 넘기면
+    /// 그 안의 중첩 실행(다른 <c>derived</c> 읽기)이 남은 단계를 이어서 쓴다.
+    /// </summary>
+    public sealed class StepMeter
+    {
+        public StepMeter(int budget) => Budget = budget;
+
+        public int Budget { get; }
+
+        /// <summary>지금까지 쓴 단계 수.</summary>
+        public int Used { get; internal set; }
     }
 
     /// <summary>함수 본문이 이름을 찾는 모드 최상위 이름 공간 (같은 모드의 함수·상수).</summary>
@@ -55,6 +78,17 @@ namespace Kesa.Engine.Script
     public interface IRuntimeIterable
     {
         IReadOnlyList<Value> Iterate();
+    }
+
+    /// <summary>
+    /// 크기와 키 포함을 아는 런타임 묶음 (키 컴포넌트의 줄 묶음). 파이썬 <c>dict</c>처럼 <c>len</c>, <c>in</c>(키가 있는가),
+    /// 참/거짓(비면 거짓)을 받는다 (spec-gaps G104).
+    /// </summary>
+    public interface IRuntimeCollection : IRuntimeIterable
+    {
+        int Size();
+
+        bool ContainsKey(Value key);
     }
 
     /// <summary>값 동등 비교를 스스로 정하는 값 (엔티티 id 등). 그 밖의 값은 참조 동등이다.</summary>

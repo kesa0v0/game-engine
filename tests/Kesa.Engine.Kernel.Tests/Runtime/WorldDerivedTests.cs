@@ -115,6 +115,115 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(e.Message, Does.Contain("Loop.a").And.Contain("Loop.b").And.Contain("->"));
         }
 
+        // 최상위 읽기 하나에 예산 하나: 안에서 읽은 derived는 남은 단계를 이어서 쓴다 (G101)
+        private const string WorkSchema =
+            "def spin(w) -> int:\n    t = 0\n    for i in range(20):\n        t += 1\n    return t\n" +
+            "def gather(w) -> int:\n    s = 0\n    for k in range(10):\n        s += w.inner\n    return s\n" +
+            "component(\"Work\", inner=derived(int, spin), outer=derived(int, gather))\n" +
+            "deftype(\"Job\", components=[\"Work\"])\n";
+
+        [Test]
+        public void NestedDerivedReadsShareTheBudgetOfTheOutermostRead()
+        {
+            Mod("banking", schema: WorkSchema, defs: "Job(\"Dig\")\n");
+            var loaded = LoadClean();
+
+            var roomy = new World(loaded);
+            Assert.That(Int(roomy.Get(roomy.Create("Dig"), roomy.Member("Work", "outer"))), Is.EqualTo(200));
+
+            // 안쪽 계산 하나는 300단계 안에 들지만 그것을 열 번 읽는 바깥 읽기는 넘는다
+            _world = new World(loaded, stepBudget: 300);
+            var dig = _world.Create("Dig");
+            Assert.That(Int(_world.Get(dig, M("Work", "inner"))), Is.EqualTo(20));
+            var e = Fails(() => _world.Get(dig, M("Work", "outer")), Codes.RunBudget);
+            Assert.That(e.Message, Does.Contain("Work.outer"));
+
+            // 실패한 읽기의 계량기는 다음 읽기로 넘어가지 않는다
+            Assert.That(Int(_world.Get(dig, M("Work", "inner"))), Is.EqualTo(20));
+        }
+
+        // 다른 derived를 읽다가 난 오류는 안쪽 함수 → 읽은 값 → 바깥 함수(읽은 위치)로 흔적이 이어진다
+        private const string ChainSchema =
+            "def boom(w) -> int:\n    return 1 // w.zero\n" +
+            "def gather(w) -> int:\n    s = 0\n    s += w.inner\n    return s\n" +
+            "component(\"Chain\", zero=field(int, default=0), inner=derived(int, boom), outer=derived(int, gather),\n" +
+            "    half=derived(int, lambda c: 1 / 2), plus=derived(int, lambda c: c.half + 1))\n" +
+            "deftype(\"Job\", components=[\"Chain\"])\n";
+
+        [Test]
+        public void AnErrorInANestedDerivedKeepsTheWholeChain()
+        {
+            Mod("banking", schema: ChainSchema, defs: "Job(\"Dig\")\n");
+            _world = new World(LoadClean());
+            var dig = _world.Create("Dig");
+            var e = Fails(() => _world.Get(dig, M("Chain", "outer")), Codes.RunArithmetic);
+            var lines = e.Message.Split('\n');
+            Assert.That(lines[0], Does.StartWith("computing Chain.outer of " + dig + ": division by zero (at "));
+            Assert.That(lines[0], Does.Contain(":2")); // boom의 줄
+            Assert.That(lines[1], Does.StartWith("  in boom"));
+            Assert.That(lines[2], Is.EqualTo("  reading Chain.inner of " + dig));
+            Assert.That(lines[3], Does.StartWith("  in gather at ").And.Contain(":5")); // gather가 w.inner를 읽은 줄
+            Assert.That(lines, Has.Length.EqualTo(4), e.Message);
+        }
+
+        [Test]
+        public void ATypeErrorOfANestedDerivedPointsAtTheReadInTheOuterFunction()
+        {
+            Mod("banking", schema: ChainSchema, defs: "Job(\"Dig\")\n");
+            _world = new World(LoadClean());
+            var dig = _world.Create("Dig");
+            var e = Fails(() => _world.Get(dig, M("Chain", "plus")), Codes.RunType);
+            var lines = e.Message.Split('\n');
+            Assert.That(lines[0], Does.Contain("'Chain.half' is declared int").And.Contain(":8")); // plus의 람다가 c.half를 읽은 줄
+            Assert.That(lines[1], Is.EqualTo("  reading Chain.half of " + dig));
+            Assert.That(lines[2], Does.StartWith("  in <lambda>"));
+        }
+
+        // 키 컴포넌트의 줄 묶음은 파이썬 dict처럼: len은 줄 수, in은 키의 줄이 있는가, 비면 거짓 (G104)
+        private const string RowsSchema =
+            "component(\"Need\", key=\"NeedDef\", keys=\"listed\", met=field(bool, default=False))\n" +
+            "component(\"Skill\", key=\"SkillDef\", level=field(int, default=0))\n" +
+            "component(\"Opinion\", key=Ref[\"Unit\"], score=field(int, default=0))\n" +
+            "component(\"Q\",\n" +
+            "    needs=derived(int, lambda q: len(q.Need)),\n" +
+            "    any_need=derived(int, lambda q: 1 if q.Need else 0),\n" +
+            "    has_food=derived(int, lambda q: 1 if \"Food\" in q.Need else 0),\n" +
+            "    skills=derived(int, lambda q: len(q.Skill)),\n" +
+            "    has_cook=derived(int, lambda q: 1 if \"Cooking\" in q.Skill and \"Mining\" in q.Skill else 0),\n" +
+            "    opinions=derived(int, lambda q: len(q.Opinion)),\n" +
+            "    knows_self=derived(int, lambda q: 1 if q.entity in q.Opinion else 0),\n" +
+            "    typo=derived(int, lambda q: 1 if \"Fod\" in q.Need else 0),\n" +
+            "    wrong_kind=derived(int, lambda q: 1 if 3 in q.Need else 0))\n" +
+            "deftype(\"NeedDef\")\ndeftype(\"SkillDef\")\n" +
+            "deftype(\"Unit\", components=[\"Need\", \"Skill\", \"Opinion\", \"Q\"])\n";
+
+        [Test]
+        public void KeyedRowsActLikeADictOfRows()
+        {
+            Mod("banking", schema: RowsSchema,
+                defs: "NeedDef(\"Food\")\nNeedDef(\"Rest\")\nSkillDef(\"Cooking\")\nSkillDef(\"Mining\")\nUnit(\"Scout\")\n");
+            _world = new World(LoadClean());
+            var scout = _world.Create("Scout");
+            long Q(string member) => Int(_world.Get(scout, M("Q", member)));
+
+            // keys="listed": 줄이 없으면 0개이고 거짓
+            Assert.That(new[] { Q("needs"), Q("any_need"), Q("has_food") }, Is.EqualTo(new long[] { 0, 0, 0 }));
+            _world.AddRow(scout, "Need", "Food");
+            Assert.That(new[] { Q("needs"), Q("any_need"), Q("has_food") }, Is.EqualTo(new long[] { 1, 1, 1 }));
+
+            // keys="all": 키 타입의 모든 Def가 줄이다
+            Assert.That(new[] { Q("skills"), Q("has_cook") }, Is.EqualTo(new long[] { 2, 1 }));
+
+            // 엔티티 키
+            Assert.That(new[] { Q("opinions"), Q("knows_self") }, Is.EqualTo(new long[] { 0, 0 }));
+            _world.AddRow(scout, "Opinion", scout);
+            Assert.That(new[] { Q("opinions"), Q("knows_self") }, Is.EqualTo(new long[] { 1, 1 }));
+
+            // 없는 Def id는 조용한 False가 아니라 h.Need["Fod"]와 같은 "혹시 …?" 오류, 키 종류가 틀리면 타입 오류
+            Assert.That(Fails(() => Q("typo"), Codes.RunUnknownName).Hint, Is.EqualTo("did you mean 'Food'?"));
+            Fails(() => Q("wrong_kind"), Codes.RunType);
+        }
+
         [Test]
         public void ScriptErrorsBecomeWorldExceptionsWithTheirCode()
         {
