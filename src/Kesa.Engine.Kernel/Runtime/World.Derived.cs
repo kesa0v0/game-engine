@@ -160,6 +160,67 @@ namespace Kesa.Engine.Runtime
             }
         }
 
+        /// <summary>
+        /// 생성 순간(G89)에 엔티티가 있어야 계산되는 기본값들을 선언 순서대로 계산해 저장한다.
+        /// 한 칸을 저장한 뒤에 다음 칸을 계산하므로 앞 칸은 뒤 칸이 읽을 수 있고, 뒤 칸을 읽으면 "아직 값이 없다" 오류다.
+        /// </summary>
+        private void FinishPending(EntityRecord entity, List<PendingDefault> pending)
+        {
+            foreach (var item in pending)
+            {
+                var member = item.Member;
+                string display = item.Component.Name + "." + member.Name;
+                Value raw;
+                try
+                {
+                    raw = item.Function != null
+                        ? RunDefault(entity, item)
+                        : ReadMember(entity, item.Component, item.Row, item.Source!);
+                }
+                catch (ScriptRuntimeException e)
+                {
+                    throw ToWorldException(e, "the default of " + display + " (" + item.Where + ")");
+                }
+                Value stored;
+                try
+                {
+                    stored = CheckWrite(display, member, ToPlain(display, raw));
+                }
+                catch (WorldException e)
+                {
+                    throw new WorldException(e.Code, "the default of " + display + " (" + item.Where + "): " + e.Message,
+                        e.Hint ?? (raw is FixedValue && ReferenceEquals(member.Spec.Type, PrimitiveTypeRef.Int)
+                            ? "turn the fixed value into an int with floor(), ceil() or round() (spec-gaps G95)"
+                            : null));
+                }
+                if (item.Row != null)
+                {
+                    entity.RowsOf(item.Component).Find(item.Row.Value)!.Values[member] = stored;
+                    continue;
+                }
+                if (member.Kind == MemberKind.Ref) Reindex(member, entity.Id, entity.Values, stored);
+                entity.Values[member] = stored;
+            }
+        }
+
+        private Value RunDefault(EntityRecord entity, PendingDefault item)
+        {
+            string label = "default of " + item.Component.Name + "." + item.Member.Name + " of " + new EntityId(entity.Id);
+            var function = item.Function!;
+            _computing.Add(label);
+            try
+            {
+                var self = new ComponentView(this, new EntityId(entity.Id), item.Component, item.Row);
+                var span = function.Definition?.Span ?? function.Lambda!.Span;
+                var result = Evaluator.Run(function, new Value[] { self }, span);
+                return result;
+            }
+            finally
+            {
+                _computing.RemoveAt(_computing.Count - 1);
+            }
+        }
+
         /// <summary>컴포넌트(줄)의 멤버 하나를 읽는다. <c>derived</c>면 계산한다.</summary>
         private Value ReadMember(EntityRecord entity, ComponentType component, RowKey? row, MemberDecl member)
         {

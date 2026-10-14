@@ -115,11 +115,12 @@ namespace Kesa.Engine.Runtime
                 {
                     rc.Rows.TryGet(key, out var row);
                     var values = new Planned();
-                    PlanMembers(values, component, row.Members, NoValues, "creating '" + defId + "', row '" + key + "'");
-                    if (values.Count == 0) continue;
+                    PlanMembers(values, component, row.Members, NoValues, "creating '" + defId + "', row '" + key + "'", RowKey.Def(key));
+                    if (values.Count == 0 && values.Pending.Count == 0) continue;
                     var record = new RowRecord(attached: false);
                     values.CopyTo(record.Values);
                     plannedRows.RowsOf(component).ByDef.Add(key, record);
+                    planned.Pending.AddRange(values.Pending);
                 }
             }
 
@@ -134,6 +135,21 @@ namespace Kesa.Engine.Runtime
             {
                 def.Components.TryGet(name, out var rc);
                 IndexRefs(entity, rc.Component);
+            }
+            if (planned.Pending.Count == 0) return new EntityId(id);
+
+            // 함수 기본값과 derived 원천의 default_from은 엔티티가 있어야 계산된다. 실패하면 만든 흔적을 모두 지운다.
+            try
+            {
+                FinishPending(entity, planned.Pending);
+            }
+            catch
+            {
+                foreach (var component in ComponentsOf(entity)) UnindexRefs(entity, component);
+                _entities.Remove(id);
+                _byType[def.Type].Remove(id);
+                _nextId = id;
+                throw;
             }
             return new EntityId(id);
         }
@@ -218,6 +234,18 @@ namespace Kesa.Engine.Runtime
             entity.Runtime.Add(component.Name, component);
             values.CopyTo(entity.Values);
             IndexRefs(entity, component);
+            if (values.Pending.Count == 0) return;
+            try
+            {
+                FinishPending(entity, values.Pending);
+            }
+            catch
+            {
+                UnindexRefs(entity, component);
+                foreach (var member in component.Members) entity.Values.Remove(member);
+                entity.Runtime.Remove(component.Name);
+                throw;
+            }
         }
 
         /// <summary>런타임에 붙인 컴포넌트를 뗀다. Def가 가진 컴포넌트는 뗄 수 없다 (spec S4).</summary>
@@ -393,7 +421,7 @@ namespace Kesa.Engine.Runtime
 
             var given = Given(inits, h => h.Component == component, "the value does not belong to '" + componentName + "'");
             var values = new Planned();
-            PlanMembers(values, component, null, given, "adding the '" + componentName + "' row " + key + " to " + id);
+            PlanMembers(values, component, null, given, "adding the '" + componentName + "' row " + key + " to " + id, key);
 
             var record = new RowRecord(attached: true);
             values.CopyTo(record.Values);
@@ -403,6 +431,21 @@ namespace Kesa.Engine.Runtime
                 if (!_keyHolders.TryGetValue(key.EntityKey, out var holders))
                     _keyHolders.Add(key.EntityKey, holders = new SortedSet<long>());
                 holders.Add(id.Value);
+            }
+            if (values.Pending.Count == 0) return;
+            try
+            {
+                FinishPending(entity, values.Pending);
+            }
+            catch
+            {
+                entity.Rows[componentName].Remove(key);
+                if (key.IsEntity && _keyHolders.TryGetValue(key.EntityKey, out var held))
+                {
+                    held.Remove(id.Value);
+                    if (held.Count == 0) _keyHolders.Remove(key.EntityKey);
+                }
+                throw;
             }
         }
 
@@ -480,7 +523,7 @@ namespace Kesa.Engine.Runtime
         /// 준 처음 값과 <c>default_from</c>으로 계산한 값. 어느 길로도 값이 정해지지 않는 칸이 있으면 실패한다.
         /// </summary>
         private void PlanMembers(Planned target, ComponentType component,
-            OrderedMap<ResolvedValue>? defMembers, Dictionary<MemberDecl, Value> given, string where)
+            OrderedMap<ResolvedValue>? defMembers, Dictionary<MemberDecl, Value> given, string where, RowKey? row = null)
         {
             foreach (var member in component.Members)
             {
@@ -500,12 +543,21 @@ namespace Kesa.Engine.Runtime
                     continue;
                 }
                 if (defMembers != null && defMembers.Contains(member.Name)) continue;
-                if (spec.Default is FunctionValue)
-                    throw new WorldException(Codes.RunNotComputed,
-                        "'" + component.Name + "." + member.Name + "' has a function default, which cannot be computed yet (spec-gaps G90; " + where + ")");
+                if (spec.Default is FunctionValue fn)
+                {
+                    // 엔티티가 만들어진 뒤에 계산한다 (FinishPending)
+                    target.Pending.Add(new PendingDefault(component, row, member, fn, null, where));
+                    continue;
+                }
                 if (spec.Default != null) continue;
                 if (spec.DefaultFrom is NameRef from)
                 {
+                    component.TryGetMember(from.Name, out var sourceMember);
+                    if (sourceMember.Kind == MemberKind.Derived)
+                    {
+                        target.Pending.Add(new PendingDefault(component, row, member, null, sourceMember, where));
+                        continue;
+                    }
                     var source = SourceValue(component, from.Name, defMembers, given, where);
                     target.Add(member, CheckWrite(component.Name + "." + member.Name, member, source));
                     continue;
@@ -524,9 +576,6 @@ namespace Kesa.Engine.Runtime
             Dictionary<MemberDecl, Value> given, string where)
         {
             component.TryGetMember(name, out var source);
-            if (source.Kind == MemberKind.Derived)
-                throw new WorldException(Codes.RunNotComputed,
-                    "'" + component.Name + "." + name + "' is derived and cannot be computed yet, so default_from cannot use it (spec-gaps G90; " + where + ")");
             if (given.TryGetValue(source, out var v)) return v;
             if (defMembers != null && defMembers.TryGet(name, out var d)) return d.Value;
             if (source.Spec.Default != null && !(source.Spec.Default is FunctionValue)) return source.Spec.Default;
@@ -624,7 +673,10 @@ namespace Kesa.Engine.Runtime
             else if (member.Kind == MemberKind.Ref && spec.Optional) value = NoneValue.Instance;
 
             // 생성 순간의 검사(G93)가 구멍을 막으므로 여기 오면 월드의 버그다
-            if (value == null) throw new InvalidOperationException("no value for '" + display + "'");
+            // (함수 기본값이 아직 계산되지 않은 칸을 읽은 경우도 여기다: 선언 순서상 뒤의 칸이다, G106)
+            if (value == null)
+                throw new WorldException(Codes.RunMissingValue, "'" + display + "' has no value yet",
+                    "a default computed at creation can only read members declared before it (spec-gaps G106)");
 
             if (member.Kind == MemberKind.Ref && value is EntityValue ev && !_entities.ContainsKey(ev.Id.Value))
             {
@@ -789,12 +841,37 @@ namespace Kesa.Engine.Runtime
 
         // ---- 저장 구조 ----
 
+        /// <summary>함수 기본값이나 <c>derived</c>를 원천으로 하는 <c>default_from</c>: 생성 순간에 엔티티를 만든 뒤 계산한다 (G89·G106).</summary>
+        private sealed class PendingDefault
+        {
+            public PendingDefault(ComponentType component, RowKey? row, MemberDecl member, FunctionValue? function,
+                MemberDecl? source, string where)
+            {
+                Component = component;
+                Row = row;
+                Member = member;
+                Function = function;
+                Source = source;
+                Where = where;
+            }
+
+            public ComponentType Component { get; }
+            public RowKey? Row { get; }
+            public MemberDecl Member { get; }
+            public FunctionValue? Function { get; }
+            public MemberDecl? Source { get; }
+            public string Where { get; }
+        }
+
         /// <summary>생성 순간에 정한 값들 (멤버 선언 순서). 검사가 다 끝난 뒤에 월드로 옮긴다.</summary>
         private sealed class Planned
         {
             private readonly List<KeyValuePair<MemberDecl, Value>> _items = new List<KeyValuePair<MemberDecl, Value>>();
 
             public int Count => _items.Count;
+
+            /// <summary>엔티티가 있어야 계산되는 기본값 (선언 순서).</summary>
+            public List<PendingDefault> Pending { get; } = new List<PendingDefault>();
 
             public void Add(MemberDecl member, Value value) => _items.Add(new KeyValuePair<MemberDecl, Value>(member, value));
 

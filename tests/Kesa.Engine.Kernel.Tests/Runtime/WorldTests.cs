@@ -251,18 +251,20 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
-        public void DefaultsThatNeedTheEvaluatorFailAtCreationForNow()
+        public void DefaultsThatNeedTheEvaluatorAreComputedAtCreation()
         {
             Mod("core", schema:
-                "component(\"A\", m=derived(int, lambda a: 1), cur=field(int, default_from=\"m\"))\n" +
+                "component(\"A\", m=derived(int, lambda a: 7), cur=field(int, default_from=\"m\"))\n" +
                 "component(\"B\", cur=field(int, default=lambda b: 2))\n" +
                 "deftype(\"X\", components=[\"A\"])\ndeftype(\"Y\", components=[\"B\"])\n",
                 defs: "X(\"x\")\nY(\"y\")\n");
             _world = new World(LoadClean());
-            Assert.That(Fails(() => _world.Create("x"), Codes.RunNotComputed).Message, Does.Contain("default_from"));
-            Assert.That(Fails(() => _world.Create("y"), Codes.RunNotComputed).Message, Does.Contain("function default"));
-            var y = _world.Create("y", new Init(M("B", "cur"), new IntValue(4)));       // 직접 주면 된다
-            Assert.That(Int(_world.Get(y, M("B", "cur"))), Is.EqualTo(4));
+            var x = _world.Create("x");
+            Assert.That(Int(_world.Get(x, M("A", "cur"))), Is.EqualTo(7));
+            var y = _world.Create("y");
+            Assert.That(Int(_world.Get(y, M("B", "cur"))), Is.EqualTo(2));
+            var z = _world.Create("y", new Init(M("B", "cur"), new IntValue(4)));       // 직접 주면 그 값
+            Assert.That(Int(_world.Get(z, M("B", "cur"))), Is.EqualTo(4));
         }
 
         [TestCase("note=field(str)", "has no default")]
