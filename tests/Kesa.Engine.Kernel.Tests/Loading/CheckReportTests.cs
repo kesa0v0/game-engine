@@ -107,5 +107,49 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(json, Does.Contain("\"mods\": {\"loaded\": [\"core\"], \"disabled\": [\"alpha\", \"zeta\"]}"));
             Assert.That(diags.Select(d => d.Code), Does.Contain(Codes.DefDuplicateId));
         }
+
+        // 사람용 텍스트 (spec-gaps G79)
+
+        [Test]
+        public void ACleanLoadPrintsOnlyTheSummary()
+        {
+            Mod("core", schema: Schema, defs: "Resource(\"Wood\")\n");
+            var result = LoadClean();
+            Assert.That(CheckReport.ToText(new List<Diagnostic>(), result, "mods/"),
+                Is.EqualTo("errors: 0, warnings: 0, info: 0; mods loaded: 1, disabled: 0\n"));
+        }
+
+        [Test]
+        public void TextPrefixesThePathAndIndentsHintAndRelated()
+        {
+            Mod("core", schema: Schema, defs: "Resource(\"Wood\")\nUnit(\"Scout\", cost={\"Wod\": 1})\n");
+            var result = Load(out var diags);
+            const string expected =
+                "mods/core/defs/defs.py:2:21: error LNK001: there is no Resource 'Wod'\n" +
+                "    hint: did you mean 'Wood'?\n" +
+                "\n" +
+                "errors: 1, warnings: 0, info: 0; mods loaded: 0, disabled: 1 (core)\n";
+            Assert.That(CheckReport.ToText(diags, result, "mods/"), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void TextShowsRelatedLocationsAndOmitsAMissingLocation()
+        {
+            Mod("core", schema: Schema, defs: "Resource(\"Wood\")\n");
+            var result = LoadClean();
+            var diags = new List<Diagnostic>
+            {
+                new Diagnostic("PAT011", Severity.Warning, "a warning", "core", new SourceSpan("core/defs/defs.py", 3, 4),
+                    null, new[] { new SourceSpan("core/defs/other.py", 7, 1) }),
+                new Diagnostic("PAT002", Severity.Info, "an info", null, SourceSpan.None),
+            };
+            const string expected =
+                "m/core/defs/defs.py:3:4: warning PAT011: a warning\n" +
+                "    related: m/core/defs/other.py:7:1\n" +
+                "info PAT002: an info\n" +
+                "\n" +
+                "errors: 0, warnings: 1, info: 1; mods loaded: 1, disabled: 0\n";
+            Assert.That(CheckReport.ToText(diags, result, "m/"), Is.EqualTo(expected));
+        }
     }
 }

@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Kesa.Engine.Cli.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Kesa.Engine.Kernel\Kesa.Engine.Kernel.csproj" />
   </ItemGroup>
 

@@ -55,6 +55,49 @@ namespace Kesa.Engine.Reporting
             return sb.ToString();
         }
 
+        /// <summary>
+        /// 사람용 텍스트 출력 (spec-gaps G79). 진단마다 <c>파일:줄:열: 심각도 코드: 메시지</c> 한 줄과 들여쓴 힌트·관련 위치,
+        /// 끝에 개수와 모드 요약 한 줄. 순서는 <see cref="ToJson"/>과 같다.
+        /// </summary>
+        /// <param name="pathPrefix">파일 경로 앞에 붙일 모드 폴더 경로(예: <c>"mods/"</c>). 터미널에서 현재 폴더 기준으로 열리게 한다</param>
+        public static string ToText(IReadOnlyList<Diagnostic> diagnostics, ContentLoadResult result, string pathPrefix)
+        {
+            int errors = 0, warnings = 0, infos = 0;
+            var sb = new StringBuilder();
+            foreach (var d in diagnostics)
+            {
+                if (d.Severity == Severity.Error) errors++;
+                else if (d.Severity == Severity.Warning) warnings++;
+                else infos++;
+
+                string location = Location(d.Span, pathPrefix);
+                if (location.Length > 0) sb.Append(location).Append(": ");
+                sb.Append(SeverityName(d.Severity)).Append(' ').Append(d.Code).Append(": ").Append(d.Message).Append('\n');
+                if (d.Hint != null) sb.Append("    hint: ").Append(d.Hint).Append('\n');
+                foreach (var r in d.Related)
+                {
+                    string related = Location(r, pathPrefix);
+                    if (related.Length > 0) sb.Append("    related: ").Append(related).Append('\n');
+                }
+            }
+            if (diagnostics.Count > 0) sb.Append('\n');
+
+            sb.Append("errors: ").Append(Number(errors)).Append(", warnings: ").Append(Number(warnings))
+                .Append(", info: ").Append(Number(infos)).Append("; mods loaded: ").Append(Number(result.Mods.Count))
+                .Append(", disabled: ").Append(Number(result.Disabled.Count));
+            if (result.Disabled.Count > 0) sb.Append(" (").Append(string.Join(", ", result.Disabled)).Append(')');
+            sb.Append('\n');
+            return sb.ToString();
+        }
+
+        /// <summary>파일이 없으면 빈 문자열, 줄이 없으면 파일만.</summary>
+        private static string Location(SourceSpan span, string pathPrefix)
+        {
+            if (span.File.Length == 0) return "";
+            if (span.Line <= 0) return pathPrefix + span.File;
+            return pathPrefix + span.File + ":" + Number(span.Line) + ":" + Number(span.Col);
+        }
+
         private static void AppendDiagnostic(StringBuilder sb, Diagnostic d)
         {
             sb.Append("    {\n");

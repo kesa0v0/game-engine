@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 
 namespace Kesa.Engine.Cli
 {
@@ -6,14 +7,13 @@ namespace Kesa.Engine.Cli
     {
         private static int Main(string[] args)
         {
-            if (args.Length >= 1 && args[0] == "check")
-            {
-                Console.Error.WriteLine("check: not implemented yet");
-                return 2;
-            }
+            Console.OutputEncoding = new UTF8Encoding(false);
 
-            Console.Error.WriteLine("usage: engine check <mods-dir> [--json]");
-            return 64;
+            if (args.Length >= 1 && args[0] == "check")
+                return CheckCommand.Run(args[1..], Console.Out, Console.Error);
+
+            Console.Error.WriteLine(CheckCommand.Usage);
+            return CheckCommand.ExitUsage;
         }
     }
 }
