@@ -61,12 +61,15 @@ namespace Kesa.Engine.Cli
         }
 
         public const string StubFileName = "__builtins__.pyi";
+
+        /// <summary>스키마 파일 폴더 (<see cref="ContentLoader.SchemaFolder"/>에서 끝의 <c>/</c>를 뺀 것).</summary>
+        private static readonly string SchemaDirectory = ContentLoader.SchemaFolder.TrimEnd('/');
         public const string PyrightConfigFileName = "pyrightconfig.json";
         public const string PyrightConfig = "{\n  \"pythonVersion\": \"3.12\"\n}\n";
 
         /// <summary>
-        /// <c>engine stubs &lt;mods-dir&gt;</c>: 로드된 모드마다 <c>__builtins__.pyi</c>를 덮어쓰고, <c>pyrightconfig.json</c>은 없을 때만
-        /// 만든다 (G81). 쓴 파일은 stdout, 진단 텍스트는 stderr. 파일 쓰기 실패는 환경 문제(2)다.
+        /// <c>engine stubs &lt;mods-dir&gt;</c>: 로드된 모드마다 <c>__builtins__.pyi</c>를 덮어쓰고(G81), <c>schema/</c> 폴더가 있으면
+        /// 그 안에 스키마 스텁도 쓴다(G82). <c>pyrightconfig.json</c>은 없을 때만 만든다. 쓴 파일은 stdout, 진단 텍스트는 stderr. 파일 쓰기 실패는 환경 문제(2)다.
         /// </summary>
         private static int Stubs(string[] args, TextWriter stdout, TextWriter stderr)
         {
@@ -83,6 +86,12 @@ namespace Kesa.Engine.Cli
                     {
                         current = prefix + mod.Directory + "/" + StubFileName;
                         WriteText(Path.Combine(root, mod.Directory, StubFileName), StubGenerator.Generate(mod.Id, result));
+                        stdout.Write("wrote " + current + "\n");
+
+                        string schemaDir = Path.Combine(root, mod.Directory, SchemaDirectory);
+                        if (!Directory.Exists(schemaDir)) continue;
+                        current = prefix + mod.Directory + "/" + SchemaDirectory + "/" + StubFileName;
+                        WriteText(Path.Combine(schemaDir, StubFileName), StubGenerator.GenerateSchema());
                         stdout.Write("wrote " + current + "\n");
                     }
                     string config = Path.Combine(root, PyrightConfigFileName);

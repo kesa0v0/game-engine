@@ -1,5 +1,6 @@
 using System;
 using Kesa.Engine.Loading;
+using Kesa.Engine.Schema;
 using Kesa.Engine.Stubs;
 using NUnit.Framework;
 
@@ -70,8 +71,27 @@ namespace Kesa.Engine.Tests.Loading
                 "\n" +
                 "def mod_loaded(mod: Never) -> bool: ...\n" +
                 "\n" +
-                "inherit: Any\n";
+                "inherit: Any\n" +
+                "\n" +
+                "def Mod(*, id: str, version: str = ..., defaultLanguage: str = ..., dependencies: list[str] = ..., " +
+                "loadAfter: list[str] = ..., optional: list[str] = ...) -> None: ...\n" +
+                "def use(path: str, /) -> None: ...\n" +
+                "def use_all(path: str, /) -> None: ...\n";
             Assert.That(stub, Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void TheSchemaStubDeclaresEverySchemaBuiltin()
+        {
+            // 스키마 파일에서 쓰는 이름이 모두 스텁에 있어야 pyright가 "not defined"를 내지 않는다 (spec-gaps G82)
+            var stub = StubGenerator.GenerateSchema();
+            var python = new[] { "int", "bool", "str", "list", "dict" };
+            foreach (var name in SchemaBuiltins.AllNames)
+            {
+                if (Array.IndexOf(python, name) >= 0) continue;
+                Assert.That(stub, Does.Match("(^|\\n)(def |class )?" + name + "[:(]"), name);
+            }
+            Assert.That(StubGenerator.GenerateSchema(), Is.EqualTo(stub));
         }
 
         [Test]
