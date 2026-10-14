@@ -16,7 +16,8 @@ namespace Kesa.Engine.Tests.Runtime
             "component(\"Location\", city=ref(\"City\", optional=True))\n" +
             "component(\"Moves\", left=field(int, default=2))\n" +
             "deftype(\"City\", components=[\"Walls\"])\n" +
-            "deftype(\"Unit\", components=[\"Location\", \"Moves\"])\n";
+            "deftype(\"Unit\", components=[\"Location\", \"Moves\"])\n" +
+            "deftype(\"Resource\")\n";
 
         private const string Defs =
             "City(\"Town\")\nUnit(\"Scout\")\n" +
@@ -60,7 +61,14 @@ namespace Kesa.Engine.Tests.Runtime
             "    t = 0\n" +
             "    for i in range(100000):\n" +
             "        t += i\n" +
-            "    return t\n";
+            "    return t\n" +
+            "Resource(\"Iron\")\nResource(\"Wood\")\n" +
+            "@command\n" +
+            "def Trade(unit: Ref[Unit], goods: dict[DefId[Resource], int], rate: fixed, path: list[Ref[City]],\n" +
+            "          escort: Ref[Unit] | None):\n" +
+            "    with preconditions:\n" +
+            "        require(rate > 0, text(\"msg.rate\"))\n" +
+            "    return 0\n";
 
         private World _world = null!;
         private EntityId _scout;
@@ -177,15 +185,111 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
-        public void UnknownCommandsAndMissingArgumentsAreRejected()
+        public void AnUnknownCommandIsACallerError()
         {
             var unknown = Assert.Throws<WorldException>(() => Check("banking.Fortfy"))!;
             Assert.That(unknown.Code, Is.EqualTo(Codes.RunUnknownName));
             Assert.That(unknown.Hint, Is.EqualTo("did you mean 'banking.Fortify'?"));
+        }
 
-            var missing = Assert.Throws<WorldException>(() =>
-                _world.CheckPreconditions("banking.Fortify", new Dictionary<string, Value>()))!;
-            Assert.That(missing.Message, Does.Contain("missing the argument 'unit'"));
+        // ---- 인자 검사 (G115) ----
+
+        private Dictionary<string, Value> TradeArgs(EntityId town) => new Dictionary<string, Value>
+        {
+            ["unit"] = new EntityValue(_scout),
+            ["goods"] = new DictValue(new[]
+            {
+                new DictItem(new StrValue("Iron"), new IntValue(3), SourceSpan.None),
+                new DictItem(new StrValue("Wood"), new IntValue(1), SourceSpan.None),
+            }),
+            ["rate"] = new IntValue(2),
+            ["path"] = new ListValue(new Value[] { new EntityValue(town) }),
+            ["escort"] = NoneValue.Instance,
+        };
+
+        private PreconditionReport Trade(Dictionary<string, Value> args) => _world.CheckPreconditions("banking.Trade", args);
+
+        private static ArgumentRejection[] Rejections(PreconditionReport r) => r.Arguments.ToArray();
+
+        [Test]
+        public void GoodArgumentsPassAndIntIsRaisedToFixed()
+        {
+            // rate=2(int)가 fixed로 올라가 rate > 0이 평가된다 (G95)
+            var report = Trade(TradeArgs(_world.Create("Town")));
+            Assert.That(report.Arguments, Is.Empty);
+            Assert.That(report.Passed, Is.True);
+            Assert.That(Statuses(report), Is.EqualTo(new[] { RequireStatus.Passed }));
+        }
+
+        [Test]
+        public void MissingAndUnexpectedArgumentsAreRejectedTogether()
+        {
+            var args = TradeArgs(_world.Create("Town"));
+            args.Remove("rate");
+            args["rat"] = new IntValue(1);
+            var report = Trade(args);
+            Assert.That(report.Passed, Is.False);
+            Assert.That(report.Requires, Is.Empty); // 인자가 틀리면 사전 조건은 평가하지 않는다
+            var r = Rejections(report);
+            Assert.That(r.Select(x => x.Problem), Is.EqualTo(new[] { ArgumentProblem.Missing, ArgumentProblem.Unexpected }));
+            Assert.That(r[0].Parameter, Is.EqualTo("rate"));
+            Assert.That(r[0].Expected, Is.EqualTo("fixed"));
+            Assert.That(r[0].Message, Is.EqualTo("banking.Trade is missing the argument 'rate' (fixed)"));
+            Assert.That(r[1].Message, Is.EqualTo("banking.Trade has no parameter 'rat'; did you mean 'rate'?"));
+            Assert.That(r[1].Expected, Is.Null);
+        }
+
+        [Test]
+        public void ADeadEntityIsRejectedNotAnError()
+        {
+            var args = TradeArgs(_world.Create("Town"));
+            var ghost = _world.Create("Scout");
+            _world.Destroy(ghost);
+            args["escort"] = new EntityValue(ghost);
+            var r = Rejections(Trade(args)).Single();
+            Assert.That(r.Problem, Is.EqualTo(ArgumentProblem.DeadEntity));
+            Assert.That(r.Path, Is.EqualTo("escort"));
+            Assert.That(r.Expected, Is.EqualTo("Ref[\"Unit\"] | None"));
+        }
+
+        [Test]
+        public void ProblemsInsideCollectionsCarryTheirPosition()
+        {
+            var town = _world.Create("Town");
+            var args = TradeArgs(town);
+            args["path"] = new ListValue(new Value[] { new EntityValue(town), new EntityValue(_scout) });
+            args["goods"] = new DictValue(new[]
+            {
+                new DictItem(new StrValue("Irom"), new IntValue(3), SourceSpan.None),
+                new DictItem(new StrValue("Town"), new IntValue(1), SourceSpan.None),
+                new DictItem(new StrValue("Wood"), new FixedValue(Kesa.Engine.Numerics.Fixed.FromRaw(1)), SourceSpan.None),
+            });
+            var r = Rejections(Trade(args));
+            Assert.That(r.Select(x => x.Problem), Is.EqualTo(new[]
+            {
+                ArgumentProblem.UnknownDef, ArgumentProblem.WrongDefType, ArgumentProblem.WrongType,
+                ArgumentProblem.WrongEntityType,
+            }));
+            Assert.That(r.Select(x => x.Path), Is.EqualTo(new[]
+            {
+                "goods key \"Irom\"", "goods key \"Town\"", "goods[\"Wood\"]", "path[1]",
+            }));
+            Assert.That(r[0].Message, Is.EqualTo("'goods key \"Irom\"' is 'Irom', which is not a Def; did you mean 'Iron'?"));
+            Assert.That(r[2].Message, Is.EqualTo("'goods[\"Wood\"]' must be int, not fixed (a fixed value is not turned into an int)"));
+            Assert.That(r[3].Message, Does.EndWith("a Unit, not a City"));
+            Assert.That(r.All(x => x.Parameter == "goods" || x.Parameter == "path"));
+        }
+
+        [TestCase("rate", "bool")]
+        [TestCase("unit", "int")]
+        [TestCase("path", "str")]
+        public void WrongKindsOfValuesAreRejected(string parameter, string kind)
+        {
+            var args = TradeArgs(_world.Create("Town"));
+            args[parameter] = kind == "bool" ? BoolValue.True : kind == "int" ? new IntValue(1) : (Value)new StrValue("x");
+            var r = Rejections(Trade(args)).Single();
+            Assert.That(r.Problem, Is.EqualTo(ArgumentProblem.WrongType));
+            Assert.That(r.Message, Does.EndWith(", not " + kind));
         }
     }
 }
