@@ -400,8 +400,11 @@ namespace Kesa.Engine.Runtime
         {
             var entity = Record(id);
             var component = Keyed(ComponentNamed(componentName), key.IsEntity ? KeyKind.Entity : KeyKind.Def);
+            if (component.KeyKind == KeyKind.Def && component.Keys == KeysMode.All)
+                throw new WorldException(Codes.RunNoRow,
+                    "'" + componentName + "' is keys=\"all\": every key always has a row, so rows are not removed");
             Require(entity, component);
-            if (!FindRow(entity, component, key, out var defRow, out var record)) throw NoRow(id, component, key);
+            if (!FindRow(entity, component, key, out _, out var record)) throw NoRow(id, component, key);
             if (record == null || !record.Attached)
                 throw new WorldException(Codes.RunNoRow,
                     "the '" + componentName + "' row " + key + " of " + id + " comes from its Def and cannot be removed");

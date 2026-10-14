@@ -334,6 +334,7 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(Fails(() => _world.GetRow(scout, level, "Medicin"), Codes.RunUnknownName).Hint, Is.EqualTo("did you mean 'Medicine'?"));
             Fails(() => _world.GetRow(scout, level, "Base"), Codes.RunUnknownName); // abstract
             Fails(() => _world.AddRow(scout, "Skill", "Medicine"), Codes.RunNoRow);
+            Assert.That(Fails(() => _world.RemoveRow(scout, "Skill", "Cooking"), Codes.RunNoRow).Message, Does.Contain("keys=\"all\""));
             Fails(() => _world.Get(scout, level), Codes.RunNoRow);
         }
 
