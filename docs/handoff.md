@@ -69,6 +69,28 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 - 기본값 없는 `const`(리스트·맵 제외)는 필수다(G67). `extend`가 더한 `const`와 `keys="all"` 키 컴포넌트의 `const`는 기본값이 있어야 한다(G74·G77). 그래서 동결본은 구멍이 없다. 런타임도 생성 순간에 구멍을 막는다(G93).
 - 동결본은 `abstract`를 뺀다(G70). 안 적힌 `keys="all"` 줄은 `FrozenDef.TryGetRow`가 기본값으로 채워 돌려준다.
 
+## 다음 할 일: S6 커맨드의 첫 슬라이스 (2026-10-15 사용자와 합의)
+
+spec 척추 기준으로 어디까지 왔나:
+
+| 영역 | 상태 |
+|---|---|
+| S1 로딩, S9 진단(일부), CLI | 끝남 |
+| S4 데이터 층(`World`), `derived`·기여 행 | 끝남 |
+| S2 순수 함수(읽기만) | 끝남, 검토 마침 |
+| S2 Flow(쓰기, `ask`, `wait`, 재개) · S5 반응 · S6 커맨드 · S8 저장 | 없음 |
+
+spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거의 모두 Flow·커맨드·저장을 요구하므로 아직 하나도 검증하지 못했다. 엔진은 콘텐츠를 읽고 값을 계산할 수 있지만 게임을 진행시킬 수는 없다. 로직용 `.pyi`(남은 일 2번)는 스크립트의 쓰기 API 모양이 정해진 뒤에 하는 편이 다시 고칠 일이 적다.
+
+첫 슬라이스 범위(제안, 세부는 spec 빈칸을 하나씩 짚으며 정한다):
+
+- `@command`와 타입 있는 매개변수, `with preconditions:` 안의 `require`(실패 사유를 하나씩 구조화해 돌려줌, C7).
+- 본문의 상태 쓰기(`u.Health.current -= 3`). 순수 함수의 불변식(G104)과 어떻게 갈라지는지 정해야 한다.
+- 커맨드 단위 롤백: 오류가 나면 효과를 남기지 않음(C8).
+- 미룸: `ask`/`wait`(Flow 중단·재개), `cost`·`choose`, 반응(S5), 저장(S8).
+
+읽을 곳: spine-spec S2(커맨드 머리부, 함수 효과 표, 평가 모델, 난수), S6 전체, 7절 C7·C8·C10, use-cases에서 커맨드가 나오는 사례(U1·U2 등). S2의 `me` 정체(❓)는 이 슬라이스나 다음 슬라이스에서 시나리오로 정한다.
+
 ## 남은 일 (사용자와 우선순위를 정할 것)
 
 1. **실행 중 이름 오류의 "혹시 …?" 후보:** `PureEvaluator.LookupName`은 후보에 지역 변수와 내장만 넣고 모드 전역을 빼먹는다(코드로 본 추측, 재현 안 함). G108 뒤로는 로드 시점에 대부분 잡히므로 우선순위는 낮다.
@@ -87,6 +109,6 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 ## 새 세션에서 시작하는 법
 
 1. `git pull` 후 `dotnet test`로 945개 통과(커널 917, CLI 28)를 확인한다.
-2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G95~G107), `docs/spine-spec.md` S2·S4를 읽는다. 실행기·월드 코드는 `Script/Execution/*`와 `Runtime/World*.cs`(부분 클래스 4개)다.
-3. 위 "남은 일" 중 하나를 고르고, 이전처럼 spec이 비어 있는 곳부터 하나씩 짚어 달라고 요청한다.
-   예: "남은 일 2번, 로직용 `.pyi`를 시작하자. spec-gaps G71·G82·G103·G107과 `StubGenerator`를 읽고, 엔티티 접근 클래스의 모양부터 짚어 줘."
+2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G95~G108), `docs/spine-spec.md` S2·S4·S6·7절을 읽는다. 실행기·월드 코드는 `Script/Execution/*`와 `Runtime/World*.cs`(부분 클래스 4개)다.
+3. 위 "다음 할 일"(S6 첫 슬라이스)을 시작하고, 이전처럼 spec이 비어 있는 곳부터 하나씩 짚어 달라고 요청한다.
+   예: "S6 커맨드 첫 슬라이스를 시작하자. spine-spec S2·S6·7절과 use-cases의 커맨드 사례를 읽고, spec이 비어 있는 첫 칸부터 짚어 줘."
