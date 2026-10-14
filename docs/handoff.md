@@ -74,7 +74,7 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 710개 통과를 확인한다.
-2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G78~G94), `docs/spine-spec.md` S1·S4·S9를 읽는다.
+1. `git pull` 후 `dotnet test`로 913개 통과(커널 885, CLI 28)를 확인한다.
+2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G95~G107), `docs/spine-spec.md` S2·S4를 읽는다. 실행기·월드 코드는 `Script/Execution/*`와 `Runtime/World*.cs`(부분 클래스 4개)다.
 3. 위 "남은 일" 중 하나를 고르고, 이전처럼 spec이 비어 있는 곳부터 하나씩 짚어 달라고 요청한다.
-   예: "순수 함수 실행기 슬라이스를 시작하자. spec S2와 schema-design 3.3.1, spec-gaps G90을 읽고, 구현 전에 spec이 비어 있는 곳부터 하나씩 짚어 줘."
+   예: "남은 일 1번, 함수 본문 이름 오타의 정적 검사를 시작하자. spec-gaps G102·G103·G107과 `FunctionChecker`, `ContentLoader`를 읽고, 모드 평가가 끝난 뒤에 검사하는 방법부터 짚어 줘."
