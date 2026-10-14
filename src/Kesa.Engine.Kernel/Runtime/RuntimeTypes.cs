@@ -26,11 +26,13 @@ namespace Kesa.Engine.Runtime
     }
 
     /// <summary>엔티티를 가리키는 값: Ref 칼럼의 값, 엔티티 키 (spec S3).</summary>
-    public sealed class EntityValue : Value
+    public sealed class EntityValue : Value, IValueEquality
     {
         public EntityValue(EntityId id) => Id = id;
         public EntityId Id { get; }
         public override string KindName => "entity";
+
+        public bool ValueEquals(Value other) => other is EntityValue e && e.Id == Id;
     }
 
     /// <summary>

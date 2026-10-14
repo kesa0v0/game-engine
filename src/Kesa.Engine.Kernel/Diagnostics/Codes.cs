@@ -113,5 +113,11 @@ namespace Kesa.Engine.Diagnostics
         public const string RunNoRow = "RUN009";
         public const string RunDeadRef = "RUN010";
         public const string RunNotEntity = "RUN011";
+
+        // 순수 함수 실행 (spec S2·S4, spec-gaps G95~G103)
+        public const string RunArithmetic = "RUN012";
+        public const string RunBudget = "RUN013";
+        public const string RunCycle = "RUN014";
+        public const string RunScript = "RUN015";
     }
 }

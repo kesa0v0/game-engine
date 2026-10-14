@@ -1,0 +1,169 @@
+using System;
+using System.Collections.Generic;
+using System.Numerics;
+using Kesa.Engine.Numerics;
+
+namespace Kesa.Engine.Script
+{
+    /// <summary>
+    /// 순수 함수에서 쓰는 내장 함수 (spec-gaps G97): <c>floor ceil round abs min max clamp len range sum</c>.
+    /// 호스트는 여기에 <c>contribs</c> 같은 것을 더해 <see cref="PureEvaluator"/>에 넘긴다.
+    /// </summary>
+    public static class PureBuiltins
+    {
+        /// <summary>내장 함수가 한 번에 펼칠 수 있는 범위의 크기 (반복 문장은 단계 예산으로 막는다).</summary>
+        private const long MaxMaterializedRange = 100_000;
+
+        public static Dictionary<string, Value> Create()
+        {
+            var table = new Dictionary<string, Value>(StringComparer.Ordinal);
+            void Add(string name, Func<IReadOnlyList<Value>, Value> body) => table.Add(name, new PureBuiltin(name, body));
+
+            Add("floor", a => Rounding("floor", a, FixedMath.Floor));
+            Add("ceil", a => Rounding("ceil", a, FixedMath.Ceiling));
+            Add("round", a => Rounding("round", a, FixedMath.Round));
+            Add("abs", Abs);
+            Add("min", a => Extreme("min", a, -1));
+            Add("max", a => Extreme("max", a, 1));
+            Add("clamp", Clamp);
+            Add("len", Len);
+            Add("range", Range);
+            Add("sum", Sum);
+            return table;
+        }
+
+        private static void Arity(string name, IReadOnlyList<Value> args, int count)
+        {
+            if (args.Count != count)
+            {
+                throw PureOps.TypeError(name + "() takes " + count + " argument" + (count == 1 ? "" : "s") + ", got " + args.Count);
+            }
+        }
+
+        private static Value NumberArg(string name, Value v)
+        {
+            if (PureOps.IsNumber(v)) return v;
+            throw PureOps.TypeError(name + "() needs a number, not " + v.KindName);
+        }
+
+        private static Value Rounding(string name, IReadOnlyList<Value> args, Func<Fixed, long> round)
+        {
+            Arity(name, args, 1);
+            var v = NumberArg(name, args[0]);
+            return v is IntValue ? v : new IntValue(round(((FixedValue)v).Value));
+        }
+
+        private static Value Abs(IReadOnlyList<Value> args)
+        {
+            Arity("abs", args, 1);
+            var v = NumberArg("abs", args[0]);
+            if (PureOps.CompareNumbers(v, new IntValue(0)) >= 0) return v;
+            return PureOps.Negate(v);
+        }
+
+        /// <summary>인자 하나가 리스트면 그 원소, 아니면 인자들 자체가 대상이다.</summary>
+        private static IReadOnlyList<Value> Operands(string name, IReadOnlyList<Value> args)
+        {
+            if (args.Count == 1)
+            {
+                switch (args[0])
+                {
+                    case ListValue list: return list.Items;
+                    case RangeValue range:
+                        if (range.Count > MaxMaterializedRange)
+                        {
+                            throw PureOps.TypeError(name + "() over a range of " + range.Count + " elements is too long",
+                                "loop over the range instead");
+                        }
+                        var items = new List<Value>();
+                        for (long i = 0; i < range.Count; i++) items.Add(new IntValue(range.At(i)));
+                        return items;
+                    default:
+                        throw PureOps.TypeError(name + "() with one argument needs a list, not " + args[0].KindName);
+                }
+            }
+            if (args.Count == 0) throw PureOps.TypeError(name + "() needs at least one argument");
+            return args;
+        }
+
+        /// <summary>하나라도 <c>fixed</c>가 있으면 결과도 <c>fixed</c>다 (G95의 승격).</summary>
+        private static Value Promote(Value v, bool anyFixed) =>
+            anyFixed && v is IntValue ? new FixedValue(PureOps.ToFixed(v)) : v;
+
+        private static Value Extreme(string name, IReadOnlyList<Value> args, int direction)
+        {
+            var items = Operands(name, args);
+            if (items.Count == 0) throw PureOps.TypeError(name + "() of an empty list");
+            Value best = NumberArg(name, items[0]);
+            bool anyFixed = best is FixedValue;
+            for (int i = 1; i < items.Count; i++)
+            {
+                var v = NumberArg(name, items[i]);
+                anyFixed |= v is FixedValue;
+                if (PureOps.CompareNumbers(v, best) * direction > 0) best = v;
+            }
+            return Promote(best, anyFixed);
+        }
+
+        private static Value Clamp(IReadOnlyList<Value> args)
+        {
+            Arity("clamp", args, 3);
+            var x = NumberArg("clamp", args[0]);
+            var lo = NumberArg("clamp", args[1]);
+            var hi = NumberArg("clamp", args[2]);
+            if (PureOps.CompareNumbers(lo, hi) > 0)
+                throw PureOps.TypeError("clamp() lower bound " + Show(lo) + " is greater than the upper bound " + Show(hi));
+            bool anyFixed = x is FixedValue || lo is FixedValue || hi is FixedValue;
+            Value result = PureOps.CompareNumbers(x, lo) < 0 ? lo : PureOps.CompareNumbers(x, hi) > 0 ? hi : x;
+            return Promote(result, anyFixed);
+        }
+
+        private static string Show(Value v) =>
+            v is IntValue i ? i.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : ((FixedValue)v).Value.ToString();
+
+        private static Value Len(IReadOnlyList<Value> args)
+        {
+            Arity("len", args, 1);
+            switch (args[0])
+            {
+                case ListValue list: return new IntValue(list.Items.Count);
+                case DictValue dict: return new IntValue(dict.Items.Count);
+                case RangeValue range: return new IntValue(range.Count);
+            }
+            throw PureOps.TypeError("len() needs a list, dict or range, not " + args[0].KindName);
+        }
+
+        private static Value Range(IReadOnlyList<Value> args)
+        {
+            if (args.Count < 1 || args.Count > 3)
+                throw PureOps.TypeError("range() takes 1 to 3 arguments, got " + args.Count);
+            var ints = new long[args.Count];
+            for (int i = 0; i < args.Count; i++)
+            {
+                if (!(args[i] is IntValue n)) throw PureOps.TypeError("range() needs int arguments, not " + args[i].KindName);
+                ints[i] = n.Value;
+            }
+
+            long start = args.Count == 1 ? 0 : ints[0];
+            long stop = args.Count == 1 ? ints[0] : ints[1];
+            long step = args.Count == 3 ? ints[2] : 1;
+            if (step == 0) throw PureOps.TypeError("range() step must not be zero");
+
+            // 원소 수 = ceil((stop - start) / step), 범위를 넘지 않게 큰 정수로 센다
+            var span = new BigInteger(stop) - new BigInteger(start);
+            BigInteger count = BigInteger.Zero;
+            if (step > 0 && span > 0) count = (span + step - 1) / step;
+            else if (step < 0 && span < 0) count = (span + step + 1) / step;
+            if (count > long.MaxValue) throw PureOps.ArithmeticError("range() is too long");
+            return new RangeValue(start, step, (long)count);
+        }
+
+        private static Value Sum(IReadOnlyList<Value> args)
+        {
+            var items = Operands("sum", args);
+            Value total = new IntValue(0);
+            foreach (var item in items) total = PureOps.Arithmetic("+", total, NumberArg("sum", item));
+            return total;
+        }
+    }
+}

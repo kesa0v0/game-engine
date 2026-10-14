@@ -1,10 +1,10 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World
 
-마지막 갱신: 2026-10-14. 브랜치 `spec-v0.5-scaffold`, 테스트 710개 통과(커널 682, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-14. 브랜치 `spec-v0.5-scaffold`, 테스트 881개 통과(커널 853, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
-spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G94에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 다음은 순수 함수 실행기(`derived` 계산)다.
+spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G94에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기는 만들었고(G95~G104) 다음은 그것을 `World`에 연결하는 3단계다: `derived` 읽기, 형제 접근(G103), read-set 기록, 재진입 감지(G100), `contribs`와 기여 행 API(G98), `default=함수`, 중첩 읽기 깊이 상한(넘으면 RUN014), 함수 본문의 이름 오타를 `check`에서 잡는 정적 검사(런타임 내장 이름 목록을 커널이 정의할 때 함께).
 
 ## 구현된 것 (`src/Kesa.Engine.Kernel/`)
 
@@ -22,6 +22,7 @@ spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engin
 | 최종 Def 덤프 | `Reporting/DefDump.ToJson` | G76 |
 | `check` 사람용 텍스트 | `Reporting/CheckReport.ToText` | G79 |
 | 스키마 스텁, 비활성 모드 스텁 | `StubGenerator.GenerateSchema`, `GenerateManifestOnly`, `ContentLoadResult.FirstRound` | G82·G83 |
+| 함수 본문 파싱, 순수 함수 실행기 | `Script/Parser`(본문, `for`·`return`·조건식), `Script/Execution/*`(`PureEvaluator`, `PureOps`, `PureBuiltins`, `FunctionChecker`), `Numerics/FixedMath`(`fixed` 산술) | G95~G104 (실행기는 아직 `World`에 연결 안 됨) |
 | 런타임 월드 | `Runtime/World`, `RuntimeTypes`(`EntityId`, `EntityValue`, `MemberHandle`, `Init`, `WorldException`) | G86~G93 |
 
 CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):

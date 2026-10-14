@@ -171,6 +171,7 @@ namespace Kesa.Engine.Script
                     return;
 
                 case FunctionDef def:
+                    FunctionChecker.Check(def, _context); // 쓸 수 없는 연산자·재귀는 정의할 때 알린다 (G96·G102)
                     Bind(def.Name, new FunctionValue(def, _context.Mod), def.Span);
                     return;
 
@@ -340,7 +341,9 @@ namespace Kesa.Engine.Script
                 case CallExpr call: return EvaluateCall(call);
                 case IndexExpr index: return EvaluateIndex(index);
                 case UnaryExpr unary: return EvaluateUnary(unary);
-                case LambdaExpr lambda: return new FunctionValue(lambda, _context.Mod);
+                case LambdaExpr lambda:
+                    FunctionChecker.Check(lambda, _context);
+                    return new FunctionValue(lambda, _context.Mod);
                 case UnsupportedExpr _: throw new ScriptError(); // 파서가 이미 보고함
                 case AttributeExpr attr:
                     if (ContainsInherit(attr))

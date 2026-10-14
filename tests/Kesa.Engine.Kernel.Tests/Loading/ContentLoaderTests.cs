@@ -515,6 +515,33 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(diags.Select(d => d.Code), Does.Contain(code), string.Join("\n", diags));
         }
 
+        // 로직에서 허용하지 않는 연산자·대입·재귀는 함수를 정의할 때 로드 오류다 (spec-gaps G96·G102)
+        [TestCase("def f(h) -> int:\n    return 2 ** 3\n")]
+        [TestCase("def f(h) -> int:\n    return 1 | 2\n")]
+        [TestCase("def f(h) -> int:\n    return 1 << 2\n")]
+        [TestCase("def f(h) -> int:\n    return ~1\n")]
+        [TestCase("def f(h) -> int:\n    x = 1\n    x **= 2\n    return x\n")]
+        [TestCase("def f(h) -> int:\n    h.x = 1\n    return 1\n")]
+        [TestCase("def f(h) -> int:\n    h[0] += 1\n    return 1\n")]
+        [TestCase("def f(h) -> int:\n    return f(h)\n")]
+        [TestCase("def f(h) -> int:\n    for i in range(3):\n        if i is 3:\n            return 1\n    return 2\n")]
+        [TestCase("g = lambda h: h ** 2\n")]
+        public void ForbiddenLogicConstructsAreLoadErrors(string schema)
+        {
+            Mod("core", schema: schema);
+            var result = Load(out var diags);
+            Assert.That(diags.Select(d => d.Code), Does.Contain(Codes.EvlUnsupported), string.Join("\n", diags));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
+        }
+
+        [Test]
+        public void TypeAnnotationsMayUseTheUnionOperator()
+        {
+            Mod("core", schema: "def f(h: int | None) -> int | None:\n    return 1\n");
+            Load(out var diags);
+            Assert.That(diags.Where(d => d.Severity == Severity.Error), Is.Empty, string.Join("\n", diags));
+        }
+
         // ---- Def 등록 ----
 
         private const string UnitSchema =
