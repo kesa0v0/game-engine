@@ -1,10 +1,10 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World
 
-마지막 갱신: 2026-10-14. 브랜치 `spec-v0.5-scaffold`, 테스트 881개 통과(커널 853, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-15. 브랜치 `spec-v0.5-scaffold`, 테스트 908개 통과(커널 880, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
-spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G94에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기는 만들었고(G95~G104) 다음은 그것을 `World`에 연결하는 3단계다: `derived` 읽기, 형제 접근(G103), read-set 기록, 재진입 감지(G100), `contribs`와 기여 행 API(G98), `default=함수`, 중첩 읽기 깊이 상한(넘으면 RUN014), 함수 본문의 이름 오타를 `check`에서 잡는 정적 검사(런타임 내장 이름 목록을 커널이 정의할 때 함께).
+spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G106에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기(G95~G104)를 `World`에 연결했다: `derived` 읽기와 형제 접근(G103), 재진입 감지·깊이 상한(G100), 기여 행 API와 `contribs`(G98), 읽은 값 근거 `Explain`(G105), 함수 기본값과 `derived` 원천 `default_from`(G106). 남은 것은 함수 본문의 이름 오타를 `check`에서 잡는 정적 검사(런타임 내장 이름 목록을 커널이 정의했으니 이제 할 수 있다)다.
 
 ## 구현된 것 (`src/Kesa.Engine.Kernel/`)
 
@@ -22,8 +22,8 @@ spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engin
 | 최종 Def 덤프 | `Reporting/DefDump.ToJson` | G76 |
 | `check` 사람용 텍스트 | `Reporting/CheckReport.ToText` | G79 |
 | 스키마 스텁, 비활성 모드 스텁 | `StubGenerator.GenerateSchema`, `GenerateManifestOnly`, `ContentLoadResult.FirstRound` | G82·G83 |
-| 함수 본문 파싱, 순수 함수 실행기 | `Script/Parser`(본문, `for`·`return`·조건식), `Script/Execution/*`(`PureEvaluator`, `PureOps`, `PureBuiltins`, `FunctionChecker`), `Numerics/FixedMath`(`fixed` 산술) | G95~G104 (실행기는 아직 `World`에 연결 안 됨) |
-| 런타임 월드 | `Runtime/World`, `RuntimeTypes`(`EntityId`, `EntityValue`, `MemberHandle`, `Init`, `WorldException`) | G86~G93 |
+| 함수 본문 파싱, 순수 함수 실행기 | `Script/Parser`(본문, `for`·`return`·조건식), `Script/Execution/*`(`PureEvaluator`, `PureOps`, `PureBuiltins`, `FunctionChecker`), `Numerics/FixedMath`(`fixed` 산술) | G95~G104 |
+| 런타임 월드 | `Runtime/World`(+ `World.Derived`·`World.Contributions`·`World.Explain` 부분 클래스), `RuntimeTypes`(`EntityId`, `EntityValue`, `MemberHandle`, `Init`, `WorldException`) | G86~G93, G98, G100, G103, G105, G106 |
 
 CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 
@@ -45,7 +45,8 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 - id는 재사용하지 않는다(G87). 구조 변경은 즉시 보이고 순회는 시작 시점의 목록이다(G88, S4의 "지연"을 바꿈).
 - 읽기는 엔티티 값 → Def 값 → 스키마 기본값. 생성 순간에 `default_from`만 계산해 저장한다(G89). 생성 순간에 구멍이 있으면 실패한다: 필수 Ref, 기본값 없는 `field`는 `Init`으로 준다(G91·G93). 쓰기는 타입·범위 검사(G92).
 - 오류는 `WorldException`(코드 `RUN001`~`RUN011`). 실패한 호출은 월드를 바꾸지 않는다.
-- **아직 안 되는 것:** `derived` 읽기와 `default=함수`, `derived`를 원천으로 한 `default_from`은 RUN004(G90). 키 줄 안의 Ref는 역방향 색인이 없다. 저장(S8)·트랜잭션·벤치는 아직 없다. 내부 저장은 엔티티마다 바뀐 값만 맵으로 둔 단순한 모양이다(저장 방식은 공개 약속이 아님).
+- `derived`는 읽을 때마다 함수를 돌려 계산한다(캐시 없음). 함수는 컴포넌트(키 컴포넌트면 줄)를 받아 자기 멤버, 형제 컴포넌트(`h.Armor.bonus`, 없으면 None), `h.entity`, `h.key`, Ref 너머를 읽는다(G103). `contribs(h, "max")`는 기여 행을 준다. 기여 행 API는 `AddContribution`·`RemoveContribution`·`RemoveBySource`이고 엔티티가 죽으면 지워진다(G98). `Explain(id, member)`는 읽은 값의 트리를 준다(G105). 함수 기본값과 `derived` 원천 `default_from`은 엔티티를 만든 뒤 선언 순서로 계산하고 실패하면 되돌린다(G106). 스키마는 `entity`·`key`라는 멤버와 컴포넌트와 같은 이름의 멤버를 거부한다(G103).
+- **아직 안 되는 것:** 함수 본문의 이름 오타 정적 검사. 키 줄 안의 Ref는 역방향 색인이 없다. 저장(S8)·트랜잭션·벤치는 아직 없다. 내부 저장은 엔티티마다 바뀐 값만 맵으로 둔 단순한 모양이다(저장 방식은 공개 약속이 아님).
 - G93은 로더 규칙도 바꿨다: `keys="all"` 줄의 `field`는 고정 기본값이 있어야 하고(`default_from`·함수 기본값 금지), Ref는 `optional`이어야 한다(SCH004).
 
 ## 핵심 규칙 (자세한 것은 spec-gaps)
@@ -58,7 +59,7 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 
 ## 남은 일 (사용자와 우선순위를 정할 것)
 
-1. **순수 함수 실행기 슬라이스**(G90): `def` 본문 파싱, `int`·`fixed` 산술(P2), 비교, `if`·`for`·`return`, `floor`·`clamp`·`min`·`max`, `contribs`, read-set, 재진입 감지. 그다음 `derived`·`default=함수`를 World에 켠다. 기여 행의 모양·수명과 `field`가 `derived` 상한을 넘는 경우(S4 🟡)도 이때 정한다. `default_from`이 "생성 때 한 번만" 계산되는지(원천이 바뀌어도 따라가지 않는지)는 `derived`가 생긴 뒤 테스트한다.
+1. **함수 본문 이름 오타의 정적 검사:** `check`가 `def`·람다 본문에서 정의되지 않은 이름을 "혹시 …?"와 함께 잡는다. 이름은 매개변수, 지역 변수, 같은 모드의 전역, 내장(`PureBuiltins`+`contribs`)이다. 모드의 전역은 파일 뒤쪽에 정의될 수 있으므로 모드 평가가 끝난 뒤에 본다. 또 스크립트가 Def 타입의 `const`(`g.def.succeeded` 같은 것)와 전역 질의(`all(Type)`)를 읽는 길이 G103에 없다.
 2. **로직용 `.pyi`**: 엔티티 접근 클래스, `derived`, `ref` 칼럼, 함수 서명. 스키마 스텁의 `derived` 함수 매개변수 타입도 이때 좁힌다.
 3. **스텁의 이름 충돌**: 멤버 이름이 `id`/`self` 같은 예약 이름이면 중복 인자가 생기고, Def 타입·컴포넌트 이름이 `Mod`·`use`·`use_all`·`patch`·`mod_loaded`·`inherit`이면 스텁 안에서 겹친다(G82 알려진 한계). 스키마 단계에서 막는 것이 유력하다.
 4. S9의 나머지 "왜?" 도구 4가지(파생값 추적, 전제 조건 보고서, 반응 추적, 단계 순서 덤프). 각자 `engine` 명령이 될 자리다(G80).

@@ -250,6 +250,21 @@ namespace Kesa.Engine.Schema
                     {
                         CheckTypeNames(member.Spec.Type, member.Mod);
                         CheckComponentMember(c, member);
+                        // 함수 본문에서 h.entity, h.key는 엔티티와 줄 키를, h.<이름>은 자기 멤버를 읽는다 (G103)
+                        if (member.Name == "entity" || member.Name == "key")
+                        {
+                            Error(member.Mod, Codes.SchBadDeclaration,
+                                "'" + member.Name + "' is reserved in functions: h." + member.Name + " reads the " +
+                                (member.Name == "entity" ? "entity" : "row key") + ", so '" + c.Name + "' cannot have a member of that name",
+                                member.Span, hint: "choose another name for this value (spec-gaps G103)");
+                        }
+                        else if (member.Name == c.Name)
+                        {
+                            Error(member.Mod, Codes.SchBadDeclaration,
+                                "'" + c.Name + "' has a member named like itself, so h." + member.Name +
+                                " in a function would be ambiguous between the member and the component",
+                                member.Span, hint: "choose another name for this value (spec-gaps G103)");
+                        }
                         // keys="all"은 키 타입 Def마다 줄이 있고 아무도 그 줄을 다 쓰지 않으니 기본값이 채워야 한다 (G77)
                         if (c.IsKeyed && c.KeyKind == KeyKind.Def && c.Keys == KeysMode.All && NeedsDefault(member.Spec))
                         {

@@ -168,6 +168,16 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(diags.Select(d => d.Code), Does.Contain(code), string.Join("\n", diags));
         }
 
+        [TestCase("component(\"C\", entity=field(int, default=0))\n", "'entity' is reserved")]
+        [TestCase("component(\"Health\", Health=field(int, default=0))\n", "named like itself")]
+        public void MemberNamesThatCollideWithFunctionAccessAreRejected(string schema, string message)
+        {
+            Mod("core", schema: schema);
+            Load(out var diags);
+            Assert.That(diags.Select(d => d.Code), Does.Contain(Codes.SchBadDeclaration), string.Join("\n", diags));
+            Assert.That(string.Join("\n", diags), Does.Contain(message));
+        }
+
         // ---- Def 참조와 엔티티 참조 (G32) ----
 
         [Test]
