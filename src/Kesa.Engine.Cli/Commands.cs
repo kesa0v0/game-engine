@@ -40,7 +40,7 @@ namespace Kesa.Engine.Cli
             int parsed = Parse("check", args, new[] { "--json" }, stderr, out var root, out var options);
             if (parsed != ExitOk) return parsed;
             bool json = options.Contains("--json");
-            return LoadAndReport("check", root, stderr, (diagnostics, result) =>
+            return LoadAndReport("check", root, stderr, (diagnostics, result, _) =>
             {
                 stdout.Write(json ? CheckReport.ToJson(diagnostics, result) : CheckReport.ToText(diagnostics, result, PathPrefix(root)));
                 return ExitOk;
@@ -52,7 +52,7 @@ namespace Kesa.Engine.Cli
         {
             int parsed = Parse("dump", args, Array.Empty<string>(), stderr, out var root, out _);
             if (parsed != ExitOk) return parsed;
-            return LoadAndReport("dump", root, stderr, (diagnostics, result) =>
+            return LoadAndReport("dump", root, stderr, (diagnostics, result, _) =>
             {
                 stdout.Write(DefDump.ToJson(result));
                 stderr.Write(CheckReport.ToText(diagnostics, result, PathPrefix(root)));
@@ -68,25 +68,40 @@ namespace Kesa.Engine.Cli
         public const string PyrightConfig = "{\n  \"pythonVersion\": \"3.12\"\n}\n";
 
         /// <summary>
-        /// <c>engine stubs &lt;mods-dir&gt;</c>: 로드된 모드마다 <c>__builtins__.pyi</c>를 덮어쓰고(G81), <c>schema/</c> 폴더가 있으면
-        /// 그 안에 스키마 스텁도 쓴다(G82). <c>pyrightconfig.json</c>은 없을 때만 만든다. 쓴 파일은 stdout, 진단 텍스트는 stderr. 파일 쓰기 실패는 환경 문제(2)다.
+        /// <c>engine stubs &lt;mods-dir&gt;</c>: 매니페스트를 읽은 모드마다 <c>__builtins__.pyi</c>를 덮어쓰고(G81, 비활성 모드는 G83),
+        /// <c>schema/</c> 폴더가 있으면 그 안에 스키마 스텁도 쓴다(G82). <c>pyrightconfig.json</c>은 없을 때만 만든다. 쓴 파일은 stdout, 진단 텍스트는 stderr. 파일 쓰기 실패는 환경 문제(2)다.
         /// </summary>
         private static int Stubs(string[] args, TextWriter stdout, TextWriter stderr)
         {
             int parsed = Parse("stubs", args, Array.Empty<string>(), stderr, out var root, out _);
             if (parsed != ExitOk) return parsed;
             string prefix = PathPrefix(root);
-            return LoadAndReport("stubs", root, stderr, (diagnostics, result) =>
+            return LoadAndReport("stubs", root, stderr, (diagnostics, result, discovered) =>
             {
                 stderr.Write(CheckReport.ToText(diagnostics, result, prefix));
                 string current = "";
                 try
                 {
-                    foreach (var mod in result.Mods)
+                    // 매니페스트를 읽은 모든 모드에 쓴다: 오류가 있는 모드야말로 편집기 도움이 필요하다 (G83)
+                    foreach (var mod in discovered)
                     {
                         current = prefix + mod.Directory + "/" + StubFileName;
-                        WriteText(Path.Combine(root, mod.Directory, StubFileName), StubGenerator.Generate(mod.Id, result));
-                        stdout.Write("wrote " + current + "\n");
+                        string stubPath = Path.Combine(root, mod.Directory, StubFileName);
+                        if (StubGenerator.CanGenerate(mod.Id, result))
+                        {
+                            WriteText(stubPath, StubGenerator.Generate(mod.Id, result));
+                            stdout.Write("wrote " + current + "\n");
+                        }
+                        else if (File.Exists(stubPath))
+                        {
+                            // ②에서 실패해 선언을 알 수 없다. 전에 만든 스텁이 지금 것보다 낫다
+                            stdout.Write("kept " + current + " (the mod failed to load)\n");
+                        }
+                        else
+                        {
+                            WriteText(stubPath, StubGenerator.GenerateManifestOnly(mod.Id));
+                            stdout.Write("wrote " + current + " (mod.py names only; the mod failed to load)\n");
+                        }
 
                         string schemaDir = Path.Combine(root, mod.Directory, SchemaDirectory);
                         if (!Directory.Exists(schemaDir)) continue;
@@ -144,15 +159,16 @@ namespace Kesa.Engine.Cli
         /// 아니면 오류 진단이 있을 때 1. 엔진 예외는 3 (G78).
         /// </summary>
         private static int LoadAndReport(string command, string root, TextWriter stderr,
-            Func<IReadOnlyList<Diagnostic>, ContentLoadResult, int> report)
+            Func<IReadOnlyList<Diagnostic>, ContentLoadResult, IReadOnlyList<ModManifest>, int> report)
         {
             try
             {
                 var bag = new DiagnosticBag();
-                var order = ModSorter.Sort(ModDiscovery.Discover(root, bag), bag);
+                var discovery = ModDiscovery.Discover(root, bag);
+                var order = ModSorter.Sort(discovery, bag);
                 var result = ContentLoader.Load(root, order, bag);
                 var diagnostics = bag.ToSortedList();
-                int reported = report(diagnostics, result);
+                int reported = report(diagnostics, result, discovery.Mods);
                 if (reported != ExitOk) return reported;
                 foreach (var d in diagnostics)
                     if (d.Severity == Severity.Error) return ExitContentErrors;

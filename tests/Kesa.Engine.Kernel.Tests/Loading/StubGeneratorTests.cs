@@ -80,6 +80,57 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(stub, Is.EqualTo(expected));
         }
 
+        // 비활성화된 모드 (spec-gaps G83)
+
+        [Test]
+        public void AModDisabledAfterDefRegistrationGetsAStubFromTheFirstRound()
+        {
+            Mod("core", schema: "deftype(\"Resource\")\ndeftype(\"Unit\", cost=const(dict[DefId[\"Resource\"], int]))\n",
+                defs: "Resource(\"Wood\")\nUnit(\"Scout\", cost={\"Wod\": 1})\n");
+            var result = Load(out var diags);
+            Assert.That(result.Disabled, Does.Contain("core"));
+            Assert.That(result.FirstRound.Mods.Count, Is.EqualTo(1));
+            Assert.That(StubGenerator.CanGenerate("core", result), Is.True);
+            var stub = StubGenerator.Generate("core", result);
+            Assert.That(stub, Does.Contain("\n# the mod failed to load (see engine check); these declarations come from before it was disabled.\n"));
+            Assert.That(stub, Does.Contain("class Unit:"));
+            Assert.That(stub, Does.Contain("cost: dict[Literal[\"Wood\"], int] = ..."));
+        }
+
+        [Test]
+        public void ALoadedModsStubDoesNotMentionTheFirstRound()
+        {
+            Mod("core", schema: Schema, defs: Defs);
+            var result = LoadClean();
+            Assert.That(StubGenerator.Generate("core", result), Does.Not.Contain("failed to load"));
+        }
+
+        [Test]
+        public void ADependentDisabledWithItsDependencyAlsoGetsAFirstRoundStub()
+        {
+            Mod("core", schema: "deftype(\"Resource\")\ndeftype(\"Unit\", cost=const(dict[DefId[\"Resource\"], int]))\n",
+                defs: "Resource(\"Wood\")\nUnit(\"Scout\", cost={\"Wod\": 1})\n");
+            Mod("scouts", defs: "Unit(\"Ranger\")\n", extra: ", dependencies=[\"core\"]");
+            var result = Load(out _);
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "core", "scouts" }));
+            var stub = StubGenerator.Generate("scouts", result);
+            Assert.That(stub, Does.Contain("class Unit:"));
+            Assert.That(stub, Does.Contain("failed to load"));
+        }
+
+        [Test]
+        public void AModThatFailsInItsDefFilesHasNoDeclarationsToStub()
+        {
+            Mod("core", schema: "deftype(\"Resource\")\n", defs: "Resource(\"Wood\")\nResource(\"Wood\")\n");
+            var result = Load(out _);
+            Assert.That(result.FirstRound.Mods, Is.Empty);
+            Assert.That(StubGenerator.CanGenerate("core", result), Is.False);
+            Assert.Throws<ArgumentException>(() => StubGenerator.Generate("core", result));
+            var stub = StubGenerator.GenerateManifestOnly("core");
+            Assert.That(stub, Does.Contain("def Mod(*, id: str"));
+            Assert.That(stub, Does.Not.Contain("class "));
+        }
+
         [Test]
         public void TheSchemaStubDeclaresEverySchemaBuiltin()
         {

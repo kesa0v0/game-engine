@@ -179,13 +179,38 @@ namespace Kesa.Engine.Cli.Tests
         }
 
         [Test]
-        public void StubsLeavesADisabledModsStubAloneAndExitsOne()
+        public void StubsKeepsTheOldStubOfAModThatFailedInItsDefFilesAndExitsOne()
         {
             Mod("Resource(\"Wood\")\nResource(\"Wood\")\n");
             Write("core/__builtins__.pyi", "old");
             Assert.That(Stubs(_root), Is.EqualTo(1));
             Assert.That(Read("core/__builtins__.pyi"), Is.EqualTo("old"));
+            Assert.That(_out.ToString(), Does.Contain("kept " + _root + "/core/__builtins__.pyi (the mod failed to load)\n"));
+            Assert.That(Read("core/schema/__builtins__.pyi"), Is.EqualTo(Kesa.Engine.Stubs.StubGenerator.GenerateSchema()));
             Assert.That(_err.ToString(), Does.Contain("disabled: 1 (core)"));
+        }
+
+        [Test]
+        public void StubsWritesManifestNamesForAFailedModWithoutAStub()
+        {
+            Mod("Resource(\"Wood\")\nResource(\"Wood\")\n");
+            Assert.That(Stubs(_root), Is.EqualTo(1));
+            Assert.That(_out.ToString(), Does.Contain(
+                "wrote " + _root + "/core/__builtins__.pyi (mod.py names only; the mod failed to load)\n"));
+            Assert.That(Read("core/__builtins__.pyi"), Is.EqualTo(Kesa.Engine.Stubs.StubGenerator.GenerateManifestOnly("core")));
+        }
+
+        [Test]
+        public void StubsWritesAFirstRoundStubForAModDisabledByALinkError()
+        {
+            Write("core/schema/types.py", "deftype(\"Resource\")\ndeftype(\"Unit\", cost=const(dict[DefId[\"Resource\"], int]))\n");
+            Write("core/defs/defs.py", "Resource(\"Wood\")\nUnit(\"Scout\", cost={\"Wod\": 1})\n");
+            Write("core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse_all(\"defs/\")\n");
+            Write("core/__builtins__.pyi", "old");
+            Assert.That(Stubs(_root), Is.EqualTo(1));
+            Assert.That(_out.ToString(), Does.StartWith("wrote " + _root + "/core/__builtins__.pyi\n"));
+            Assert.That(Read("core/__builtins__.pyi"), Does.Contain("class Unit:"));
+            Assert.That(Read("core/__builtins__.pyi"), Does.Contain("failed to load"));
         }
 
         [Test]

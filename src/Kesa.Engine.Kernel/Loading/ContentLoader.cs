@@ -12,8 +12,9 @@ namespace Kesa.Engine.Loading
     {
         internal ContentLoadResult(IReadOnlyList<ModManifest> mods, IReadOnlyList<string> disabled, SchemaSet schema,
             DefRegistry defs, IReadOnlyList<PatchCall> patches, IReadOnlyList<ResolvedPatch> resolved, PatchLog log,
-            ResolvedDefs expanded, DefSet frozen)
+            ResolvedDefs expanded, DefSet frozen, DefinitionSnapshot firstRound)
         {
+            FirstRound = firstRound;
             Expanded = expanded;
             Frozen = frozen;
             Mods = mods;
@@ -50,6 +51,27 @@ namespace Kesa.Engine.Loading
 
         /// <summary>동결된 Def 집합 (spec-gaps G69·G70): 검증을 마친 최종 값, 기본값까지 채움, `abstract` 제외.</summary>
         public DefSet Frozen { get; }
+
+        /// <summary>
+        /// 첫 회차의 ②a·②b 결과 (spec-gaps G83). ③~⑥에서 비활성화된 모드도 들어 있어 그 모드의 작성용 스텁을 만드는 데 쓴다.
+        /// 편집기용 추정일 뿐이고 로드의 판정은 아니다.
+        /// </summary>
+        public DefinitionSnapshot FirstRound { get; }
+    }
+
+    /// <summary>한 회차의 ②a·②b가 남긴 것: 살아남은 모드(로드 순서), 완성된 스키마, 등록된 Def.</summary>
+    public sealed class DefinitionSnapshot
+    {
+        internal DefinitionSnapshot(IReadOnlyList<ModManifest> mods, SchemaSet schema, DefRegistry defs)
+        {
+            Mods = mods;
+            Schema = schema;
+            Defs = defs;
+        }
+
+        public IReadOnlyList<ModManifest> Mods { get; }
+        public SchemaSet Schema { get; }
+        public DefRegistry Defs { get; }
     }
 
     /// <summary>
@@ -82,11 +104,14 @@ namespace Kesa.Engine.Loading
             // 파이프라인을 활성 모드 집합으로 돌린다. ③ 이후 단계에서 모드가 비활성화되면 그 모드와 의존 모드를 빼고
             // ②a부터 다시 돌린다 (spec-gaps G49): 비활성화된 모드의 `extend`가 스키마에 남거나 이미 참으로 평가된
             // `mod_loaded` 가드가 낡은 채로 남지 않게 한다. 집합이 줄어드는 방향이라 반복은 끝난다.
+            DefinitionSnapshot? firstRound = null;
             while (true)
             {
                 foreach (var u in units) u.ResetRun();
                 var runDiagnostics = new DiagnosticBag();
                 var run = RunDefinitionStages(units, order, runDiagnostics);
+                // ③ 이후에 빠질 모드도 아직 들어 있을 때 남긴다 (G83)
+                firstRound ??= new DefinitionSnapshot(SurvivingManifests(units), run.Schema, run.Defs);
                 if (ExcludeFailedAtPatchStage(units, run, order, runDiagnostics)) continue;
 
                 diagnostics.AddRange(runDiagnostics.ToSortedList());
@@ -104,8 +129,16 @@ namespace Kesa.Engine.Loading
                     patches.AddRange(u.Patches);
                 }
                 return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
-                    run.Log, run.Expanded, DefSet.Freeze(run.Expanded));
+                    run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound);
             }
+        }
+
+        private static List<ModManifest> SurvivingManifests(List<ModUnit> units)
+        {
+            var mods = new List<ModManifest>();
+            foreach (var u in units)
+                if (!u.Failed) mods.Add(u.Manifest);
+            return mods;
         }
 
         /// <summary>②a·②b가 한 회차에 만든 것.</summary>
