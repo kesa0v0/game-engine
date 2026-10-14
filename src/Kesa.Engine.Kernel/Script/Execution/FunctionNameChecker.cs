@@ -38,39 +38,10 @@ namespace Kesa.Engine.Script
             foreach (var function in functions.Functions)
             {
                 var walker = new Walker(globals, isLoadTimeName, context);
-                var locals = new SortedSet<string>(StringComparer.Ordinal);
-                foreach (var p in function.Parameters) locals.Add(p.Name);
                 if (function.Definition != null)
-                {
-                    CollectLocals(function.Definition.Body, locals);
-                    walker.Block(function.Definition.Body, locals);
-                }
+                    walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
                 else
-                {
-                    walker.Expr(function.Lambda!.Body, locals);
-                }
-            }
-        }
-
-        /// <summary>본문 어디서든 대입하거나 <c>for</c>로 묶는 이름 (파이썬의 지역 변수 규칙).</summary>
-        private static void CollectLocals(IReadOnlyList<Stmt> body, SortedSet<string> locals)
-        {
-            foreach (var stmt in body)
-            {
-                switch (stmt)
-                {
-                    case AssignStmt assign when assign.Target is NameExpr name:
-                        locals.Add(name.Name);
-                        break;
-                    case ForStmt loop:
-                        locals.Add(loop.Target.Name);
-                        CollectLocals(loop.Body, locals);
-                        break;
-                    case IfStmt ifs:
-                        foreach (var branch in ifs.Branches) CollectLocals(branch.Body, locals);
-                        if (ifs.OrElse != null) CollectLocals(ifs.OrElse, locals);
-                        break;
-                }
+                    walker.Expr(function.Lambda!.Body, FunctionLocals.Parameters(function.Parameters));
             }
         }
 

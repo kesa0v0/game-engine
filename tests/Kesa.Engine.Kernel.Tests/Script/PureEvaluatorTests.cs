@@ -316,6 +316,43 @@ namespace Kesa.Engine.Tests.Script
             Assert.That(e.Span.Line, Is.EqualTo(3));
         }
 
+        // 함수 안 어디서든 대입하는 이름은 함수 전체에서 지역 변수다: 값이 없을 때 같은 이름의 전역·내장을 읽지 않는다 (파이썬, G104)
+        [TestCase("def limit():\n    return 10\ndef f(h):\n    if h > 0:\n        limit = 5\n    return limit\n")]
+        [TestCase("def f(h):\n    if h > 0:\n        max = 5\n    return max(1, 2)\n")]
+        [TestCase("def f(h):\n    for limit in []:\n        pass\n    return limit\ndef limit():\n    return 10\n")]
+        [TestCase("def limit():\n    return 10\ndef f(h):\n    g = lambda: limit\n    r = g()\n    limit = 1\n    return r\n")]
+        public void ALocalReadBeforeItIsAssignedDoesNotFallBackToAGlobal(string source)
+        {
+            var e = Fails(source, "f", new IntValue(0));
+            Assert.That(e.Code, Is.EqualTo(Codes.RunScript));
+            Assert.That(e.Message, Does.Match("local variable '(limit|max)' is used before it is assigned"));
+        }
+
+        [Test]
+        public void ALocalAssignedOnTheTakenPathShadowsTheGlobal()
+        {
+            const string source = "def limit():\n    return 10\ndef f(h):\n    if h > 0:\n        limit = 5\n    return limit\n";
+            Assert.That(Show(Call(source, "f", new IntValue(1))), Is.EqualTo("5"));
+        }
+
+        // 순수 함수의 값은 불변이다: 파이썬에서 그 자리에서 고치는 리스트 +=는 별칭에 보이므로 오류로 막는다 (G104)
+        [Test]
+        public void PlusEqualsOnAListIsAnError()
+        {
+            var e = Fails("def f():\n    a = [1]\n    b = a\n    a += [2]\n    return len(b)\n", "f");
+            Assert.That(e.Code, Is.EqualTo(Codes.RunScript));
+            Assert.That(e.Message, Does.Contain("'+=' cannot be used on a list"));
+            Assert.That(e.Hint, Does.Contain("a = a + [...]"));
+            Assert.That(e.Span.Line, Is.EqualTo(4));
+        }
+
+        [Test]
+        public void ListConcatenationAndPlusEqualsOnNumbersAndStringsStillWork()
+        {
+            Assert.That(Show(Call("def f():\n    a = [1]\n    a = a + [2]\n    return len(a)\n", "f")), Is.EqualTo("2"));
+            Assert.That(Show(Call("def f():\n    s = \"a\"\n    s += \"b\"\n    return s\n", "f")), Is.EqualTo("ab"));
+        }
+
         // ---- 호스트 값 (G103) ----
 
         [Test]

@@ -87,14 +87,19 @@ namespace Kesa.Engine.Script
     /// </summary>
     public sealed class ClosureValue : Value
     {
-        public ClosureValue(FunctionValue function, IReadOnlyDictionary<string, Value> captured)
+        public ClosureValue(FunctionValue function, IReadOnlyDictionary<string, Value> captured,
+            SortedSet<string> capturedLocals)
         {
             Function = function;
             Captured = captured;
+            CapturedLocals = capturedLocals;
         }
 
         public FunctionValue Function { get; }
         public IReadOnlyDictionary<string, Value> Captured { get; }
+
+        /// <summary>만든 함수의 지역 변수 이름 전체 (아직 값이 없는 것 포함). 람다 안에서도 전역 대신 이 이름을 본다 (G104).</summary>
+        public SortedSet<string> CapturedLocals { get; }
 
         public override string KindName => "function";
     }

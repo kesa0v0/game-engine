@@ -62,17 +62,38 @@ namespace Kesa.Engine.Script
             Return,
         }
 
+        /// <summary><c>def</c>마다 지역 변수 이름 (한 번 계산해 둔다).</summary>
+        private readonly Dictionary<FunctionDef, SortedSet<string>> _localNames = new Dictionary<FunctionDef, SortedSet<string>>();
+
+        private SortedSet<string> LocalNamesOf(FunctionDef def)
+        {
+            if (!_localNames.TryGetValue(def, out var names))
+            {
+                names = FunctionLocals.Of(def);
+                _localNames.Add(def, names);
+            }
+            return names;
+        }
+
         private sealed class Frame
         {
-            public Frame(FunctionValue function, SortedDictionary<string, Value> locals, SourceSpan callSite)
+            public Frame(FunctionValue function, SortedDictionary<string, Value> locals,
+                SortedSet<string> localNames, SourceSpan callSite)
             {
                 Function = function;
                 Locals = locals;
+                LocalNames = localNames;
                 CallSite = callSite;
             }
 
             public FunctionValue Function { get; }
             public SortedDictionary<string, Value> Locals { get; }
+
+            /// <summary>
+            /// 이 함수의 지역 변수 이름 전체 (파이썬 규칙, G104). 여기 든 이름은 값이 아직 없어도 전역·내장으로 넘어가지 않는다.
+            /// </summary>
+            public SortedSet<string> LocalNames { get; }
+
             public SourceSpan CallSite { get; }
         }
 
@@ -122,8 +143,9 @@ namespace Kesa.Engine.Script
             {
                 switch (function)
                 {
-                    case FunctionValue f: return CallFunction(f, null, positional, keywords, site);
-                    case ClosureValue c: return CallFunction(c.Function, c.Captured, positional, keywords, site);
+                    case FunctionValue f: return CallFunction(f, null, null, positional, keywords, site);
+                    case ClosureValue c:
+                        return CallFunction(c.Function, c.Captured, c.CapturedLocals, positional, keywords, site);
                     case PureBuiltin b:
                         if (keywords.Count > 0) throw Fail(Codes.RunScript, b.Name + "() does not take keyword arguments");
                         return b.Body(positional);
@@ -135,7 +157,7 @@ namespace Kesa.Engine.Script
                 ReferenceEquals(a.Definition, b.Definition) && ReferenceEquals(a.Lambda, b.Lambda);
 
             private Value CallFunction(FunctionValue fn, IReadOnlyDictionary<string, Value>? captured,
-                IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site)
+                SortedSet<string>? capturedLocals, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site)
             {
                 foreach (var frame in _stack)
                 {
@@ -184,7 +206,19 @@ namespace Kesa.Engine.Script
                         throw Fail(Codes.RunScript, fn.Name + "() is missing the argument '" + p.Name + "'");
                 }
 
-                var newFrame = new Frame(fn, locals, site);
+                SortedSet<string> localNames;
+                if (fn.Definition != null)
+                {
+                    localNames = _owner.LocalNamesOf(fn.Definition);
+                }
+                else
+                {
+                    // 람다는 대입할 수 없으니 지역 변수는 매개변수와, 만든 함수의 지역 변수다
+                    localNames = FunctionLocals.Parameters(fn.Parameters);
+                    if (capturedLocals != null) localNames.UnionWith(capturedLocals);
+                }
+
+                var newFrame = new Frame(fn, locals, localNames, site);
                 _stack.Add(newFrame);
                 try
                 {
@@ -272,6 +306,12 @@ namespace Kesa.Engine.Script
                 if (!frame.Locals.TryGetValue(target.Name, out var current))
                 {
                     throw Fail(Codes.RunScript, "local variable '" + target.Name + "' is used before it is assigned");
+                }
+                // 파이썬의 리스트 +=는 그 자리에서 고쳐 별칭에도 보인다. 순수 함수의 값은 불변이므로 막는다 (G104)
+                if (assign.Op == "+=" && current is ListValue)
+                {
+                    throw Fail(Codes.RunScript, "'+=' cannot be used on a list in a logic function",
+                        "write " + target.Name + " = " + target.Name + " + [...]: values in logic functions never change in place");
                 }
                 var right = Eval(assign.Value, frame);
                 string op = assign.Op.Substring(0, assign.Op.Length - 1);
@@ -373,7 +413,7 @@ namespace Kesa.Engine.Script
 
                     case LambdaExpr lambda:
                         // 만든 함수의 지역 변수 자체를 들고 있다가 부를 때 읽는다: 파이썬처럼 늦게 묶인다
-                        return new ClosureValue(new FunctionValue(lambda, frame.Function.Mod), frame.Locals);
+                        return new ClosureValue(new FunctionValue(lambda, frame.Function.Mod), frame.Locals, frame.LocalNames);
                 }
                 throw Fail(Codes.RunScript, "this expression is not supported in a logic function");
             }
@@ -381,6 +421,11 @@ namespace Kesa.Engine.Script
             private Value LookupName(string name, Frame frame)
             {
                 if (frame.Locals.TryGetValue(name, out var local)) return local;
+                // 함수 안 어딘가에서 대입하는 이름은 값이 없어도 지역 변수다: 같은 이름의 전역·내장으로 넘어가지 않는다 (G104)
+                if (frame.LocalNames.Contains(name))
+                    throw Fail(Codes.RunScript, "local variable '" + name + "' is used before it is assigned",
+                        "it is assigned somewhere in this function, so it is local everywhere in it; " +
+                        "assign it on every path first, or use a different name");
                 var global = _owner._globals.Lookup(frame.Function.Mod, name);
                 if (global != null) return global;
                 if (_owner._builtins.TryGetValue(name, out var builtin)) return builtin;
