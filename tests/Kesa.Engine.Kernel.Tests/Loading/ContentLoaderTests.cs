@@ -472,6 +472,8 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("component(\"C\", tags=field(list[str]))\n", Codes.SchBadDeclaration)]
         [TestCase("component(\"C\", hp=const(int, merge=\"append\"))\n", Codes.SchBadDeclaration)]
         [TestCase("component(\"C\", hp=const(str, min=1))\n", Codes.SchBadDeclaration)]
+        [TestCase("component(\"C\", hp=field(int, max=\"mx\"), mx=derived(int, lambda c: 5))\n", Codes.EvlType)]
+        [TestCase("def cap(c: C) -> int:\n    return 5\ncomponent(\"C\", hp=field(int, max=cap))\n", Codes.EvlType)]
         [TestCase("component(\"C\", hp=field(int, defualt=1))\n", Codes.EvlArguments)]
         [TestCase("component(\"C\", hp=field(int, default_from=\"mx\"))\n", Codes.SchUnknownName)]
         [TestCase("component(\"C\", a=field(int, default_from=\"b\"), b=field(int, default=1))\n", Codes.SchBadDeclaration)]

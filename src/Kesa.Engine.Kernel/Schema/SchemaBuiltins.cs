@@ -408,7 +408,9 @@ namespace Kesa.Engine.Schema
                     name + "= needs an int or fixed type (or a list or map of them), not " + spec.Type.Display, arg.Span);
             }
             if (!(arg.Value is IntValue) && !(arg.Value is FixedValue))
-                throw ctx.Fail(Codes.EvlType, name + " must be a number, not " + arg.Value.KindName, arg.Span);
+                throw ctx.Fail(Codes.EvlType, name + " must be a number, not " + arg.Value.KindName +
+                    ". A bound that follows another value (such as a derived max) is not supported: " +
+                    "store the damage and derive the current value, or clamp in a reaction (spec-gaps G99)", arg.Span);
             return arg.Value;
         }
 
