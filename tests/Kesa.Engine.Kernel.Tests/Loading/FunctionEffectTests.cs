@@ -99,6 +99,63 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(d.Message, Is.EqualTo("the default of 'Health.mark' uses 'start', which changes the world; it can only read"));
         }
 
+        // ---- 커맨드는 로직에서 쓸 수 없다 (G118) ----
+
+        private const string Heal =
+            "@command\ndef Heal(u: Ref[Unit]):\n    with preconditions:\n        require(u.Health.current < 10, text(\"m\"))\n" +
+            "    u.Health.current = 10\n    return 0\n";
+
+        [TestCase("def helper(u):\n    Heal(u)\n", 8)]
+        [TestCase("@command\ndef Rally(u: Ref[Unit]):\n    Heal(u)\n    return 0\n", 9)]
+        [TestCase("def helper(u):\n    x = Heal(u)\n    return x\n", 8)]
+        [TestCase("def helper(u):\n    f = Heal\n    return 0\n", 8)]
+        [TestCase("def helper(u, g):\n    return g(Heal)\n", 8)]
+        [TestCase("g = lambda u: Heal(u)\n", 7)]
+        public void LogicCannotCallOrPassACommand(string defs, int line)
+        {
+            Mod("core", schema: Schema, defs: Heal + defs);
+            var result = Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.CmdWriteEffect));
+            Assert.That(d.Message, Is.EqualTo("'Heal' is a @command, so logic cannot call it or use it as a value"));
+            Assert.That(d.Span.Line, Is.EqualTo(line));
+            Assert.That(d.Hint, Is.EqualTo("move the shared part into a plain function that the commands call (spec-gaps G118)"));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
+        }
+
+        [Test]
+        public void SharedEffectsGoInAPlainFunction()
+        {
+            Mod("core", schema: Schema,
+                defs: "def heal(u):\n    u.Health.current = 10\n" +
+                      "@command\ndef Heal(u: Ref[Unit]):\n    heal(u)\n    return 0\n" +
+                      "@command\ndef Rally(u: Ref[Unit]):\n    heal(u)\n    return 0\n");
+            LoadClean();
+        }
+
+        [Test]
+        public void ACommandCannotBeADefFunctionValue()
+        {
+            Mod("core", schema: Schema + "deftype(\"Goal\", effect=const(Action[\"Goal\"]))\n",
+                defs: Heal + "Goal(\"A\", effect=Heal)\n");
+            var result = Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Message, Is.EqualTo("'effect': 'Heal' is a @command, so it cannot be a value of Action[\"Goal\"]; use a plain function"));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
+        }
+
+        [Test]
+        public void ACommandCannotBeADerivedFunction()
+        {
+            Mod("core", schema: "@command\ndef Peek(h: int):\n    return 1\n" +
+                                "component(\"Health\", current=field(int, default=10), max=derived(int, Peek))\n" +
+                                "deftype(\"Unit\", components=[\"Health\"])\n");
+            Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.CmdWriteEffect));
+            Assert.That(d.Message, Is.EqualTo("derived 'Health.max' uses 'Peek', which is a @command"));
+        }
+
         [Test]
         public void AWriterCannotFillACondSlotButCanFillAnAction()
         {

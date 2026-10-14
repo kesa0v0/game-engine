@@ -129,6 +129,9 @@ namespace Kesa.Engine.Script
 
         public bool Writes => WriteWitness != null;
 
+        /// <summary><c>@command</c> 함수인가. 데코레이터는 <c>@command</c>만 허용된다 (G109). 로직에서 쓸 수 없다 (G118).</summary>
+        public bool IsCommand => Definition != null && Definition.Decorators.Count > 0;
+
         public override string KindName => "function";
     }
 

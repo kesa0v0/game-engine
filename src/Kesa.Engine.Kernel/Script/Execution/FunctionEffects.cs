@@ -52,10 +52,20 @@ namespace Kesa.Engine.Script
                 }
             }
 
+            // 커맨드는 제출로만 실행된다: 로직에서 부르거나 값으로 쓰면 사전 조건과 권한을 건너뛴다 (G118)
+            foreach (var body in bodies)
+            foreach (var use in body.CommandUses)
+            {
+                context.Error(Codes.CmdWriteEffect,
+                    "'" + use.Callee.Name + "' is a @command, so logic cannot call it or use it as a value", use.Span,
+                    "move the shared part into a plain function that the commands call (spec-gaps G118)",
+                    new[] { use.Callee.Definition!.Span });
+            }
+
             foreach (var body in bodies)
             foreach (var call in body.ExpressionCalls)
             {
-                if (!call.Callee.Writes) continue;
+                if (!call.Callee.Writes || call.Callee.IsCommand) continue;
                 context.Error(Codes.CmdWriteEffect,
                     "'" + call.Callee.Name + "' changes the world, so it can only be called as a statement", call.Span,
                     "call it on its own line in a @command body or in another function that changes the world (spec-gaps G117)",
@@ -73,7 +83,15 @@ namespace Kesa.Engine.Script
         {
             void Pure(FunctionValue? fn, string what, SourceSpan span)
             {
-                if (fn == null || fn.Mod != context.Mod || !fn.Writes) return;
+                if (fn == null || fn.Mod != context.Mod) return;
+                if (fn.IsCommand)
+                {
+                    context.Error(Codes.CmdWriteEffect, what + " uses '" + fn.Name + "', which is a @command", span,
+                        "a command only runs when it is submitted; use a plain function (spec-gaps G118)",
+                        new[] { fn.Definition!.Span });
+                    return;
+                }
+                if (!fn.Writes) return;
                 context.Error(Codes.CmdWriteEffect,
                     what + " uses '" + fn.Name + "', which changes the world; it can only read", span,
                     "change the world in a @command body instead (spec-gaps G117)", new[] { fn.WriteWitness!.Value });
@@ -121,6 +139,9 @@ namespace Kesa.Engine.Script
 
             /// <summary>식 안에서 부른 같은 모드의 함수.</summary>
             public List<Call> ExpressionCalls { get; } = new List<Call>();
+
+            /// <summary>본문에서 커맨드 이름을 쓴 곳 (호출이든 값이든, G118).</summary>
+            public List<Call> CommandUses { get; } = new List<Call>();
         }
 
         private sealed class Walker
@@ -135,11 +156,15 @@ namespace Kesa.Engine.Script
             }
 
             /// <summary>지역 변수가 아니고 모드가 <c>def</c> 함수로 묶은 이름이면 그 함수 (G112의 덮어쓰기와 같은 규칙).</summary>
+            /// 커맨드면 쓴 곳을 기록하고 null이다 (호출로도 세지 않는다, G118).
             private FunctionValue? Resolve(Expr callee, SortedSet<string> locals)
             {
                 if (!(callee is NameExpr name) || locals.Contains(name.Name)) return null;
                 if (!_scope.TryGet(name.Name, out var value, out _)) return null;
-                return value is FunctionValue fn && fn.Definition != null ? fn : null;
+                if (!(value is FunctionValue fn) || fn.Definition == null) return null;
+                if (!fn.IsCommand) return fn;
+                _body.CommandUses.Add(new Call(fn, name.Span));
+                return null;
             }
 
             public void Block(IReadOnlyList<Stmt> body, SortedSet<string> locals)
@@ -153,7 +178,7 @@ namespace Kesa.Engine.Script
                             {
                                 var callee = Resolve(call.Callee, locals);
                                 if (callee != null) _body.StatementCalls.Add(new Call(callee, call.Span));
-                                else Expr(call.Callee, locals);
+                                else if (!(call.Callee is NameExpr)) Expr(call.Callee, locals);
                                 foreach (var arg in call.Arguments) Expr(arg.Value, locals);
                             }
                             else Expr(es.Expr, locals);
@@ -200,8 +225,11 @@ namespace Kesa.Engine.Script
                     case CallExpr call:
                         var callee = Resolve(call.Callee, locals);
                         if (callee != null) _body.ExpressionCalls.Add(new Call(callee, call.Span));
-                        else Expr(call.Callee, locals);
+                        else if (!(call.Callee is NameExpr)) Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
+                        break;
+                    case NameExpr name:
+                        Resolve(name, locals); // 값으로 쓴 커맨드 이름을 기록한다 (G118)
                         break;
                     case BinaryExpr bin:
                         Expr(bin.Left, locals);
