@@ -1,10 +1,10 @@
 # 인계 메모: 로딩 파이프라인 슬라이스
 
-마지막 갱신: 2026-10-13. 브랜치 `spec-v0.5-scaffold`, 테스트 648개 통과. 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-14. 브랜치 `spec-v0.5-scaffold`, 테스트 684개 통과(커널 656, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
-spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)이 모두 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G77에 있고, spec 본문(S1·S2·S9, use-cases U16)에도 반영했다. 남은 일은 CLI와 로직 쪽이다.
+spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`)가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G85에 있고, spec 본문(S1·S2·S9, use-cases U16)에도 반영했다. 남은 일은 로직 쪽이다.
 
 ## 구현된 것 (`src/Kesa.Engine.Kernel/`)
 
@@ -20,6 +20,18 @@ spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)이 모두 구
 | ⑥ 작성용 `.pyi` | `Stubs/StubGenerator.Generate(modId, result)` | G71·G72 |
 | `check` JSON | `Reporting/CheckReport.ToJson` | G75 |
 | 최종 Def 덤프 | `Reporting/DefDump.ToJson` | G76 |
+| `check` 사람용 텍스트 | `Reporting/CheckReport.ToText` | G79 |
+| 스키마 스텁, 비활성 모드 스텁 | `StubGenerator.GenerateSchema`, `GenerateManifestOnly`, `ContentLoadResult.FirstRound` | G82·G83 |
+
+CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
+
+| 명령 | 하는 일 | 결정 |
+|---|---|---|
+| `engine check <mods> [--json] [--warnings-as-errors]` | 진단을 텍스트(기본)나 JSON으로 stdout에 | G78·G79·G84·G85 |
+| `engine dump <mods>` | 덤프 JSON은 stdout, 진단 텍스트는 stderr | G80 |
+| `engine stubs <mods>` | 모드마다 `__builtins__.pyi`, `schema/__builtins__.pyi`, 없을 때만 `pyrightconfig.json` | G81~G83 |
+
+종료 코드는 0(오류 없음)·1(콘텐츠 오류)·2(사용법·환경)·3(엔진 예외)이다(G78). 스텁은 pyright 1.1.389로 실제로 확인했다: pyright는 파일에서 가장 가까운 상위 폴더의 `__builtins__.pyi`를 내장 이름으로 쓴다. 확인하려면 `npx -y pyright@1.1.389`(node는 `C:/Users/kesa0/AppData/Roaming/JetBrains/WebStorm2024.3/node/versions/22.14.0`에 있고 PATH에는 없다).
 
 흐름: `ContentLoader.Load`가 회차 루프를 돈다. ③ 이후에 모드가 비활성화되면 그 모드와 의존 모드를 빼고 ②a부터 다시 돈다(G49). 한 회차의 ③~⑥ 검사는 `ExcludeFailedAtPatchStage`에서 같은 `StageDiagnostics`로 모은다.
 
@@ -33,20 +45,20 @@ spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)이 모두 구
 
 ## 남은 일 (사용자와 우선순위를 정할 것)
 
-추천 순서의 첫 항목은 CLI다. 지금까지 만든 `CheckReport`·`DefDump`·`StubGenerator`를 실제 모드 폴더에 돌려 볼 첫 진입점이다.
+CLI 슬라이스(G78~G85)는 끝났다.
 
-1. **CLI `engine check mods/`**: 파일 읽기, 종료 코드, JSON 출력, 스텁 파일 배치, `pyrightconfig.json`(pythonVersion 3.12). 경고를 오류로 올리는 옵션(S9 열린 질문).
-2. **로직용 `.pyi`**: 엔티티 접근 클래스, `derived`, `ref` 칼럼, 함수 서명. 엔티티 모델(S4)과 로직 슬라이스가 먼저다.
-3. 스텁에서 멤버 이름이 `id`/`self` 같은 예약 이름이면 중복 인자가 생긴다(스키마 단계에서 막거나 나중에 처리).
-4. S9의 나머지 "왜?" 도구 4가지(파생값 추적, 전제 조건 보고서, 반응 추적, 단계 순서 덤프).
-5. **G32 규칙**(`Ref`=엔티티, `DefId`=Def)을 spec 본문으로 옮기는 일. 예시만 고쳐 둔 상태다.
-6. **`check` 모드에서 `optional` 모드를 전부 설치로 볼지**(G38 열린 점).
-7. 덤프의 `patches`가 부모 체인 전체를 훑어, 자식이 같은 값을 직접 적어 영향이 없었던 부모 패치도 나온다(G76 알려진 한계).
-8. 속성 접근 표기(`Resource.Wood`, 따옴표 없는 Def 참조)는 후속 과제다(G63). 내부 값은 같은 id 문자열이라 ⑤는 바뀌지 않는다.
+1. **로직용 `.pyi`**: 엔티티 접근 클래스, `derived`, `ref` 칼럼, 함수 서명. 엔티티 모델(S4)과 로직 슬라이스가 먼저다. 스키마 스텁의 `derived` 함수 매개변수 타입도 이때 좁힌다.
+2. **스텁의 이름 충돌**: 멤버 이름이 `id`/`self` 같은 예약 이름이면 중복 인자가 생기고, Def 타입·컴포넌트 이름이 `Mod`·`use`·`use_all`·`patch`·`mod_loaded`·`inherit`이면 스텁 안에서 겹친다(G82 알려진 한계). 스키마 단계에서 막는 것이 유력하다.
+3. S9의 나머지 "왜?" 도구 4가지(파생값 추적, 전제 조건 보고서, 반응 추적, 단계 순서 덤프). 각자 `engine` 명령이 될 자리다(G80).
+4. **G32 규칙**(`Ref`=엔티티, `DefId`=Def)을 spec 본문으로 옮기는 일. 예시만 고쳐 둔 상태다.
+5. 덤프의 `patches`가 부모 체인 전체를 훑어, 자식이 같은 값을 직접 적어 영향이 없었던 부모 패치도 나온다(G76 알려진 한계). `dump`에서 특정 Def만 고르는 옵션도 미뤘다(G80).
+6. 속성 접근 표기(`Resource.Wood`, 따옴표 없는 Def 참조)는 후속 과제다(G63). 내부 값은 같은 id 문자열이라 ⑤는 바뀌지 않는다.
+7. 진단 코드 체계(S9 열린 질문, G6 잠정).
+8. 종료 코드 3(엔진 내부 예외) 경로는 테스트가 없다. 커널 예외를 일으킬 방법이 마땅치 않았다.
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 648개 통과를 확인한다.
-2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G70~G77), `docs/spine-spec.md` S1을 읽는다.
+1. `git pull` 후 `dotnet test`로 684개 통과를 확인한다.
+2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G70~G85), `docs/spine-spec.md` S1·S9를 읽는다.
 3. 위 "남은 일" 중 하나를 고르고, 이전처럼 spec이 비어 있는 곳부터 하나씩 짚어 달라고 요청한다.
-   예: "CLI(`engine check`) 슬라이스를 시작하자. S9와 spec-gaps를 읽고, 구현 전에 spec이 비어 있는 곳부터 하나씩 짚어 줘."
+   예: "스텁 이름 충돌을 정리하자. spec-gaps G72·G82를 읽고, 구현 전에 spec이 비어 있는 곳부터 하나씩 짚어 줘."
