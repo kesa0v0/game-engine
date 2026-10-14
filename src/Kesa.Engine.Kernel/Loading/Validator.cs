@@ -76,8 +76,9 @@ namespace Kesa.Engine.Loading
                 {
                     rc.Rows.TryGet(key, out var row);
                     var by = row.AttachedBy;
-                    CheckMembers(def, component, row.Members, by?.Mod ?? mod, by?.Call.Span ?? at,
-                        "row '" + key + "' of '" + component.Name + "' on '" + def.Id + "'");
+                    string rowWhere = "row '" + key + "' of '" + component.Name + "' on '" + def.Id + "'";
+                    CheckMembers(def, component, row.Members, by?.Mod ?? mod, by?.Call.Span ?? at, rowWhere);
+                    if (component.Keys == KeysMode.Listed) CheckCreatable(def, component, row.Members, by?.Mod ?? mod, by?.Call.Span ?? at, rowWhere);
                 }
                 return;
             }
@@ -104,6 +105,33 @@ namespace Kesa.Engine.Loading
             if (spec.Default != null || spec.Type is ListTypeRef || spec.Type is DictTypeRef) return;
             Report(mod, Codes.ValMissing, where + " has no value for '" + decl.Name + "'", at,
                 "give '" + decl.Name + "' a value, or give it a default= in the schema");
+        }
+
+        /// <summary>
+        /// Def가 적은 <c>keys="listed"</c> 줄은 엔티티를 만들 때 생기는데, 그때 줄 값을 줄 길이 없다(생성 초기값은 키 없는 컴포넌트만).
+        /// 그래서 줄의 필수 Ref(Def는 엔티티를 못 줌, G32)와 기본값 없는 <c>field</c>는 Def가 채워야 하고, 못 채우면 그 Def로는
+        /// 엔티티를 만들 수 없으니 로드 오류다 (spec-gaps G94).
+        /// </summary>
+        private void CheckCreatable(ResolvedDef def, ComponentType component, OrderedMap<ResolvedValue> members, string mod,
+            SourceSpan at, string where)
+        {
+            if (def.IsAbstract) return;
+            foreach (var member in component.Members)
+            {
+                var spec = member.Spec;
+                if (member.Kind == MemberKind.Ref && !spec.Optional)
+                {
+                    Report(mod, Codes.ValMissing,
+                        where + " needs an entity for the required ref '" + member.Name + "', which a Def cannot give", at,
+                        "declare it optional=True, or add the row at runtime with AddRow (spec-gaps G94)");
+                }
+                else if (member.Kind == MemberKind.Field && !members.Contains(member.Name) && spec.Default == null &&
+                         spec.DefaultFrom == null)
+                {
+                    Report(mod, Codes.ValMissing, where + " has no value for '" + member.Name + "', which has no default", at,
+                        "write '" + member.Name + "' in the row, or give it a default= in the schema (spec-gaps G94)");
+                }
+            }
         }
 
         // ---- 타입과 범위 (G68) ----

@@ -279,6 +279,39 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(d.Hint, Does.Contain("keys=\"listed\""));
         }
 
+        [TestCase("at=ref(\"City\")", "Post()", "required ref 'at'")]
+        [TestCase("note=field(str)", "Post()", "no value for 'note'")]
+        public void ADefCannotListARowItCannotFill(string members, string row, string problem)
+        {
+            Mod("core", schema:
+                "component(\"Banner\", c=field(int, default=0))\ndeftype(\"City\", components=[\"Banner\"])\n" +
+                "deftype(\"SkillDef\")\n" +
+                "component(\"Post\", key=\"SkillDef\", keys=\"listed\", " + members + ")\n" +
+                "deftype(\"Unit\", components=[\"Post\"])\n",
+                defs: "SkillDef(\"Medicine\")\nUnit(\"Base\", abstract=True, Post={\"Medicine\": " + row + "})\n" +
+                      "Unit(\"Doc\", parent=\"Base\")\n");
+            Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.ValMissing));
+            Assert.That(d.Message, Does.Contain("row 'Medicine' of 'Post' on 'Doc'"));   // 물려받은 줄도, abstract는 면제
+            Assert.That(d.Message, Does.Contain(problem));
+        }
+
+        [Test]
+        public void ADefListedRowThatIsFilledCanBeCreated()
+        {
+            Mod("core", schema:
+                "component(\"Banner\", c=field(int, default=0))\ndeftype(\"City\", components=[\"Banner\"])\n" +
+                "deftype(\"SkillDef\")\n" +
+                "component(\"Post\", key=\"SkillDef\", keys=\"listed\", note=field(str), at=ref(\"City\", optional=True))\n" +
+                "deftype(\"Unit\", components=[\"Post\"])\n",
+                defs: "SkillDef(\"Medicine\")\nUnit(\"Doc\", Post={\"Medicine\": Post(note=\"x\")})\n");
+            _world = new World(LoadClean());
+            var doc = _world.Create("Doc");
+            Assert.That(((StrValue)_world.GetRow(doc, M("Post", "note"), "Medicine")).Value, Is.EqualTo("x"));
+            Assert.That(_world.GetRow(doc, M("Post", "at"), "Medicine"), Is.SameAs(NoneValue.Instance));
+        }
+
         [Test]
         public void KeysListedAndOptionalRefsMayLeaveRowValuesToCreation()
         {

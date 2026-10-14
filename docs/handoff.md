@@ -1,10 +1,10 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World
 
-마지막 갱신: 2026-10-14. 브랜치 `spec-v0.5-scaffold`, 테스트 707개 통과(커널 679, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-14. 브랜치 `spec-v0.5-scaffold`, 테스트 710개 통과(커널 682, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
-spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G93에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 다음은 순수 함수 실행기(`derived` 계산)다.
+spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G94에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 다음은 순수 함수 실행기(`derived` 계산)다.
 
 ## 구현된 것 (`src/Kesa.Engine.Kernel/`)
 
@@ -57,20 +57,19 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 
 ## 남은 일 (사용자와 우선순위를 정할 것)
 
-1. **(결정 대기) Def에 적힌 `keys="listed"` 줄의 필수 Ref·기본값 없는 `field`**: Def가 그 칸을 못 채우면(Ref는 Def가 줄 수 없음, G32) 그 Def로는 엔티티를 만들 수 없는데 `check`는 통과한다. 로드 오류로 할지, `Create`가 줄 초기값을 받을지 정해야 한다.
-2. **순수 함수 실행기 슬라이스**(G90): `def` 본문 파싱, `int`·`fixed` 산술(P2), 비교, `if`·`for`·`return`, `floor`·`clamp`·`min`·`max`, `contribs`, read-set, 재진입 감지. 그다음 `derived`·`default=함수`를 World에 켠다. 기여 행의 모양·수명과 `field`가 `derived` 상한을 넘는 경우(S4 🟡)도 이때 정한다. `default_from`이 "생성 때 한 번만" 계산되는지(원천이 바뀌어도 따라가지 않는지)는 `derived`가 생긴 뒤 테스트한다.
-3. **로직용 `.pyi`**: 엔티티 접근 클래스, `derived`, `ref` 칼럼, 함수 서명. 스키마 스텁의 `derived` 함수 매개변수 타입도 이때 좁힌다.
-4. **스텁의 이름 충돌**: 멤버 이름이 `id`/`self` 같은 예약 이름이면 중복 인자가 생기고, Def 타입·컴포넌트 이름이 `Mod`·`use`·`use_all`·`patch`·`mod_loaded`·`inherit`이면 스텁 안에서 겹친다(G82 알려진 한계). 스키마 단계에서 막는 것이 유력하다.
-5. S9의 나머지 "왜?" 도구 4가지(파생값 추적, 전제 조건 보고서, 반응 추적, 단계 순서 덤프). 각자 `engine` 명령이 될 자리다(G80).
-6. **G32 규칙**(`Ref`=엔티티, `DefId`=Def)을 spec 본문으로 옮기는 일. 예시만 고쳐 둔 상태다.
-7. 덤프의 `patches`가 부모 체인 전체를 훑어, 자식이 같은 값을 직접 적어 영향이 없었던 부모 패치도 나온다(G76 알려진 한계). `dump`에서 특정 Def만 고르는 옵션도 미뤘다(G80).
-8. 속성 접근 표기(`Resource.Wood`, 따옴표 없는 Def 참조)는 후속 과제다(G63).
-9. 진단 코드 체계(S9 열린 질문, G6 잠정).
-10. 종료 코드 3(엔진 내부 예외) 경로는 테스트가 없다.
+1. **순수 함수 실행기 슬라이스**(G90): `def` 본문 파싱, `int`·`fixed` 산술(P2), 비교, `if`·`for`·`return`, `floor`·`clamp`·`min`·`max`, `contribs`, read-set, 재진입 감지. 그다음 `derived`·`default=함수`를 World에 켠다. 기여 행의 모양·수명과 `field`가 `derived` 상한을 넘는 경우(S4 🟡)도 이때 정한다. `default_from`이 "생성 때 한 번만" 계산되는지(원천이 바뀌어도 따라가지 않는지)는 `derived`가 생긴 뒤 테스트한다.
+2. **로직용 `.pyi`**: 엔티티 접근 클래스, `derived`, `ref` 칼럼, 함수 서명. 스키마 스텁의 `derived` 함수 매개변수 타입도 이때 좁힌다.
+3. **스텁의 이름 충돌**: 멤버 이름이 `id`/`self` 같은 예약 이름이면 중복 인자가 생기고, Def 타입·컴포넌트 이름이 `Mod`·`use`·`use_all`·`patch`·`mod_loaded`·`inherit`이면 스텁 안에서 겹친다(G82 알려진 한계). 스키마 단계에서 막는 것이 유력하다.
+4. S9의 나머지 "왜?" 도구 4가지(파생값 추적, 전제 조건 보고서, 반응 추적, 단계 순서 덤프). 각자 `engine` 명령이 될 자리다(G80).
+5. **G32 규칙**(`Ref`=엔티티, `DefId`=Def)을 spec 본문으로 옮기는 일. 예시만 고쳐 둔 상태다.
+6. 덤프의 `patches`가 부모 체인 전체를 훑어, 자식이 같은 값을 직접 적어 영향이 없었던 부모 패치도 나온다(G76 알려진 한계). `dump`에서 특정 Def만 고르는 옵션도 미뤘다(G80).
+7. 속성 접근 표기(`Resource.Wood`, 따옴표 없는 Def 참조)는 후속 과제다(G63).
+8. 진단 코드 체계(S9 열린 질문, G6 잠정).
+9. 종료 코드 3(엔진 내부 예외) 경로는 테스트가 없다.
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 707개 통과를 확인한다.
-2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G78~G93), `docs/spine-spec.md` S1·S4·S9를 읽는다.
+1. `git pull` 후 `dotnet test`로 710개 통과를 확인한다.
+2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G78~G94), `docs/spine-spec.md` S1·S4·S9를 읽는다.
 3. 위 "남은 일" 중 하나를 고르고, 이전처럼 spec이 비어 있는 곳부터 하나씩 짚어 달라고 요청한다.
    예: "순수 함수 실행기 슬라이스를 시작하자. spec S2와 schema-design 3.3.1, spec-gaps G90을 읽고, 구현 전에 spec이 비어 있는 곳부터 하나씩 짚어 줘."
