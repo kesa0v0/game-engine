@@ -1,10 +1,10 @@
-# 인계 메모: 로딩 파이프라인, CLI, 런타임 World
+# 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-15. 브랜치 `spec-v0.5-scaffold`, 테스트 945개 통과(커널 917, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-15. 브랜치 `spec-v0.5-scaffold`, 테스트 1057개 통과(커널 1029, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
-spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G108에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기(G95~G104)를 `World`에 연결했다: `derived` 읽기와 형제 접근(G103), 재진입 감지·깊이 상한(G100), 기여 행 API와 `contribs`(G98), 읽은 값 근거 `Explain`(G105), 함수 기본값과 `derived` 원천 `default_from`(G106). `check`는 함수 본문의 이름 오타도 잡는다(G108). 그 뒤 실행기를 검토해 파이썬과 결과가 다르거나 spec과 어긋난 곳 6가지를 재현하고 고쳤다(아래 "실행기 검토").
+spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G108에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기(G95~G104)를 `World`에 연결했다: `derived` 읽기와 형제 접근(G103), 재진입 감지·깊이 상한(G100), 기여 행 API와 `contribs`(G98), 읽은 값 근거 `Explain`(G105), 함수 기본값과 `derived` 원천 `default_from`(G106). `check`는 함수 본문의 이름 오타도 잡는다(G108). 그 뒤 실행기를 검토해 파이썬과 결과가 다르거나 spec과 어긋난 곳 6가지를 재현하고 고쳤다(아래 "실행기 검토"). 이어서 S6 커맨드 첫 슬라이스를 시작해 선언·사전 검사·인자 검사·쓰기 판정까지 왔다(G109~G118, 아래 "S6 커맨드 진행 상황"). 본문 실행은 아직 없다.
 
 ## 구현된 것 (`src/Kesa.Engine.Kernel/`)
 
@@ -24,7 +24,9 @@ spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engin
 | 스키마 스텁, 비활성 모드 스텁 | `StubGenerator.GenerateSchema`, `GenerateManifestOnly`, `ContentLoadResult.FirstRound` | G82·G83 |
 | 함수 본문 파싱, 순수 함수 실행기 | `Script/Parser`(본문, `for`·`return`·조건식), `Script/Execution/*`(`PureEvaluator`, `PureOps`, `PureBuiltins`, `FunctionChecker`), `Numerics/FixedMath`(`fixed` 산술) | G95~G104 |
 | 함수 본문 이름 검사 (②b 끝, 모드마다) | `Script/Execution/FunctionNameChecker`(`ModFunctions`에 인터프리터가 함수와 최상위 이름을 모음), `PureBuiltins.RuntimeNames` | G108 |
-| 런타임 월드 | `Runtime/World`(+ `World.Derived`·`World.Contributions`·`World.Explain` 부분 클래스), `RuntimeTypes`(`EntityId`, `EntityValue`, `MemberHandle`, `Init`, `WorldException`) | G86~G93, G98, G100, G103, G105, G106 |
+| 런타임 월드 | `Runtime/World`(+ `World.Derived`·`World.Contributions`·`World.Explain`·`World.Commands` 부분 클래스), `RuntimeTypes`(`EntityId`, `EntityValue`, `MemberHandle`, `Init`, `WorldException`) | G86~G93, G98, G100, G103, G105, G106 |
+| 커맨드 선언·사전 검사·인자 검사 | `Script/CommandDecl`(`CommandParameter`), `Interpreter.DeclareCommand`, `FunctionChecker`(`with preconditions:`), `Loading/CommandSignatures`(어노테이션·기본값), `PureEvaluator.RunPreconditions`, `World.CheckPreconditions`(`PreconditionReport`, `ArgumentRejection`) | G109~G116 |
+| 함수 효과(쓰기 함수) 판정 (②b 끝, 모드마다) | `Script/Execution/FunctionEffects`, `FunctionValue.WriteWitness`·`IsCommand`, `PatchOperationCheck.Mismatch`(Cond 자리) | G117·G118 |
 
 CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 
@@ -61,6 +63,24 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 - **아직 안 되는 것:** 키 줄 안의 Ref는 역방향 색인이 없다. 저장(S8)·트랜잭션·벤치는 아직 없다. 내부 저장은 엔티티마다 바뀐 값만 맵으로 둔 단순한 모양이다(저장 방식은 공개 약속이 아님).
 - G93은 로더 규칙도 바꿨다: `keys="all"` 줄의 `field`는 고정 기본값이 있어야 하고(`default_from`·함수 기본값 금지), Ref는 `optional`이어야 한다(SCH004).
 
+## S6 커맨드 진행 상황 (2026-10-15)
+
+결정은 모두 사용자와 정했다(spec-gaps 상태 `확인`). 테스트는 `Loading/CommandDeclarationTests`, `Loading/BuiltinShadowingTests`, `Loading/FunctionEffectTests`, `Runtime/WorldPreconditionTests`.
+
+| G | 정한 것 |
+|---|---|
+| G109 | `@command` / `@command(free=True)`, 커맨드 id는 `모드id.함수이름` (`ContentLoadResult.Commands`) |
+| G110·G113 | `require(조건, text("키", **인자))`는 모두 평가, 앞 실패에 기댄 오류는 “평가 안 됨”, 예산·순환 오류는 늘 오류. 메시지는 조건이 거짓일 때만 평가(assert처럼) |
+| G111 | `with preconditions:`는 커맨드의 첫 문장, 안에는 `require` 호출과 `이름 = 식`만. `cost`·`choose`는 아직 “미지원” |
+| G112 | 엔진 이름(`require`, `text`, `command`, `int` 등)은 덮어쓸 수 있는 내장(파이썬 LEGB). 덮어쓴 모드에서는 그 자리에 못 씀 |
+| G114 | 커맨드 매개변수는 어노테이션 필수: `int`·`fixed`·`bool`·`str`·`Ref[X]`·`DefId[X]`·`list[T]`·`dict[K, V]`·“T 또는 None” (CMD003) |
+| G115 | 제출 인자가 틀리면 예외가 아니라 `PreconditionReport.Arguments`의 구조화된 거절(빠짐·남음·타입·죽은 엔티티·엔티티 타입·없는 Def·Def 타입). 숫자는 G95(`fixed` 자리의 int는 올림) |
+| G116 | 기본값은 커맨드에만, 리터럴만. 로드 시 타입 대조, DefId는 ⑤ 링크, 제출 시 채움(로그에는 채운 뒤 전체 인자) |
+| G117 | 쓰기 = 엔티티 상태 경로의 속성 대입. 쓰기 함수는 전이적으로 자동 판정, 문장으로만 부름, 순수 자리(`derived`, 함수 기본값, `Cond`)에 못 둠 (CMD004). 이름으로 알 수 없는 호출은 런타임 안전망(아래 다음 할 일) |
+| G118 | 로직에서 커맨드 이름을 부르거나 값으로 쓰면 로드 오류. 공용 효과는 일반 쓰기 함수로 |
+
+진단 코드: CMD001 데코레이터, CMD002 사전 조건 블록, CMD003 매개변수 타입·기본값, CMD004 함수 효과.
+
 ## 핵심 규칙 (자세한 것은 spec-gaps)
 
 - Def 참조는 id 문자열이다(S2). ⑤는 존재·타입·보이는 범위·`abstract` 금지만 검사한다.
@@ -69,7 +89,18 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 - 기본값 없는 `const`(리스트·맵 제외)는 필수다(G67). `extend`가 더한 `const`와 `keys="all"` 키 컴포넌트의 `const`는 기본값이 있어야 한다(G74·G77). 그래서 동결본은 구멍이 없다. 런타임도 생성 순간에 구멍을 막는다(G93).
 - 동결본은 `abstract`를 뺀다(G70). 안 적힌 `keys="all"` 줄은 `FrozenDef.TryGetRow`가 기본값으로 채워 돌려준다.
 
-## 다음 할 일: S6 커맨드의 첫 슬라이스 (2026-10-15 사용자와 합의)
+## 다음 할 일: G117 2단계 — 커맨드 본문 실행
+
+S6 첫 슬라이스에서 남은 것, 이 순서로 하나씩 짚는다(spec 빈칸은 선택지와 추천을 내고 사용자가 고른다):
+
+1. **제출 API의 모양:** `World`에 커맨드를 제출해 사전 검사 → 본문 실행까지 하는 입구(이름 후보 `Submit`). 돌려주는 결과(거절 / 성공 / 스크립트 오류), issuer 인자, 자유 커맨드(`free`)만 받을지, 채운 전체 인자(G116)를 결과에 담을지.
+2. **본문 실행:** 실행기에 속성 대입 → `World.Set` 연결(복합 대입 포함). 쓸 수 있는 칸은 `field`·Ref(`const`·`derived`는 `World`가 이미 거부). 리스트 칼럼의 `+=`, 키 줄 쓰기(`h.Skill[k].level = …`)를 이번에 열지 정한다.
+3. **런타임 안전망(G117에 규칙이 적혀 있음):** 실행 프레임마다 순수/쓰기 모드. `derived` 읽기·사전 조건·`Cond` 호출·순수 함수에서 시작한 호출은 커맨드 실행 중이라도 쓰기를 거부. 최상위 대입으로 숨긴 커맨드(`x = Heal`) 호출도 여기서 막는다(G118).
+4. **커맨드 단위 롤백(C8):** 스크립트 오류가 나면 효과를 남기지 않는다. 방식(쓰기 로그 되감기 vs 스냅샷)을 정한다. spec 9절 벤치 항목과 관련.
+5. **`me`의 정체(S2 ❓):** 시나리오 ②③④로 정한다(이 슬라이스나 다음).
+6. 미룸: `ask`/`wait`(Flow 중단·재개), `cost`·`choose`, 반응(S5), 저장(S8), 엔티티 생성·삭제·컴포넌트 부착을 스크립트에서 하는 길.
+
+### (참고) 첫 슬라이스를 시작할 때의 합의 (2026-10-15)
 
 spec 척추 기준으로 어디까지 왔나:
 
@@ -78,7 +109,8 @@ spec 척추 기준으로 어디까지 왔나:
 | S1 로딩, S9 진단(일부), CLI | 끝남 |
 | S4 데이터 층(`World`), `derived`·기여 행 | 끝남 |
 | S2 순수 함수(읽기만) | 끝남, 검토 마침 |
-| S2 Flow(쓰기, `ask`, `wait`, 재개) · S5 반응 · S6 커맨드 · S8 저장 | 없음 |
+| S6 커맨드 | 선언·사전 검사·인자 검사·쓰기 판정까지(G109~G118), 본문 실행·롤백 없음 |
+| S2 Flow(쓰기 실행, `ask`, `wait`, 재개) · S5 반응 · S8 저장 | 없음 |
 
 spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거의 모두 Flow·커맨드·저장을 요구하므로 아직 하나도 검증하지 못했다. 엔진은 콘텐츠를 읽고 값을 계산할 수 있지만 게임을 진행시킬 수는 없다. 로직용 `.pyi`(남은 일 2번)는 스크립트의 쓰기 API 모양이 정해진 뒤에 하는 편이 다시 고칠 일이 적다.
 
@@ -110,7 +142,7 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 945개 통과(커널 917, CLI 28)를 확인한다.
-2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G95~G108), `docs/spine-spec.md` S2·S4·S6·7절을 읽는다. 실행기·월드 코드는 `Script/Execution/*`와 `Runtime/World*.cs`(부분 클래스 4개)다.
-3. 위 "다음 할 일"(S6 첫 슬라이스)을 시작하고, 이전처럼 spec이 비어 있는 곳부터 하나씩 짚어 달라고 요청한다.
-   예: "S6 커맨드 첫 슬라이스를 시작하자. spine-spec S2·S6·7절과 use-cases의 커맨드 사례를 읽고, spec이 비어 있는 첫 칸부터 짚어 줘."
+1. `git pull` 후 `dotnet test`로 1057개 통과(커널 1029, CLI 28)를 확인한다.
+2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G118), `docs/spine-spec.md` S2·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Commands.cs`, `Script/Execution/PureEvaluator.cs`(`RunPreconditions`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
+3. 위 "다음 할 일"(G117 2단계)의 1번부터 시작한다.
+   예: "커맨드 본문 실행을 시작하자. handoff의 다음 할 일 1번(제출 API 모양)부터 짚어 줘."
