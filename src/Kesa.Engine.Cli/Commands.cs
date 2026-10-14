@@ -19,8 +19,11 @@ namespace Kesa.Engine.Cli
         public const int ExitUsage = 2;
         public const int ExitInternal = 3;
 
+        /// <summary>경고를 오류로 올린다 (G84). <c>check</c>만 받는다.</summary>
+        public const string WarningsAsErrors = "--warnings-as-errors";
+
         public const string Usage =
-            "usage: engine check <mods-dir> [--json]\n" +
+            "usage: engine check <mods-dir> [--json] [--warnings-as-errors]\n" +
             "       engine dump <mods-dir>\n" +
             "       engine stubs <mods-dir>";
 
@@ -37,14 +40,14 @@ namespace Kesa.Engine.Cli
         /// <summary><c>engine check &lt;mods-dir&gt; [--json]</c>: 진단을 텍스트나 JSON으로 stdout에 낸다 (G79).</summary>
         private static int Check(string[] args, TextWriter stdout, TextWriter stderr)
         {
-            int parsed = Parse("check", args, new[] { "--json" }, stderr, out var root, out var options);
+            int parsed = Parse("check", args, new[] { "--json", WarningsAsErrors }, stderr, out var root, out var options);
             if (parsed != ExitOk) return parsed;
             bool json = options.Contains("--json");
             return LoadAndReport("check", root, stderr, (diagnostics, result, _) =>
             {
                 stdout.Write(json ? CheckReport.ToJson(diagnostics, result) : CheckReport.ToText(diagnostics, result, PathPrefix(root)));
                 return ExitOk;
-            });
+            }, warningsAsErrors: options.Contains(WarningsAsErrors));
         }
 
         /// <summary><c>engine dump &lt;mods-dir&gt;</c>: 덤프 JSON은 stdout, 진단 텍스트는 stderr (G80).</summary>
@@ -156,10 +159,12 @@ namespace Kesa.Engine.Cli
 
         /// <summary>
         /// ①~⑥을 돌리고 결과를 넘긴다. <paramref name="report"/>가 0이 아닌 코드를 돌려주면 그 코드로 끝나고,
-        /// 아니면 오류 진단이 있을 때 1. 엔진 예외는 3 (G78).
+        /// 아니면 오류 진단이 있을 때 1. 엔진 예외는 3 (G78). <paramref name="warningsAsErrors"/>면 경고를 오류로 올린 진단을
+        /// 넘기고 그것으로 종료 코드를 정한다 (G84).
         /// </summary>
         private static int LoadAndReport(string command, string root, TextWriter stderr,
-            Func<IReadOnlyList<Diagnostic>, ContentLoadResult, IReadOnlyList<ModManifest>, int> report)
+            Func<IReadOnlyList<Diagnostic>, ContentLoadResult, IReadOnlyList<ModManifest>, int> report,
+            bool warningsAsErrors = false)
         {
             try
             {
@@ -168,6 +173,7 @@ namespace Kesa.Engine.Cli
                 var order = ModSorter.Sort(discovery, bag);
                 var result = ContentLoader.Load(root, order, bag);
                 var diagnostics = bag.ToSortedList();
+                if (warningsAsErrors) diagnostics = PromoteWarnings(diagnostics);
                 int reported = report(diagnostics, result, discovery.Mods);
                 if (reported != ExitOk) return reported;
                 foreach (var d in diagnostics)
@@ -180,6 +186,21 @@ namespace Kesa.Engine.Cli
                 stderr.WriteLine(e.ToString());
                 return ExitInternal;
             }
+        }
+
+        /// <summary>
+        /// 경고만 오류로 바꾼다. 정보는 알림이라 그대로 둔다 (G84). 정렬 기준에 심각도가 없어 순서는 그대로다.
+        /// </summary>
+        internal static IReadOnlyList<Diagnostic> PromoteWarnings(IReadOnlyList<Diagnostic> diagnostics)
+        {
+            var promoted = new List<Diagnostic>(diagnostics.Count);
+            foreach (var d in diagnostics)
+            {
+                promoted.Add(d.Severity != Severity.Warning
+                    ? d
+                    : new Diagnostic(d.Code, Severity.Error, d.Message, d.Mod, d.Span, d.Hint, d.Related));
+            }
+            return promoted;
         }
 
         /// <summary>사용자가 준 폴더 경로를 <c>/</c>로 끝나게 한다. 텍스트의 파일 경로가 현재 폴더 기준이 된다 (G79).</summary>

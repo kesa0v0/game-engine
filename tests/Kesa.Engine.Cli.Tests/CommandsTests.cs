@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using Kesa.Engine.Diagnostics;
 using NUnit.Framework;
 
 namespace Kesa.Engine.Cli.Tests
@@ -144,6 +145,58 @@ namespace Kesa.Engine.Cli.Tests
         {
             Assert.That(Run(_root, _root), Is.EqualTo(2));
             Assert.That(_err.ToString(), Does.Contain("more than one"));
+        }
+
+        // --warnings-as-errors (G84)
+
+        [Test]
+        public void AWarningAloneExitsZero()
+        {
+            Mod("Resource(\"Wood\")\n");
+            Directory.CreateDirectory(Path.Combine(_root, "notes"));
+            Assert.That(Run(_root), Is.EqualTo(0), _out.ToString());
+            Assert.That(_out.ToString(), Does.Contain(": warning MOD"));
+        }
+
+        [Test]
+        public void WarningsAsErrorsPromotesTheWarningEverywhere()
+        {
+            Mod("Resource(\"Wood\")\n");
+            Directory.CreateDirectory(Path.Combine(_root, "notes"));
+            Assert.That(Run("--warnings-as-errors", "--json", _root), Is.EqualTo(1));
+            string json = _out.ToString();
+            Assert.That(json, Does.Contain("\"ok\": false"));
+            Assert.That(json, Does.Contain("\"counts\": {\"error\": 1, \"warning\": 0, \"info\": 0}"));
+            Assert.That(json, Does.Contain("\"severity\": \"error\""));
+            Assert.That(json, Does.Not.Contain("\"severity\": \"warning\""));
+        }
+
+        [Test]
+        public void WarningsAsErrorsLeavesInfoAndErrorsAlone()
+        {
+            var span = new SourceSpan("core/defs/defs.py", 1, 1);
+            var input = new[]
+            {
+                new Diagnostic("A001", Severity.Error, "e", "core", span),
+                new Diagnostic("A002", Severity.Warning, "w", "core", span, "h",
+                    new[] { span }),
+                new Diagnostic("A003", Severity.Info, "i", "core", span),
+            };
+            var output = Commands.PromoteWarnings(input);
+            Assert.That(output[0], Is.SameAs(input[0]));
+            Assert.That(output[1].Severity, Is.EqualTo(Severity.Error));
+            Assert.That(output[1].Code, Is.EqualTo("A002"));
+            Assert.That(output[1].Hint, Is.EqualTo("h"));
+            Assert.That(output[1].Related, Is.EqualTo(new[] { span }));
+            Assert.That(output[2], Is.SameAs(input[2]));
+        }
+
+        [TestCase("dump")]
+        [TestCase("stubs")]
+        public void OnlyCheckTakesWarningsAsErrors(string command)
+        {
+            Mod("Resource(\"Wood\")\n");
+            Assert.That(Commands.Run(new[] { command, "--warnings-as-errors", _root }, _out, _err), Is.EqualTo(2));
         }
 
         // stubs (G81)
