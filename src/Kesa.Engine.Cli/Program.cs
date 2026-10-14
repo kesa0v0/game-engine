@@ -8,12 +8,7 @@ namespace Kesa.Engine.Cli
         private static int Main(string[] args)
         {
             Console.OutputEncoding = new UTF8Encoding(false);
-
-            if (args.Length >= 1 && args[0] == "check")
-                return CheckCommand.Run(args[1..], Console.Out, Console.Error);
-
-            Console.Error.WriteLine(CheckCommand.Usage);
-            return CheckCommand.ExitUsage;
+            return Commands.Run(args, Console.Out, Console.Error);
         }
     }
 }
