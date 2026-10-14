@@ -531,7 +531,6 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("def f(h) -> int:\n    return 1 << 2\n")]
         [TestCase("def f(h) -> int:\n    return ~1\n")]
         [TestCase("def f(h) -> int:\n    x = 1\n    x **= 2\n    return x\n")]
-        [TestCase("def f(h) -> int:\n    h.x = 1\n    return 1\n")]
         [TestCase("def f(h) -> int:\n    h[0] += 1\n    return 1\n")]
         [TestCase("def f(h) -> int:\n    return f(h)\n")]
         [TestCase("def f(h) -> int:\n    for i in range(3):\n        if i is 3:\n            return 1\n    return 2\n")]

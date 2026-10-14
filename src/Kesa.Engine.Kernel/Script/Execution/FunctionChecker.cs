@@ -5,7 +5,8 @@ namespace Kesa.Engine.Script
 {
     /// <summary>
     /// 함수 본문의 로드 시점 정적 검사 (spec-gaps G96·G102). 파서는 유효한 파이썬을 모두 읽으므로, 로직에서 허용하지 않는
-    /// 연산자(<c>**</c>, 비트 연산, <c>@</c>)와 순수 함수가 할 수 없는 것(속성·항목 대입), 직접 재귀를 여기서 막는다.
+    /// 연산자(<c>**</c>, 비트 연산, <c>@</c>)와 지역 값을 고치는 것(항목 대입, G104), 직접 재귀를 여기서 막는다.
+    /// 속성 대입(엔티티 쓰기)이 허용되는 자리는 <see cref="FunctionEffects"/>가 본다 (G117).
     /// 값 식만 본다: 매개변수·반환 어노테이션은 <c>X | None</c> 같은 표기를 쓰므로 검사하지 않는다.
     /// 간접 재귀(a가 b를, b가 a를 부름)는 실행 중 호출 체인으로 잡는다.
     /// </summary>
@@ -153,10 +154,12 @@ namespace Kesa.Engine.Script
                         break;
 
                     case AssignStmt assign:
-                        if (!(assign.Target is NameExpr))
+                        // 속성 대입은 엔티티 상태 쓰기다: 어디서 부를 수 있는지는 모드 이름이 다 정해진 뒤 FunctionEffects가 본다 (G117).
+                        // 지역 값은 불변이라 항목 대입은 안 된다 (G104)
+                        if (!(assign.Target is NameExpr) && !(assign.Target is AttributeExpr))
                         {
-                            Report("a logic function can only assign to local variables", assign.Target.Span,
-                                "it cannot write to attributes or items: logic functions only read");
+                            Report("a logic function can only assign to local variables and entity values", assign.Target.Span,
+                                "write name = ... or unit.Health.current = ...; lists and dicts cannot be changed in place (spec-gaps G104)");
                         }
                         if (!AllowedAssign.Contains(assign.Op))
                         {

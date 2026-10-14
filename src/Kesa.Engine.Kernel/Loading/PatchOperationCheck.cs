@@ -224,7 +224,12 @@ namespace Kesa.Engine.Loading
                     return null;
 
                 case FunctionTypeRef f:
-                    return value is FunctionValue ? null : "expected a function for " + f.Display + ", found " + value.KindName;
+                    if (!(value is FunctionValue fn)) return "expected a function for " + f.Display + ", found " + value.KindName;
+                    // 확인용 자리에는 쓰기 함수를 둘 수 없다 (G117). 판정은 ②b 끝에 끝나 있다
+                    if (f.Kind == FunctionSlotKind.Cond && fn.Writes)
+                        return "'" + fn.Name + "' changes the world (at " + fn.WriteWitness + "), but " + f.Display +
+                               " only holds functions that read";
+                    return null;
             }
             return "values of type " + type.Display + " cannot be written in a patch";
         }

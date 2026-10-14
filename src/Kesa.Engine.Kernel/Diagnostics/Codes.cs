@@ -4,7 +4,7 @@ namespace Kesa.Engine.Diagnostics
     /// 진단 코드. 잠정 체계: 영역 접두사 + 세 자리 번호 (spec-gaps G6).
     /// LEX = 렉서, PAR = 파서, MOD = 모드 매니페스트·정렬, LOD = 콘텐츠 파일 목록, EVL = 로드 시점 평가,
     /// SCH = 스키마 단계(②a), DEF = Def 등록(②b), PAT = 패치(③), INH = 상속 펼치기(④), LNK = 링크(⑤), VAL = 검증(⑥),
-    /// RUN = 런타임 월드, CMD = 커맨드 선언.
+    /// RUN = 런타임 월드, CMD = 커맨드 선언과 함수 효과(쓰기).
     /// </summary>
     public static class Codes
     {
@@ -124,5 +124,8 @@ namespace Kesa.Engine.Diagnostics
         public const string CmdBadDecorator = "CMD001";
         public const string CmdPreconditions = "CMD002";
         public const string CmdParameterType = "CMD003";
+
+        // 함수 효과: 쓰기 함수를 부를 수 있는 자리 (spec S2 함수 효과 표, spec-gaps G117)
+        public const string CmdWriteEffect = "CMD004";
     }
 }

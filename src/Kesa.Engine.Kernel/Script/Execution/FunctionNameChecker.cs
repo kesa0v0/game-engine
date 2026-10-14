@@ -71,7 +71,7 @@ namespace Kesa.Engine.Script
                             Expr(es.Expr, locals);
                             break;
                         case AssignStmt assign:
-                            // 이름 대상은 지역 변수다. 그 밖의 대상은 FunctionChecker가 이미 거부했다
+                            // 이름 대상은 지역 변수다. 속성 대상(상태 쓰기, G117)은 그 안의 이름을 본다
                             if (!(assign.Target is NameExpr)) Expr(assign.Target, locals);
                             Expr(assign.Value, locals);
                             break;

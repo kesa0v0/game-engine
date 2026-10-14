@@ -121,6 +121,14 @@ namespace Kesa.Engine.Script
         /// <summary>정의한 모드.</summary>
         public string Mod { get; }
 
+        /// <summary>
+        /// 쓰기 함수면 그렇게 만든 첫 속성 대입이나 쓰기 함수 호출의 위치 (spec-gaps G117). 순수면 null.
+        /// 모드의 ②b 끝에서 <see cref="FunctionEffects"/>가 채운다.
+        /// </summary>
+        public SourceSpan? WriteWitness { get; internal set; }
+
+        public bool Writes => WriteWitness != null;
+
         public override string KindName => "function";
     }
 
