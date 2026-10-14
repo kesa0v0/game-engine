@@ -134,7 +134,7 @@ namespace Kesa.Engine.Script
         {
             if (Cur.IsOp("@"))
             {
-                body.Add(SkipDecorated());
+                body.Add(ParseDecorated());
                 return;
             }
 
@@ -340,7 +340,7 @@ namespace Kesa.Engine.Script
         /// <c>def</c>의 머리부와 본문. 매개변수는 이름과 어노테이션만 지원한다 (기본값, <c>*args</c>, <c>/</c> 등은 미지원).
         /// 함수 안의 <c>def</c>는 미지원이다 (spec-gaps G102).
         /// </summary>
-        private Stmt ParseFunctionDef()
+        private Stmt ParseFunctionDef(IReadOnlyList<Expr>? decorators = null)
         {
             if (_functionDepth > 0)
             {
@@ -378,7 +378,7 @@ namespace Kesa.Engine.Script
                     _functionDepth--;
                     _loopDepth = savedLoopDepth;
                 }
-                return new FunctionDef(name.Text, parameters, returns, body, keyword.Span);
+                return new FunctionDef(name.Text, parameters, returns, body, keyword.Span, decorators);
             }
             catch (ParseError)
             {
@@ -436,21 +436,40 @@ namespace Kesa.Engine.Script
             return new UnsupportedStmt(keyword.Text, keyword.Span);
         }
 
-        /// <summary>데코레이터 줄들과 그 아래의 def/class 블록을 건너뛴다.</summary>
-        private Stmt SkipDecorated()
+        /// <summary>
+        /// 데코레이터 줄들(<c>@식</c>)과 그 아래의 <c>def</c>. 데코레이터는 식으로 읽기만 하고, 무엇이 허용되는지는
+        /// 인터프리터가 본다 (spec-gaps G109). <c>class</c> 앞의 데코레이터는 <c>class</c>와 함께 미지원으로 보고된다.
+        /// </summary>
+        private Stmt ParseDecorated()
         {
             var at = Cur;
-            _diagnostics.Error(Codes.ParUnsupported, "decorators are not supported yet", at.Span);
-            while (Cur.IsOp("@")) SkipToNewline();
-            if (Cur.IsName("def") || Cur.IsName("class") || Cur.IsName("async"))
+            var decorators = new List<Expr>();
+            try
+            {
+                while (Cur.IsOp("@"))
+                {
+                    Advance();
+                    decorators.Add(ParseExpression());
+                    if (Cur.Kind != TokenKind.Newline) throw Fail("expected end of line after a decorator" + Describe(Cur), Cur.Span);
+                    Advance();
+                }
+            }
+            catch (ParseError)
             {
                 SkipToNewline();
-                if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                while (Cur.IsOp("@")) SkipToNewline();
+                if (Cur.IsName("def") || Cur.IsName("class"))
+                {
+                    SkipToNewline();
+                    if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                }
+                return new UnsupportedStmt("@", at.Span);
             }
-            else if (Cur.Kind != TokenKind.EndOfFile)
-            {
-                _diagnostics.Error(Codes.ParSyntax, "a decorator must be followed by def or class", Cur.Span);
-            }
+
+            if (Cur.IsName("def") && _functionDepth == 0) return ParseFunctionDef(decorators);
+            if (Cur.IsName("def")) return ParseFunctionDef(); // 함수 안의 def는 ParseFunctionDef가 미지원으로 보고한다
+            if (Cur.IsName("class")) return SkipUnsupportedCompound();
+            _diagnostics.Error(Codes.ParSyntax, "a decorator must be followed by def or class", Cur.Span);
             return new UnsupportedStmt("@", at.Span);
         }
 

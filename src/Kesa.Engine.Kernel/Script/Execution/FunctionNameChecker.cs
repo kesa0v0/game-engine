@@ -18,6 +18,9 @@ namespace Kesa.Engine.Script
         /// 원인 오류 하나가 함수 본문의 "정의되지 않은 이름" 오류로 번지지 않게 한다.
         /// </summary>
         public SortedSet<string> TopLevelNames { get; } = new SortedSet<string>(StringComparer.Ordinal);
+
+        /// <summary><c>@command</c>로 선언한 커맨드, 정의된 순서대로 (spec-gaps G109).</summary>
+        public List<CommandDecl> Commands { get; } = new List<CommandDecl>();
     }
 
     /// <summary>

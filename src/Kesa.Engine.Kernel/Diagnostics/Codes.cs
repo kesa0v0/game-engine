@@ -4,7 +4,7 @@ namespace Kesa.Engine.Diagnostics
     /// 진단 코드. 잠정 체계: 영역 접두사 + 세 자리 번호 (spec-gaps G6).
     /// LEX = 렉서, PAR = 파서, MOD = 모드 매니페스트·정렬, LOD = 콘텐츠 파일 목록, EVL = 로드 시점 평가,
     /// SCH = 스키마 단계(②a), DEF = Def 등록(②b), PAT = 패치(③), INH = 상속 펼치기(④), LNK = 링크(⑤), VAL = 검증(⑥),
-    /// RUN = 런타임 월드.
+    /// RUN = 런타임 월드, CMD = 커맨드 선언.
     /// </summary>
     public static class Codes
     {
@@ -119,5 +119,8 @@ namespace Kesa.Engine.Diagnostics
         public const string RunBudget = "RUN013";
         public const string RunCycle = "RUN014";
         public const string RunScript = "RUN015";
+
+        // 커맨드 선언 (spec S6, spec-gaps G109)
+        public const string CmdBadDecorator = "CMD001";
     }
 }

@@ -121,8 +121,8 @@ namespace Kesa.Engine.Tests.Script
         [TestCase("x: int = 1\n")]
         [TestCase("f(*args)\n")]
         [TestCase("x = y[1:2]\n")]
-        [TestCase("@command\ndef Move():\n    pass\n")]
-        [TestCase("@on(\"tick\", stage=\"core.economy\")\n@other\ndef f():\n    pass\n")]
+        [TestCase("@command\nclass C:\n    pass\n")]
+        [TestCase("def f():\n    @command\n    def g():\n        pass\n")]
         [TestCase("match x:\n    case 1:\n        pass\n")]
         public void UnsupportedPythonIsReportedSeparately(string text)
         {
@@ -140,9 +140,25 @@ namespace Kesa.Engine.Tests.Script
         }
 
         [Test]
-        public void ParsingContinuesAfterDecoratedFunction()
+        public void DecoratorsAreParsedAsExpressionsOnTheFunction()
         {
-            var (module, _) = Parse("@command\ndef f():\n    pass\nx = 2\n");
+            var (module, diags) = Parse("@command\n@on(\"tick\", stage=\"core.economy\")\ndef f():\n    pass\nx = 2\n");
+            Assert.That(diags, Is.Empty);
+            var def = (FunctionDef)module.Body[0];
+            Assert.That(def.Decorators, Has.Count.EqualTo(2));
+            Assert.That(((NameExpr)def.Decorators[0]).Name, Is.EqualTo("command"));
+            Assert.That(((CallExpr)def.Decorators[1]).Arguments.Select(a => a.Name), Is.EqualTo(new[] { null, "stage" }));
+            Assert.That(module.Body.Last(), Is.InstanceOf<AssignStmt>());
+        }
+
+        [TestCase("@\ndef f():\n    pass\nx = 2\n")]
+        [TestCase("@command x\ndef f():\n    pass\nx = 2\n")]
+        [TestCase("@command\nx = 2\n")]
+        public void BadDecoratorSyntaxIsReportedAndParsingContinues(string text)
+        {
+            var (module, diags) = Parse(text);
+            Assert.That(diags.Select(d => d.Code), Has.All.EqualTo(Codes.ParSyntax));
+            Assert.That(diags, Is.Not.Empty);
             Assert.That(module.Body.Last(), Is.InstanceOf<AssignStmt>());
         }
 

@@ -13,9 +13,10 @@ namespace Kesa.Engine.Loading
         internal ContentLoadResult(IReadOnlyList<ModManifest> mods, IReadOnlyList<string> disabled, SchemaSet schema,
             DefRegistry defs, IReadOnlyList<PatchCall> patches, IReadOnlyList<ResolvedPatch> resolved, PatchLog log,
             ResolvedDefs expanded, DefSet frozen, DefinitionSnapshot firstRound,
-            IReadOnlyDictionary<string, ModScope> scopes)
+            IReadOnlyDictionary<string, ModScope> scopes, IReadOnlyDictionary<string, CommandDecl> commands)
         {
             Scopes = scopes;
+            Commands = commands;
             FirstRound = firstRound;
             Expanded = expanded;
             Frozen = frozen;
@@ -65,6 +66,9 @@ namespace Kesa.Engine.Loading
         /// (spec-gaps G105).
         /// </summary>
         public IReadOnlyDictionary<string, ModScope> Scopes { get; }
+
+        /// <summary>살아남은 모드가 선언한 커맨드 (id <c>모드id.함수이름</c> → 선언, id 서수 순, spec-gaps G109).</summary>
+        public IReadOnlyDictionary<string, CommandDecl> Commands { get; }
     }
 
     /// <summary>한 회차의 ②a·②b가 남긴 것: 살아남은 모드(로드 순서), 완성된 스키마, 등록된 Def.</summary>
@@ -126,6 +130,7 @@ namespace Kesa.Engine.Loading
                 var mods = new List<ModManifest>();
                 var patches = new List<PatchCall>();
                 var scopes = new SortedDictionary<string, ModScope>(StringComparer.Ordinal);
+                var commands = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 foreach (var u in units)
                 {
                     diagnostics.AddRange(u.Bag.ToSortedList());
@@ -137,9 +142,11 @@ namespace Kesa.Engine.Loading
                     mods.Add(u.Manifest);
                     patches.AddRange(u.Patches);
                     scopes.Add(u.Manifest.Id, u.Scope);
+                    // 같은 모드 안의 같은 이름은 EVL004로 막히고 모드 id는 유일하므로 id는 겹치지 않는다
+                    foreach (var command in u.Functions.Commands) commands.Add(command.Id, command);
                 }
                 return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
-                    run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound, scopes);
+                    run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound, scopes, commands);
             }
         }
 

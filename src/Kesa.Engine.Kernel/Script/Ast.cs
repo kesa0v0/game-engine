@@ -252,13 +252,20 @@ namespace Kesa.Engine.Script
     public sealed class FunctionDef : Stmt
     {
         public FunctionDef(string name, IReadOnlyList<Parameter> parameters, Expr? returns,
-            IReadOnlyList<Stmt> body, SourceSpan span) : base(span)
+            IReadOnlyList<Stmt> body, SourceSpan span, IReadOnlyList<Expr>? decorators = null) : base(span)
         {
             Name = name;
             Parameters = parameters;
             Returns = returns;
             Body = body;
+            Decorators = decorators ?? new List<Expr>();
         }
+
+        /// <summary>
+        /// <c>@</c> 뒤의 식들 (위에서 아래 순서). 파서는 모양만 읽고, 무엇이 허용되는지는 인터프리터가 본다
+        /// (<c>@command</c>, spec-gaps G109).
+        /// </summary>
+        public IReadOnlyList<Expr> Decorators { get; }
 
         public string Name { get; }
         public IReadOnlyList<Parameter> Parameters { get; }

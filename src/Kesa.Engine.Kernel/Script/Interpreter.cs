@@ -181,13 +181,64 @@ namespace Kesa.Engine.Script
                     var function = new FunctionValue(def, _context.Mod);
                     _context.Functions.Functions.Add(function); // 이름은 모드 평가가 끝난 뒤에 본다 (G108)
                     _context.Functions.TopLevelNames.Add(def.Name);
+                    // 데코레이터가 잘못돼도 함수는 묶는다: 원인 오류 하나가 "정의되지 않은 이름"으로 번지지 않게.
+                    // 커맨드는 이름이 묶인 뒤에 등록해 같은 id가 둘 생기지 않게 한다
                     Bind(def.Name, function, def.Span);
+                    if (def.Decorators.Count > 0) DeclareCommand(def, function);
                     return;
 
                 case UnsupportedStmt _:
                     return; // 파서가 이미 보고함
             }
             throw _context.Fail(Codes.EvlUnsupported, "statement not supported at load time", stmt.Span);
+        }
+
+        public const string CommandName = "command";
+
+        /// <summary>
+        /// <c>def</c> 위의 데코레이터. 지금은 <c>@command</c>와 <c>@command(free=True/False)</c> 하나만 받는다
+        /// (spec S6, spec-gaps G109). 커맨드 id는 <c>모드id.함수이름</c>이다.
+        /// </summary>
+        private void DeclareCommand(FunctionDef def, FunctionValue function)
+        {
+            var decorator = def.Decorators[0];
+            if (def.Decorators.Count > 1)
+            {
+                _context.Error(Codes.CmdBadDecorator, "a function can have only one decorator", def.Decorators[1].Span);
+                return;
+            }
+
+            bool free = false;
+            switch (decorator)
+            {
+                case NameExpr name when name.Name == CommandName:
+                    break;
+                case CallExpr call when call.Callee is NameExpr callee && callee.Name == CommandName:
+                    foreach (var arg in call.Arguments)
+                    {
+                        if (arg.Name != "free")
+                        {
+                            _context.Error(Codes.CmdBadDecorator,
+                                arg.Name == null
+                                    ? "@command takes no positional arguments"
+                                    : "@command has no argument '" + arg.Name + "'",
+                                arg.Span, hint: "@command accepts free=True or free=False");
+                            return;
+                        }
+                        if (!(arg.Value is BoolLiteral literal))
+                        {
+                            _context.Error(Codes.CmdBadDecorator, "free= must be True or False", arg.Value.Span);
+                            return;
+                        }
+                        free = literal.Value;
+                    }
+                    break;
+                default:
+                    _context.Error(Codes.CmdBadDecorator, "unknown decorator; only @command is supported",
+                        decorator.Span, hint: "write @command or @command(free=True)");
+                    return;
+            }
+            _context.Functions.Commands.Add(new CommandDecl(_context.Mod, function, free, decorator.Span));
         }
 
         /// <summary>
