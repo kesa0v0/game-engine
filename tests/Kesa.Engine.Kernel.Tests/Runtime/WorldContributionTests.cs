@@ -139,6 +139,51 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
+        public void ExplainListsTheValuesAndContributionsThatWereActuallyRead()
+        {
+            var scout = NewScout();
+            var wall = _world.Create("Stone");
+            var max = M("Health", "max");
+            _world.AddContribution(scout, max, "add", new IntValue(3), wall);
+            _world.AddContribution(scout, max, "pct", new IntValue(10));
+
+            var node = _world.Explain(scout, max);
+            Assert.That(node.Kind, Is.EqualTo(ExplainKind.Derived));
+            Assert.That(Int(node.Value), Is.EqualTo(16));
+            Assert.That(node.Reads, Has.Count.EqualTo(3)); // 기여 둘, base_max
+            Assert.That(node.Reads[0].Kind, Is.EqualTo(ExplainKind.Contribution));
+            Assert.That(node.Reads[0].Op, Is.EqualTo("add"));
+            Assert.That(node.Reads[0].Source, Is.EqualTo(wall));
+            Assert.That(node.Reads[2].Member, Is.EqualTo("base_max"));
+            Assert.That(Int(node.Reads[2].Value), Is.EqualTo(12));
+            Assert.That(node.Render(), Does.Contain("Health.max of " + scout + " = 16"));
+            Assert.That(node.Render(), Does.Contain("  Health.base_max of " + scout + " = 12"));
+        }
+
+        [Test]
+        public void ExplainNestsDerivedReadsAndDoesNotLeakIntoPlainReads()
+        {
+            var scout = NewScout();
+            var node = _world.Explain(scout, M("Health", "src"));
+            Assert.That(node.Reads, Is.Empty); // 기여 행이 없으니 읽은 게 없다
+            _world.AddContribution(scout, M("Health", "max"), "add", new IntValue(1));
+            Assert.That(_world.Explain(scout, M("Health", "src")).Reads, Has.Count.EqualTo(1));
+            // Explain 밖의 평범한 읽기는 기록하지 않는다
+            Assert.That(Int(_world.Get(scout, M("Health", "src"))), Is.EqualTo(0));
+            Assert.That(_world.Explain(scout, M("Health", "src")).Reads, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public void ExplainOfAKeyedRowNamesTheKey()
+        {
+            var scout = NewScout();
+            var node = _world.Explain(scout, M("Skill", "eff"), "Cooking");
+            Assert.That(node.Key, Is.EqualTo("Cooking"));
+            Assert.That(Int(node.Value), Is.EqualTo(4));
+            Assert.That(node.Render(), Does.Contain("Skill.eff[Cooking]"));
+        }
+
+        [Test]
         public void ContribsRejectsAValueThatCannotTakeContributions()
         {
             var scout = NewScout();

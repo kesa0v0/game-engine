@@ -195,6 +195,9 @@ namespace Kesa.Engine.Runtime
                     var c = _contributions[id];
                     if (c.Member != member || !SameRow(c.Row, view.Row)) continue;
                     rows.Add(new ContributionView(this, c));
+                    _trace?.Add(new ExplainNode(ExplainKind.Contribution, view.Id, view.Component.Name,
+                        c.Row?.ToString().Trim('\''), member.Name, new FixedValue(c.Value), new List<ExplainNode>(), c.Op,
+                        c.Source == null ? (EntityId?)null : new EntityId(c.Source.Value)));
                 }
             }
             return new ListValue(rows);

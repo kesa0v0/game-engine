@@ -289,7 +289,7 @@ namespace Kesa.Engine.Runtime
         {
             var entity = Record(view.Id);
             var component = view.Component;
-            if (component.TryGetMember(name, out var member)) return ToScript(ReadMember(entity, component, view.Row, member));
+            if (component.TryGetMember(name, out var member)) return ToScript(ReadMemberTraced(entity, component, view.Row, member));
             if (name == "entity") return new EntityView(this, view.Id);
             if (name == "key" && view.Row != null)
                 return view.Row.Value.IsEntity ? (Value)new EntityView(this, new EntityId(view.Row.Value.EntityKey))

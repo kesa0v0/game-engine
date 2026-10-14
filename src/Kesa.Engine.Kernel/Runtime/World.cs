@@ -661,7 +661,7 @@ namespace Kesa.Engine.Runtime
             return 0;
         }
 
-        private static string Show(Value value) =>
+        internal static string Show(Value value) =>
             value is IntValue i ? i.Value.ToString(CultureInfo.InvariantCulture)
             : value is FixedValue f ? f.Value.ToString()
             : value.KindName;
