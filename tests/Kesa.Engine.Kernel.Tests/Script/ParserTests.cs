@@ -121,6 +121,8 @@ namespace Kesa.Engine.Tests.Script
         [TestCase("x: int = 1\n")]
         [TestCase("f(*args)\n")]
         [TestCase("x = y[1:2]\n")]
+        [TestCase("with a as b:\n    pass\n")]
+        [TestCase("with a, b:\n    pass\n")]
         [TestCase("@command\nclass C:\n    pass\n")]
         [TestCase("def f():\n    @command\n    def g():\n        pass\n")]
         [TestCase("match x:\n    case 1:\n        pass\n")]

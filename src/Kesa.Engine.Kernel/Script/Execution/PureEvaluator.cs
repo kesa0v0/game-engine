@@ -58,6 +58,25 @@ namespace Kesa.Engine.Script
             }
         }
 
+        /// <summary>
+        /// 커맨드의 <c>with preconditions:</c>만 평가해 <c>require</c>마다 결과를 돌려준다 (spec-gaps G110·G111).
+        /// 인자는 매개변수 이름으로 받는다. 블록이 없으면 빈 목록이다.
+        /// </summary>
+        public List<RequireOutcome> RunPreconditions(FunctionValue command, IReadOnlyDictionary<string, Value> args,
+            SourceSpan callSite = default, StepMeter? meter = null)
+        {
+            var session = new Session(this, meter ?? new StepMeter(_budget));
+            try
+            {
+                return session.Preconditions(command, args, callSite);
+            }
+            catch (ScriptRuntimeException e) when (e.Span.Line <= 0)
+            {
+                e.Span = callSite;
+                throw;
+            }
+        }
+
         private enum Flow
         {
             Normal,
@@ -81,13 +100,11 @@ namespace Kesa.Engine.Script
 
         private sealed class Frame
         {
-            public Frame(FunctionValue function, SortedDictionary<string, Value> locals,
-                SortedSet<string> localNames, SourceSpan callSite)
+            public Frame(FunctionValue function, SortedDictionary<string, Value> locals, SortedSet<string> localNames)
             {
                 Function = function;
                 Locals = locals;
                 LocalNames = localNames;
-                CallSite = callSite;
             }
 
             public FunctionValue Function { get; }
@@ -98,7 +115,7 @@ namespace Kesa.Engine.Script
             /// </summary>
             public SortedSet<string> LocalNames { get; }
 
-            public SourceSpan CallSite { get; }
+            public SourceSpan CallSite { get; set; }
         }
 
         private sealed class Session
@@ -175,6 +192,117 @@ namespace Kesa.Engine.Script
             private Value CallFunction(FunctionValue fn, IReadOnlyDictionary<string, Value>? captured,
                 SortedSet<string>? capturedLocals, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site)
             {
+                var newFrame = Enter(fn, captured, capturedLocals, positional, keywords);
+                newFrame.CallSite = site;
+                _stack.Add(newFrame);
+                try
+                {
+                    if (fn.Lambda != null) return Eval(fn.Lambda.Body, newFrame);
+                    var flow = ExecBlock(fn.Definition!.Body, newFrame);
+                    return flow == Flow.Return ? _returned : NoneValue.Instance;
+                }
+                finally
+                {
+                    _stack.RemoveAt(_stack.Count - 1);
+                }
+            }
+
+            /// <summary>
+            /// 커맨드의 <c>with preconditions:</c> 블록만 실행한다 (spec-gaps G110·G111). 인자는 매개변수 이름으로 받는다.
+            /// <c>require</c>는 모두 위에서부터 평가하고, 앞에서 실패한 <c>require</c>가 있은 뒤의 실행 오류는 그 문장을
+            /// "평가 안 됨"으로 만든다 (대입이면 그 변수가 비어, 그 변수를 읽는 뒤 문장도 평가 안 됨이 된다).
+            /// 앞에 실패가 없을 때의 오류와 단계 예산·순환 오류는 그대로 던진다.
+            /// </summary>
+            public List<RequireOutcome> Preconditions(FunctionValue command, IReadOnlyDictionary<string, Value> args,
+                SourceSpan site)
+            {
+                var frame = Enter(command, null, null, Array.Empty<Value>(), args);
+                frame.CallSite = site;
+                _stack.Add(frame);
+                var results = new List<RequireOutcome>();
+                try
+                {
+                    var body = command.Definition!.Body;
+                    if (body.Count == 0 || !(body[0] is WithStmt with)) return results;
+                    bool failed = false;
+                    foreach (var stmt in with.Body)
+                    {
+                        try
+                        {
+                            if (stmt is AssignStmt)
+                            {
+                                Exec(stmt, frame);
+                                continue;
+                            }
+                            var outcome = Require((CallExpr)((ExprStmt)stmt).Expr, frame);
+                            if (outcome.Status == RequireStatus.Failed) failed = true;
+                            results.Add(outcome);
+                        }
+                        catch (ScriptRuntimeException e) when (failed && e.Code != Codes.RunBudget && e.Code != Codes.RunCycle)
+                        {
+                            if (stmt is AssignStmt assign)
+                            {
+                                frame.Locals.Remove(((NameExpr)assign.Target).Name);
+                                continue;
+                            }
+                            var call = (CallExpr)((ExprStmt)stmt).Expr;
+                            results.Add(new RequireOutcome(RequireStatus.NotEvaluated, LiteralKey(call), null, call.Span));
+                        }
+                    }
+                    return results;
+                }
+                finally
+                {
+                    _stack.RemoveAt(_stack.Count - 1);
+                }
+            }
+
+            /// <summary>파이썬 호출처럼 인자를 모두 왼쪽부터 평가한 뒤 조건의 참/거짓(G104)을 본다.</summary>
+            private RequireOutcome Require(CallExpr call, Frame frame)
+            {
+                try
+                {
+                    Tick();
+                    Value? condition = null;
+                    Value? key = null;
+                    var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+                    foreach (var arg in call.Arguments)
+                    {
+                        var value = Eval(arg.Value, frame);
+                        if (arg.Name != null) args[arg.Name] = value;
+                        else if (condition == null) condition = value;
+                        else key = value;
+                    }
+                    if (!(key is StrValue text))
+                    {
+                        throw Fail(Codes.RunType, "the message key of require() must be a str, not " + key!.KindName,
+                            "write require(condition, \"msg.key\", ...)");
+                    }
+                    var status = PureOps.Truthy(condition!) ? RequireStatus.Passed : RequireStatus.Failed;
+                    return new RequireOutcome(status, text.Value, args, call.Span);
+                }
+                catch (ScriptRuntimeException e)
+                {
+                    Attach(e, call.Span);
+                    throw;
+                }
+            }
+
+            private static string? LiteralKey(CallExpr call)
+            {
+                int positional = 0;
+                foreach (var arg in call.Arguments)
+                {
+                    if (arg.Name != null) continue;
+                    if (positional++ == 1) return arg.Value is StringLiteral s ? s.Value : null;
+                }
+                return null;
+            }
+
+            /// <summary>재귀를 검사하고 인자를 매개변수에 묶은 새 프레임을 만든다 (스택에는 아직 넣지 않는다).</summary>
+            private Frame Enter(FunctionValue fn, IReadOnlyDictionary<string, Value>? captured,
+                SortedSet<string>? capturedLocals, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+            {
                 foreach (var frame in _stack)
                 {
                     if (!SameFunction(frame.Function, fn)) continue;
@@ -234,18 +362,7 @@ namespace Kesa.Engine.Script
                     if (capturedLocals != null) localNames.UnionWith(capturedLocals);
                 }
 
-                var newFrame = new Frame(fn, locals, localNames, site);
-                _stack.Add(newFrame);
-                try
-                {
-                    if (fn.Lambda != null) return Eval(fn.Lambda.Body, newFrame);
-                    var flow = ExecBlock(fn.Definition!.Body, newFrame);
-                    return flow == Flow.Return ? _returned : NoneValue.Instance;
-                }
-                finally
-                {
-                    _stack.RemoveAt(_stack.Count - 1);
-                }
+                return new Frame(fn, locals, localNames);
             }
 
             // ---- 문장 ----

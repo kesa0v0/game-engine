@@ -189,6 +189,10 @@ namespace Kesa.Engine.Script
 
                 case UnsupportedStmt _:
                     return; // 파서가 이미 보고함
+
+                case WithStmt with:
+                    throw _context.Fail(Codes.CmdPreconditions,
+                        "'with' can only be the first statement of a @command function", with.Span);
             }
             throw _context.Fail(Codes.EvlUnsupported, "statement not supported at load time", stmt.Span);
         }
@@ -205,6 +209,15 @@ namespace Kesa.Engine.Script
             if (def.Decorators.Count > 1)
             {
                 _context.Error(Codes.CmdBadDecorator, "a function can have only one decorator", def.Decorators[1].Span);
+                return;
+            }
+
+            var decoratorName = decorator is CallExpr c ? c.Callee : decorator;
+            if (decoratorName is NameExpr shadowed && shadowed.Name == CommandName && !IsBuiltin(CommandName))
+            {
+                _context.Error(Codes.CmdBadDecorator,
+                    "this mod defines its own 'command', so the built-in @command cannot be used here", decorator.Span,
+                    hint: "rename this mod's 'command' (spec-gaps G112)");
                 return;
             }
 
@@ -281,9 +294,10 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary><c>mod_loaded("m")</c> 조건이면 m (인자가 문자열 리터럴일 때만).</summary>
-        private static string? GuardModOf(Expr condition)
+        private string? GuardModOf(Expr condition)
         {
             if (condition is CallExpr call && call.Callee is NameExpr name && name.Name == ModLoadedName &&
+                IsBuiltin(ModLoadedName) &&
                 call.Arguments.Count == 1 && call.Arguments[0].Name == null &&
                 call.Arguments[0].Value is StringLiteral literal)
                 return literal.Value;
@@ -302,7 +316,7 @@ namespace Kesa.Engine.Script
             skipped.Count += n;
         }
 
-        private static int CountPatchCalls(IReadOnlyList<Stmt> body)
+        private int CountPatchCalls(IReadOnlyList<Stmt> body)
         {
             int n = 0;
             foreach (var stmt in body)
@@ -330,8 +344,9 @@ namespace Kesa.Engine.Script
             throw _context.Fail(Codes.EvlBadCondition, "a condition must be a bool, not " + value.KindName, condition.Span);
         }
 
-        private static bool IsGuardCondition(Expr condition) =>
-            condition is CallExpr call && call.Callee is NameExpr name && name.Name == ModLoadedName;
+        private bool IsGuardCondition(Expr condition) =>
+            condition is CallExpr call && call.Callee is NameExpr name && name.Name == ModLoadedName &&
+            IsBuiltin(ModLoadedName);
 
         private bool CheckGuardBodies(IfStmt ifs)
         {
@@ -368,16 +383,25 @@ namespace Kesa.Engine.Script
             return ok;
         }
 
-        private static bool IsPatchCall(Expr expr) =>
+        private bool IsPatchCall(Expr expr) =>
             expr is CallExpr call && call.Callee is AttributeExpr attr && attr.Target is NameExpr target &&
-            target.Name == PatchName;
+            target.Name == PatchName && IsBuiltin(PatchName);
 
+        /// <summary>
+        /// 이 이름이 아직 내장의 뜻인가. 엔진이 주는 이름은 덮어쓸 수 있는 내장이라 (spec-gaps G112), 모드가 그 이름을
+        /// 묶은 뒤로는 그 모드 안에서 모드의 값이다 (파이썬의 builtins와 같다).
+        /// </summary>
+        private bool IsBuiltin(string name) => !_scope.TryGet(name, out _, out _);
+
+        /// <summary>식 안의 <c>inherit</c>가 내장의 뜻인가 (모드가 <c>inherit</c>를 묶었으면 평범한 이름이다, G112).</summary>
+        private bool UsesInherit(Expr expr) => IsBuiltin(InheritName) && ContainsInherit(expr);
+
+        /// <summary>
+        /// 최상위 이름을 묶는다. 엔진이 주는 이름(<c>field</c>, <c>patch</c>, <c>list</c>, Def 타입 이름 등)도 묶을 수 있고
+        /// 그 뒤로 이 모드 안에서는 모드의 값이다 (spec-gaps G112). 같은 모드 안에서 두 번 묶는 것만 오류다 (G20).
+        /// </summary>
         private void Bind(string name, Value value, SourceSpan span)
         {
-            if (name == InheritName || _builtins.Lookup(name) != null || _builtins.Explain(name) != null)
-            {
-                throw _context.Fail(Codes.EvlNameTaken, "'" + name + "' is a built-in name and cannot be redefined", span);
-            }
             if (_scope.TryGet(name, out _, out var first))
             {
                 throw _context.Fail(Codes.EvlNameTaken, "'" + name + "' is already defined in this mod", span,
@@ -408,7 +432,7 @@ namespace Kesa.Engine.Script
                     return lambdaValue;
                 case UnsupportedExpr _: throw new ScriptError(); // 파서가 이미 보고함
                 case AttributeExpr attr:
-                    if (ContainsInherit(attr))
+                    if (UsesInherit(attr))
                         throw _context.Fail(Codes.EvlUnsupported, "'inherit' can only be used in a Def field value", attr.Span);
                     var owner = Evaluate(attr.Target);
                     if (owner is IAttributeSource source) return source.GetAttribute(_context, attr.Span, attr.Name);
@@ -492,7 +516,7 @@ namespace Kesa.Engine.Script
             var args = new List<ArgValue>(call.Arguments.Count);
             foreach (var arg in call.Arguments)
             {
-                Value value = callable.AcceptsDeferred && ContainsInherit(arg.Value)
+                Value value = callable.AcceptsDeferred && UsesInherit(arg.Value)
                     ? new DeferredValue(arg.Value)
                     : Evaluate(arg.Value);
                 args.Add(new ArgValue(arg.Name, value, arg.Name == null ? arg.Value.Span : arg.Span));

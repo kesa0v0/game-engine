@@ -40,15 +40,16 @@ namespace Kesa.Engine.Runtime
         public const int DefaultStepBudget = 100000;
 
         public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget)
-            : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget) { }
+            : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands) { }
 
         public World(DefSet defs, SchemaSet schema, IReadOnlyDictionary<string, ModScope>? scopes = null,
-            int stepBudget = DefaultStepBudget)
+            int stepBudget = DefaultStepBudget, IReadOnlyDictionary<string, CommandDecl>? commands = null)
         {
             _defs = defs;
             _schema = schema;
             _scopes = scopes ?? new SortedDictionary<string, ModScope>(StringComparer.Ordinal);
             _stepBudget = stepBudget;
+            _commands = commands ?? new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
         }
 
         // ---- 이름 풀기 ----

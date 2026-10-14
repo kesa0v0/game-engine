@@ -40,6 +40,9 @@ namespace Kesa.Engine.Script
                         foreach (var branch in ifs.Branches) Collect(branch.Body, locals);
                         if (ifs.OrElse != null) Collect(ifs.OrElse, locals);
                         break;
+                    case WithStmt with: // 파이썬 with는 범위를 만들지 않는다: 블록의 변수는 함수의 지역 변수다 (G111)
+                        Collect(with.Body, locals);
+                        break;
                 }
             }
         }

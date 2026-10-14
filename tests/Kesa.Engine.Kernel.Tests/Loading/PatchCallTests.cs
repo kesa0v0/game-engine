@@ -129,11 +129,13 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         [Test]
-        public void PatchIsABuiltInName()
+        public void PatchCanBeShadowed()
         {
-            Mod("core", defs: "patch = 1\n");
-            Load(out var diags);
-            Assert.That(diags.Single().Code, Is.EqualTo(Codes.EvlNameTaken));
+            // 엔진이 주는 이름은 덮어쓸 수 있는 내장이다 (G112). 덮어쓴 뒤의 patch.set은 모드의 값에 대한 속성 접근이다
+            Mod("core", defs: "patch = 1\npatch.set(\"X\", \"n\", 1)\n");
+            var result = Load(out var diags);
+            Assert.That(diags.Single().Code, Is.EqualTo(Codes.EvlUnsupported), string.Join("\n", diags));
+            Assert.That(result.Patches, Is.Empty);
         }
     }
 }

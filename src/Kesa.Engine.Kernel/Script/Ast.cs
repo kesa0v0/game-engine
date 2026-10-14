@@ -273,6 +273,22 @@ namespace Kesa.Engine.Script
         public IReadOnlyList<Stmt> Body { get; }
     }
 
+    /// <summary>
+    /// <c>with 식:</c> 블록. 쓰이는 곳은 커맨드 본문 첫 문장의 <c>with preconditions:</c> 하나다 (spec S2, spec-gaps G111).
+    /// <c>as</c>와 여러 항목은 미지원이다.
+    /// </summary>
+    public sealed class WithStmt : Stmt
+    {
+        public WithStmt(Expr context, IReadOnlyList<Stmt> body, SourceSpan span) : base(span)
+        {
+            Context = context;
+            Body = body;
+        }
+
+        public Expr Context { get; }
+        public IReadOnlyList<Stmt> Body { get; }
+    }
+
     /// <summary><c>return</c> 또는 <c>return 식</c> (함수 본문에서만).</summary>
     public sealed class ReturnStmt : Stmt
     {

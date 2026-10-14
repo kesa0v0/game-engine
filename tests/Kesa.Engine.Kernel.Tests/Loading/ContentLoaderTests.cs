@@ -502,7 +502,7 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("deftype(\"T\", n=const(DefId[Unit]))\n", Codes.EvlUnknownName)]
         [TestCase("component(\"C\", m=derived(int, later))\ndef later(c: C) -> int:\n    return 1\n", Codes.EvlUnknownName)]
         [TestCase("x = 1\nx = 2\n", Codes.EvlNameTaken)]
-        [TestCase("component = 1\n", Codes.EvlNameTaken)]
+        [TestCase("component = 1\ncomponent(\"C\")\n", Codes.EvlType)] // 덮어쓴 뒤로는 모드의 값이다 (G112)
         [TestCase("deftype(\"T\", n=const(int, default=1 + 2))\n", Codes.EvlUnsupported)]
         public void BadSchemaDeclarations(string schema, string code)
         {

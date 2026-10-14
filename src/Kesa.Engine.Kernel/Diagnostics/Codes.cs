@@ -122,5 +122,6 @@ namespace Kesa.Engine.Diagnostics
 
         // 커맨드 선언 (spec S6, spec-gaps G109)
         public const string CmdBadDecorator = "CMD001";
+        public const string CmdPreconditions = "CMD002";
     }
 }

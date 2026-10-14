@@ -156,6 +156,12 @@ namespace Kesa.Engine.Script
                 return;
             }
 
+            if (Cur.IsName("with"))
+            {
+                body.Add(ParseWith());
+                return;
+            }
+
             if (Cur.IsName("elif") || Cur.IsName("else"))
             {
                 _diagnostics.Error(Codes.ParSyntax, "'" + Cur.Text + "' without a matching 'if'", Cur.Span);
@@ -333,6 +339,36 @@ namespace Kesa.Engine.Script
                 SkipToNewline();
                 if (Cur.Kind == TokenKind.Indent) SkipBlock();
                 return new UnsupportedStmt("for", keyword.Span);
+            }
+        }
+
+        /// <summary>
+        /// <c>with 식:</c> 블록 (spec-gaps G111). <c>as</c>와 여러 항목(<c>with a, b:</c>)은 미지원으로 보고한다.
+        /// 어디에 올 수 있는지는 로드 시점 검사가 본다.
+        /// </summary>
+        private Stmt ParseWith()
+        {
+            var keyword = Advance();
+            try
+            {
+                var context = ParseExpression();
+                if (Cur.IsName("as") || Cur.IsOp(","))
+                {
+                    _diagnostics.Error(Codes.ParUnsupported,
+                        Cur.IsOp(",") ? "several items in a 'with' statement are not supported" : "'with ... as' is not supported",
+                        Cur.Span);
+                    SkipToNewline();
+                    if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                    return new UnsupportedStmt("with", keyword.Span);
+                }
+                Expect(":");
+                return new WithStmt(context, ParseSuite(), keyword.Span);
+            }
+            catch (ParseError)
+            {
+                SkipToNewline();
+                if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                return new UnsupportedStmt("with", keyword.Span);
             }
         }
 

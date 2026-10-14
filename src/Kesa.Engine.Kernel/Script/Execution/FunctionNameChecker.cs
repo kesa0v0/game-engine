@@ -87,12 +87,63 @@ namespace Kesa.Engine.Script
                             Expr(loop.Iterable, locals);
                             Block(loop.Body, locals);
                             break;
+                        case WithStmt with:
+                            // 자리와 모양은 FunctionChecker가 본다 (G111). preconditions는 이름이 아니라 표지다
+                            if (!(with.Context is NameExpr context && context.Name == FunctionChecker.PreconditionsName))
+                                Expr(with.Context, locals);
+                            PreconditionBlock(with.Body, locals);
+                            break;
                         case ReturnStmt ret:
                             if (ret.Value != null) Expr(ret.Value, locals);
                             break;
                     }
                 }
             }
+
+            /// <summary>
+            /// <c>with preconditions:</c>의 문장. <c>require(...)</c> 문장은 내장 <c>require</c>여야 한다: 모드나 함수가 그 이름을
+            /// 덮어썼으면 이 자리에서 쓸 수 없다 (G112). 인자는 평범한 식으로 본다.
+            /// </summary>
+            private void PreconditionBlock(IReadOnlyList<Stmt> body, SortedSet<string> locals)
+            {
+                foreach (var stmt in body)
+                {
+                    if (!(stmt is ExprStmt es) || !FunctionChecker.IsPreconditionCall(es.Expr, out var name))
+                    {
+                        // 블록에 올 수 없는 문장은 FunctionChecker가 알렸다: 그 안의 require를 한 번 더 알리지 않는다.
+                        // 허용되는 대입(x = require(...))의 require는 알린다
+                        bool allowed = stmt is AssignStmt assign && assign.Op == "=" && assign.Target is NameExpr;
+                        if (allowed)
+                        {
+                            Block(new[] { stmt }, locals);
+                            continue;
+                        }
+                        _quietPreconditionNames++;
+                        try
+                        {
+                            Block(new[] { stmt }, locals);
+                        }
+                        finally
+                        {
+                            _quietPreconditionNames--;
+                        }
+                        continue;
+                    }
+                    var call = (CallExpr)es.Expr;
+                    if (IsShadowed(name, locals))
+                    {
+                        _context.Error(Codes.CmdPreconditions,
+                            "'" + name + "' here is " + (locals.Contains(name) ? "a local variable" : "this mod's own name") +
+                            ", so the built-in " + name + "() cannot be used", call.Callee.Span,
+                            hint: "rename it (spec-gaps G112)");
+                    }
+                    foreach (var arg in call.Arguments) Expr(arg.Value, locals);
+                }
+            }
+
+            private int _quietPreconditionNames;
+
+            private bool IsShadowed(string name, SortedSet<string> locals) => locals.Contains(name) || _globals.Contains(name);
 
             public void Expr(Expr expr, SortedSet<string> locals)
             {
@@ -146,6 +197,14 @@ namespace Kesa.Engine.Script
             {
                 string n = name.Name;
                 if (locals.Contains(n) || _globals.Contains(n) || PureBuiltins.IsRuntimeName(n)) return;
+                // 덮어쓰지 않은 require 등이 블록의 문장이 아닌 자리에 나왔다 (G111·G112)
+                if (Array.IndexOf(FunctionChecker.PreconditionCalls, n) >= 0)
+                {
+                    if (_quietPreconditionNames > 0) return;
+                    _context.Error(Codes.CmdPreconditions,
+                        n + "() can only be used as a statement inside 'with preconditions:'", name.Span);
+                    return;
+                }
 
                 if (_isLoadTimeName(n))
                 {

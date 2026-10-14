@@ -192,11 +192,15 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         [Test]
-        public void ModLoadedIsABuiltInName()
+        public void ModLoadedCanBeShadowedAndThenIsNotAGuard()
         {
+            // 엔진이 주는 이름은 덮어쓸 수 있는 내장이다 (G112). 덮어쓴 뒤의 if는 가드가 아니라 평범한 조건이다
             Mod("core", defs: "mod_loaded = 1\n");
+            LoadClean();
+            Mod("other", defs: "def mod_loaded(x):\n    return True\nif mod_loaded(\"core\"):\n    patch.set(\"X\", \"n\", 1)\n");
             Load(out var diags);
-            Assert.That(diags.Single().Code, Is.EqualTo(Codes.EvlNameTaken));
+            Assert.That(diags.Select(d => d.Code), Does.Not.Contain(Codes.EvlGuardBody));
+            Assert.That(diags.Select(d => d.Code), Does.Not.Contain(Codes.EvlModNotDeclared));
         }
     }
 }
