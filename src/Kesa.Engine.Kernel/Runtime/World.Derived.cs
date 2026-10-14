@@ -28,7 +28,12 @@ namespace Kesa.Engine.Runtime
         private PureEvaluator Evaluator =>
             _evaluator ??= new PureEvaluator(new ScopeGlobals(_scopes), RuntimeBuiltins(), _stepBudget);
 
-        private static IReadOnlyDictionary<string, Value> RuntimeBuiltins() => PureBuiltins.Create();
+        private IReadOnlyDictionary<string, Value> RuntimeBuiltins()
+        {
+            var table = PureBuiltins.Create();
+            table.Add("contribs", new PureBuiltin("contribs", ContribsBuiltin));
+            return table;
+        }
 
         // ---- 계산 ----
 

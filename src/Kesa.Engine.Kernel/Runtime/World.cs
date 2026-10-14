@@ -145,6 +145,7 @@ namespace Kesa.Engine.Runtime
         {
             var entity = Record(id);
             foreach (var component in ComponentsOf(entity)) UnindexRefs(entity, component);
+            DropContributionsOf(id.Value);
             _entities.Remove(id.Value);
             _byType[entity.Def.Type].Remove(id.Value);
 
@@ -233,6 +234,7 @@ namespace Kesa.Engine.Runtime
             foreach (var member in component.Members) entity.Values.Remove(member);
             entity.Rows.Remove(componentName);
             entity.Runtime.Remove(componentName);
+            DropContributionsTo(id.Value, component);
         }
 
         public bool Has(EntityId id, string componentName) => Has(Record(id), ComponentNamed(componentName));
@@ -417,6 +419,7 @@ namespace Kesa.Engine.Runtime
                 throw new WorldException(Codes.RunNoRow,
                     "the '" + componentName + "' row " + key + " of " + id + " comes from its Def and cannot be removed");
             entity.Rows[componentName].Remove(key);
+            DropContributionsTo(id.Value, component, key);
         }
 
         /// <summary>
