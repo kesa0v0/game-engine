@@ -1,10 +1,10 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World
 
-마지막 갱신: 2026-10-15. 브랜치 `spec-v0.5-scaffold`, 테스트 908개 통과(커널 880, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-15. 브랜치 `spec-v0.5-scaffold`, 테스트 913개 통과(커널 885, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
-spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G106에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기(G95~G104)를 `World`에 연결했다: `derived` 읽기와 형제 접근(G103), 재진입 감지·깊이 상한(G100), 기여 행 API와 `contribs`(G98), 읽은 값 근거 `Explain`(G105), 함수 기본값과 `derived` 원천 `default_from`(G106). 남은 것은 함수 본문의 이름 오타를 `check`에서 잡는 정적 검사(런타임 내장 이름 목록을 커널이 정의했으니 이제 할 수 있다)다.
+spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G107에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기(G95~G104)를 `World`에 연결했다: `derived` 읽기와 형제 접근(G103), 재진입 감지·깊이 상한(G100), 기여 행 API와 `contribs`(G98), 읽은 값 근거 `Explain`(G105), 함수 기본값과 `derived` 원천 `default_from`(G106). 남은 것은 함수 본문의 이름 오타를 `check`에서 잡는 정적 검사(런타임 내장 이름 목록을 커널이 정의했으니 이제 할 수 있다)다.
 
 ## 구현된 것 (`src/Kesa.Engine.Kernel/`)
 
@@ -59,7 +59,7 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 
 ## 남은 일 (사용자와 우선순위를 정할 것)
 
-1. **함수 본문 이름 오타의 정적 검사:** `check`가 `def`·람다 본문에서 정의되지 않은 이름을 "혹시 …?"와 함께 잡는다. 이름은 매개변수, 지역 변수, 같은 모드의 전역, 내장(`PureBuiltins`+`contribs`)이다. 모드의 전역은 파일 뒤쪽에 정의될 수 있으므로 모드 평가가 끝난 뒤에 본다. 또 스크립트가 Def 타입의 `const`(`g.def.succeeded` 같은 것)와 전역 질의(`all(Type)`)를 읽는 길이 G103에 없다.
+1. **함수 본문 이름 오타의 정적 검사:** `check`가 `def`·람다 본문에서 정의되지 않은 이름을 "혹시 …?"와 함께 잡는다. 이름은 매개변수, 지역 변수, 같은 모드의 전역, 내장(`PureBuiltins`+`contribs`)이다. 모드의 전역은 파일 뒤쪽에 정의될 수 있으므로 모드 평가가 끝난 뒤에 본다. 허용 이름에 Def 타입 `const`를 읽는 속성(G107, `g.ConflictGoal.succeeded`)은 속성이라 영향이 없다. 전역 질의(`all(Type)`)는 아직 없다(11번).
 2. **로직용 `.pyi`**: 엔티티 접근 클래스, `derived`, `ref` 칼럼, 함수 서명. 스키마 스텁의 `derived` 함수 매개변수 타입도 이때 좁힌다.
 3. **스텁의 이름 충돌**: 멤버 이름이 `id`/`self` 같은 예약 이름이면 중복 인자가 생기고, Def 타입·컴포넌트 이름이 `Mod`·`use`·`use_all`·`patch`·`mod_loaded`·`inherit`이면 스텁 안에서 겹친다(G82 알려진 한계). 스키마 단계에서 막는 것이 유력하다.
 4. S9의 나머지 "왜?" 도구 4가지(파생값 추적, 전제 조건 보고서, 반응 추적, 단계 순서 덤프). 각자 `engine` 명령이 될 자리다(G80).

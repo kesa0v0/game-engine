@@ -366,7 +366,7 @@ WG 분쟁 목표(`successConditions`, `onSuccessEffects`, `onRegisterEffects`), 
   )
   ```
 
-- ✅ **언제 부르는지는 그 Def 타입을 선언한 시스템 모드가 정한다**(예: 분쟁 모드가 `when` 하나로 각 목표의 `g.def.succeeded(g)`를 본다). 커널이 아는 것은 "Def 값으로 함수가 올 수 있다"뿐.
+- ✅ **언제 부르는지는 그 Def 타입을 선언한 시스템 모드가 정한다**(예: 분쟁 모드가 `when` 하나로 각 목표의 `g.ConflictGoal.succeeded(g)`를 본다. Def 타입 이름으로 읽는다, spec-gaps G107). 커널이 아는 것은 "Def 값으로 함수가 올 수 있다"뿐.
 - ✅ **확인용과 바꾸는 함수를 자리의 타입으로 나눈다.** 함수 자체는 spec S2대로 한 종류이고 효과는 엔진이 자동 판정한다. 스키마는 그 자리에 어떤 효과의 함수가 와야 하는지를 선언한다. 확인용(`Cond`·`Fn`)은 `derived`와 같은 순수 규칙(쓰기·RNG·`emit` 금지), `when`·`derived` 안에서 불려도 안전. 바꾸는 함수(`Action`)는 Flow 본문으로 실행되어 쓰기·`ask`·`rand()` 가능. 확인용 자리에 바꾸는 함수가 오면 로드 오류. 타입 이름은 `.pyi` 모양과 함께 확정.
 - ✅ **확장 지점은 `list[Action]` + `merge="append"`.** 다른 모드가 남의 Def에 효과를 덧붙인다(Paradox `on_action`). 순서는 로드 순서.
 - 저장: Def는 세이브에 들어가지 않으므로 Def 안의 함수는 문제없다. 세이브되는 Flow 프레임이 함수를 가리킬 때만 이름으로(S7).

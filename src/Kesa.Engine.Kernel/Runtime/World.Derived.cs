@@ -318,8 +318,9 @@ namespace Kesa.Engine.Runtime
         {
             var entity = Record(id);
             if (_schema.TryGetComponent(name, out var component)) return SiblingOrNone(entity, component);
+            if (_schema.TryGetType(name, out var defType)) return DefOrNone(entity, defType);
 
-            var candidates = new List<string>();
+            var candidates = new List<string> { entity.Def.Type.Name };
             foreach (var c in ComponentsOf(entity)) candidates.Add(c.Name);
             foreach (var inverse in entity.Def.Type.Inverses)
             {
@@ -335,6 +336,48 @@ namespace Kesa.Engine.Runtime
             }
             throw new ScriptRuntimeException(Codes.RunScript,
                 id + " (" + entity.Def.Id + ") has no component or collection '" + name + "'", Suggest.Hint(name, candidates));
+        }
+
+        /// <summary>엔티티의 Def 타입 이름으로 그 타입 바로 아래의 <c>const</c>들을 본다 (<c>g.ConflictGoal.succeeded</c>, G107). 다른 타입이면 None.</summary>
+        private Value DefOrNone(EntityRecord entity, DefType type) =>
+            entity.Def.Type == type ? new DefView(this, entity.Id, type) : (Value)NoneValue.Instance;
+
+        private Value DefConst(long id, DefType type, string name)
+        {
+            var entity = Record(new EntityId(id));
+            MemberDecl? found = null;
+            foreach (var decl in type.Consts)
+                if (decl.Name == name) found = decl;
+            if (found == null)
+            {
+                var names = new List<string>();
+                foreach (var decl in type.Consts) names.Add(decl.Name);
+                throw new ScriptRuntimeException(Codes.RunScript, "Def type '" + type.Name + "' has no const '" + name + "'",
+                    Suggest.Hint(name, names));
+            }
+            entity.Def.Consts.TryGet(name, out var raw);
+            var value = Normalize(found.Spec.Type, raw.Value);
+            _trace?.Add(new ExplainNode(ExplainKind.Read, new EntityId(id), type.Name, null, name, value, new List<ExplainNode>()));
+            return value;
+        }
+
+        /// <summary>엔티티의 Def 타입 바로 아래 <c>const</c>들 (Def마다 하나의 값, 엔티티가 공유한다).</summary>
+        private sealed class DefView : Value, IRuntimeAttributes
+        {
+            private readonly World _world;
+            private readonly long _id;
+            private readonly DefType _type;
+
+            public DefView(World world, long id, DefType type)
+            {
+                _world = world;
+                _id = id;
+                _type = type;
+            }
+
+            public override string KindName => _type.Name;
+
+            public Value GetAttribute(string name) => _world.DefConst(_id, _type, name);
         }
 
         private Value SiblingOrNone(EntityRecord entity, ComponentType component)
@@ -356,8 +399,9 @@ namespace Kesa.Engine.Runtime
                 return view.Row.Value.IsEntity ? (Value)new EntityView(this, new EntityId(view.Row.Value.EntityKey))
                                                : new StrValue(view.Row.Value.DefKey!);
             if (_schema.TryGetComponent(name, out var sibling)) return SiblingOrNone(entity, sibling);
+            if (_schema.TryGetType(name, out var defType)) return DefOrNone(entity, defType);
 
-            var candidates = new List<string> { "entity" };
+            var candidates = new List<string> { "entity", entity.Def.Type.Name };
             if (view.Row != null) candidates.Add("key");
             foreach (var m in component.Members) candidates.Add(m.Name);
             foreach (var c in ComponentsOf(entity)) candidates.Add(c.Name);
