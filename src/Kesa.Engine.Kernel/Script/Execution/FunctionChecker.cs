@@ -30,7 +30,7 @@ namespace Kesa.Engine.Script
         public static void Check(FunctionDef def, CallContext context)
         {
             var walker = new Walker(context, def.Name);
-            bool isCommand = def.Decorators.Count > 0;
+            bool isCommand = def.IsCommand;
             for (int i = 0; i < def.Body.Count; i++)
             {
                 if (i == 0 && isCommand && def.Body[0] is WithStmt with) walker.Preconditions(with);

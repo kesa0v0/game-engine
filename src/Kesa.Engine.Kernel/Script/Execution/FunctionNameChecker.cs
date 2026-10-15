@@ -21,6 +21,9 @@ namespace Kesa.Engine.Script
 
         /// <summary><c>@command</c>로 선언한 커맨드, 정의된 순서대로 (spec-gaps G109).</summary>
         public List<CommandDecl> Commands { get; } = new List<CommandDecl>();
+
+        /// <summary><c>@submit_policy</c>로 선언한 정책 함수 (G122). 모드 안에서 둘 이상이면 로드 오류다.</summary>
+        public List<SubmitPolicyDecl> Policies { get; } = new List<SubmitPolicyDecl>();
     }
 
     /// <summary>

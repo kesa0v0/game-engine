@@ -271,6 +271,23 @@ namespace Kesa.Engine.Script
         /// </summary>
         public IReadOnlyList<Expr> Decorators { get; }
 
+        /// <summary>첫 데코레이터의 이름 (<c>@command</c>·<c>@command(...)</c> → <c>command</c>). 없거나 이름 모양이 아니면 null.</summary>
+        public string? DecoratorName
+        {
+            get
+            {
+                if (Decorators.Count == 0) return null;
+                var head = Decorators[0] is CallExpr call ? call.Callee : Decorators[0];
+                return head is NameExpr name ? name.Name : null;
+            }
+        }
+
+        /// <summary>
+        /// 커맨드로 볼 함수인가: 데코레이터가 있고 <c>@submit_policy</c>가 아니다. 잘못된 데코레이터도 커맨드로 봐서
+        /// 원인 오류 하나가 다른 오류로 번지지 않게 한다 (데코레이터 자체는 인터프리터가 검사).
+        /// </summary>
+        public bool IsCommand => Decorators.Count > 0 && DecoratorName != Interpreter.SubmitPolicyName;
+
         public string Name { get; }
         public IReadOnlyList<Parameter> Parameters { get; }
         public Expr? Returns { get; }

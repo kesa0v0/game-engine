@@ -76,7 +76,7 @@
 - **텍스트 키 타입.** 화면에 나가는 곳(`log`, `label`, 툴팁)은 `str`이 아니라 **텍스트 키 타입**만 받는다: `log("msg.lost_units", name=..., n=...)`. 키는 로컬라이제이션 파일에서 스텁으로 생성되어 오타와 `log("그냥 문자열")`을 표시한다. f-string·문자열 연산은 ID 조합 등에 어디서나 허용.
 - **커맨드 머리부는 명시적 `with preconditions:` 영역.** 영역 안에는 `require`/`cost`/`choose`만 허용(부작용 문장은 로드 오류), 커맨드당 최대 하나. 엔진은 이 영역만 본문 실행 없이 따로 평가해 UI 비활성 사유와 AI 합법 수 나열에 쓴다.
   ```python
-  @command(free=True, acts_for=lambda party, unit, dest: party)
+  @command(free=True, acts_for=lambda party: party)  # 람다는 커맨드 매개변수를 이름으로 골라 받는다 (G130)
   def Move(party: Ref[Party], unit: Ref[Unit], dest: Ref[City]):
       with preconditions:
           choose(unit, where=lambda u: u.owner == party)

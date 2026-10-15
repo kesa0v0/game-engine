@@ -12,7 +12,7 @@ namespace Kesa.Engine.Tests.Loading
         public void CommandIdIsModIdDotFunctionName()
         {
             Mod("core", defs: "@command\ndef Move(n: int):\n    return n\n" +
-                              "@command(free=True)\ndef EndTurn():\n    return 0\n" +
+                              "@command(free=True, acts_for=None)\ndef EndTurn():\n    return 0\n" +
                               "def helper(x):\n    return x\n");
             var result = LoadClean();
             Assert.That(result.Commands.Keys, Is.EqualTo(new[] { "core.EndTurn", "core.Move" }));
@@ -24,19 +24,19 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void TwoModsCanDeclareCommandsWithTheSameFunctionName()
         {
-            Mod("core", defs: "@command(free=True)\ndef Move():\n    return 0\n");
-            Mod("naval", defs: "@command(free=True)\ndef Move():\n    return 1\n", extra: ", dependencies=[\"core\"]");
+            Mod("core", defs: "@command(free=True, acts_for=None)\ndef Move():\n    return 0\n");
+            Mod("naval", defs: "@command(free=True, acts_for=None)\ndef Move():\n    return 1\n", extra: ", dependencies=[\"core\"]");
             var result = LoadClean();
             Assert.That(result.Commands.Keys, Is.EqualTo(new[] { "core.Move", "naval.Move" }));
             Assert.That(result.Commands["naval.Move"].Mod, Is.EqualTo("naval"));
         }
 
-        [TestCase("@other\ndef f():\n    return 0\n", "unknown decorator; only @command is supported")]
+        [TestCase("@other\ndef f():\n    return 0\n", "unknown decorator; only @command and @submit_policy are supported")]
         [TestCase("@command(True)\ndef f():\n    return 0\n", "@command takes no positional arguments")]
         [TestCase("@command(cost=1)\ndef f():\n    return 0\n", "@command has no argument 'cost'")]
         [TestCase("@command(free=1)\ndef f():\n    return 0\n", "free= must be True or False")]
         [TestCase("@command\n@command\ndef f():\n    return 0\n", "a function can have only one decorator")]
-        [TestCase("@command.free\ndef f():\n    return 0\n", "unknown decorator; only @command is supported")]
+        [TestCase("@command.free\ndef f():\n    return 0\n", "unknown decorator; only @command and @submit_policy are supported")]
         public void BadDecoratorsAreLoadErrors(string defs, string message)
         {
             Mod("core", defs: defs);
@@ -63,7 +63,7 @@ namespace Kesa.Engine.Tests.Loading
         {
             Mod("core", schema: "component(\"Moves\", left=field(int, default=1))\n" +
                                 "deftype(\"Unit\", components=[\"Moves\"])\ndeftype(\"City\", components=[\"Moves\"])\n",
-                defs: "@command(free=True)\ndef Move(unit: Ref[Unit], dest: Ref[City]):\n" +
+                defs: "@command(free=True, acts_for=lambda unit: unit)\ndef Move(unit: Ref[Unit], dest: Ref[City]):\n" +
                       "    with preconditions:\n        require(unit.Moves.left > 0, text(\"msg.no_moves\"))\n    return 0\n");
             var result = LoadClean();
             Assert.That(result.Commands.Keys, Is.EqualTo(new[] { "core.Move" }));
@@ -255,7 +255,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void CommandsOfADisabledModAreNotListed()
         {
-            Mod("broken", defs: "@command(free=True)\ndef Move():\n    return 0\nx = nope\n");
+            Mod("broken", defs: "@command(free=True, acts_for=None)\ndef Move():\n    return 0\nx = nope\n");
             var result = Load(out _);
             Assert.That(result.Disabled, Is.EqualTo(new[] { "broken" }));
             Assert.That(result.Commands, Is.Empty);

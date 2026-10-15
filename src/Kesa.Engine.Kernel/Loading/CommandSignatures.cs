@@ -53,6 +53,29 @@ namespace Kesa.Engine.Loading
                     parameters.Add(new CommandParameter(p.Name, type, p.Span, @default));
                 }
                 if (ok) command.Parameters = parameters;
+                CheckActsFor(command, context);
+            }
+        }
+
+        /// <summary>
+        /// <c>acts_for</c> 람다는 커맨드 매개변수를 이름으로 골라 받는다 (G130): 매개변수 이름은 커맨드에 있어야 한다.
+        /// 람다의 기본값은 파서가 이미 막는다.
+        /// </summary>
+        private static void CheckActsFor(CommandDecl command, CallContext context)
+        {
+            if (command.ActsFor == null) return;
+            var names = new List<string>();
+            foreach (var p in command.Function.Definition!.Parameters) names.Add(p.Name);
+            foreach (var p in command.ActsFor.Parameters)
+            {
+                if (!names.Contains(p.Name))
+                {
+                    context.Error(Codes.CmdBadDecorator,
+                        "the acts_for lambda of command '" + command.Id + "' takes '" + p.Name +
+                        "', which is not a parameter of the command", p.Span,
+                        hint: Suggest.Hint(p.Name, names) ??
+                              "name the lambda's parameters after the command's parameters (spec-gaps G130)");
+                }
             }
         }
 

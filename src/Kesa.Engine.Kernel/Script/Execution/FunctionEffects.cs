@@ -72,6 +72,16 @@ namespace Kesa.Engine.Script
                     new[] { call.Callee.WriteWitness!.Value });
             }
 
+            // 입구 검사는 순수하다: 거부가 상태를 건드리지 않는다 (C10, G122)
+            foreach (var policy in functions.Policies)
+            {
+                if (!policy.Function.Writes) continue;
+                context.Error(Codes.CmdWriteEffect,
+                    "the submit policy '" + policy.Function.Name + "' changes the world; it can only read",
+                    policy.Function.Definition!.Span, "the gate must not change anything (spec-gaps G122)",
+                    new[] { policy.Function.WriteWitness!.Value });
+            }
+
             CheckPureSlots(schema, context);
         }
 

@@ -127,5 +127,8 @@ namespace Kesa.Engine.Diagnostics
 
         // 함수 효과: 쓰기 함수를 부를 수 있는 자리 (spec S2 함수 효과 표, spec-gaps G117)
         public const string CmdWriteEffect = "CMD004";
+
+        // 제출 정책 함수: 모양·개수·교체 (spec S6 입구, spec-gaps G122·G124·G130)
+        public const string CmdSubmitPolicy = "CMD005";
     }
 }

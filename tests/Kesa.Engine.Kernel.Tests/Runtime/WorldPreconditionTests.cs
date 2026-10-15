@@ -21,7 +21,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private const string Defs =
             "City(\"Town\")\nUnit(\"Scout\")\n" +
-            "@command(free=True)\n" +
+            "@command(free=True, acts_for=lambda unit: unit)\n" +
             "def Fortify(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
             "        c = unit.Location.city\n" +

@@ -69,6 +69,12 @@ namespace Kesa.Engine.Loading
 
         /// <summary>살아남은 모드가 선언한 커맨드 (id <c>모드id.함수이름</c> → 선언, id 서수 순, spec-gaps G109).</summary>
         public IReadOnlyDictionary<string, CommandDecl> Commands { get; }
+
+        /// <summary>
+        /// 제출 정책 함수 (spec-gaps G122·G124). 활성 모드 전체에서 최대 하나이고 교체됐으면 마지막 것이다. 없으면 null이고
+        /// 그때 입구는 모든 issuer를 허용한다.
+        /// </summary>
+        public SubmitPolicyDecl? SubmitPolicy { get; internal set; }
     }
 
     /// <summary>한 회차의 ②a·②b가 남긴 것: 살아남은 모드(로드 순서), 완성된 스키마, 등록된 Def.</summary>
@@ -146,7 +152,10 @@ namespace Kesa.Engine.Loading
                     foreach (var command in u.Functions.Commands) commands.Add(command.Id, command);
                 }
                 return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
-                    run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound, scopes, commands);
+                    run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound, scopes, commands)
+                {
+                    SubmitPolicy = run.Policy,
+                };
             }
         }
 
@@ -171,6 +180,9 @@ namespace Kesa.Engine.Loading
             public SchemaSet Schema { get; }
             public DefRegistry Defs { get; }
             public ModVisibility Visibility { get; }
+
+            /// <summary>제출 정책 함수 (G124). 없으면 null.</summary>
+            public SubmitPolicyDecl? Policy { get; set; }
 
             /// <summary>③이 검사를 통과시킨 패치 (③을 돌린 뒤에 채워진다).</summary>
             public IReadOnlyList<ResolvedPatch> Resolved { get; set; } = new List<ResolvedPatch>();
@@ -237,13 +249,13 @@ namespace Kesa.Engine.Loading
             }
 
             // ②b 끝: Def 등록 (고정점). 모드가 더 빠졌으면 스키마도 그 모드의 확장 없이 다시 만든다.
-            var defs = BuildDefs(units, visibility, order, runDiagnostics);
+            var defs = BuildDefs(units, visibility, order, runDiagnostics, out var policy);
             if (CountSurvivors(units) != survivorsBefore)
             {
                 schema = BuildSchema(units, visibility, runDiagnostics);
                 Rebind(defs, schema);
             }
-            return new DefinitionRun(schema, defs, visibility);
+            return new DefinitionRun(schema, defs, visibility) { Policy = policy };
         }
 
         /// <summary>
@@ -560,21 +572,90 @@ namespace Kesa.Engine.Loading
             return ids;
         }
 
-        /// <summary>Def를 로드 순서대로 등록한다. 고정점은 <see cref="BuildSchema"/>와 같다.</summary>
+        /// <summary>
+        /// Def와 제출 정책 함수(G124)를 로드 순서대로 등록한다. 고정점은 <see cref="BuildSchema"/>와 같다.
+        /// </summary>
         private static DefRegistry BuildDefs(List<ModUnit> units, ModVisibility visibility, LoadOrder order,
-            DiagnosticBag diagnostics)
+            DiagnosticBag diagnostics, out SubmitPolicyDecl? policy)
         {
             while (true)
             {
                 var stage = new StageDiagnostics(SurvivorIds(units));
                 var registry = new DefRegistry();
+                policy = null;
                 foreach (var u in units)
                 {
                     if (u.Failed) continue;
                     foreach (var record in u.Defs) Register(registry, record, visibility, order, stage);
+                    foreach (var p in u.Functions.Policies) policy = RegisterPolicy(policy, p, visibility, order, stage);
                 }
                 if (!Settle(units, stage, diagnostics)) return registry;
             }
+        }
+
+        /// <summary>
+        /// 제출 정책 함수는 활성 모드 전체에서 최대 하나이고 교체는 <c>override=True</c>다 (spec-gaps G124). 판정은 Def 교체
+        /// (<see cref="Register"/>, spec S1)와 같다. 돌려주는 값은 지금까지의 정책이다.
+        /// </summary>
+        private static SubmitPolicyDecl? RegisterPolicy(SubmitPolicyDecl? current, SubmitPolicyDecl record,
+            ModVisibility visibility, LoadOrder order, StageDiagnostics stage)
+        {
+            const string Code = Codes.CmdSubmitPolicy;
+            if (current == null)
+            {
+                if (!record.IsOverride) return record;
+                stage.Error(record.Mod, Code, "override=True but there is no submit policy to replace", record.Span,
+                    "remove override=True to declare the game's submit policy");
+                return null;
+            }
+
+            var original = current;
+            while (original.Replaced != null) original = original.Replaced;
+            bool own = original.Mod == record.Mod || current.Mod == record.Mod;
+            var at = new[] { current.Span };
+
+            if (!record.IsOverride)
+            {
+                bool canReplace = !own && visibility.CanSee(record.Mod, original.Mod);
+                string message = own
+                    ? "a mod can declare only one submit policy"
+                    : "a submit policy is already declared by mod '" + original.Mod + "'";
+                if (own || canReplace)
+                {
+                    stage.Error(record.Mod, Code, message, record.Span,
+                        canReplace ? "add override=True to replace it (spec-gaps G124)" : null, new[] { original.Span });
+                    return current;
+                }
+                // 서로 의존하지 않는 두 모드: 어느 정책이 맞는지 근거가 없으므로 둘 다 오류 (Def와 같은 규칙)
+                stage.ConflictError(record.Mod, Code, message, record.Span, related: new[] { original.Span });
+                stage.ConflictError(original.Mod, Code, "a submit policy is also declared by mod '" + record.Mod + "'",
+                    original.Span, related: new[] { record.Span });
+                return current;
+            }
+
+            if (own)
+            {
+                stage.Error(record.Mod, Code, "a mod cannot override its own submit policy", record.Span, related: at);
+                return current;
+            }
+            if (!visibility.CanSee(record.Mod, original.Mod))
+            {
+                stage.Error(record.Mod, Codes.SchNotVisible,
+                    "the submit policy belongs to mod '" + original.Mod + "', which mod '" + record.Mod +
+                    "' does not depend on", record.Span, "add \"" + original.Mod + "\" to dependencies in mod.py", at);
+                return current;
+            }
+            if (current.IsOverride && !order.IsOrdered(current.Mod, record.Mod))
+            {
+                string message = "the submit policy is overridden by both mod '" + current.Mod + "' and mod '" +
+                                 record.Mod + "', which have no load order between them";
+                stage.ConflictError(record.Mod, Code, message, record.Span, "declare loadAfter in one of them", at);
+                stage.ConflictError(current.Mod, Code, message, current.Span, "declare loadAfter in one of them",
+                    new[] { record.Span });
+                return current;
+            }
+            record.Replaced = current;
+            return record;
         }
 
         /// <summary>

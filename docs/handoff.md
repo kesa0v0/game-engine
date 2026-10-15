@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-15. 브랜치 `spec-v0.5-scaffold`, 테스트 1057개 통과(커널 1029, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-15. 브랜치 `spec-v0.5-scaffold`, 테스트 1082개 통과(커널 1054, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -98,8 +98,9 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 | G127 | UI의 "나" = 클라이언트가 보고 있는 엔티티, UI 로컬(시뮬레이션 상태 아님). 호스트·UI가 설정, 후보는 정책 함수로. 근거: 옛 `"Player"` 세션 별칭, OpenTTD `_local_company` |
 | G128 | `std.stack`의 대기 행동 표현은 모드 몫(방향: 노드 엔티티에 행동 Def id + 인자, 해소 때 Def의 `Action` 함수 호출). 커널 몫은 이걸 커널 기능만으로 만들 수 있게 하는 것. Flow 사이 대기 기능은 지금 안 넣음 |
 | G129 | 키 컴포넌트에 `int` 키 허용(항상 `listed`), 커널 헬퍼 `replace_rows`·`append_row`, 번호 다시 매기기 = 지우고 새로 만들기(그 줄의 기여 행도 지움). 리스트 칼럼·상태 안 맵은 안 엶 |
+| G130 | `acts_for` 람다는 커맨드 매개변수를 이름으로 골라 받음(`lambda unit: unit.owner`), 자유 커맨드에만. 정책은 `@submit_policy`(교체 `override=True`), `(issuer, target)`. **코드 반영함** |
 
-**코드와 어긋나는 점:** 지금 로더는 `@command(free=True)`를 `acts_for` 없이 받는다(G109 구현). G123대로라면 로드 오류가 되어야 하고, 기존 테스트의 자유 커맨드에도 `acts_for`를 붙여야 한다. 아래 다음 할 일 1번에서 함께 한다.
+**로더 쪽 구현 (G130, 2026-10-15):** `acts_for` 람다는 커맨드 매개변수를 이름으로 골라 받는다(`acts_for=lambda unit: unit.owner`). 자유 커맨드에 `acts_for`가 없거나, 자유 커맨드가 아닌데 있거나, 람다가 커맨드에 없는 이름을 받으면 `CMD001`이다(`CommandDecl.ActsFor`, `CommandSignatures.CheckActsFor`). 정책 함수는 `@submit_policy`/`@submit_policy(override=True)`이고 `(issuer, target)` 두 매개변수를 받는다. 개수·교체는 Def 교체와 같은 규칙으로 `BuildDefs` 고정점 안에서 판정한다(`ContentLoader.RegisterPolicy`, `CMD005`). 결과는 `ContentLoadResult.SubmitPolicy`, 쓰기 함수면 `CMD004`다. 테스트는 `Loading/SubmitGateDeclarationTests`. 입구에서 실제로 부르는 일은 아직 없다(다음 할 일 1번의 `Submit`).
 
 **아직 안 정한 것:**
 
@@ -168,7 +169,7 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1057개 통과(커널 1029, CLI 28)를 확인한다.
+1. `git pull` 후 `dotnet test`로 1082개 통과(커널 1054, CLI 28)를 확인한다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G129), `docs/spine-spec.md` S2·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Commands.cs`, `Script/Execution/PureEvaluator.cs`(`RunPreconditions`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일"(G117 2단계)의 1번부터 시작한다.
    예: "커맨드 본문 실행을 시작하자. handoff의 다음 할 일 1번(제출 API 모양)부터 짚어 줘."

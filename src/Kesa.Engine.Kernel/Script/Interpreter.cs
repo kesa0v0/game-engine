@@ -198,10 +198,12 @@ namespace Kesa.Engine.Script
         }
 
         public const string CommandName = "command";
+        public const string SubmitPolicyName = "submit_policy";
+        public const string ActsForName = "acts_for";
 
         /// <summary>
-        /// <c>def</c> 위의 데코레이터. 지금은 <c>@command</c>와 <c>@command(free=True/False)</c> 하나만 받는다
-        /// (spec S6, spec-gaps G109). 커맨드 id는 <c>모드id.함수이름</c>이다.
+        /// <c>def</c> 위의 데코레이터. <c>@command</c>(<c>free=</c>, <c>acts_for=</c>)와 <c>@submit_policy</c>(<c>override=</c>)를
+        /// 받는다 (spec S6, spec-gaps G109·G122~G124·G130). 커맨드 id는 <c>모드id.함수이름</c>이다.
         /// </summary>
         private void DeclareCommand(FunctionDef def, FunctionValue function)
         {
@@ -212,32 +214,35 @@ namespace Kesa.Engine.Script
                 return;
             }
 
-            var decoratorName = decorator is CallExpr c ? c.Callee : decorator;
-            if (decoratorName is NameExpr shadowed && shadowed.Name == CommandName && !IsBuiltin(CommandName))
+            string? name = def.DecoratorName;
+            if ((name == CommandName || name == SubmitPolicyName) && !IsBuiltin(name))
             {
                 _context.Error(Codes.CmdBadDecorator,
-                    "this mod defines its own 'command', so the built-in @command cannot be used here", decorator.Span,
-                    hint: "rename this mod's 'command' (spec-gaps G112)");
+                    "this mod defines its own '" + name + "', so the built-in @" + name + " cannot be used here",
+                    decorator.Span, hint: "rename this mod's '" + name + "' (spec-gaps G112)");
+                return;
+            }
+
+            if (name == SubmitPolicyName)
+            {
+                DeclareSubmitPolicy(def, function, decorator);
+                return;
+            }
+            if (name != CommandName)
+            {
+                _context.Error(Codes.CmdBadDecorator, "unknown decorator; only @command and @submit_policy are supported",
+                    decorator.Span, hint: "write @command or @command(free=True, acts_for=...)");
                 return;
             }
 
             bool free = false;
-            switch (decorator)
+            Argument? actsFor = null;
+            if (decorator is CallExpr call)
             {
-                case NameExpr name when name.Name == CommandName:
-                    break;
-                case CallExpr call when call.Callee is NameExpr callee && callee.Name == CommandName:
-                    foreach (var arg in call.Arguments)
+                foreach (var arg in call.Arguments)
+                {
+                    if (arg.Name == "free")
                     {
-                        if (arg.Name != "free")
-                        {
-                            _context.Error(Codes.CmdBadDecorator,
-                                arg.Name == null
-                                    ? "@command takes no positional arguments"
-                                    : "@command has no argument '" + arg.Name + "'",
-                                arg.Span, hint: "@command accepts free=True or free=False");
-                            return;
-                        }
                         if (!(arg.Value is BoolLiteral literal))
                         {
                             _context.Error(Codes.CmdBadDecorator, "free= must be True or False", arg.Value.Span);
@@ -245,13 +250,92 @@ namespace Kesa.Engine.Script
                         }
                         free = literal.Value;
                     }
-                    break;
-                default:
-                    _context.Error(Codes.CmdBadDecorator, "unknown decorator; only @command is supported",
-                        decorator.Span, hint: "write @command or @command(free=True)");
-                    return;
+                    else if (arg.Name == ActsForName)
+                    {
+                        if (!(arg.Value is LambdaExpr) && !(arg.Value is NoneLiteral))
+                        {
+                            _context.Error(Codes.CmdBadDecorator, "acts_for= must be a lambda or None", arg.Value.Span,
+                                hint: "write acts_for=lambda party: party, or acts_for=None if the command acts for no one " +
+                                      "(spec-gaps G130)");
+                            return;
+                        }
+                        actsFor = arg;
+                    }
+                    else
+                    {
+                        _context.Error(Codes.CmdBadDecorator,
+                            arg.Name == null
+                                ? "@command takes no positional arguments"
+                                : "@command has no argument '" + arg.Name + "'",
+                            arg.Span, hint: "@command accepts free= and acts_for=");
+                        return;
+                    }
+                }
             }
-            _context.Functions.Commands.Add(new CommandDecl(_context.Mod, function, free, decorator.Span));
+
+            // 누구로서 행동하는지는 자유 커맨드만 적는다. 응답 커맨드는 응답한 엔티티로서 행동한다 (G123·G126)
+            if (free && actsFor == null)
+            {
+                _context.Error(Codes.CmdBadDecorator,
+                    "a free command must say whom it acts for", decorator.Span,
+                    hint: "add acts_for=lambda party: party (a parameter of the command), or acts_for=None if it acts " +
+                          "for no one (spec-gaps G123)");
+                return;
+            }
+            if (!free && actsFor != null)
+            {
+                _context.Error(Codes.CmdBadDecorator,
+                    "acts_for is only for free commands (free=True); a response acts as the entity that answers",
+                    actsFor.Span, hint: "spec-gaps G123·G126");
+                return;
+            }
+
+            FunctionValue? chooser = null;
+            if (actsFor != null && actsFor.Value is LambdaExpr)
+                chooser = (FunctionValue)Evaluate(actsFor.Value); // 람다 본문 검사와 함수 목록 등록 (G108·G117)
+            _context.Functions.Commands.Add(new CommandDecl(_context.Mod, function, free, decorator.Span, chooser));
+        }
+
+        /// <summary>
+        /// <c>@submit_policy</c> / <c>@submit_policy(override=True)</c> (G122·G124). 함수는 기본값 없는 매개변수 둘
+        /// <c>(issuer, target)</c>을 받는다. 개수와 교체는 모든 모드를 모은 뒤 본다.
+        /// </summary>
+        private void DeclareSubmitPolicy(FunctionDef def, FunctionValue function, Expr decorator)
+        {
+            bool isOverride = false;
+            if (decorator is CallExpr call)
+            {
+                foreach (var arg in call.Arguments)
+                {
+                    if (arg.Name != "override")
+                    {
+                        _context.Error(Codes.CmdBadDecorator,
+                            arg.Name == null
+                                ? "@submit_policy takes no positional arguments"
+                                : "@submit_policy has no argument '" + arg.Name + "'",
+                            arg.Span, hint: "@submit_policy accepts override=True");
+                        return;
+                    }
+                    if (!(arg.Value is BoolLiteral literal))
+                    {
+                        _context.Error(Codes.CmdBadDecorator, "override= must be True or False", arg.Value.Span);
+                        return;
+                    }
+                    isOverride = literal.Value;
+                }
+            }
+
+            bool shapeOk = def.Parameters.Count == 2;
+            foreach (var p in def.Parameters)
+                if (p.Default != null) shapeOk = false;
+            if (!shapeOk)
+            {
+                _context.Error(Codes.CmdSubmitPolicy,
+                    "a submit policy takes exactly two parameters without defaults: (issuer, target)", def.Span,
+                    hint: "issuer is the connection's tag, target is the entity chosen by acts_for or None (spec-gaps G122)");
+                return;
+            }
+            _context.Functions.Policies.Add(new SubmitPolicyDecl(_context.Mod, function, isOverride, decorator.Span));
         }
 
         /// <summary>
