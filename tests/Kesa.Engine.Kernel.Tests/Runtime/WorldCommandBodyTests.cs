@@ -52,6 +52,16 @@ namespace Kesa.Engine.Tests.Runtime
             "    f = count\n" +
             "    n = f(unit)\n" +
             "    unit.Moves.left += n\n" +
+            "def drain(u):\n" +
+            "    for i in range(10):\n" +
+            "        if u.Moves.left == 0:\n" +
+            "            return i\n" +
+            "        u.Moves.left -= 1\n" +
+            "    return -1\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def Drain(unit: Ref[Unit]):\n" +
+            "    n = drain(unit)\n" +
+            "    unit.Moves.left = n + 7\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Step(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
@@ -155,6 +165,14 @@ namespace Kesa.Engine.Tests.Runtime
             _world.Set(_scout, _left, new IntValue(5));
             Assert.That(Submit("ViaAssignment").Succeeded, Is.True);
             Assert.That(Left, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void AWriteFunctionReturningFromInsideALoopHandsItsValueToTheNextLine()
+        {
+            // 2 → 1 → 0, 셋째 바퀴(i=2)에서 돌려준다
+            Assert.That(Submit("Drain").Succeeded, Is.True);
+            Assert.That(Left, Is.EqualTo(9));
         }
 
         [Test]

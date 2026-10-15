@@ -96,14 +96,6 @@ namespace Kesa.Engine.Script
             }
         }
 
-        private enum Flow
-        {
-            Normal,
-            Break,
-            Continue,
-            Return,
-        }
-
         /// <summary><c>def</c>마다 지역 변수 이름 (한 번 계산해 둔다).</summary>
         private readonly Dictionary<FunctionDef, SortedSet<string>> _localNames = new Dictionary<FunctionDef, SortedSet<string>>();
 
@@ -141,6 +133,62 @@ namespace Kesa.Engine.Script
             /// 순수 함수에서 시작한 호출, 식 안의 호출, <c>derived</c>·사전 조건·<c>Cond</c>는 커맨드 실행 중이라도 순수다.
             /// </summary>
             public bool Writable { get; set; }
+
+            /// <summary>
+            /// 실행 중인 블록들, 바깥에서 안쪽 순 (S2 평가 모델: 문장 실행은 C# 호출 스택이 아니라 이 데이터에 있다).
+            /// 비면 함수가 끝까지 실행된 것이다.
+            /// </summary>
+            public List<Block> Blocks { get; } = new List<Block>();
+
+            /// <summary>이 함수가 끝났을 때 돌려준 값을 어디에 둘지.</summary>
+            public ResultTo Result { get; set; }
+
+            /// <summary><see cref="ResultTo.Local"/>일 때 부른 쪽 프레임의 지역 변수 이름 (<c>x = f()</c>).</summary>
+            public string? ResultName { get; set; }
+
+            /// <summary><see cref="ResultTo.Host"/>일 때 함수가 돌려준 값.</summary>
+            public Value Returned { get; set; } = NoneValue.Instance;
+        }
+
+        private enum ResultTo
+        {
+            /// <summary>C# 쪽(호스트 실행이나 식 안의 호출)이 끝까지 실행하고 <see cref="Frame.Returned"/>를 읽는다.</summary>
+            Host,
+
+            /// <summary>문장 하나 전체인 호출: 값을 버린다.</summary>
+            Discard,
+
+            /// <summary>이름 대입의 오른쪽 전체인 호출: 부른 쪽 지역 변수에 넣는다.</summary>
+            Local,
+        }
+
+        /// <summary>
+        /// 실행 중인 문장 목록 하나와 다음에 실행할 문장의 번호. <c>for</c>의 몸체면 반복 상태(남은 항목과 위치)도 든다.
+        /// </summary>
+        private sealed class Block
+        {
+            public Block(IReadOnlyList<Stmt> body, int next = 0)
+            {
+                Body = body;
+                Next = next;
+            }
+
+            public IReadOnlyList<Stmt> Body { get; }
+            public int Next { get; set; }
+
+            /// <summary>이 블록이 <c>for</c>의 몸체면 그 문장.</summary>
+            public ForStmt? Loop { get; set; }
+
+            /// <summary>반복 항목: <see cref="Range"/>가 아니면 시작할 때 펼친 목록.</summary>
+            public IReadOnlyList<Value>? Items { get; set; }
+
+            public RangeValue? Range { get; set; }
+            public long Count { get; set; }
+
+            /// <summary>지금 실행 중인 항목의 위치 (아직 시작 전이면 -1).</summary>
+            public long Index { get; set; } = -1;
+
+            public Value ItemAt(long i) => Range != null ? new IntValue(Range.At(i)) : Items![(int)i];
         }
 
         private sealed class Session
@@ -148,7 +196,6 @@ namespace Kesa.Engine.Script
             private readonly PureEvaluator _owner;
             private readonly List<Frame> _stack = new List<Frame>();
             private readonly StepMeter _meter;
-            private Value _returned = NoneValue.Instance;
 
             public Session(PureEvaluator owner, StepMeter meter)
             {
@@ -226,7 +273,28 @@ namespace Kesa.Engine.Script
             private static bool SameFunction(FunctionValue a, FunctionValue b) =>
                 ReferenceEquals(a.Definition, b.Definition) && ReferenceEquals(a.Lambda, b.Lambda);
 
+            /// <summary>C# 쪽에서 끝까지 실행하는 호출 (호스트 실행, 식 안의 호출). 돌려준 값을 받는다.</summary>
             private Value CallFunction(FunctionValue fn, IReadOnlyDictionary<string, Value>? captured,
+                SortedSet<string>? capturedLocals, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
+                bool writable)
+            {
+                int depth = _stack.Count;
+                var newFrame = Push(fn, captured, capturedLocals, positional, keywords, site, writable);
+                newFrame.Result = ResultTo.Host;
+                try
+                {
+                    if (fn.Lambda != null) return Eval(fn.Lambda.Body, newFrame);
+                    RunUntil(depth);
+                    return newFrame.Returned;
+                }
+                finally
+                {
+                    Truncate(depth);
+                }
+            }
+
+            /// <summary>재귀를 검사하고 인자를 묶은 프레임을 스택에 넣는다. <c>def</c>면 몸체 블록에서 시작한다.</summary>
+            private Frame Push(FunctionValue fn, IReadOnlyDictionary<string, Value>? captured,
                 SortedSet<string>? capturedLocals, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
                 bool writable)
             {
@@ -239,17 +307,15 @@ namespace Kesa.Engine.Script
                 var newFrame = Enter(fn, captured, capturedLocals, positional, keywords);
                 newFrame.CallSite = site;
                 newFrame.Writable = writable && fn.Writes;
+                if (fn.Definition != null) newFrame.Blocks.Add(new Block(fn.Definition.Body));
                 _stack.Add(newFrame);
-                try
-                {
-                    if (fn.Lambda != null) return Eval(fn.Lambda.Body, newFrame);
-                    var flow = ExecBlock(fn.Definition!.Body, newFrame);
-                    return flow == Flow.Return ? _returned : NoneValue.Instance;
-                }
-                finally
-                {
-                    _stack.RemoveAt(_stack.Count - 1);
-                }
+                return newFrame;
+            }
+
+            /// <summary>오류로 빠져나갈 때 이 실행 단위가 넣은 프레임을 걷어 낸다.</summary>
+            private void Truncate(int depth)
+            {
+                while (_stack.Count > depth) _stack.RemoveAt(_stack.Count - 1);
             }
 
             /// <summary>
@@ -268,8 +334,10 @@ namespace Kesa.Engine.Script
             public List<RequireOutcome> Command(FunctionValue command, IReadOnlyDictionary<string, Value> args,
                 SourceSpan site, bool runBody)
             {
+                int depth = _stack.Count;
                 var frame = Enter(command, null, null, Array.Empty<Value>(), args);
                 frame.CallSite = site;
+                frame.Result = ResultTo.Discard;
                 _stack.Add(frame);
                 var results = new List<RequireOutcome>();
                 try
@@ -280,14 +348,14 @@ namespace Kesa.Engine.Script
                     if (runBody && !failed)
                     {
                         frame.Writable = true;
-                        for (int i = hasBlock ? 1 : 0; i < body.Count; i++)
-                            if (Exec(body[i], frame) == Flow.Return) break;
+                        frame.Blocks.Add(new Block(body, hasBlock ? 1 : 0));
+                        RunUntil(depth);
                     }
                     return results;
                 }
                 finally
                 {
-                    _stack.RemoveAt(_stack.Count - 1);
+                    Truncate(depth);
                 }
             }
 
@@ -295,6 +363,7 @@ namespace Kesa.Engine.Script
             private bool EvaluateBlock(WithStmt with, Frame frame, List<RequireOutcome> results)
             {
                 bool failed = false;
+                int depth = _stack.Count;
                 foreach (var stmt in with.Body)
                 {
                     try
@@ -302,6 +371,7 @@ namespace Kesa.Engine.Script
                         if (stmt is AssignStmt)
                         {
                             Exec(stmt, frame);
+                            RunUntil(depth); // x = f()로 들어간 함수를 끝까지
                             continue;
                         }
                         var outcome = Require((CallExpr)((ExprStmt)stmt).Expr, frame);
@@ -310,6 +380,7 @@ namespace Kesa.Engine.Script
                     }
                     catch (ScriptRuntimeException e) when (failed && e.Code != Codes.RunBudget && e.Code != Codes.RunCycle)
                     {
+                        Truncate(depth);
                         if (stmt is AssignStmt assign)
                         {
                             frame.Locals.Remove(((NameExpr)assign.Target).Name);
@@ -433,22 +504,73 @@ namespace Kesa.Engine.Script
 
             // ---- 문장 ----
 
-            private Flow ExecBlock(IReadOnlyList<Stmt> body, Frame frame)
+            /// <summary>
+            /// 스택이 <paramref name="depth"/>로 줄어들 때까지 맨 위 프레임의 문장을 하나씩 실행한다 (S2 "막힐 때까지 실행").
+            /// 문장 수준의 <c>def</c> 호출은 프레임을 쌓고 이 고리가 이어서 돈다. 식은 재귀로 평가한다.
+            /// </summary>
+            private void RunUntil(int depth)
             {
-                foreach (var stmt in body)
-                {
-                    var flow = Exec(stmt, frame);
-                    if (flow != Flow.Normal) return flow;
-                }
-                return Flow.Normal;
+                while (_stack.Count > depth) Step(_stack[_stack.Count - 1]);
             }
 
-            private Flow Exec(Stmt stmt, Frame frame)
+            private void Step(Frame frame)
+            {
+                if (frame.Blocks.Count == 0)
+                {
+                    Finish(NoneValue.Instance); // 끝까지 실행했다
+                    return;
+                }
+                var block = frame.Blocks[frame.Blocks.Count - 1];
+                if (block.Next < block.Body.Count)
+                {
+                    Exec(block.Body[block.Next++], frame);
+                    return;
+                }
+                if (block.Loop == null || !NextIteration(block, frame)) frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
+            }
+
+            /// <summary>반복의 다음 항목으로 넘어간다. 항목이 더 없으면 false.</summary>
+            private bool NextIteration(Block block, Frame frame)
+            {
+                if (block.Index + 1 >= block.Count) return false;
+                try
+                {
+                    Tick();
+                }
+                catch (ScriptRuntimeException e)
+                {
+                    Attach(e, block.Loop!.Span);
+                    throw;
+                }
+                block.Index++;
+                frame.Locals[block.Loop!.Target.Name] = block.ItemAt(block.Index);
+                block.Next = 0;
+                return true;
+            }
+
+            /// <summary>맨 위 프레임을 끝내고 돌려준 값을 정해진 곳에 둔다.</summary>
+            private void Finish(Value value)
+            {
+                var frame = _stack[_stack.Count - 1];
+                _stack.RemoveAt(_stack.Count - 1);
+                frame.Blocks.Clear();
+                switch (frame.Result)
+                {
+                    case ResultTo.Host:
+                        frame.Returned = value;
+                        break;
+                    case ResultTo.Local:
+                        _stack[_stack.Count - 1].Locals[frame.ResultName!] = value;
+                        break;
+                }
+            }
+
+            private void Exec(Stmt stmt, Frame frame)
             {
                 try
                 {
                     Tick();
-                    return ExecCore(stmt, frame);
+                    ExecCore(stmt, frame);
                 }
                 catch (ScriptRuntimeException e)
                 {
@@ -457,39 +579,73 @@ namespace Kesa.Engine.Script
                 }
             }
 
-            private Flow ExecCore(Stmt stmt, Frame frame)
+            private void ExecCore(Stmt stmt, Frame frame)
             {
                 switch (stmt)
                 {
                     case ExprStmt es:
-                        if (es.Expr is CallExpr statementCall) EvalCall(statementCall, frame, statement: true);
+                        if (es.Expr is CallExpr statementCall) StatementCall(statementCall, frame, null);
                         else Eval(es.Expr, frame);
-                        return Flow.Normal;
+                        return;
 
                     case AssignStmt assign:
                         ExecAssign(assign, frame);
-                        return Flow.Normal;
+                        return;
 
                     case IfStmt ifs:
                         foreach (var branch in ifs.Branches)
                         {
                             if (PureOps.Truthy(Eval(branch.Condition, frame)))
-                                return ExecBlock(branch.Body, frame);
+                            {
+                                frame.Blocks.Add(new Block(branch.Body));
+                                return;
+                            }
                         }
-                        return ifs.OrElse != null ? ExecBlock(ifs.OrElse, frame) : Flow.Normal;
+                        if (ifs.OrElse != null) frame.Blocks.Add(new Block(ifs.OrElse));
+                        return;
 
                     case ForStmt loop:
-                        return ExecFor(loop, frame);
+                        StartFor(loop, frame);
+                        return;
 
                     case ReturnStmt ret:
-                        _returned = ret.Value == null ? NoneValue.Instance : Eval(ret.Value, frame);
-                        return Flow.Return;
+                        Finish(ret.Value == null ? NoneValue.Instance : Eval(ret.Value, frame));
+                        return;
 
-                    case PassStmt _: return Flow.Normal;
-                    case BreakStmt _: return Flow.Break;
-                    case ContinueStmt _: return Flow.Continue;
+                    case PassStmt _:
+                        return;
+
+                    case BreakStmt _:
+                        // 가장 안쪽 반복의 몸체까지 걷어 낸다 (반복 밖의 break는 파서가 막는다)
+                        while (frame.Blocks[frame.Blocks.Count - 1].Loop == null) frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
+                        frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
+                        return;
+
+                    case ContinueStmt _:
+                        while (frame.Blocks[frame.Blocks.Count - 1].Loop == null) frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
+                        var body = frame.Blocks[frame.Blocks.Count - 1];
+                        body.Next = body.Body.Count;
+                        return;
                 }
                 throw Fail(Codes.RunScript, "this statement is not supported in a logic function");
+            }
+
+            /// <summary>
+            /// 문장 수준의 호출: 한 줄 전체(<paramref name="target"/> 없음)이거나 이름 대입의 오른쪽 전체 (G117·G135).
+            /// <c>def</c>는 프레임을 쌓고 돌아가 실행 고리가 이어서 실행한다. 람다·내장은 그 자리에서 값을 낸다.
+            /// </summary>
+            private void StatementCall(CallExpr call, Frame frame, string? target)
+            {
+                var (callee, positional, keywords) = CallParts(call, frame);
+                if (callee is FunctionValue fn && fn.Definition != null)
+                {
+                    var called = Push(fn, null, null, positional, keywords, call.Span, frame.Writable);
+                    called.Result = target == null ? ResultTo.Discard : ResultTo.Local;
+                    called.ResultName = target;
+                    return;
+                }
+                var value = Invoke(callee, positional, keywords, call.Span, frame.Writable);
+                if (target != null) frame.Locals[target] = value;
             }
 
             private void ExecAssign(AssignStmt assign, Frame frame)
@@ -517,9 +673,8 @@ namespace Kesa.Engine.Script
                 if (assign.Op == "=")
                 {
                     // 이름 대입의 오른쪽 전체인 호출은 문장이다: 쓰기 함수의 결과를 받을 수 있다 (G135)
-                    frame.Locals[target.Name] = assign.Value is CallExpr call
-                        ? EvalCallTraced(call, frame)
-                        : Eval(assign.Value, frame);
+                    if (assign.Value is CallExpr call) StatementCallTraced(call, frame, target.Name);
+                    else frame.Locals[target.Name] = Eval(assign.Value, frame);
                     return;
                 }
 
@@ -569,44 +724,37 @@ namespace Kesa.Engine.Script
                 target.SetAttribute(attr.Name, value);
             }
 
-            private Flow ExecFor(ForStmt loop, Frame frame)
+            /// <summary>
+            /// 반복할 항목을 정해 반복 블록을 쌓는다. 항목은 시작할 때 굳는다(목록은 펼치고 range는 그대로 둔다).
+            /// 첫 항목으로 넘어가는 것은 실행 고리가 한다.
+            /// </summary>
+            private void StartFor(ForStmt loop, Frame frame)
             {
                 var iterable = Eval(loop.Iterable, frame);
-                long count;
-                Func<long, Value> at;
+                var block = new Block(loop.Body) { Loop = loop };
                 switch (iterable)
                 {
                     case ListValue list:
-                        count = list.Items.Count;
-                        at = i => list.Items[(int)i];
+                        block.Items = list.Items;
                         break;
                     case DictValue dict:
-                        count = dict.Items.Count;
-                        at = i => dict.Items[(int)i].Key;
+                        var keys = new List<Value>(dict.Items.Count);
+                        foreach (var item in dict.Items) keys.Add(item.Key);
+                        block.Items = keys;
                         break;
                     case RangeValue range:
-                        count = range.Count;
-                        at = i => new IntValue(range.At(i));
+                        block.Range = range;
                         break;
-                    case IRuntimeIterable iterable2:
-                        var items = iterable2.Iterate();
-                        count = items.Count;
-                        at = i => items[(int)i];
+                    case IRuntimeIterable runtime:
+                        block.Items = runtime.Iterate();
                         break;
                     default:
                         throw Fail(Codes.RunScript, "'" + iterable.KindName + "' is not iterable",
                             "loop over a list, a dict or range(...)");
                 }
-
-                for (long i = 0; i < count; i++)
-                {
-                    Tick();
-                    frame.Locals[loop.Target.Name] = at(i);
-                    var flow = ExecBlock(loop.Body, frame);
-                    if (flow == Flow.Break) break;
-                    if (flow == Flow.Return) return Flow.Return;
-                }
-                return Flow.Normal;
+                block.Count = block.Range?.Count ?? block.Items!.Count;
+                block.Next = block.Body.Count;
+                frame.Blocks.Add(block);
             }
 
             // ---- 식 ----
@@ -723,13 +871,13 @@ namespace Kesa.Engine.Script
                 throw Fail(Codes.RunScript, "'" + target.KindName + "' cannot be indexed");
             }
 
-            /// <summary>문장 자리의 호출을 <see cref="Eval"/>처럼 단계를 세고 오류 위치를 붙여 평가한다.</summary>
-            private Value EvalCallTraced(CallExpr call, Frame frame)
+            /// <summary><c>x = f(...)</c>의 호출을 <see cref="Eval"/>처럼 단계를 세고 오류 위치를 붙여 실행한다.</summary>
+            private void StatementCallTraced(CallExpr call, Frame frame, string target)
             {
                 try
                 {
                     Tick();
-                    return EvalCall(call, frame, statement: true);
+                    StatementCall(call, frame, target);
                 }
                 catch (ScriptRuntimeException e)
                 {
@@ -738,10 +886,14 @@ namespace Kesa.Engine.Script
                 }
             }
 
-            /// <param name="statement">
-            /// 이 호출이 문장 하나 전체이거나 이름 대입의 오른쪽 전체인가 (쓰기 함수는 이 자리에서만 부른다, G117·G135).
-            /// </param>
-            private Value EvalCall(CallExpr call, Frame frame, bool statement = false)
+            /// <summary>식 안의 호출: 끝까지 실행해 값을 낸다. 쓰기 함수는 여기서 쓰기 모드가 되지 않는다 (G117·G135).</summary>
+            private Value EvalCall(CallExpr call, Frame frame)
+            {
+                var (callee, positional, keywords) = CallParts(call, frame);
+                return Invoke(callee, positional, keywords, call.Span);
+            }
+
+            private (Value Callee, List<Value> Positional, SortedDictionary<string, Value> Keywords) CallParts(CallExpr call, Frame frame)
             {
                 var callee = Eval(call.Callee, frame);
                 var positional = new List<Value>();
@@ -752,7 +904,7 @@ namespace Kesa.Engine.Script
                     if (arg.Name == null) positional.Add(value);
                     else keywords[arg.Name] = value;
                 }
-                return Invoke(callee, positional, keywords, call.Span, statement && frame.Writable);
+                return (callee, positional, keywords);
             }
 
             private Value EvalUnary(UnaryExpr unary, Frame frame)

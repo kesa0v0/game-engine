@@ -428,6 +428,62 @@ namespace Kesa.Engine.Tests.Script
                 Is.EqualTo(Codes.RunBudget));
         }
 
+        // ---- 문장 실행기 (S2 평가 모델: 명시적 프레임 스택) ----
+
+        private const string ControlFlowProgram =
+            "def inner(n):\n" +
+            "    for i in range(n):\n" +
+            "        for j in range(n):\n" +
+            "            if j == 1:\n" +
+            "                continue\n" +
+            "            if i * 10 + j == 22:\n" +
+            "                return i * 10 + j\n" +
+            "    return -1\n" +
+            "def note(n):\n" +
+            "    if n > 100:\n" +
+            "        return n\n" +
+            "def f(n):\n" +
+            "    total = 0\n" +
+            "    k = lambda x: x * 2\n" +
+            "    for i in range(n):\n" +
+            "        if i == 4:\n" +
+            "            break\n" +
+            "        elif i == 1:\n" +
+            "            continue\n" +
+            "        else:\n" +
+            "            note(i)\n" +
+            "        found = inner(3)\n" +
+            "        total += found + inner(i) + k(i)\n" +
+            "    return total\n";
+
+        [Test]
+        public void NestedControlFlowAcrossStatementAndExpressionCalls()
+        {
+            // i=0: 22 + (-1) + 0, i=2: 22 + (-1) + 4, i=3: 22 + 22 + 6
+            Assert.That(Show(Call(ControlFlowProgram, "f", new IntValue(6))), Is.EqualTo("96"));
+        }
+
+        [Test]
+        public void TheStepCountOfAProgramIsPinned()
+        {
+            var (evaluator, find) = Build(ControlFlowProgram);
+            var meter = new StepMeter(PureEvaluator.DefaultStepBudget);
+            evaluator.Run(find("f"), new Value[] { new IntValue(6) }, meter: meter);
+            Assert.That(meter.Used, Is.EqualTo(667)); // 리팩터링 전 실행기에서 잰 값
+        }
+
+        [Test]
+        public void AnErrorInAFunctionCalledAsAStatementPointsInsideIt()
+        {
+            const string source = "def g(h):\n    x = 1\n    return h.nothing\n\ndef f(h):\n    y = g(h)\n    return y\n";
+            var (evaluator, find) = Build(source);
+            var e = Assert.Throws<ScriptRuntimeException>(() => evaluator.Run(find("f"), new Value[] { new Bag() }))!;
+            Assert.That(e.Span.Line, Is.EqualTo(3));
+            Assert.That(e.Trace, Has.Count.EqualTo(2));
+            Assert.That(e.Trace[0], Does.StartWith("g (called at"));
+            Assert.That(e.Trace[1], Does.StartWith("f"));
+        }
+
         // ---- 재귀 (G102) ----
 
         [Test]
