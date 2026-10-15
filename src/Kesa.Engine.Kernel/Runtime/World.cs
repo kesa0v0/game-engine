@@ -39,17 +39,28 @@ namespace Kesa.Engine.Runtime
 
         public const int DefaultStepBudget = 100000;
 
-        public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget)
-            : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands) { }
+        /// <param name="requireSubmitPolicy">
+        /// 멀티 게임처럼 제출 정책 함수가 꼭 있어야 하는 호스트가 켠다. 켰는데 정책이 없으면 만들지 않는다 (spec-gaps G124).
+        /// </param>
+        public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget, bool requireSubmitPolicy = false)
+            : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, loaded.SubmitPolicy)
+        {
+            if (requireSubmitPolicy && loaded.SubmitPolicy == null)
+                throw new WorldException(Codes.RunNoSubmitPolicy,
+                    "the host requires a submit policy, but no active mod declares one",
+                    "a mod must declare @submit_policy def may_act(issuer, target) (spec-gaps G124)");
+        }
 
         public World(DefSet defs, SchemaSet schema, IReadOnlyDictionary<string, ModScope>? scopes = null,
-            int stepBudget = DefaultStepBudget, IReadOnlyDictionary<string, CommandDecl>? commands = null)
+            int stepBudget = DefaultStepBudget, IReadOnlyDictionary<string, CommandDecl>? commands = null,
+            SubmitPolicyDecl? submitPolicy = null)
         {
             _defs = defs;
             _schema = schema;
             _scopes = scopes ?? new SortedDictionary<string, ModScope>(StringComparer.Ordinal);
             _stepBudget = stepBudget;
             _commands = commands ?? new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
+            _submitPolicy = submitPolicy;
         }
 
         // ---- 이름 풀기 ----

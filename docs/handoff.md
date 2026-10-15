@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-15. 브랜치 `spec-v0.5-scaffold`, 테스트 1082개 통과(커널 1054, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-15. 브랜치 `spec-v0.5-scaffold`, 테스트 1099개 통과(커널 1071, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -99,14 +99,17 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 | G128 | `std.stack`의 대기 행동 표현은 모드 몫(방향: 노드 엔티티에 행동 Def id + 인자, 해소 때 Def의 `Action` 함수 호출). 커널 몫은 이걸 커널 기능만으로 만들 수 있게 하는 것. Flow 사이 대기 기능은 지금 안 넣음 |
 | G129 | 키 컴포넌트에 `int` 키 허용(항상 `listed`), 커널 헬퍼 `replace_rows`·`append_row`, 번호 다시 매기기 = 지우고 새로 만들기(그 줄의 기여 행도 지움). 리스트 칼럼·상태 안 맵은 안 엶 |
 | G130 | `acts_for` 람다는 커맨드 매개변수를 이름으로 골라 받음(`lambda unit: unit.owner`), 자유 커맨드에만. 정책은 `@submit_policy`(교체 `override=True`), `(issuer, target)`. **코드 반영함** |
+| G131 | `Submit`의 결과는 모두 값 `SubmitResult`(성공·Request 필요·인자 거절·입구 거부·전제 조건 실패·스크립트 오류), 예외는 없는 커맨드 id뿐. 채운 전체 인자를 담음. 정책 필수는 호스트 옵션. **코드 반영함** |
 
-**로더 쪽 구현 (G130, 2026-10-15):** `acts_for` 람다는 커맨드 매개변수를 이름으로 골라 받는다(`acts_for=lambda unit: unit.owner`). 자유 커맨드에 `acts_for`가 없거나, 자유 커맨드가 아닌데 있거나, 람다가 커맨드에 없는 이름을 받으면 `CMD001`이다(`CommandDecl.ActsFor`, `CommandSignatures.CheckActsFor`). 정책 함수는 `@submit_policy`/`@submit_policy(override=True)`이고 `(issuer, target)` 두 매개변수를 받는다. 개수·교체는 Def 교체와 같은 규칙으로 `BuildDefs` 고정점 안에서 판정한다(`ContentLoader.RegisterPolicy`, `CMD005`). 결과는 `ContentLoadResult.SubmitPolicy`, 쓰기 함수면 `CMD004`다. 테스트는 `Loading/SubmitGateDeclarationTests`. 입구에서 실제로 부르는 일은 아직 없다(다음 할 일 1번의 `Submit`).
+**로더 쪽 구현 (G130, 2026-10-15):** `acts_for` 람다는 커맨드 매개변수를 이름으로 골라 받는다(`acts_for=lambda unit: unit.owner`). 자유 커맨드에 `acts_for`가 없거나, 자유 커맨드가 아닌데 있거나, 람다가 커맨드에 없는 이름을 받으면 `CMD001`이다(`CommandDecl.ActsFor`, `CommandSignatures.CheckActsFor`). 정책 함수는 `@submit_policy`/`@submit_policy(override=True)`이고 `(issuer, target)` 두 매개변수를 받는다. 개수·교체는 Def 교체와 같은 규칙으로 `BuildDefs` 고정점 안에서 판정한다(`ContentLoader.RegisterPolicy`, `CMD005`). 결과는 `ContentLoadResult.SubmitPolicy`, 쓰기 함수면 `CMD004`다. 테스트는 `Loading/SubmitGateDeclarationTests`.
+
+**제출 API (G131, 2026-10-15):** `World.Submit(issuer, command, args)` → `SubmitResult`(`Runtime/World.Submit.cs`). 순서는 자유 커맨드 확인 → 인자 검사 → `acts_for` → `may_act` → 전제 조건이다. `Outcome`은 `Succeeded`/`NeedsRequest`/`ArgumentsRejected`/`GateDenied`/`PreconditionsFailed`/`ScriptError`이고, 결과에 채운 전체 인자(`Arguments`), 대상(`Target`), `Preconditions`, `Error`를 담는다. 예외는 없는 커맨드 id뿐이다. `new World(loaded, requireSubmitPolicy: true)`에 정책이 없으면 `RUN016`이다. 테스트는 `Runtime/WorldSubmitTests`. **본문은 아직 실행하지 않는다**: `Succeeded`는 지금 "모든 검사 통과"의 뜻이고, 본문 실행(다음 할 일 2)이 이 자리에 붙는다.
 
 **아직 안 정한 것:**
 
 - ~~**Def·Flow 경계를 넘는 값 넘기기**~~ → 정리됨. 같은 실행 안(TR `PaidExtraOP`)은 `Action` 함수 인자, `ask`를 사이에 둔 값은 Flow 지역 변수(S2), 다른 Flow·참가자가 보고 고치는 값(스택 노드, 주사위 눈)은 상태: 노드 표현은 `std.stack` 몫(G128), 인자 묶음은 런타임 컴포넌트, 값 목록은 `int` 키 컴포넌트(G129). 스택의 취소·환불은 `std.stack`을 만들 때 정한다(모드 몫).
 - **G129 구현 메모:** `int` 키, `replace_rows`·`append_row`, 줄 삭제 시 그 줄 대상 기여 행 삭제. 스크립트에서 줄을 붙이고 떼는 길(아래 다음 할 일 6 "미룸")과 함께 한다.
-- 표기: `acts_for`·`submit_policy` 이름, `ask` 반환값의 필드 이름.
+- 표기: `ask` 반환값의 필드 이름. (`acts_for`·`submit_policy`는 G130으로 정함)
 
 ## 핵심 규칙 (자세한 것은 spec-gaps)
 
@@ -120,7 +123,7 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 
 S6 첫 슬라이스에서 남은 것, 이 순서로 하나씩 짚는다(spec 빈칸은 선택지와 추천을 내고 사용자가 고른다):
 
-1. **제출 API의 모양:** `World`에 커맨드를 제출해 입구(G122: `acts_for` + 정책 함수) → 사전 검사 → 본문 실행까지 하는 입구(이름 후보 `Submit`). issuer는 불투명한 문자열 인자(G119). 돌려주는 결과(입구 거부 / 전제 조건 거절 / 성공 / 스크립트 오류), 자유 커맨드(`free`)만 받을지, 채운 전체 인자(G116)를 결과에 담을지. `acts_for` 필수(G123)와 정책 함수 선언·개수 규칙(G124)의 로더 쪽 구현도 여기서.
+1. ~~**제출 API의 모양**~~: G130·G131로 정하고 구현함(`World.Submit`, 위 "제출 API").
 2. **본문 실행:** 실행기에 속성 대입 → `World.Set` 연결(복합 대입 포함). 쓸 수 있는 칸은 `field`·Ref(`const`·`derived`는 `World`가 이미 거부). 리스트 칼럼의 `+=`, 키 줄 쓰기(`h.Skill[k].level = …`)를 이번에 열지 정한다.
 3. **런타임 안전망(G117에 규칙이 적혀 있음):** 실행 프레임마다 순수/쓰기 모드. `derived` 읽기·사전 조건·`Cond` 호출·순수 함수에서 시작한 호출은 커맨드 실행 중이라도 쓰기를 거부. 최상위 대입으로 숨긴 커맨드(`x = Heal`) 호출도 여기서 막는다(G118).
 4. **커맨드 단위 롤백(C8):** 스크립트 오류가 나면 효과를 남기지 않는다. 방식(쓰기 로그 되감기 vs 스냅샷)을 정한다. spec 9절 벤치 항목과 관련.
@@ -169,7 +172,7 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1082개 통과(커널 1054, CLI 28)를 확인한다.
+1. `git pull` 후 `dotnet test`로 1099개 통과(커널 1071, CLI 28)를 확인한다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G129), `docs/spine-spec.md` S2·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Commands.cs`, `Script/Execution/PureEvaluator.cs`(`RunPreconditions`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일"(G117 2단계)의 1번부터 시작한다.
    예: "커맨드 본문 실행을 시작하자. handoff의 다음 할 일 1번(제출 API 모양)부터 짚어 줘."

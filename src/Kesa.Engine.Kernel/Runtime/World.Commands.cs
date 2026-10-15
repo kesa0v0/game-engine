@@ -113,7 +113,13 @@ namespace Kesa.Engine.Runtime
             var rejections = new List<ArgumentRejection>();
             var checkedArgs = CheckArguments(decl, args, rejections);
             if (rejections.Count > 0) return new PreconditionReport(command, rejections, Array.Empty<RequireOutcome>());
+            return EvaluateRequires(decl, checkedArgs);
+        }
 
+        /// <summary>인자 검사를 통과한 인자로 <c>require</c>를 평가한다. 스크립트 오류는 <see cref="WorldException"/>이다.</summary>
+        private PreconditionReport EvaluateRequires(CommandDecl decl, SortedDictionary<string, Value> checkedArgs)
+        {
+            string command = decl.Id;
             var scriptArgs = new SortedDictionary<string, Value>(StringComparer.Ordinal);
             foreach (var pair in checkedArgs) scriptArgs[pair.Key] = ToScript(pair.Value);
 

@@ -120,6 +120,9 @@ namespace Kesa.Engine.Diagnostics
         public const string RunCycle = "RUN014";
         public const string RunScript = "RUN015";
 
+        // 제출 입구 (spec S6, spec-gaps G124): 호스트가 정책 필수를 켰는데 정책 함수가 없다
+        public const string RunNoSubmitPolicy = "RUN016";
+
         // 커맨드 선언 (spec S6, spec-gaps G109)
         public const string CmdBadDecorator = "CMD001";
         public const string CmdPreconditions = "CMD002";
