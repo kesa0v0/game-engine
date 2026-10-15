@@ -30,28 +30,28 @@ namespace Kesa.Engine.Tests.Runtime
             "        require(w < 5, text(\"msg.walls_full\", walls=w))\n" +
             "        require(unit.Moves.left > 0, text(\"msg.no_moves\", left=unit.Moves.left))\n" +
             "    return c\n" +
-            "@command\n" +
+            "@command(free=True, acts_for=None)\n" +
             "def Rest(unit: Ref[Unit]):\n" +
             "    return 0\n" +
-            "@command\n" +
+            "@command(free=True, acts_for=None)\n" +
             "def Buggy(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
             "        require(unit.Moves.nope > 0, text(\"msg.first\"))\n" +
             "        require(False, text(\"msg.second\"))\n" +
             "    return 0\n" +
-            "@command\n" +
+            "@command(free=True, acts_for=None)\n" +
             "def Lazy(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
             "        c = unit.Location.city\n" +
             "        require(c is None or c.Walls.walls < 5, text(\"msg.walls_full\", walls=c.Walls.walls))\n" +
             "    return 0\n" +
-            "@command\n" +
+            "@command(free=True, acts_for=None)\n" +
             "def NotText(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
             "        m = \"msg.plain\"\n" +
             "        require(False, m)\n" +
             "    return 0\n" +
-            "@command\n" +
+            "@command(free=True, acts_for=None)\n" +
             "def Spin(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
             "        require(False, text(\"msg.first\"))\n" +
@@ -63,13 +63,13 @@ namespace Kesa.Engine.Tests.Runtime
             "        t += i\n" +
             "    return t\n" +
             "Resource(\"Iron\")\nResource(\"Wood\")\n" +
-            "@command\n" +
+            "@command(free=True, acts_for=None)\n" +
             "def Trade(unit: Ref[Unit], goods: dict[DefId[Resource], int], rate: fixed, path: list[Ref[City]],\n" +
             "          escort: Ref[Unit] | None):\n" +
             "    with preconditions:\n" +
             "        require(rate > 0, text(\"msg.rate\"))\n" +
             "    return 0\n" +
-            "@command\n" +
+            "@command(free=True, acts_for=None)\n" +
             "def Wait(unit: Ref[Unit], turns: int = 2, pace: fixed = 1):\n" +
             "    with preconditions:\n" +
             "        require(turns <= 2, text(\"msg.too_long\", turns=turns))\n" +

@@ -382,6 +382,8 @@ namespace Kesa.Engine.Script
                                 "call it on its own line (or as 'x = " + b.Name + "(...)') in a @command body or in a " +
                                 "function that changes the world called on its own line from it (spec-gaps G117, G135)");
                         }
+                        if (b.CallerBody != null)
+                            return b.CallerBody(_stack.Count == 0 ? "" : _stack[_stack.Count - 1].Function.Mod, positional, keywords);
                         if (b.KeywordBody != null) return b.KeywordBody(positional, keywords);
                         if (keywords.Count > 0) throw Fail(Codes.RunScript, b.Name + "() does not take keyword arguments");
                         return b.Body(positional);

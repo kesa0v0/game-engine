@@ -181,6 +181,11 @@ namespace Kesa.Engine.Script
         /// </summary>
         public bool Suspends { get; set; }
 
+        /// <summary>
+        /// 부른 함수의 모드 id도 받는 몸체 (<c>ask</c>가 커맨드 이름 <c>"React"</c>를 그 모드의 커맨드로 푼다). 있으면 이것을 부른다.
+        /// </summary>
+        public Func<string, IReadOnlyList<Value>, IReadOnlyDictionary<string, Value>, Value>? CallerBody { get; set; }
+
         public override string KindName => "built-in function";
     }
 

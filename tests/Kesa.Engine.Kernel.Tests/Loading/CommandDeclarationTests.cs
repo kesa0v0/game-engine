@@ -11,7 +11,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void CommandIdIsModIdDotFunctionName()
         {
-            Mod("core", defs: "@command\ndef Move(n: int):\n    return n\n" +
+            Mod("core", defs: "@command(acts_for=lambda n: n)\ndef Move(n: int):\n    return n\n" +
                               "@command(free=True, acts_for=None)\ndef EndTurn():\n    return 0\n" +
                               "def helper(x):\n    return x\n");
             var result = LoadClean();
@@ -35,7 +35,7 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("@command(True)\ndef f():\n    return 0\n", "@command takes no positional arguments")]
         [TestCase("@command(cost=1)\ndef f():\n    return 0\n", "@command has no argument 'cost'")]
         [TestCase("@command(free=1)\ndef f():\n    return 0\n", "free= must be True or False")]
-        [TestCase("@command\n@command\ndef f():\n    return 0\n", "a function can have only one decorator")]
+        [TestCase("@command(free=True, acts_for=None)\n@command(free=True, acts_for=None)\ndef f():\n    return 0\n", "a function can have only one decorator")]
         [TestCase("@command.free\ndef f():\n    return 0\n", "unknown decorator; only @command and @submit_policy are supported")]
         public void BadDecoratorsAreLoadErrors(string defs, string message)
         {
@@ -50,7 +50,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void ADuplicateCommandNameIsANameErrorNotASecondCommand()
         {
-            Mod("core", defs: "@command\ndef Move():\n    return 0\n@command\ndef Move():\n    return 1\n");
+            Mod("core", defs: "@command(free=True, acts_for=None)\ndef Move():\n    return 0\n@command(free=True, acts_for=None)\ndef Move():\n    return 1\n");
             var result = Load(out var diags);
             Assert.That(diags.Select(d => d.Code), Is.EqualTo(new[] { Codes.EvlNameTaken }));
             Assert.That(result.Commands, Is.Empty);
@@ -72,34 +72,34 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void PreconditionLocalsAreVisibleInTheBody()
         {
-            Mod("core", defs: "@command\ndef Move(u: int):\n    with preconditions:\n        c = u + 1\n" +
+            Mod("core", defs: "@command(free=True, acts_for=None)\ndef Move(u: int):\n    with preconditions:\n        c = u + 1\n" +
                               "        require(c > 0, text(\"msg.neg\", c=c))\n    return c\n");
             LoadClean();
         }
 
-        [TestCase("@command\ndef f(u: bool):\n    x = 1\n    with preconditions:\n        require(u, text(\"m\"))\n    return x\n",
+        [TestCase("@command(free=True, acts_for=None)\ndef f(u: bool):\n    x = 1\n    with preconditions:\n        require(u, text(\"m\"))\n    return x\n",
             "'with' can only be the first statement of a @command function")]
         [TestCase("def f(u: bool):\n    with preconditions:\n        require(u, text(\"m\"))\n    return 0\n",
             "'with' can only be the first statement of a @command function")]
-        [TestCase("@command\ndef f(u: bool):\n    if u:\n        with preconditions:\n            require(u, text(\"m\"))\n    return 0\n",
+        [TestCase("@command(free=True, acts_for=None)\ndef f(u: bool):\n    if u:\n        with preconditions:\n            require(u, text(\"m\"))\n    return 0\n",
             "'with' can only be the first statement of a @command function")]
-        [TestCase("@command\ndef f(u: bool):\n    with other:\n        require(u, text(\"m\"))\n    return 0\n",
+        [TestCase("@command(free=True, acts_for=None)\ndef f(u: bool):\n    with other:\n        require(u, text(\"m\"))\n    return 0\n",
             "a command can only open 'with preconditions:'")]
-        [TestCase("@command\ndef f(u: bool):\n    with preconditions:\n        x = 1\n        x += 1\n    return 0\n",
+        [TestCase("@command(free=True, acts_for=None)\ndef f(u: bool):\n    with preconditions:\n        x = 1\n        x += 1\n    return 0\n",
             "'with preconditions:' can only hold require(...) calls and 'name = value' assignments")]
-        [TestCase("@command\ndef f(u: bool):\n    with preconditions:\n        if u:\n            require(u, text(\"m\"))\n    return 0\n",
+        [TestCase("@command(free=True, acts_for=None)\ndef f(u: bool):\n    with preconditions:\n        if u:\n            require(u, text(\"m\"))\n    return 0\n",
             "'with preconditions:' can only hold require(...) calls and 'name = value' assignments")]
-        [TestCase("@command\ndef f(u: bool):\n    with preconditions:\n        print(u)\n    return 0\n",
+        [TestCase("@command(free=True, acts_for=None)\ndef f(u: bool):\n    with preconditions:\n        print(u)\n    return 0\n",
             "'with preconditions:' can only hold require(...) calls and 'name = value' assignments")]
-        [TestCase("@command\ndef f(u: bool):\n    require(u, text(\"m\"))\n    return 0\n",
+        [TestCase("@command(free=True, acts_for=None)\ndef f(u: bool):\n    require(u, text(\"m\"))\n    return 0\n",
             "require() can only be used as a statement inside 'with preconditions:'")]
-        [TestCase("@command\ndef f(u: bool):\n    with preconditions:\n        x = require(u, text(\"m\"))\n    return 0\n",
+        [TestCase("@command(free=True, acts_for=None)\ndef f(u: bool):\n    with preconditions:\n        x = require(u, text(\"m\"))\n    return 0\n",
             "require() can only be used as a statement inside 'with preconditions:'")]
-        [TestCase("@command\ndef f(u: bool):\n    with preconditions:\n        require(u)\n    return 0\n",
+        [TestCase("@command(free=True, acts_for=None)\ndef f(u: bool):\n    with preconditions:\n        require(u)\n    return 0\n",
             "require() takes a condition and a message, got 1 argument")]
-        [TestCase("@command\ndef f(u: bool):\n    with preconditions:\n        require(u, text(\"m\"), n=1)\n    return 0\n",
+        [TestCase("@command(free=True, acts_for=None)\ndef f(u: bool):\n    with preconditions:\n        require(u, text(\"m\"), n=1)\n    return 0\n",
             "require() takes no keyword arguments")]
-        [TestCase("@command\ndef f(u: bool):\n    with preconditions:\n        require(u, \"msg.old_form\")\n    return 0\n",
+        [TestCase("@command(free=True, acts_for=None)\ndef f(u: bool):\n    with preconditions:\n        require(u, \"msg.old_form\")\n    return 0\n",
             "the message of require() must be a text(...) value")]
         [TestCase("with preconditions:\n    x = 1\n",
             "'with' can only be the first statement of a @command function")]
@@ -116,7 +116,7 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("choose")]
         public void CostAndChooseAreNotSupportedYet(string name)
         {
-            Mod("core", defs: "@command\ndef f(u: bool):\n    with preconditions:\n        " + name + "(u, 1)\n    return 0\n");
+            Mod("core", defs: "@command(free=True, acts_for=None)\ndef f(u: bool):\n    with preconditions:\n        " + name + "(u, 1)\n    return 0\n");
             Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.EvlUnsupported));
@@ -133,7 +133,7 @@ namespace Kesa.Engine.Tests.Loading
         public void ParameterAnnotationsAreResolvedToTypes()
         {
             Mod("core", schema: TypesSchema,
-                defs: "@command\ndef Trade(unit: Ref[Unit], what: DefId[\"Resource\"], n: int, rate: fixed, loud: bool, note: str,\n" +
+                defs: "@command(free=True, acts_for=None)\ndef Trade(unit: Ref[Unit], what: DefId[\"Resource\"], n: int, rate: fixed, loud: bool, note: str,\n" +
                       "          path: list[Ref[Unit]], goods: dict[DefId[Resource], int], target: Ref[Unit] | None):\n" +
                       "    return 0\n");
             var result = LoadClean();
@@ -162,7 +162,7 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("def Move(n: 3):", "this is not a parameter type")]
         public void BadParameterTypesAreLoadErrors(string header, string message)
         {
-            Mod("core", schema: TypesSchema, defs: "@command\n" + header + "\n    return 0\n");
+            Mod("core", schema: TypesSchema, defs: "@command(free=True, acts_for=None)\n" + header + "\n    return 0\n");
             var result = Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.CmdParameterType));
@@ -181,7 +181,7 @@ namespace Kesa.Engine.Tests.Loading
         public void ADefTypeOfAModNotDependedOnCannotBeUsed()
         {
             Mod("core", schema: TypesSchema);
-            Mod("naval", defs: "@command\ndef Sail(u: Ref[Unit]):\n    return 0\n");
+            Mod("naval", defs: "@command(free=True, acts_for=None)\ndef Sail(u: Ref[Unit]):\n    return 0\n");
             Load(out var diags);
             var d = diags.Single(x => x.Code == Codes.CmdParameterType);
             Assert.That(d.Message, Is.EqualTo("Def type 'Unit' belongs to mod 'core', which mod 'naval' does not depend on"));
@@ -191,7 +191,7 @@ namespace Kesa.Engine.Tests.Loading
         public void AShadowedTypeNameIsNotTheBuiltinType()
         {
             // G112: 모드가 int를 묶으면 그 모드에서 int는 엔진 타입이 아니다
-            Mod("core", defs: "int = 3\n@command\ndef Move(n: int):\n    return 0\n");
+            Mod("core", defs: "int = 3\n@command(free=True, acts_for=None)\ndef Move(n: int):\n    return 0\n");
             Load(out var diags);
             var d = diags.Single(x => x.Code == Codes.CmdParameterType);
             Assert.That(d.Message, Is.EqualTo("'int' is this mod's own name, so it cannot be used as a type here"));
@@ -204,7 +204,7 @@ namespace Kesa.Engine.Tests.Loading
         {
             Mod("core", schema: TypesSchema,
                 defs: "Resource(\"Iron\")\n" +
-                      "@command\ndef Trade(n: int = -2, rate: fixed = 3, loud: bool = False, what: DefId[Resource] = \"Iron\",\n" +
+                      "@command(free=True, acts_for=None)\ndef Trade(n: int = -2, rate: fixed = 3, loud: bool = False, what: DefId[Resource] = \"Iron\",\n" +
                       "          path: list[int] = [1, 2], goods: dict[str, int] = {\"a\": 1}, escort: Ref[Unit] | None = None,\n" +
                       "          unit: Ref[Unit] | None = None):\n" +
                       "    return 0\n");
@@ -228,7 +228,7 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("g: dict[str, int] = {\"a\": 1, \"a\": 2}", "the key \"a\" is written twice")]
         public void BadDefaultsAreLoadErrors(string parameter, string message)
         {
-            Mod("core", schema: TypesSchema, defs: "LIMIT = 3\n@command\ndef Move(" + parameter + "):\n    return 0\n");
+            Mod("core", schema: TypesSchema, defs: "LIMIT = 3\n@command(free=True, acts_for=None)\ndef Move(" + parameter + "):\n    return 0\n");
             var result = Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.CmdParameterType));
@@ -243,7 +243,7 @@ namespace Kesa.Engine.Tests.Loading
         {
             Mod("core", schema: TypesSchema,
                 defs: "Resource(\"Iron\")\nResource(\"Ore\", abstract=True)\nUnit(\"Scout\")\n" +
-                      "@command\ndef Mine(what: DefId[Resource] = " + id + "):\n    return 0\n");
+                      "@command(free=True, acts_for=None)\ndef Mine(what: DefId[Resource] = " + id + "):\n    return 0\n");
             var result = Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(code));

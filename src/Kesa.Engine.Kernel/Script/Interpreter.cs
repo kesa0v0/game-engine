@@ -273,20 +273,23 @@ namespace Kesa.Engine.Script
                 }
             }
 
-            // 누구로서 행동하는지는 자유 커맨드만 적는다. 응답 커맨드는 응답한 엔티티로서 행동한다 (G123·G126)
-            if (free && actsFor == null)
+            // 모든 커맨드가 누구로서 행동하는지 적는다. 응답 커맨드는 답하는 엔티티를 인자에서 고른다 (G123·G139)
+            if (actsFor == null)
             {
                 _context.Error(Codes.CmdBadDecorator,
-                    "a free command must say whom it acts for", decorator.Span,
-                    hint: "add acts_for=lambda party: party (a parameter of the command), or acts_for=None if it acts " +
-                          "for no one (spec-gaps G123)");
+                    free ? "a free command must say whom it acts for" : "a response command must say which entity answers",
+                    decorator.Span,
+                    hint: free
+                        ? "add acts_for=lambda party: party (a parameter of the command), or acts_for=None if it acts " +
+                          "for no one (spec-gaps G123)"
+                        : "add acts_for=lambda party: party (a parameter of the command) (spec-gaps G139)");
                 return;
             }
-            if (!free && actsFor != null)
+            if (!free && actsFor.Value is NoneLiteral)
             {
                 _context.Error(Codes.CmdBadDecorator,
-                    "acts_for is only for free commands (free=True); a response acts as the entity that answers",
-                    actsFor.Span, hint: "spec-gaps G123·G126");
+                    "a response command cannot use acts_for=None; an answer always comes from an entity",
+                    actsFor.Span, hint: "write acts_for=lambda party: party (spec-gaps G139)");
                 return;
             }
 

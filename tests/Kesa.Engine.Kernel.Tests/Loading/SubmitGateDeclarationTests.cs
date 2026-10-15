@@ -24,7 +24,7 @@ namespace Kesa.Engine.Tests.Loading
                 defs: "@command(free=True, acts_for=lambda unit: unit.Owner.party)\n" +
                       "def Move(party: Ref[Party], unit: Ref[Unit], n: int):\n    return 0\n" +
                       "@command(free=True, acts_for=None)\ndef Chat(msg: str):\n    return 0\n" +
-                      "@command\ndef Answer(n: int):\n    return 0\n");
+                      "@command(free=True, acts_for=None)\ndef Answer(n: int):\n    return 0\n");
             var result = LoadClean();
             var move = result.Commands["core.Move"];
             Assert.That(move.ActsFor, Is.Not.Null);
@@ -36,10 +36,10 @@ namespace Kesa.Engine.Tests.Loading
 
         [TestCase("@command(free=True)\ndef Move(party: Ref[Party]):\n    return 0\n",
             "a free command must say whom it acts for")]
-        [TestCase("@command(acts_for=lambda party: party)\ndef Move(party: Ref[Party]):\n    return 0\n",
-            "acts_for is only for free commands (free=True); a response acts as the entity that answers")]
+        [TestCase("@command\ndef Move(party: Ref[Party]):\n    return 0\n",
+            "a response command must say which entity answers")]
         [TestCase("@command(free=False, acts_for=None)\ndef Move(party: Ref[Party]):\n    return 0\n",
-            "acts_for is only for free commands (free=True); a response acts as the entity that answers")]
+            "a response command cannot use acts_for=None; an answer always comes from an entity")]
         [TestCase("@command(free=True, acts_for=\"party\")\ndef Move(party: Ref[Party]):\n    return 0\n",
             "acts_for= must be a lambda or None")]
         [TestCase("@command(free=True, acts_for=lambda partu: partu)\ndef Move(party: Ref[Party]):\n    return 0\n",

@@ -31,7 +31,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\n" +
             "def Chat(msg: str):\n" +
             "    return 0\n" +
-            "@command\n" +
+            "@command(acts_for=lambda n: n)\n" +
             "def Answer(n: int):\n" +
             "    return 0\n" +
             "@command(free=True, acts_for=lambda n: n)\n" +

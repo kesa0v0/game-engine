@@ -53,7 +53,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AShadowedRequireCannotBeUsedInPreconditions()
         {
-            Mod("core", defs: "@command\ndef Move(u: bool):\n    with preconditions:\n        require(u, text(\"m\"))\n    return 0\n" +
+            Mod("core", defs: "@command(free=True, acts_for=None)\ndef Move(u: bool):\n    with preconditions:\n        require(u, text(\"m\"))\n    return 0\n" +
                               "def require(x, y):\n    return x\n");
             var result = Load(out var diags);
             var d = diags.Single();
@@ -65,7 +65,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void ALocalNamedRequireShadowsItToo()
         {
-            Mod("core", defs: "@command\ndef Move(u: bool):\n    with preconditions:\n        require = u\n        require(u, text(\"m\"))\n    return 0\n");
+            Mod("core", defs: "@command(free=True, acts_for=None)\ndef Move(u: bool):\n    with preconditions:\n        require = u\n        require(u, text(\"m\"))\n    return 0\n");
             Load(out var diags);
             Assert.That(diags.Single().Message,
                 Is.EqualTo("'require' here is a local variable, so the built-in require() cannot be used"));
@@ -74,7 +74,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AShadowedCommandCannotBeUsedAsTheDecorator()
         {
-            Mod("core", defs: "command = 1\n@command\ndef Move():\n    return 0\n");
+            Mod("core", defs: "command = 1\n@command(free=True, acts_for=None)\ndef Move():\n    return 0\n");
             var result = Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.CmdBadDecorator));

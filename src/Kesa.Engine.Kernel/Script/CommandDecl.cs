@@ -29,9 +29,9 @@ namespace Kesa.Engine.Script
         public bool Free { get; }
 
         /// <summary>
-        /// 자유 커맨드가 누구로서 행동하는지 고르는 람다 (<c>acts_for=lambda party: party</c>, spec-gaps G122·G130).
-        /// 매개변수는 커맨드 매개변수를 이름으로 골라 받는다. null이면 <c>acts_for=None</c>(누구로서도 아님, G123)이거나
-        /// 자유 커맨드가 아니다.
+        /// 커맨드가 누구로서 행동하는지 고르는 람다 (<c>acts_for=lambda party: party</c>, spec-gaps G122·G130·G139).
+        /// 매개변수는 커맨드 매개변수를 이름으로 골라 받는다. 응답 커맨드에서는 답하는 엔티티다.
+        /// null이면 자유 커맨드의 <c>acts_for=None</c>(누구로서도 아님, G123)이다.
         /// </summary>
         public FunctionValue? ActsFor { get; }
 

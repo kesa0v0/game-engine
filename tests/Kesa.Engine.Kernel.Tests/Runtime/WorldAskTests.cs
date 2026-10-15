@@ -51,7 +51,36 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\n" +
             "def Silent(p: Ref[Party]):\n" +
             "    ask(p, \"Q\", choices=[\"ok\"])\n" +
-            "    p.Score.v = 9\n";
+            "    p.Score.v = 9\n" +
+            // 응답 커맨드 (G139): 우선권 한 바퀴처럼 번갈아 묻고 둘 다 연속으로 넘기면 끝
+            "@command(acts_for=lambda party: party)\n" +
+            "def Pass(party: Ref[Party]):\n" +
+            "    pass\n" +
+            "@command(acts_for=lambda party: party)\n" +
+            "def Bid(party: Ref[Party], amount: int):\n" +
+            "    with preconditions:\n" +
+            "        require(amount > 0, text(\"bid.positive\"))\n" +
+            "    party.Score.v = party.Score.v + amount\n" +
+            "@command(acts_for=lambda party: party)\n" +
+            "def Crash(party: Ref[Party]):\n" +
+            "    party.Score.v = 50\n" +
+            "    party.Score.v = \"oops\"\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def Round(a: Ref[Party], b: Ref[Party]):\n" +
+            "    passes = 0\n" +
+            "    for i in range(6):\n" +
+            "        p = a if i % 2 == 0 else b\n" +
+            "        r = ask(p, \"Bid\", responses=[\"Pass\", \"Bid\", \"Crash\"], choices=[\"Fold\"])\n" +
+            "        if r.response == \"Pass\":\n" +
+            "            passes += 1\n" +
+            "            if passes == 2:\n" +
+            "                break\n" +
+            "        elif r.response == \"Bid\":\n" +
+            "            passes = 0\n" +
+            "        else:\n" +
+            "            r.by.Score.v = -1\n" +
+            "            break\n" +
+            "    a.Score.v = a.Score.v + 1000\n";
 
         private World _world = null!;
         private EntityId _red, _blue, _green;
@@ -211,6 +240,81 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(world.Answer("host", q.Id, red, 0).Succeeded, Is.True);
         }
 
+        // ---- 응답 커맨드 (G139) ----
+
+        private AnswerResult Respond(long request, string command, EntityId party, params (string Name, Value Value)[] more)
+        {
+            var args = new Dictionary<string, Value> { ["party"] = new EntityValue(party) };
+            foreach (var (name, value) in more) args[name] = value;
+            return _world.Respond("host", request, "banking." + command, args);
+        }
+
+        [Test]
+        public void ResponseCommandsRunAndAskSeesTheirName()
+        {
+            var q = Submit("Round", ("a", _red), ("b", _blue)).OpenedRequest!;
+            Assert.That(q.Responses, Is.EqualTo(new[] { "banking.Pass", "banking.Bid", "banking.Crash" }));
+            var bid = Respond(q.Id, "Bid", _red, ("amount", new IntValue(5)));
+            Assert.That(bid.Succeeded, Is.True, bid.Message);
+            Assert.That(V(_red), Is.EqualTo(5));
+            q = bid.OpenedRequest!;
+            Assert.That(q.Who, Is.EqualTo(new[] { _blue }));
+            q = Respond(q.Id, "Pass", _blue).OpenedRequest!;
+            var last = Respond(q.Id, "Pass", _red);
+            Assert.That(last.Succeeded, Is.True, last.Message);
+            Assert.That(last.OpenedRequest, Is.Null);
+            Assert.That(V(_red), Is.EqualTo(1005));
+        }
+
+        [Test]
+        public void ChoicesAndResponsesCanBeMixed()
+        {
+            var q = Submit("Round", ("a", _red), ("b", _blue)).OpenedRequest!;
+            Assert.That(_world.Answer("host", q.Id, _red, 0).Succeeded, Is.True);
+            Assert.That(V(_red), Is.EqualTo(999)); // r.response가 None이라 else, r.by = red
+        }
+
+        [Test]
+        public void AResponseIsRejectedBeforeItRuns()
+        {
+            var q = Submit("Round", ("a", _red), ("b", _blue)).OpenedRequest!;
+            Assert.That(Respond(q.Id, "Bid", _blue, ("amount", new IntValue(5))).Outcome, Is.EqualTo(AnswerOutcome.NotListed));
+            var wrongArg = Respond(q.Id, "Bid", _red, ("amount", new StrValue("x")));
+            Assert.That(wrongArg.Outcome, Is.EqualTo(AnswerOutcome.ArgumentsRejected));
+            Assert.That(wrongArg.ArgumentRejections.Single().Parameter, Is.EqualTo("amount"));
+            var failed = Respond(q.Id, "Bid", _red, ("amount", new IntValue(0)));
+            Assert.That(failed.Outcome, Is.EqualTo(AnswerOutcome.PreconditionsFailed));
+            Assert.That(failed.Preconditions!.Failures.Single().MessageKey, Is.EqualTo("bid.positive"));
+            Assert.That(_world.OpenRequests.Single(), Is.SameAs(q));
+            Assert.That(V(_red), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void AResponseCommandTheRequestDoesNotTakeIsRejected()
+        {
+            var q = Submit("Branch", ("p", _red)).OpenedRequest!;
+            var r = Respond(q.Id, "Pass", _red);
+            Assert.That(r.Outcome, Is.EqualTo(AnswerOutcome.NotAccepted));
+            Assert.That(r.Message, Does.Contain("it accepts: [] and choices"));
+        }
+
+        [Test]
+        public void AFailingResponseBodyIsUndoneAndTheRequestStaysOpen()
+        {
+            var q = Submit("Round", ("a", _red), ("b", _blue)).OpenedRequest!;
+            var r = Respond(q.Id, "Crash", _red);
+            Assert.That(r.Outcome, Is.EqualTo(AnswerOutcome.ScriptError));
+            Assert.That(V(_red), Is.EqualTo(0));
+            Assert.That(_world.OpenRequests.Single(), Is.SameAs(q));
+        }
+
+        [Test]
+        public void AResponseCommandCannotBeSubmittedOnItsOwn()
+        {
+            var r = Submit("Pass", ("party", _red));
+            Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.NeedsRequest));
+        }
+
         // ---- 잘못 쓴 ask ----
 
         private static string Command(string body) =>
@@ -224,11 +328,13 @@ namespace Kesa.Engine.Tests.Runtime
             return world.Submit("host", "banking.C", new Dictionary<string, Value> { ["p"] = new EntityValue(red) });
         }
 
-        [TestCase("    r = ask(p, \"Q\")\n", "ask() needs choices=[...]")]
+        [TestCase("    r = ask(p, \"Q\")\n", "ask() needs choices=[...] or responses=[...]")]
         [TestCase("    r = ask(p, \"Q\", choices=[])\n", "non-empty list")]
         [TestCase("    r = ask(3, \"Q\", choices=[\"a\"])\n", "ask() asks entities, not int")]
         [TestCase("    r = ask(p, 3, choices=[\"a\"])\n", "title of ask()")]
-        [TestCase("    r = ask(p, \"Q\", choices=[\"a\"], responses=[\"Pass\"])\n", "not supported yet")]
+        [TestCase("    r = ask(p, \"Q\", responses=[\"Nope\"])\n", "there is no command 'banking.Nope'")]
+        [TestCase("    r = ask(p, \"Q\", responses=[\"C\"])\n", "banking.C is a free command, so it cannot answer a question")]
+        [TestCase("    r = ask(p, \"Q\", responses=[3])\n", "takes command names (str), not int")]
         [TestCase("    r = ask(p, \"Q\", choices=[\"a\"], hnit=\"x\")\n", "ask() has no argument 'hnit'")]
         [TestCase("    r = ask(p, \"Q\", choices=[lambda x: x])\n", "cannot hold")]
         public void MisusedAskIsAScriptError(string body, string message)

@@ -17,7 +17,7 @@ namespace Kesa.Engine.Tests.Loading
             Mod("core", schema: Schema,
                 defs: "def damage(u, n):\n    u.Health.current -= n\n" +
                       "def strike(u):\n    if u:\n        damage(u, 3)\n" +
-                      "@command\ndef Attack(u: Ref[Unit]):\n    strike(u)\n    u.Health.current = 0\n    return 0\n");
+                      "@command(free=True, acts_for=None)\ndef Attack(u: Ref[Unit]):\n    strike(u)\n    u.Health.current = 0\n    return 0\n");
             LoadClean();
         }
 
@@ -37,7 +37,7 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("def f(u):\n    if damage(u, 1):\n        return 1\n    return 0\n", 4)]
         [TestCase("def f(u):\n    return damage(u, 1)\n", 4)]
         [TestCase("g = lambda u: damage(u, 1)\n", 3)]
-        [TestCase("@command\ndef F(u: Ref[Unit]):\n    with preconditions:\n        require(damage(u, 1), text(\"m\"))\n    return 0\n", 6)]
+        [TestCase("@command(free=True, acts_for=None)\ndef F(u: Ref[Unit]):\n    with preconditions:\n        require(damage(u, 1), text(\"m\"))\n    return 0\n", 6)]
         [TestCase("def f(u):\n    [damage(u, 1)]\n", 4)]
         public void AWriterCalledInsideAnExpressionIsALoadError(string defs, int line)
         {
@@ -103,11 +103,11 @@ namespace Kesa.Engine.Tests.Loading
         // ---- 커맨드는 로직에서 쓸 수 없다 (G118) ----
 
         private const string Heal =
-            "@command\ndef Heal(u: Ref[Unit]):\n    with preconditions:\n        require(u.Health.current < 10, text(\"m\"))\n" +
+            "@command(free=True, acts_for=None)\ndef Heal(u: Ref[Unit]):\n    with preconditions:\n        require(u.Health.current < 10, text(\"m\"))\n" +
             "    u.Health.current = 10\n    return 0\n";
 
         [TestCase("def helper(u):\n    Heal(u)\n", 8)]
-        [TestCase("@command\ndef Rally(u: Ref[Unit]):\n    Heal(u)\n    return 0\n", 9)]
+        [TestCase("@command(free=True, acts_for=None)\ndef Rally(u: Ref[Unit]):\n    Heal(u)\n    return 0\n", 9)]
         [TestCase("def helper(u):\n    x = Heal(u)\n    return x\n", 8)]
         [TestCase("def helper(u):\n    f = Heal\n    return 0\n", 8)]
         [TestCase("def helper(u, g):\n    return g(Heal)\n", 8)]
@@ -129,8 +129,8 @@ namespace Kesa.Engine.Tests.Loading
         {
             Mod("core", schema: Schema,
                 defs: "def heal(u):\n    u.Health.current = 10\n" +
-                      "@command\ndef Heal(u: Ref[Unit]):\n    heal(u)\n    return 0\n" +
-                      "@command\ndef Rally(u: Ref[Unit]):\n    heal(u)\n    return 0\n");
+                      "@command(free=True, acts_for=None)\ndef Heal(u: Ref[Unit]):\n    heal(u)\n    return 0\n" +
+                      "@command(free=True, acts_for=None)\ndef Rally(u: Ref[Unit]):\n    heal(u)\n    return 0\n");
             LoadClean();
         }
 
@@ -148,7 +148,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void ACommandCannotBeADerivedFunction()
         {
-            Mod("core", schema: "@command\ndef Peek(h: int):\n    return 1\n" +
+            Mod("core", schema: "@command(free=True, acts_for=None)\ndef Peek(h: int):\n    return 1\n" +
                                 "component(\"Health\", current=field(int, default=10), max=derived(int, Peek))\n" +
                                 "deftype(\"Unit\", components=[\"Health\"])\n");
             Load(out var diags);
