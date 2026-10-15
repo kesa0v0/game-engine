@@ -226,8 +226,8 @@ namespace Kesa.Engine.Loading
                 case FunctionTypeRef f:
                     if (!(value is FunctionValue fn)) return "expected a function for " + f.Display + ", found " + value.KindName;
                     // 커맨드는 제출로만 실행된다 (G118)
-                    if (fn.IsCommand)
-                        return "'" + fn.Name + "' is a @command, so it cannot be a value of " + f.Display +
+                    if (fn.IsEntry)
+                        return "'" + fn.Name + "' is a " + fn.EntryKind + ", so it cannot be a value of " + f.Display +
                                "; use a plain function";
                     // 확인용 자리에는 쓰기 함수를 둘 수 없다 (G117). 판정은 ②b 끝에 끝나 있다
                     if (f.Kind == FunctionSlotKind.Cond && fn.Writes)

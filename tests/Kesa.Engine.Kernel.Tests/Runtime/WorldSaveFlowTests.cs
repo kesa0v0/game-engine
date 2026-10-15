@@ -17,7 +17,8 @@ namespace Kesa.Engine.Tests.Runtime
             "component(\"Skill\", key=\"SkillDef\", keys=\"all\", level=field(int, default=3))\n" +
             "component(\"Wounded\", turns=field(int, default=0))\n" +
             "deftype(\"SkillDef\")\n" +
-            "deftype(\"Party\", tier=const(int, default=2), components=[\"Score\", \"Skill\"])\n";
+            "deftype(\"Party\", tier=const(int, default=2), components=[\"Score\", \"Skill\"])\n" +
+            "signal(\"Hit\", who=Ref[\"Party\"], n=int)\n";
 
         private const string Defs =
             "SkillDef(\"Cooking\")\nSkillDef(\"Mining\")\n" +
@@ -68,6 +69,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    pg = pair()\n" +
             "    cv = Score(v=lam)\n" +
             "    tv = text(\"k\", f=lam)\n" +
+            "    sg = Hit(who=p, n=2)\n" +
             "    r0 = ask(p, \"Start\", choices=[\"go\", \"rush\"])\n" +
             "    bonus = 5\n" +
             "    picked = survey(p, [p, q])\n" +
@@ -91,7 +93,8 @@ namespace Kesa.Engine.Tests.Runtime
             "    hv.v = hv.v + lam(1) + mk() + pg()\n" +
             "    hv.log = hv.log + (\"L\" if lam == same else \"-\") + (\"N\" if lam != mk else \"-\")\n" +
             "    hv.log = hv.log + (\"C\" if cv == Score(v=lam) else \"-\") + (\"T\" if tv == text(\"k\", f=lam) else \"-\")\n" +
-            "    hv.log = hv.log + (\"E\" if each == same else \"-\")\n";
+            "    hv.log = hv.log + (\"E\" if each == same else \"-\")\n" +
+            "    hv.log = hv.log + (\"G\" if sg == Hit(n=2, who=p) and sg.who == p and sg.n == 2 else \"-\")\n";
 
         /// <summary>시나리오의 걸음: 제출 하나, 그다음 열린 질문에 고른 번호로 답하기. 6번째 답(2)은 재개 뒤 오류를 낸다.</summary>
         private static readonly long[] Answers = { 1, 0, 1, 1, 0, 2, 0, 0, 0, 0 };
@@ -167,7 +170,7 @@ namespace Kesa.Engine.Tests.Runtime
             // 저장들이 실제로 모든 종류의 값을 거쳤다
             var text = all.ToString();
             foreach (var tag in new[] { "entity_view", "component", "rows", "def_view", "answer", "component_value", "range",
-                         "function", "builtin", "branch", "items", "closure", "lambda", "frame", "env" })
+                         "function", "builtin", "branch", "items", "closure", "lambda", "frame", "env", "signal" })
                 Assert.That(text, Does.Contain("\"" + tag + "\""), tag);
         }
 
@@ -180,7 +183,7 @@ namespace Kesa.Engine.Tests.Runtime
             // bump(p,1)=1, key(p)로 2, bump(p,10)=12, + double(len([p]))=2 + len([1,2])=2 + tier 2 + level 3 + rush 100,
             // + lam(1)=1+5 (bonus는 재개 뒤에 5) + mk()=lam(1)=6 + pg()=1
             Assert.That(((IntValue)w.Get(red, w.Member("Score", "v"))).Value, Is.EqualTo(12 + 2 + 2 + 2 + 3 + 100 + 6 + 6 + 1));
-            Assert.That(((StrValue)w.Get(red, w.Member("Score", "log"))).Value, Is.EqualTo("SHMWLNCTE"));
+            Assert.That(((StrValue)w.Get(red, w.Member("Score", "log"))).Value, Is.EqualTo("SHMWLNCTEG"));
             Assert.That(((StrValue)w.Get(new EntityId(2), w.Member("Score", "log"))).Value, Is.EqualTo("s"));
             Assert.That(w.Has(red, "Wounded"), Is.True);
         }

@@ -63,6 +63,7 @@ namespace Kesa.Engine.Schema
                 {
                     foreach (var t in m.Types) Note(t.Name, t.Mod, t.Span);
                     foreach (var c in m.Components) Note(c.Name, c.Mod, c.Span);
+                    foreach (var s in m.Signals) Note(s.Name, s.Mod, s.Span);
                 }
 
                 bool Unique(string name, string mod, SourceSpan span)
@@ -77,7 +78,7 @@ namespace Kesa.Engine.Schema
                         owners.Add(otherMod);
                         if (!otherSpan.Equals(span)) related.Add(otherSpan);
                     }
-                    const string hint = "Def types and components share one namespace";
+                    const string hint = "Def types, components and signals share one namespace";
                     if (owners.Count == 1)
                         Error(mod, Codes.SchDuplicateName, "'" + name + "' is declared more than once", span, hint, related);
                     else
@@ -93,6 +94,8 @@ namespace Kesa.Engine.Schema
                         if (Unique(t.Name, t.Mod, t.Span)) _set.Add(new DefType(t));
                     foreach (var c in m.Components)
                         if (Unique(c.Name, c.Mod, c.Span)) _set.Add(new ComponentType(c));
+                    foreach (var s in m.Signals)
+                        if (Unique(s.Name, s.Mod, s.Span)) _set.Add(new SignalType(s));
                 }
             }
 
@@ -291,6 +294,10 @@ namespace Kesa.Engine.Schema
                 {
                     foreach (var k in t.Consts) CheckTypeNames(k.Spec.Type, k.Mod);
                 }
+                foreach (var s in _set.Signals)
+                {
+                    foreach (var f in s.Fields) CheckTypeNames(f.Type, s.Mod);
+                }
             }
 
             private void CheckTypeNames(TypeRef type, string mod)
@@ -458,6 +465,11 @@ namespace Kesa.Engine.Schema
                     Error(from, Codes.SchUnknownName, "'" + r.Name + "' is a component, not a Def type", r.Span);
                     return null;
                 }
+                if (_set.TryGetSignal(r.Name, out _))
+                {
+                    Error(from, Codes.SchUnknownName, "'" + r.Name + "' is a signal, not a Def type", r.Span);
+                    return null;
+                }
                 if (_ambiguous.Contains(r.Name)) return null;
 
                 var visible = new List<string>();
@@ -479,6 +491,11 @@ namespace Kesa.Engine.Schema
                 if (_set.TryGetType(r.Name, out _))
                 {
                     Error(from, Codes.SchUnknownName, "'" + r.Name + "' is a Def type, not a component", r.Span);
+                    return null;
+                }
+                if (_set.TryGetSignal(r.Name, out _))
+                {
+                    Error(from, Codes.SchUnknownName, "'" + r.Name + "' is a signal, not a component", r.Span);
                     return null;
                 }
                 if (_ambiguous.Contains(r.Name)) return null;

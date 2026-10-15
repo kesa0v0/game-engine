@@ -286,7 +286,10 @@ namespace Kesa.Engine.Script
         /// 커맨드로 볼 함수인가: 데코레이터가 있고 <c>@submit_policy</c>가 아니다. 잘못된 데코레이터도 커맨드로 봐서
         /// 원인 오류 하나가 다른 오류로 번지지 않게 한다 (데코레이터 자체는 인터프리터가 검사).
         /// </summary>
-        public bool IsCommand => Decorators.Count > 0 && DecoratorName != Interpreter.SubmitPolicyName;
+        public bool IsCommand => Decorators.Count > 0 && DecoratorName != Interpreter.SubmitPolicyName && !IsHandler;
+
+        /// <summary><c>@on(신호)</c> 핸들러인가 (spec S5, spec-gaps G145). 본문은 커맨드처럼 Flow지만 사전 조건이 없다.</summary>
+        public bool IsHandler => Decorators.Count > 0 && DecoratorName == Interpreter.OnName;
 
         public string Name { get; }
         public IReadOnlyList<Parameter> Parameters { get; }

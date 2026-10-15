@@ -178,12 +178,28 @@ namespace Kesa.Engine.Loading
             if (_schema.TryGetType(name, out var t) && _visibility.CanSee(_mod, t.Mod)) return new DefConstructor(this, t);
             if (_schema.TryGetComponent(name, out var c) && _visibility.CanSee(_mod, c.Mod))
                 return new ComponentConstructor(c);
+            if (_schema.TryGetSignal(name, out var s) && _visibility.CanSee(_mod, s.Mod)) return new SignalName(s);
             return null;
         }
 
-        /// <summary>이 모드에 보이는 컴포넌트 이름인가. 컴포넌트 값 생성자는 로직 함수에서도 쓴다 (spec-gaps G134).</summary>
-        public bool IsVisibleComponent(string name) =>
-            _schema.TryGetComponent(name, out var c) && _visibility.CanSee(_mod, c.Mod);
+        /// <summary>
+        /// 이 모드에 보이는 컴포넌트나 신호 이름인가. 컴포넌트 값 생성자(spec-gaps G134)와 신호 값 생성자(G145)는 로직 함수에서 쓴다.
+        /// </summary>
+        /// <summary>이 모드에 보이는 컴포넌트와 신호 이름 (함수 본문의 이름 오타에 "혹시 …?" 후보로 쓴다).</summary>
+        public IEnumerable<string> RuntimeSchemaNames
+        {
+            get
+            {
+                foreach (var c in _schema.Components)
+                    if (_visibility.CanSee(_mod, c.Mod)) yield return c.Name;
+                foreach (var s in _schema.Signals)
+                    if (_visibility.CanSee(_mod, s.Mod)) yield return s.Name;
+            }
+        }
+
+        public bool IsVisibleRuntimeSchemaName(string name) =>
+            (_schema.TryGetComponent(name, out var c) && _visibility.CanSee(_mod, c.Mod)) ||
+            (_schema.TryGetSignal(name, out var s) && _visibility.CanSee(_mod, s.Mod));
 
         public IEnumerable<string> Names
         {
@@ -195,6 +211,8 @@ namespace Kesa.Engine.Loading
                     if (_visibility.CanSee(_mod, t.Mod)) yield return t.Name;
                 foreach (var c in _schema.Components)
                     if (_visibility.CanSee(_mod, c.Mod)) yield return c.Name;
+                foreach (var s in _schema.Signals)
+                    if (_visibility.CanSee(_mod, s.Mod)) yield return s.Name;
             }
         }
 
@@ -205,6 +223,7 @@ namespace Kesa.Engine.Loading
             string? owner = null;
             if (_schema.TryGetType(name, out var t)) owner = t.Mod;
             else if (_schema.TryGetComponent(name, out var c)) owner = c.Mod;
+            else if (_schema.TryGetSignal(name, out var s)) owner = s.Mod;
             if (owner != null)
                 return (Codes.SchNotVisible,
                     "'" + name + "' belongs to mod '" + owner + "', which mod '" + _mod +
@@ -384,6 +403,23 @@ namespace Kesa.Engine.Loading
                     arg.Span);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Def 파일에서 신호 이름이 가리키는 값 (spec-gaps G145). <c>@on(Damaged)</c>가 받는다. 신호 값은 함수 본문에서만 만든다.
+        /// </summary>
+        internal sealed class SignalName : CallableValue
+        {
+            public SignalName(SignalType signal) => Signal = signal;
+
+            public SignalType Signal { get; }
+            public override string Name => Signal.Name;
+            public override string KindName => "signal '" + Signal.Name + "'";
+
+            public override Value Call(CallContext ctx, SourceSpan span, IReadOnlyList<ArgValue> args) =>
+                throw ctx.Fail(Codes.EvlUnsupported,
+                    "signal values are made when the game runs, inside a function: emit(" + Signal.Name + "(...))", span,
+                    hint: "spec-gaps G145");
         }
 
         private sealed class ComponentConstructor : CallableValue

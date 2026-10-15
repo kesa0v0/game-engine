@@ -132,6 +132,17 @@ namespace Kesa.Engine.Script
         /// <summary><c>@command</c> 함수인가 (G109). 로직에서 쓸 수 없다 (G118).</summary>
         public bool IsCommand => Definition != null && Definition.IsCommand;
 
+        /// <summary><c>@on</c> 핸들러인가 (G145).</summary>
+        public bool IsHandler => Definition != null && Definition.IsHandler;
+
+        /// <summary>
+        /// 제출이나 신호로만 실행되는 Flow 입구(커맨드·핸들러)인가. 로직에서 부르거나 값으로 쓸 수 없다 (G118, 핸들러는 G145).
+        /// </summary>
+        public bool IsEntry => IsCommand || IsHandler;
+
+        /// <summary>메시지에 쓰는 입구 종류: <c>@command</c> 또는 <c>@on handler</c>.</summary>
+        public string EntryKind => IsHandler ? "@on handler" : "@command";
+
         /// <summary><c>@submit_policy</c> 함수인가 (G122). 순수 자리다.</summary>
         public bool IsSubmitPolicy => Definition != null && Definition.DecoratorName == Interpreter.SubmitPolicyName;
 

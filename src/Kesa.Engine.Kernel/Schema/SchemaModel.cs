@@ -273,6 +273,40 @@ namespace Kesa.Engine.Schema
         public IReadOnlyList<NameRef> Components { get; }
     }
 
+    /// <summary>신호의 인자 하나 (<c>amount=int</c>, spec-gaps G145).</summary>
+    public sealed class SignalField
+    {
+        internal SignalField(string name, TypeRef type, SourceSpan span)
+        {
+            Name = name;
+            Type = type;
+            Span = span;
+        }
+
+        public string Name { get; }
+        public TypeRef Type { get; }
+        public SourceSpan Span { get; }
+    }
+
+    /// <summary><c>signal("Damaged", target=Ref[Unit], amount=int)</c> (spec S5, spec-gaps G145).</summary>
+    public sealed class SignalDecl
+    {
+        internal SignalDecl(string name, SourceSpan span, string mod, IReadOnlyList<SignalField> fields)
+        {
+            Name = name;
+            Span = span;
+            Mod = mod;
+            Fields = fields;
+        }
+
+        public string Name { get; }
+        public SourceSpan Span { get; }
+        public string Mod { get; }
+
+        /// <summary>선언 순서.</summary>
+        public IReadOnlyList<SignalField> Fields { get; }
+    }
+
     /// <summary><c>extend("Unit", components=[...], x=const(...))</c> (schema-design 4.2).</summary>
     public sealed class ExtensionDecl
     {
@@ -302,6 +336,29 @@ namespace Kesa.Engine.Schema
         public List<DefTypeDecl> Types { get; } = new List<DefTypeDecl>();
         public List<ComponentDecl> Components { get; } = new List<ComponentDecl>();
         public List<ExtensionDecl> Extensions { get; } = new List<ExtensionDecl>();
+        public List<SignalDecl> Signals { get; } = new List<SignalDecl>();
+    }
+
+    /// <summary>
+    /// 완성된 신호 (spec S5, spec-gaps G145). 이름은 Def 타입·컴포넌트와 한 이름 공간이고, 함수 본문에서 <c>Damaged(...)</c>로
+    /// 신호 값을 만들고 <c>@on(Damaged)</c>로 핸들러를 붙인다.
+    /// </summary>
+    public sealed class SignalType
+    {
+        private readonly Dictionary<string, SignalField> _fields = new Dictionary<string, SignalField>(StringComparer.Ordinal);
+
+        internal SignalType(SignalDecl decl)
+        {
+            Decl = decl;
+            foreach (var f in decl.Fields) _fields[f.Name] = f;
+        }
+
+        public SignalDecl Decl { get; }
+        public string Name => Decl.Name;
+        public string Mod => Decl.Mod;
+        public IReadOnlyList<SignalField> Fields => Decl.Fields;
+
+        public bool TryGetField(string name, out SignalField field) => _fields.TryGetValue(name, out field!);
     }
 
     // ---- 완성된 스키마 (②a 끝) ----
@@ -422,6 +479,20 @@ namespace Kesa.Engine.Schema
         {
             _components.Add(component.Name, component);
             _componentList.Add(component);
+        }
+
+        private readonly Dictionary<string, SignalType> _signals = new Dictionary<string, SignalType>(StringComparer.Ordinal);
+        private readonly List<SignalType> _signalList = new List<SignalType>();
+
+        /// <summary>로드 순서, 같은 모드 안에서는 선언 순서 (G145).</summary>
+        public IReadOnlyList<SignalType> Signals => _signalList;
+
+        public bool TryGetSignal(string name, out SignalType signal) => _signals.TryGetValue(name, out signal!);
+
+        internal void Add(SignalType signal)
+        {
+            _signals.Add(signal.Name, signal);
+            _signalList.Add(signal);
         }
     }
 }

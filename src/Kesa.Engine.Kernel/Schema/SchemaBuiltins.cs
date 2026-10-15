@@ -15,6 +15,7 @@ namespace Kesa.Engine.Schema
         public const string DefType = "deftype";
         public const string Component = "component";
         public const string Extend = "extend";
+        public const string Signal = "signal";
 
         /// <summary>Def 생성자 키워드 중 필드 이름으로 쓸 수 없는 것 (spec S1 상속·중복 ID).</summary>
         public static readonly IReadOnlyList<string> ReservedDefKeywords = new[] { "abstract", "override", "parent" };
@@ -41,6 +42,7 @@ namespace Kesa.Engine.Schema
             Add(new BuiltinFunction(DefType, DeclareType));
             Add(new BuiltinFunction(Component, DeclareComponent));
             Add(new BuiltinFunction(Extend, DeclareExtension));
+            Add(new BuiltinFunction(Signal, DeclareSignal));
             Add(new BuiltinFunction("const", MakeConst));
             Add(new BuiltinFunction("field", MakeField));
             Add(new BuiltinFunction("derived", MakeDerived));
@@ -56,6 +58,7 @@ namespace Kesa.Engine.Schema
                 yield return DefType;
                 yield return Component;
                 yield return Extend;
+                yield return Signal;
                 yield return "const";
                 yield return "field";
                 yield return "derived";
@@ -189,6 +192,30 @@ namespace Kesa.Engine.Schema
                 members.Add(new MemberDecl(arg.Name!, arg.Span, ctx.Mod, spec));
             }
             _target.Components.Add(new ComponentDecl(name.Name, name.Span, ctx.Mod, key, keyKind, keys, members));
+            return NoneValue.Instance;
+        }
+
+        /// <summary>
+        /// <c>signal("Damaged", target=Ref[Unit], amount=int)</c> (spec S5, spec-gaps G145). 이름은 Def 타입·컴포넌트와 한 이름
+        /// 공간이고 인자는 <c>이름=타입</c>이다 (모두 필수, 기본값 없음).
+        /// </summary>
+        private Value DeclareSignal(CallContext ctx, SourceSpan span, IReadOnlyList<ArgValue> args)
+        {
+            var r = new ArgReader(ctx, Signal, span, args);
+            r.ExpectPositional(1, "signal(\"Name\", target=Ref[\"Unit\"], amount=int)");
+            var name = ReadTypeName(ctx, r, "signal name");
+            var fields = new List<SignalField>();
+            foreach (var arg in r.Rest())
+            {
+                if (!(arg.Value is TypeRef type))
+                    throw ctx.Fail(Codes.EvlType, "a signal value is declared with its type, like " + arg.Name + "=int, not " +
+                                                  arg.Value.KindName, arg.Span,
+                        hint: "signal values have no defaults: every emit gives all of them (spec-gaps G145)");
+                if (ContainsFunctionType(type))
+                    throw ctx.Fail(Codes.SchBadDeclaration, "a signal cannot carry function values", arg.Span);
+                fields.Add(new SignalField(arg.Name!, type, arg.Span));
+            }
+            _target.Signals.Add(new SignalDecl(name.Name, name.Span, ctx.Mod, fields));
             return NoneValue.Instance;
         }
 

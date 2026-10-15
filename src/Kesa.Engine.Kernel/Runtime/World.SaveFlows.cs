@@ -375,6 +375,12 @@ namespace Kesa.Engine.Runtime
                     return Tag("component_value", new JsonObject()
                         .Add("name", new JsonString(c.Component.Name))
                         .Add("values", given));
+                case SignalValue s:
+                    var fields = new JsonObject();
+                    foreach (var pair in s.Values) fields.Add(pair.Key.Name, SaveValue(pair.Value));
+                    return Tag("signal", new JsonObject()
+                        .Add("name", new JsonString(s.Signal.Name))
+                        .Add("values", fields));
                 case ContributionView c:
                     return Tag("contribution", SaveContribution(c.Row));
                 case RangeValue r:
@@ -778,6 +784,23 @@ namespace Kesa.Engine.Runtime
                                 values.Add(new KeyValuePair<MemberDecl, Value>(decl, value));
                             }
                             return component == null ? (Value)NoneValue.Instance : new ComponentInitValue(component, values);
+                        }
+                        case "signal":
+                        {
+                            // 지금 선언과 맞춘다: 없어진 신호, 더해지거나 빠진 인자, 타입이 바뀐 인자는 SAV002 (G145)
+                            var v = AsObject(tag.Value, "a signal value");
+                            string name = Text(Field(v, "name"), "a signal name");
+                            var given = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+                            foreach (var pair in AsObject(Field(v, "values"), "signal values").Members)
+                                given[pair.Key] = LoadValue(pair.Value);
+                            if (!_schema.TryGetSignal(name, out var signal))
+                            {
+                                problems.Add(where + ": the signal '" + name + "' no longer exists");
+                                return NoneValue.Instance;
+                            }
+                            var values = SignalValues(signal, given, out var mismatches);
+                            foreach (var m in mismatches) problems.Add(where + ": signal " + name + ": " + m.Message);
+                            return new SignalValue(this, signal, values);
                         }
                         case "contribution":
                         {

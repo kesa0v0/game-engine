@@ -76,6 +76,7 @@ namespace Kesa.Engine.Stubs
             "def deftype(name: str, /, *, components: list[str] = ..., **consts: MemberDecl) -> None: ...\n" +
             "def component(name: str, /, *, key: Any = ..., keys: Literal[\"all\", \"listed\"] = ..., **members: MemberDecl) -> None: ...\n" +
             "def extend(type_name: str, /, *, components: list[str] = ..., **consts: MemberDecl) -> None: ...\n" +
+            "def signal(name: str, /, **values: Any) -> None: ...\n" +
             "def const(type: Any, /, *, default: Any = ..., min: int | float = ..., max: int | float = ..., " +
             "merge: Literal[\"replace\", \"append\"] = ...) -> MemberDecl: ...\n" +
             "def field(type: Any, /, *, default: Any = ..., default_from: str = ..., min: int | float = ..., " +
@@ -121,6 +122,8 @@ namespace Kesa.Engine.Stubs
                     if (Sees(c.Mod)) WriteComponent(c);
                 foreach (var t in _schema.Types)
                     if (Sees(t.Mod)) WriteDefType(t);
+                foreach (var s in _schema.Signals)
+                    if (Sees(s.Mod)) WriteSignal(s);
 
                 WritePatch();
                 WriteModLoaded();
@@ -141,6 +144,20 @@ namespace Kesa.Engine.Stubs
                 {
                     if (member.Kind == MemberKind.Derived || member.Kind == MemberKind.Ref) continue;
                     parameters.Add(member.Name + ": " + TypeText(member.Spec.Type) + " = ...");
+                }
+                WriteInit(parameters, keywordOnly: true);
+                Line();
+            }
+
+            /// <summary>신호 (spec-gaps G145): 인자는 모두 필수인 키워드 인자이고 <c>d.amount</c>로 읽는다.</summary>
+            private void WriteSignal(SignalType signal)
+            {
+                Line("class " + signal.Name + ":");
+                var parameters = new List<string>();
+                foreach (var field in signal.Fields)
+                {
+                    Line("    " + field.Name + ": " + TypeText(field.Type));
+                    parameters.Add(field.Name + ": " + TypeText(field.Type));
                 }
                 WriteInit(parameters, keywordOnly: true);
                 Line();

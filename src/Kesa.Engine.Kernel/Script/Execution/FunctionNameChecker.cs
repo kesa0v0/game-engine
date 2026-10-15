@@ -25,6 +25,9 @@ namespace Kesa.Engine.Script
         /// <summary><c>@submit_policy</c>로 선언한 정책 함수 (G122). 모드 안에서 둘 이상이면 로드 오류다.</summary>
         public List<SubmitPolicyDecl> Policies { get; } = new List<SubmitPolicyDecl>();
 
+        /// <summary><c>@on(신호)</c>로 붙인 핸들러, 정의된 순서대로 (G145).</summary>
+        public List<HandlerDecl> Handlers { get; } = new List<HandlerDecl>();
+
         /// <summary>
         /// 함수 본문에서 내장 <c>spawn("Def id", ...)</c>에 리터럴로 적은 Def id (G134). 이름 검사가 모으고 ⑤ 링크가 본다.
         /// </summary>
@@ -44,14 +47,15 @@ namespace Kesa.Engine.Script
         /// <param name="isSchemaRuntimeName">로직에서도 쓰는 스키마 이름인가 (이 모드에 보이는 컴포넌트의 값 생성자, G134)</param>
         /// <param name="notVisible">다른 모드의 것이라 보이지 않는 이름이면 그 안내 (SCH003)</param>
         public static void Check(ModFunctions functions, ModScope scope, Func<string, bool> isLoadTimeName,
-            CallContext context, Func<string, bool>? isSchemaRuntimeName = null, Func<string, string?>? notVisible = null)
+            CallContext context, Func<string, bool>? isSchemaRuntimeName = null, Func<string, string?>? notVisible = null,
+            IEnumerable<string>? schemaRuntimeNames = null)
         {
             var globals = new SortedSet<string>(scope.Names, StringComparer.Ordinal);
             globals.UnionWith(functions.TopLevelNames);
             foreach (var function in functions.Functions)
             {
                 var walker = new Walker(globals, isLoadTimeName, context, isSchemaRuntimeName ?? (_ => false),
-                    notVisible ?? (_ => null), functions.SpawnedDefs);
+                    notVisible ?? (_ => null), functions.SpawnedDefs, schemaRuntimeNames ?? Array.Empty<string>());
                 if (function.Definition != null)
                     walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
                 else
@@ -68,10 +72,11 @@ namespace Kesa.Engine.Script
             private readonly Func<string, bool> _isSchemaRuntimeName;
             private readonly Func<string, string?> _notVisible;
             private readonly List<KeyValuePair<string, SourceSpan>> _spawned;
+            private readonly IEnumerable<string> _schemaRuntimeNames;
 
             public Walker(SortedSet<string> globals, Func<string, bool> isLoadTimeName, CallContext context,
                 Func<string, bool> isSchemaRuntimeName, Func<string, string?> notVisible,
-                List<KeyValuePair<string, SourceSpan>> spawned)
+                List<KeyValuePair<string, SourceSpan>> spawned, IEnumerable<string> schemaRuntimeNames)
             {
                 _globals = globals;
                 _isLoadTimeName = isLoadTimeName;
@@ -79,6 +84,7 @@ namespace Kesa.Engine.Script
                 _isSchemaRuntimeName = isSchemaRuntimeName;
                 _notVisible = notVisible;
                 _spawned = spawned;
+                _schemaRuntimeNames = schemaRuntimeNames;
             }
 
             public void Block(IReadOnlyList<Stmt> body, SortedSet<string> locals)
@@ -249,6 +255,7 @@ namespace Kesa.Engine.Script
                 var candidates = new List<string>(locals);
                 candidates.AddRange(_globals);
                 candidates.AddRange(PureBuiltins.RuntimeNames);
+                candidates.AddRange(_schemaRuntimeNames);
                 _context.Error(Codes.EvlUnknownName, "name '" + n + "' is not defined", name.Span,
                     hint: Suggest.Hint(n, candidates));
             }

@@ -200,6 +200,62 @@ namespace Kesa.Engine.Script
         public const string CommandName = "command";
         public const string SubmitPolicyName = "submit_policy";
         public const string ActsForName = "acts_for";
+        public const string OnName = "on";
+
+        /// <summary>
+        /// <c>@on(Damaged)</c> (spec S5, spec-gaps G145). 인자는 신호 하나이고, 함수의 매개변수는 신호의 인자 중 필요한 것을 이름으로
+        /// 고른다(기본값·타입 표기 없음: 타입은 신호 선언이 정한다).
+        /// </summary>
+        private void DeclareHandler(FunctionDef def, FunctionValue function, Expr decorator)
+        {
+            const string usage = "write @on(SignalName) with a signal declared by signal(\"SignalName\", ...) in a schema file";
+            if (!(decorator is CallExpr call) || call.Arguments.Count == 0)
+            {
+                _context.Error(Codes.CmdBadDecorator, "@on needs the signal it handles", decorator.Span, hint: usage);
+                return;
+            }
+            foreach (var arg in call.Arguments)
+            {
+                if (arg.Name == null) continue;
+                _context.Error(Codes.CmdBadDecorator, "@on has no argument '" + arg.Name + "' yet", arg.Span,
+                    hint: arg.Name == "stage" ? "stages are not supported yet (spec S5)" : usage);
+                return;
+            }
+            if (call.Arguments.Count != 1)
+            {
+                _context.Error(Codes.CmdBadDecorator, "@on takes one signal", call.Arguments[1].Span, hint: usage);
+                return;
+            }
+            var value = Evaluate(call.Arguments[0].Value);
+            if (!(value is Loading.DefBuiltins.SignalName signal))
+            {
+                _context.Error(Codes.CmdBadDecorator, "@on needs a signal, not " + value.KindName, call.Arguments[0].Span, hint: usage);
+                return;
+            }
+
+            bool ok = true;
+            foreach (var p in def.Parameters)
+            {
+                if (!signal.Signal.TryGetField(p.Name, out _))
+                {
+                    var names = new List<string>();
+                    foreach (var f in signal.Signal.Fields) names.Add(f.Name);
+                    _context.Error(Codes.CmdBadDecorator, "signal '" + signal.Signal.Name + "' has no value '" + p.Name + "'", p.Span,
+                        hint: Suggest.Hint(p.Name, names) ??
+                              "a handler's parameters pick values of the signal by name: " + string.Join(", ", names));
+                    ok = false;
+                }
+                else if (p.Default != null || p.Annotation != null)
+                {
+                    _context.Error(Codes.CmdBadDecorator,
+                        "a handler's parameter takes its type from the signal, so it has no " +
+                        (p.Default != null ? "default" : "type annotation"), p.Span,
+                        hint: "write just the name: def " + def.Name + "(" + p.Name + "): ... (spec-gaps G145)");
+                    ok = false;
+                }
+            }
+            if (ok) _context.Functions.Handlers.Add(new HandlerDecl(_context.Mod, function, signal.Signal, decorator.Span));
+        }
 
         /// <summary>
         /// <c>def</c> 위의 데코레이터. <c>@command</c>(<c>free=</c>, <c>acts_for=</c>)와 <c>@submit_policy</c>(<c>override=</c>)를
@@ -215,7 +271,7 @@ namespace Kesa.Engine.Script
             }
 
             string? name = def.DecoratorName;
-            if ((name == CommandName || name == SubmitPolicyName) && !IsBuiltin(name))
+            if ((name == CommandName || name == SubmitPolicyName || name == OnName) && !IsBuiltin(name))
             {
                 _context.Error(Codes.CmdBadDecorator,
                     "this mod defines its own '" + name + "', so the built-in @" + name + " cannot be used here",
@@ -228,9 +284,14 @@ namespace Kesa.Engine.Script
                 DeclareSubmitPolicy(def, function, decorator);
                 return;
             }
+            if (name == OnName)
+            {
+                DeclareHandler(def, function, decorator);
+                return;
+            }
             if (name != CommandName)
             {
-                _context.Error(Codes.CmdBadDecorator, "unknown decorator; only @command and @submit_policy are supported",
+                _context.Error(Codes.CmdBadDecorator, "unknown decorator; only @command, @on and @submit_policy are supported",
                     decorator.Span, hint: "write @command or @command(free=True, acts_for=...)");
                 return;
             }

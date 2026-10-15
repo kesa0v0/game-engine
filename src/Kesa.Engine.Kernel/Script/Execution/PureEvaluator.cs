@@ -500,9 +500,9 @@ namespace Kesa.Engine.Script
                 bool writable)
             {
                 // 커맨드는 제출로만 실행된다 (G118). 이름으로 잡히지 않은 길(함수 값)의 마지막 방어선
-                if (fn.IsCommand)
+                if (fn.IsEntry)
                 {
-                    throw Fail(Codes.RunScript, "'" + fn.Name + "' is a @command, so logic cannot call it",
+                    throw Fail(Codes.RunScript, "'" + fn.Name + "' is a " + fn.EntryKind + ", so logic cannot call it",
                         "a command only runs when it is submitted; move the shared part into a plain function (spec-gaps G118)");
                 }
                 var newFrame = Enter(fn, captured, capturedLocals, positional, keywords);

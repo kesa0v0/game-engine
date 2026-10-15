@@ -57,7 +57,7 @@ namespace Kesa.Engine.Script
             foreach (var use in body.CommandUses)
             {
                 context.Error(Codes.CmdWriteEffect,
-                    "'" + use.Callee.Name + "' is a @command, so logic cannot call it or use it as a value", use.Span,
+                    "'" + use.Callee.Name + "' is a " + use.Callee.EntryKind + ", so logic cannot call it or use it as a value", use.Span,
                     "move the shared part into a plain function that the commands call (spec-gaps G118)",
                     new[] { use.Callee.Definition!.Span });
             }
@@ -68,7 +68,7 @@ namespace Kesa.Engine.Script
             foreach (var body in bodies)
             foreach (var call in body.ExpressionCalls)
             {
-                if (!call.Callee.Writes || call.Callee.IsCommand) continue;
+                if (!call.Callee.Writes || call.Callee.IsEntry) continue;
                 context.Error(Codes.CmdWriteEffect,
                     "'" + call.Callee.Name + "' changes the world, so it can only be called as a statement", call.Span,
                     statementHint, new[] { call.Callee.WriteWitness!.Value });
@@ -103,9 +103,9 @@ namespace Kesa.Engine.Script
             void Pure(FunctionValue? fn, string what, SourceSpan span)
             {
                 if (fn == null || fn.Mod != context.Mod) return;
-                if (fn.IsCommand)
+                if (fn.IsEntry)
                 {
-                    context.Error(Codes.CmdWriteEffect, what + " uses '" + fn.Name + "', which is a @command", span,
+                    context.Error(Codes.CmdWriteEffect, what + " uses '" + fn.Name + "', which is a " + fn.EntryKind, span,
                         "a command only runs when it is submitted; use a plain function (spec-gaps G118)",
                         new[] { fn.Definition!.Span });
                     return;
@@ -185,7 +185,7 @@ namespace Kesa.Engine.Script
                 if (!(callee is NameExpr name) || locals.Contains(name.Name)) return null;
                 if (!_scope.TryGet(name.Name, out var value, out _)) return null;
                 if (!(value is FunctionValue fn) || fn.Definition == null) return null;
-                if (!fn.IsCommand) return fn;
+                if (!fn.IsEntry) return fn;
                 _body.CommandUses.Add(new Call(fn, name.Span));
                 return null;
             }

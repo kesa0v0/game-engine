@@ -75,6 +75,9 @@ namespace Kesa.Engine.Loading
         /// 그때 입구는 모든 issuer를 허용한다.
         /// </summary>
         public SubmitPolicyDecl? SubmitPolicy { get; internal set; }
+
+        /// <summary>살아남은 모드의 <c>@on</c> 핸들러, 모드 로드 순서 → 정의 순서 (spec S5 동률 규칙, spec-gaps G145).</summary>
+        public IReadOnlyList<HandlerDecl> Handlers { get; internal set; } = Array.Empty<HandlerDecl>();
     }
 
     /// <summary>한 회차의 ②a·②b가 남긴 것: 살아남은 모드(로드 순서), 완성된 스키마, 등록된 Def.</summary>
@@ -137,6 +140,7 @@ namespace Kesa.Engine.Loading
                 var patches = new List<PatchCall>();
                 var scopes = new SortedDictionary<string, ModScope>(StringComparer.Ordinal);
                 var commands = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
+                var handlers = new List<HandlerDecl>();
                 foreach (var u in units)
                 {
                     diagnostics.AddRange(u.Bag.ToSortedList());
@@ -150,11 +154,13 @@ namespace Kesa.Engine.Loading
                     scopes.Add(u.Manifest.Id, u.Scope);
                     // 같은 모드 안의 같은 이름은 EVL004로 막히고 모드 id는 유일하므로 id는 겹치지 않는다
                     foreach (var command in u.Functions.Commands) commands.Add(command.Id, command);
+                    handlers.AddRange(u.Functions.Handlers);
                 }
                 return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
                     run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound, scopes, commands)
                 {
                     SubmitPolicy = run.Policy,
+                    Handlers = handlers,
                 };
             }
         }
@@ -485,11 +491,12 @@ namespace Kesa.Engine.Loading
         private static void CheckFunctionNames(ModUnit u, DefBuiltins builtins) =>
             FunctionNameChecker.Check(u.Functions, u.Scope,
                 name => name == Interpreter.InheritName || builtins.Lookup(name) != null || builtins.Explain(name) != null,
-                new CallContext(u.Manifest.Id, u.Bag), builtins.IsVisibleComponent,
+                new CallContext(u.Manifest.Id, u.Bag), builtins.IsVisibleRuntimeSchemaName,
                 // Explain은 Lookup이 못 찾은 이름에만 맞다 (보이는지는 보지 않는다)
                 name => builtins.Lookup(name) == null && builtins.Explain(name) is { } e && e.Code == Codes.SchNotVisible
                     ? e.Message
-                    : null);
+                    : null,
+                builtins.RuntimeSchemaNames);
 
         /// <summary>
         /// 필수 의존 중 실패한 모드가 있으면 이 모드를 비활성화한다 (MOD009). 로드 순서상 의존 대상이 앞에 있으므로

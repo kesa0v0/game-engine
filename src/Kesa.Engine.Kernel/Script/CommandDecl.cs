@@ -69,6 +69,27 @@ namespace Kesa.Engine.Script
         public SubmitPolicyDecl? Replaced { get; internal set; }
     }
 
+    /// <summary>
+    /// <c>@on(Damaged)</c>로 신호에 붙인 핸들러 (spec S5, spec-gaps G145). 매개변수는 신호의 인자 중 필요한 것을 이름으로 고른다.
+    /// </summary>
+    public sealed class HandlerDecl
+    {
+        public HandlerDecl(string mod, FunctionValue function, SignalType signal, SourceSpan span)
+        {
+            Mod = mod;
+            Function = function;
+            Signal = signal;
+            Span = span;
+        }
+
+        public string Mod { get; }
+        public FunctionValue Function { get; }
+        public SignalType Signal { get; }
+
+        /// <summary><c>@on</c> 데코레이터의 위치.</summary>
+        public SourceSpan Span { get; }
+    }
+
     /// <summary>커맨드 매개변수 하나: 이름과 타입 (spec-gaps G114).</summary>
     public sealed class CommandParameter
     {
