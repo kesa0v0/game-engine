@@ -121,8 +121,13 @@ namespace Kesa.Engine.Runtime
         /// (G132, 예산은 커맨드 하나에 하나). 스크립트 오류는 <see cref="WorldException"/>이다.
         /// </summary>
         private PreconditionReport EvaluateRequires(CommandDecl decl, SortedDictionary<string, Value> checkedArgs,
-            bool runBody = false)
+            bool runBody = false) => EvaluateRequires(decl, checkedArgs, runBody, out _);
+
+        /// <param name="suspended">본문이 <c>ask</c>에서 멈췄으면 그 실행 (spec X1).</param>
+        private PreconditionReport EvaluateRequires(CommandDecl decl, SortedDictionary<string, Value> checkedArgs,
+            bool runBody, out PureEvaluator.Suspended? suspended)
         {
+            suspended = null;
             string command = decl.Id;
             var scriptArgs = new SortedDictionary<string, Value>(StringComparer.Ordinal);
             foreach (var pair in checkedArgs) scriptArgs[pair.Key] = ToScript(pair.Value);
@@ -132,7 +137,7 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var raw = runBody
-                    ? Evaluator.RunCommand(decl.Function, scriptArgs, decl.Span, _meter)
+                    ? Evaluator.RunCommand(decl.Function, scriptArgs, out suspended, decl.Span, _meter)
                     : Evaluator.RunPreconditions(decl.Function, scriptArgs, decl.Span, _meter);
                 var requires = new List<RequireOutcome>(raw.Count);
                 foreach (var r in raw)

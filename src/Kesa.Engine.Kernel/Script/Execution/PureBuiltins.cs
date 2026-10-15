@@ -27,15 +27,24 @@ namespace Kesa.Engine.Script
         public const string ReplaceRowsName = "replace_rows";
         public const string AppendRowName = "append_row";
 
-        /// <summary>월드를 바꾸는 내장. 부르면 쓰기다 (G135). 이름 집합보다 먼저 초기화되어야 한다.</summary>
+        /// <summary>멈춰서 답을 기다리는 내장 (spec X1, spec-gaps G138). 자리 규칙은 쓰는 내장과 같다 (G136).</summary>
+        public const string AskName = "ask";
+
+        /// <summary>
+        /// 월드를 바꾸거나 멈추는 내장. 부르면 쓰기다 (G135·G136). 이름 집합보다 먼저 초기화되어야 한다.
+        /// </summary>
         private static readonly string[] WritingNameArray =
         {
             SpawnName, DestroyName, AttachName, DetachName, AddRowName, RemoveRowName, ReplaceRowsName, AppendRowName,
+            AskName,
         };
 
         public static IReadOnlyList<string> WritingNames => WritingNameArray;
 
         public static bool IsWritingName(string name) => Array.IndexOf(WritingNameArray, name) >= 0;
+
+        /// <summary>오류 메시지에서 쓰는 내장이 하는 일: "changes the world" 또는 "waits for an answer".</summary>
+        public static string EffectPhrase(string name) => name == AskName ? "waits for an answer" : "changes the world";
 
         /// <summary>
         /// 실행 중 함수 본문에서 보이는 내장 이름 전체: <see cref="Create"/>의 이름, <see cref="ContribsName"/>, 쓰는 내장.

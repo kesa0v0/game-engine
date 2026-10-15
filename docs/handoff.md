@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1175개 통과(커널 1147, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1197개 통과(커널 1169, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -147,7 +147,16 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 
 1. **G136(확인):** `ask`/`await`/`wait`는 쓰기 함수와 같은 규칙. 포함한 함수(또는 그런 함수를 문장으로 부르는 함수)는 멈추는 함수이고 한 줄 전체나 `x = f()`로만 부른다. 식 안·순수 자리는 로드 오류(아직 미구현, `ask`와 함께).
 2. **실행기 리팩터링(끝남, 동작 불변):** `PureEvaluator`의 문장 실행을 데이터로 옮겼다. `Frame.Blocks`(블록마다 다음 문장 번호, `for`면 굳힌 항목·위치), `Frame.Result`(버림·지역 변수·호스트)와 실행 고리 `RunUntil`/`Step`. 문장 수준 `def` 호출은 프레임만 쌓고, 식 안의 호출은 끝까지 실행한다. 단계 수를 고정한 테스트(`TheStepCountOfAProgramIsPinned`, 667)가 리팩터링 전후로 같다.
-3. **다음:** `ask`의 표기와 반환값 모양(G126이 미룬 필드 이름), 응답 커맨드 선언, 멈춘 Flow를 `World`가 들고 있는 방식. 재개 구간이 실패하면 Flow와 Request도 되돌아가야 한다(C8·C9): 재개 전 프레임 스냅숏(지역 변수 값은 불변이라 얕은 복사로 충분).
+3. **G137(확인):** 선택 방법(창·지도 강조 클릭)은 스크립트가 `hint=`로 제안만 하고 UI 모듈이 정한다. 커널은 해석하지 않는다. 질문에 자유 데이터 `data=`. 근거는 TR의 고정 클래스(`PendingChoiceData`) 문제.
+4. **G138(확인):** `ask(who, title, choices=[...], responses=[...], hint=, data=)`, 돌려받는 `r.response`·`r.index`·`r.choice`·`r.by`.
+5. **`ask`(choices만) 구현(끝남, 커밋 전):** `Runtime/World.Flows.cs`.
+   - `ask`는 `PureBuiltin { Writes, Suspends }`라 로드 판정은 쓰는 내장과 같다. 메시지만 "waits for an answer".
+   - 실행기는 질문을 들고 멈추고(`PureEvaluator.Suspended` = 프레임 스택 + 답을 받을 변수), 이어서 실행할 때는 사본에서 돈다(`Resume`).
+   - `World`가 Flow 표(`_flows`, 번호 카운터 `_nextFlow`·`_nextRequest`, 모두 되돌리기 기록)를 들고 있다.
+   - `Submit` 결과의 `OpenedRequest`, `World.OpenRequests`.
+   - `World.Answer(issuer, request, by, choice)` → `AnswerResult`(`UnknownRequest`·`NotListed`·`GateDenied`·`BadChoice`·`ScriptError`). 이어서 실행한 구간이 실패하면 효과와 Flow가 되감기고 질문은 그대로 열려 있다.
+   - 테스트는 `Runtime/WorldAskTests`(C2·C3·C8·C9). Flow 되감기 기록을 빼면 실패하는 것까지 확인했다.
+6. **남은 것:** 응답 커맨드(`responses=`, 지금은 "not supported yet" 오류), 시간(`blocks_time`·`deadline`·`on_timeout`·`wait`·`advance`), 저장(C1), 고를 수 없는 선택지 표시, 동시 고르기(시나리오 ②), 엔티티가 죽은 뒤의 Flow(`on_stale`).
 
 ## 다음 할 일 (사용자와 고를 것)
 
@@ -200,6 +209,6 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1175개 통과(커널 1147, CLI 28)를 확인한다.
+1. `git pull` 후 `dotnet test`로 1197개 통과(커널 1169, CLI 28)를 확인한다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G135), `docs/spine-spec.md` S2·S4·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.

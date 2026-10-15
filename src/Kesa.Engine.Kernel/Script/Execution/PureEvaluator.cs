@@ -82,18 +82,65 @@ namespace Kesa.Engine.Script
         /// (spec-gaps G132). 본문의 속성 대입은 상태 쓰기다. 결과는 <c>require</c>마다의 결과이고, 실패가 있으면 본문은 돌지 않았다.
         /// </summary>
         public List<RequireOutcome> RunCommand(FunctionValue command, IReadOnlyDictionary<string, Value> args,
-            SourceSpan callSite = default, StepMeter? meter = null)
+            SourceSpan callSite = default, StepMeter? meter = null) =>
+            RunCommand(command, args, out _, callSite, meter);
+
+        /// <summary>
+        /// <see cref="RunCommand(FunctionValue, IReadOnlyDictionary{string, Value}, SourceSpan, StepMeter?)"/>와 같고,
+        /// 본문이 문장 수준의 <c>ask</c>에서 멈추면 멈춘 실행을 <paramref name="suspended"/>로 돌려준다 (spec S2 "막힐 때까지 실행").
+        /// </summary>
+        public List<RequireOutcome> RunCommand(FunctionValue command, IReadOnlyDictionary<string, Value> args,
+            out Suspended? suspended, SourceSpan callSite = default, StepMeter? meter = null)
         {
             var session = new Session(this, meter ?? new StepMeter(_budget));
             try
             {
-                return session.Command(command, args, callSite, runBody: true);
+                var results = session.Command(command, args, callSite, runBody: true);
+                suspended = session.TakeSuspended();
+                return results;
             }
             catch (ScriptRuntimeException e) when (e.Span.Line <= 0)
             {
                 e.Span = callSite;
                 throw;
             }
+        }
+
+        /// <summary>
+        /// 멈춘 실행을 답 <paramref name="answer"/>로 이어서 다음 막힘이나 끝까지 실행한다. 다시 멈추면 그 실행을 돌려주고, 끝나면 null이다.
+        /// <paramref name="from"/>은 바꾸지 않는다(사본에서 실행한다): 실행이 오류로 끝나면 부른 쪽은 그대로 다시 기다릴 수 있다 (C8·C9).
+        /// </summary>
+        public Suspended? Resume(Suspended from, Value answer, StepMeter? meter = null)
+        {
+            var session = new Session(this, meter ?? new StepMeter(_budget));
+            session.Restore(from, answer);
+            session.RunToEnd();
+            return session.TakeSuspended();
+        }
+
+        /// <summary>
+        /// 문장 수준의 <c>ask</c>에서 멈춘 실행 (spec S2 평가 모델: 프레임 스택 전체가 데이터다). 질문의 내용은 <see cref="Request"/>이고
+        /// 그 모양은 <c>ask</c>를 준 쪽(월드)이 정한다.
+        /// </summary>
+        public sealed class Suspended
+        {
+            internal Suspended(List<Frame> frames, string? answerTo, Value request)
+            {
+                Frames = frames;
+                AnswerTo = answerTo;
+                Request = request;
+            }
+
+            internal List<Frame> Frames { get; }
+
+            /// <summary>답을 받을 맨 위 프레임의 지역 변수 (<c>r = ask(...)</c>). 한 줄 전체의 <c>ask</c>면 null이다.</summary>
+            internal string? AnswerTo { get; }
+
+            /// <summary><c>ask</c> 내장의 몸체가 돌려준 질문의 내용.</summary>
+            public Value Request { get; }
+
+            /// <summary>가장 바깥 프레임(커맨드)의 함수 이름.</summary>
+            public string Origin => Frames[0].Function.Name;
         }
 
         /// <summary><c>def</c>마다 지역 변수 이름 (한 번 계산해 둔다).</summary>
@@ -109,13 +156,29 @@ namespace Kesa.Engine.Script
             return names;
         }
 
-        private sealed class Frame
+        internal sealed class Frame
         {
             public Frame(FunctionValue function, SortedDictionary<string, Value> locals, SortedSet<string> localNames)
             {
                 Function = function;
                 Locals = locals;
                 LocalNames = localNames;
+            }
+
+            /// <summary>
+            /// 이어서 실행할 사본. 지역 변수와 블록 위치는 새로 담고, 값은 불변이라(G104) 그대로 나눠 쓴다.
+            /// </summary>
+            public Frame Copy()
+            {
+                var copy = new Frame(Function, new SortedDictionary<string, Value>(Locals, StringComparer.Ordinal), LocalNames)
+                {
+                    CallSite = CallSite,
+                    Writable = Writable,
+                    Result = Result,
+                    ResultName = ResultName,
+                };
+                foreach (var block in Blocks) copy.Blocks.Add(block.Copy());
+                return copy;
             }
 
             public FunctionValue Function { get; }
@@ -150,7 +213,7 @@ namespace Kesa.Engine.Script
             public Value Returned { get; set; } = NoneValue.Instance;
         }
 
-        private enum ResultTo
+        internal enum ResultTo
         {
             /// <summary>C# 쪽(호스트 실행이나 식 안의 호출)이 끝까지 실행하고 <see cref="Frame.Returned"/>를 읽는다.</summary>
             Host,
@@ -165,7 +228,7 @@ namespace Kesa.Engine.Script
         /// <summary>
         /// 실행 중인 문장 목록 하나와 다음에 실행할 문장의 번호. <c>for</c>의 몸체면 반복 상태(남은 항목과 위치)도 든다.
         /// </summary>
-        private sealed class Block
+        internal sealed class Block
         {
             public Block(IReadOnlyList<Stmt> body, int next = 0)
             {
@@ -189,6 +252,15 @@ namespace Kesa.Engine.Script
             public long Index { get; set; } = -1;
 
             public Value ItemAt(long i) => Range != null ? new IntValue(Range.At(i)) : Items![(int)i];
+
+            public Block Copy() => new Block(Body, Next)
+            {
+                Loop = Loop,
+                Items = Items,
+                Range = Range,
+                Count = Count,
+                Index = Index,
+            };
         }
 
         private sealed class Session
@@ -201,6 +273,53 @@ namespace Kesa.Engine.Script
             {
                 _owner = owner;
                 _meter = meter;
+            }
+
+            // ---- 멈춤 ----
+
+            /// <summary>문장 수준의 <c>ask</c>가 낸 질문. 있으면 실행 고리가 멈춘다.</summary>
+            private Value? _pendingRequest;
+
+            private string? _answerTo;
+
+            /// <summary>멈춘 실행. 멈출 때 스택에서 떼어 둔다.</summary>
+            private Suspended? _suspended;
+
+            /// <summary>가장 바깥 실행 고리가 멈췄으면 스택 전체를 떼어 멈춘 실행으로 만든다.</summary>
+            private void Detach()
+            {
+                if (_pendingRequest == null) return;
+                _suspended = new Suspended(new List<Frame>(_stack), _answerTo, _pendingRequest);
+                _stack.Clear();
+                _pendingRequest = null;
+                _answerTo = null;
+            }
+
+            public Suspended? TakeSuspended()
+            {
+                var s = _suspended;
+                _suspended = null;
+                return s;
+            }
+
+            /// <summary>멈춘 실행의 사본을 스택에 올리고 답을 받을 변수에 넣는다.</summary>
+            public void Restore(Suspended from, Value answer)
+            {
+                foreach (var frame in from.Frames) _stack.Add(frame.Copy());
+                if (from.AnswerTo != null) _stack[_stack.Count - 1].Locals[from.AnswerTo] = answer;
+            }
+
+            public void RunToEnd()
+            {
+                try
+                {
+                    RunUntil(0);
+                    Detach();
+                }
+                finally
+                {
+                    Truncate(0);
+                }
             }
 
             // ---- 오류 ----
@@ -259,7 +378,7 @@ namespace Kesa.Engine.Script
                         if (b.Writes && !writable)
                         {
                             throw Fail(Codes.RunNotWritable,
-                                b.Name + "() changes the world, so it cannot be called here",
+                                b.Name + "() " + PureBuiltins.EffectPhrase(b.Name) + ", so it cannot be called here",
                                 "call it on its own line (or as 'x = " + b.Name + "(...)') in a @command body or in a " +
                                 "function that changes the world called on its own line from it (spec-gaps G117, G135)");
                         }
@@ -285,6 +404,9 @@ namespace Kesa.Engine.Script
                 {
                     if (fn.Lambda != null) return Eval(fn.Lambda.Body, newFrame);
                     RunUntil(depth);
+                    // 식 안의 호출은 쓰기 모드가 아니라 ask가 먼저 거부된다: 여기 오면 엔진 결함이다 (G136)
+                    if (_pendingRequest != null)
+                        throw new InvalidOperationException("a call inside an expression stopped at ask()");
                     return newFrame.Returned;
                 }
                 finally
@@ -350,6 +472,7 @@ namespace Kesa.Engine.Script
                         frame.Writable = true;
                         frame.Blocks.Add(new Block(body, hasBlock ? 1 : 0));
                         RunUntil(depth);
+                        if (depth == 0) Detach();
                     }
                     return results;
                 }
@@ -510,7 +633,7 @@ namespace Kesa.Engine.Script
             /// </summary>
             private void RunUntil(int depth)
             {
-                while (_stack.Count > depth) Step(_stack[_stack.Count - 1]);
+                while (_stack.Count > depth && _pendingRequest == null) Step(_stack[_stack.Count - 1]);
             }
 
             private void Step(Frame frame)
@@ -645,6 +768,13 @@ namespace Kesa.Engine.Script
                     return;
                 }
                 var value = Invoke(callee, positional, keywords, call.Span, frame.Writable);
+                if (callee is PureBuiltin b && b.Suspends)
+                {
+                    // 질문을 들고 멈춘다: 실행 고리가 돌아가고, 답은 이어서 실행할 때 target에 들어간다 (G136·G138)
+                    _pendingRequest = value;
+                    _answerTo = target;
+                    return;
+                }
                 if (target != null) frame.Locals[target] = value;
             }
 

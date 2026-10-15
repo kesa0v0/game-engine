@@ -77,7 +77,8 @@ namespace Kesa.Engine.Script
             foreach (var call in body.BuiltinExpressionCalls)
             {
                 context.Error(Codes.CmdWriteEffect,
-                    call.Key + "() changes the world, so it can only be called as a statement", call.Value, statementHint);
+                    call.Key + "() " + PureBuiltins.EffectPhrase(call.Key) + ", so it can only be called as a statement",
+                    call.Value, statementHint);
             }
 
             // 입구 검사는 순수하다: 거부가 상태를 건드리지 않는다 (C10, G122)

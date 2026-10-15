@@ -8,7 +8,9 @@ namespace Kesa.Engine.Runtime
     /// <summary>제출이 어디서 끝났나 (spec S6, spec-gaps G131). 앞의 단계에서 멈추면 뒤 단계는 돌지 않는다.</summary>
     public enum SubmitOutcome
     {
-        /// <summary>모든 검사를 통과하고 본문을 실행했다 (G132).</summary>
+        /// <summary>
+        /// 모든 검사를 통과하고 본문을 실행했다 (G132). 본문이 <c>ask</c>에서 멈췄으면 <see cref="SubmitResult.OpenedRequest"/>가 있다.
+        /// </summary>
         Succeeded,
 
         /// <summary>자유 커맨드(<c>free=True</c>)가 아니라 Request 없이 낼 수 없다 (S6 "기본 거부").</summary>
@@ -69,6 +71,11 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>스크립트 오류 (<see cref="SubmitOutcome.ScriptError"/>일 때만). 위치와 호출 흔적이 메시지에 있다.</summary>
         public WorldException? Error { get; internal set; }
+
+        /// <summary>
+        /// 본문이 <c>ask</c>에서 멈춰 연 질문 (spec X1). 커맨드는 거기까지 실행되어 효과가 남았고, 나머지는 답이 오면 이어서 실행된다.
+        /// </summary>
+        public Request? OpenedRequest { get; internal set; }
     }
 
     /// <summary>커맨드 제출 (spec S6 권한 3층, spec-gaps G122~G124·G131).</summary>
@@ -102,9 +109,18 @@ namespace Kesa.Engine.Runtime
                 var target = ActsFor(decl, checkedArgs);
                 if (!MayAct(issuer, target, command)) return Copy(result, SubmitOutcome.GateDenied, target);
                 // 본문이 중간에 실패하면 그때까지의 쓰기를 되감는다 (C8, G133)
-                var report = Atomically(() => EvaluateRequires(decl, checkedArgs, runBody: true));
+                Request? opened = null;
+                var report = Atomically(() =>
+                {
+                    var r = EvaluateRequires(decl, checkedArgs, runBody: true, out var suspended);
+                    // ask에서 멈췄으면 여기까지가 한 트랜잭션이고 Flow가 질문을 들고 남는다 (S5·X1)
+                    if (suspended != null) opened = OpenFlow(command, suspended);
+                    return r;
+                });
                 if (!report.Passed) return Copy(result, SubmitOutcome.PreconditionsFailed, target, report);
-                return Copy(result, SubmitOutcome.Succeeded, target, report);
+                var done = Copy(result, SubmitOutcome.Succeeded, target, report);
+                done.OpenedRequest = opened;
+                return done;
             }
             catch (WorldException e)
             {

@@ -175,6 +175,12 @@ namespace Kesa.Engine.Script
         /// </summary>
         public bool Writes { get; set; }
 
+        /// <summary>
+        /// 실행을 멈추고 답을 기다리는 내장인가 (<c>ask</c>, spec S2·X1). 자리 규칙은 쓰는 내장과 같아서 <see cref="Writes"/>도 참이다
+        /// (spec-gaps G136). 몸체가 돌려주는 값은 결과가 아니라 질문의 내용이고, 실행기는 그것을 들고 멈춘다.
+        /// </summary>
+        public bool Suspends { get; set; }
+
         public override string KindName => "built-in function";
     }
 

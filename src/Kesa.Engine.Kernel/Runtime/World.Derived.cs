@@ -55,6 +55,7 @@ namespace Kesa.Engine.Runtime
             var table = PureBuiltins.Create();
             table.Add(PureBuiltins.ContribsName, new PureBuiltin(PureBuiltins.ContribsName, ContribsBuiltin));
             AddStructureBuiltins(table);
+            AddFlowBuiltins(table);
             return table;
         }
 
