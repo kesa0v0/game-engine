@@ -226,11 +226,11 @@ namespace Kesa.Engine.Runtime
                 }
                 if (item.Row != null)
                 {
-                    entity.RowsOf(item.Component).Find(item.Row.Value)!.Values[member] = stored;
+                    Assign(entity.RowsOf(item.Component).Find(item.Row.Value)!.Values, member, stored);
                     continue;
                 }
                 if (member.Kind == MemberKind.Ref) Reindex(member, entity.Id, entity.Values, stored);
-                entity.Values[member] = stored;
+                Assign(entity.Values, member, stored);
             }
         }
 
@@ -288,7 +288,7 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>컴포넌트 하나(키 컴포넌트면 줄 하나). 자기 멤버, 형제 컴포넌트, <c>entity</c>, <c>key</c>를 읽는다 (G103).</summary>
-        private sealed class ComponentView : ComponentViewBase, IRuntimeAttributes
+        private sealed class ComponentView : ComponentViewBase, IRuntimeAttributes, IRuntimeAssignable
         {
             private readonly World _world;
             private readonly EntityId _id;
@@ -308,6 +308,29 @@ namespace Kesa.Engine.Runtime
             public override string KindName => Component.Name;
 
             public Value GetAttribute(string name) => Guard(() => _world.ComponentAttribute(this, name));
+
+            public void SetAttribute(string name, Value value) => Guard(() => _world.WriteMember(this, name, value));
+        }
+
+        /// <summary>
+        /// 커맨드 본문의 쓰기 <c>u.Moves.left = 값</c> (G117·G132). 키 컴포넌트면 그 줄에 쓴다(있는 줄만, 줄 뷰가 있으면 줄이 있다).
+        /// 검사는 호스트 API와 같다: <c>field</c>·Ref만, 타입·범위 (G92).
+        /// </summary>
+        private bool WriteMember(ComponentView view, string name, Value value)
+        {
+            var component = view.Component;
+            if (!component.TryGetMember(name, out var member))
+            {
+                var names = new List<string>();
+                foreach (var m in component.Members) names.Add(m.Name);
+                throw new WorldException(Codes.RunUnknownName, "'" + component.Name + "' has no member '" + name + "'",
+                    Suggest.Hint(name, names) ?? "only members of a component can be written");
+            }
+            var handle = new MemberHandle(component, null, member);
+            var plain = ToPlain(handle.Display, value);
+            if (view.Row == null) Set(view.Id, handle, plain);
+            else SetRow(view.Id, handle, view.Row.Value, plain);
+            return true;
         }
 
         /// <summary>키 컴포넌트 전체: 키로 줄 하나를 꼬집는다 (<c>h.Skill.Medicine</c>, <c>h.Skill[s]</c>, <c>for s in h.Skill</c>).</summary>

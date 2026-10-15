@@ -77,6 +77,25 @@ namespace Kesa.Engine.Script
             }
         }
 
+        /// <summary>
+        /// 커맨드를 실행한다: 사전 조건을 평가하고 실패한 <c>require</c>가 없으면 같은 지역 변수로 본문을 이어서 실행한다
+        /// (spec-gaps G132). 본문의 속성 대입은 상태 쓰기다. 결과는 <c>require</c>마다의 결과이고, 실패가 있으면 본문은 돌지 않았다.
+        /// </summary>
+        public List<RequireOutcome> RunCommand(FunctionValue command, IReadOnlyDictionary<string, Value> args,
+            SourceSpan callSite = default, StepMeter? meter = null)
+        {
+            var session = new Session(this, meter ?? new StepMeter(_budget));
+            try
+            {
+                return session.Command(command, args, callSite, runBody: true);
+            }
+            catch (ScriptRuntimeException e) when (e.Span.Line <= 0)
+            {
+                e.Span = callSite;
+                throw;
+            }
+        }
+
         private enum Flow
         {
             Normal,
@@ -116,6 +135,12 @@ namespace Kesa.Engine.Script
             public SortedSet<string> LocalNames { get; }
 
             public SourceSpan CallSite { get; set; }
+
+            /// <summary>
+            /// 쓰기 모드 (G117 런타임 안전망). 커맨드 본문, 그리고 쓰기 모드 프레임이 문장으로 부른 쓰기 함수만 참이다.
+            /// 순수 함수에서 시작한 호출, 식 안의 호출, <c>derived</c>·사전 조건·<c>Cond</c>는 커맨드 실행 중이라도 순수다.
+            /// </summary>
+            public bool Writable { get; set; }
         }
 
         private sealed class Session
@@ -171,14 +196,18 @@ namespace Kesa.Engine.Script
 
             // ---- 호출 ----
 
+            /// <param name="writable">
+            /// 부른 쪽이 쓰기 모드 프레임이고 이 호출이 문장일 때 참. 그래도 부르는 함수가 쓰기 함수여야 쓰기 모드가 된다 (G117).
+            /// </param>
             public Value Invoke(Value function, IReadOnlyList<Value> positional,
-                IReadOnlyDictionary<string, Value> keywords, SourceSpan site)
+                IReadOnlyDictionary<string, Value> keywords, SourceSpan site, bool writable = false)
             {
                 switch (function)
                 {
-                    case FunctionValue f: return CallFunction(f, null, null, positional, keywords, site);
+                    case FunctionValue f:
+                        return CallFunction(f, null, null, positional, keywords, site, writable);
                     case ClosureValue c:
-                        return CallFunction(c.Function, c.Captured, c.CapturedLocals, positional, keywords, site);
+                        return CallFunction(c.Function, c.Captured, c.CapturedLocals, positional, keywords, site, writable);
                     case PureBuiltin b:
                         if (b.KeywordBody != null) return b.KeywordBody(positional, keywords);
                         if (keywords.Count > 0) throw Fail(Codes.RunScript, b.Name + "() does not take keyword arguments");
@@ -191,10 +220,18 @@ namespace Kesa.Engine.Script
                 ReferenceEquals(a.Definition, b.Definition) && ReferenceEquals(a.Lambda, b.Lambda);
 
             private Value CallFunction(FunctionValue fn, IReadOnlyDictionary<string, Value>? captured,
-                SortedSet<string>? capturedLocals, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site)
+                SortedSet<string>? capturedLocals, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
+                bool writable)
             {
+                // 커맨드는 제출로만 실행된다 (G118). 이름으로 잡히지 않은 길(함수 값)의 마지막 방어선
+                if (fn.IsCommand)
+                {
+                    throw Fail(Codes.RunScript, "'" + fn.Name + "' is a @command, so logic cannot call it",
+                        "a command only runs when it is submitted; move the shared part into a plain function (spec-gaps G118)");
+                }
                 var newFrame = Enter(fn, captured, capturedLocals, positional, keywords);
                 newFrame.CallSite = site;
+                newFrame.Writable = writable && fn.Writes;
                 _stack.Add(newFrame);
                 try
                 {
@@ -215,7 +252,14 @@ namespace Kesa.Engine.Script
             /// 앞에 실패가 없을 때의 오류와 단계 예산·순환 오류는 그대로 던진다.
             /// </summary>
             public List<RequireOutcome> Preconditions(FunctionValue command, IReadOnlyDictionary<string, Value> args,
-                SourceSpan site)
+                SourceSpan site) => Command(command, args, site, runBody: false);
+
+            /// <summary>
+            /// 사전 조건을 평가하고, <paramref name="runBody"/>이고 실패한 <c>require</c>가 없으면 같은 지역 변수로 본문을 이어서
+            /// 실행한다 (G132). 본문 실행 중에만 상태 쓰기가 열린다. 본문 안에서 읽는 <c>derived</c>는 따로 도는 순수 실행이다.
+            /// </summary>
+            public List<RequireOutcome> Command(FunctionValue command, IReadOnlyDictionary<string, Value> args,
+                SourceSpan site, bool runBody)
             {
                 var frame = Enter(command, null, null, Array.Empty<Value>(), args);
                 frame.CallSite = site;
@@ -224,31 +268,13 @@ namespace Kesa.Engine.Script
                 try
                 {
                     var body = command.Definition!.Body;
-                    if (body.Count == 0 || !(body[0] is WithStmt with)) return results;
-                    bool failed = false;
-                    foreach (var stmt in with.Body)
+                    bool hasBlock = body.Count > 0 && body[0] is WithStmt;
+                    bool failed = hasBlock && EvaluateBlock((WithStmt)body[0], frame, results);
+                    if (runBody && !failed)
                     {
-                        try
-                        {
-                            if (stmt is AssignStmt)
-                            {
-                                Exec(stmt, frame);
-                                continue;
-                            }
-                            var outcome = Require((CallExpr)((ExprStmt)stmt).Expr, frame);
-                            if (outcome.Status == RequireStatus.Failed) failed = true;
-                            results.Add(outcome);
-                        }
-                        catch (ScriptRuntimeException e) when (failed && e.Code != Codes.RunBudget && e.Code != Codes.RunCycle)
-                        {
-                            if (stmt is AssignStmt assign)
-                            {
-                                frame.Locals.Remove(((NameExpr)assign.Target).Name);
-                                continue;
-                            }
-                            var call = (CallExpr)((ExprStmt)stmt).Expr;
-                            results.Add(new RequireOutcome(RequireStatus.NotEvaluated, LiteralKey(call), null, call.Span));
-                        }
+                        frame.Writable = true;
+                        for (int i = hasBlock ? 1 : 0; i < body.Count; i++)
+                            if (Exec(body[i], frame) == Flow.Return) break;
                     }
                     return results;
                 }
@@ -256,6 +282,37 @@ namespace Kesa.Engine.Script
                 {
                     _stack.RemoveAt(_stack.Count - 1);
                 }
+            }
+
+            /// <summary><c>with preconditions:</c> 블록 안의 문장들. 실패한 <c>require</c>가 있으면 true.</summary>
+            private bool EvaluateBlock(WithStmt with, Frame frame, List<RequireOutcome> results)
+            {
+                bool failed = false;
+                foreach (var stmt in with.Body)
+                {
+                    try
+                    {
+                        if (stmt is AssignStmt)
+                        {
+                            Exec(stmt, frame);
+                            continue;
+                        }
+                        var outcome = Require((CallExpr)((ExprStmt)stmt).Expr, frame);
+                        if (outcome.Status == RequireStatus.Failed) failed = true;
+                        results.Add(outcome);
+                    }
+                    catch (ScriptRuntimeException e) when (failed && e.Code != Codes.RunBudget && e.Code != Codes.RunCycle)
+                    {
+                        if (stmt is AssignStmt assign)
+                        {
+                            frame.Locals.Remove(((NameExpr)assign.Target).Name);
+                            continue;
+                        }
+                        var call = (CallExpr)((ExprStmt)stmt).Expr;
+                        results.Add(new RequireOutcome(RequireStatus.NotEvaluated, LiteralKey(call), null, call.Span));
+                    }
+                }
+                return failed;
             }
 
             /// <summary>
@@ -398,7 +455,8 @@ namespace Kesa.Engine.Script
                 switch (stmt)
                 {
                     case ExprStmt es:
-                        Eval(es.Expr, frame);
+                        if (es.Expr is CallExpr statementCall) EvalCall(statementCall, frame, statement: true);
+                        else Eval(es.Expr, frame);
                         return Flow.Normal;
 
                     case AssignStmt assign:
@@ -429,6 +487,23 @@ namespace Kesa.Engine.Script
 
             private void ExecAssign(AssignStmt assign, Frame frame)
             {
+                if (assign.Target is AttributeExpr attr)
+                {
+                    if (frame.Writable)
+                    {
+                        ExecWrite(assign, attr, frame);
+                        return;
+                    }
+                    // 커맨드 실행 중인데 이 프레임이 순수 모드다: 이름으로 판정할 수 없던 길로 들어왔다 (G117 런타임 안전망)
+                    if (_stack.Exists(f => f.Writable))
+                    {
+                        throw Fail(Codes.RunNotWritable,
+                            "'" + frame.Function.Name + "' cannot change the world here: it was reached through a function " +
+                            "that only reads, or called inside an expression",
+                            "only a @command body, and functions that change the world called on their own line from it, " +
+                            "can write (spec-gaps G117)");
+                    }
+                }
                 if (!(assign.Target is NameExpr target))
                     throw Fail(Codes.RunScript, "a logic function can only assign to local variables");
 
@@ -451,6 +526,37 @@ namespace Kesa.Engine.Script
                 var right = Eval(assign.Value, frame);
                 string op = assign.Op.Substring(0, assign.Op.Length - 1);
                 frame.Locals[target.Name] = Binary(op, current, right);
+            }
+
+            /// <summary>
+            /// 커맨드 본문의 상태 쓰기 <c>u.Moves.left = 값</c> (G117·G132). 파이썬처럼 대상 객체(<c>u.Moves</c>)는 한 번만 평가한다.
+            /// </summary>
+            private void ExecWrite(AssignStmt assign, AttributeExpr attr, Frame frame)
+            {
+                var owner = Eval(attr.Target, frame);
+                if (!(owner is IRuntimeAssignable target))
+                {
+                    throw Fail(Codes.RunScript, owner is NoneValue
+                            ? "cannot set '" + attr.Name + "' on None"
+                            : "cannot set '" + attr.Name + "' on " + owner.KindName,
+                        owner is NoneValue
+                            ? "the component or row is missing; check it with 'is not None' first"
+                            : "only members of a component or of a row can be written (spec-gaps G117)");
+                }
+
+                Value value;
+                if (assign.Op == "=")
+                {
+                    value = Eval(assign.Value, frame);
+                }
+                else
+                {
+                    // 상태 칸에는 리스트·맵이 없으므로(SCH004, G129) 리스트 +=의 제자리 수정 문제(G104)는 생기지 않는다
+                    var current = ((IRuntimeAttributes)owner).GetAttribute(attr.Name);
+                    var right = Eval(assign.Value, frame);
+                    value = Binary(assign.Op.Substring(0, assign.Op.Length - 1), current, right);
+                }
+                target.SetAttribute(attr.Name, value);
             }
 
             private Flow ExecFor(ForStmt loop, Frame frame)
@@ -607,7 +713,8 @@ namespace Kesa.Engine.Script
                 throw Fail(Codes.RunScript, "'" + target.KindName + "' cannot be indexed");
             }
 
-            private Value EvalCall(CallExpr call, Frame frame)
+            /// <param name="statement">이 호출이 문장 하나 전체인가 (쓰기 함수는 문장으로만 부른다, G117).</param>
+            private Value EvalCall(CallExpr call, Frame frame, bool statement = false)
             {
                 var callee = Eval(call.Callee, frame);
                 var positional = new List<Value>();
@@ -618,7 +725,7 @@ namespace Kesa.Engine.Script
                     if (arg.Name == null) positional.Add(value);
                     else keywords[arg.Name] = value;
                 }
-                return Invoke(callee, positional, keywords, call.Span);
+                return Invoke(callee, positional, keywords, call.Span, statement && frame.Writable);
             }
 
             private Value EvalUnary(UnaryExpr unary, Frame frame)

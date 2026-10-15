@@ -222,7 +222,7 @@ namespace Kesa.Engine.Runtime
             Require(entity, component);
             var stored = CheckWrite(member.Display, member.Member, value);
             if (member.Kind == MemberKind.Ref) Reindex(member.Member, id.Value, entity.Values, stored);
-            entity.Values[member.Member] = stored;
+            Assign(entity.Values, member.Member, stored);
         }
 
         // ---- 런타임 컴포넌트 ----
@@ -407,10 +407,13 @@ namespace Kesa.Engine.Runtime
             var stored = CheckWrite(member.Display, member.Member, value);
             if (record == null)
             {
+                // keys="all"의 안 적힌 줄: 처음 쓸 때 기록을 만든다. 되감으면 기록이 사라져 다시 기본값 줄이 된다
                 record = new RowRecord(attached: false);
-                entity.RowsOf(component).Put(key, record);
+                var rows = entity.RowsOf(component);
+                rows.Put(key, record);
+                Journal(() => rows.Remove(key));
             }
-            record.Values[member.Member] = stored;
+            Assign(record.Values, member.Member, stored);
         }
 
         private bool HasRow(EntityId id, string componentName, RowKey key)
@@ -763,13 +766,14 @@ namespace Kesa.Engine.Runtime
             if (!_inverse.TryGetValue(member, out var byTarget))
                 _inverse.Add(member, byTarget = new Dictionary<long, SortedSet<long>>());
             if (!byTarget.TryGetValue(target, out var sources)) byTarget.Add(target, sources = new SortedSet<long>());
-            sources.Add(source);
+            if (sources.Add(source)) Journal(() => sources.Remove(source));
         }
 
         private void RemoveInverse(MemberDecl member, long target, long source)
         {
-            if (_inverse.TryGetValue(member, out var byTarget) && byTarget.TryGetValue(target, out var sources))
-                sources.Remove(source);
+            if (_inverse.TryGetValue(member, out var byTarget) && byTarget.TryGetValue(target, out var sources) &&
+                sources.Remove(source))
+                Journal(() => sources.Add(source));
         }
 
         // ---- 작은 도우미 ----

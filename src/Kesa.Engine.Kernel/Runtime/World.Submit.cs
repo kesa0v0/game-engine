@@ -8,7 +8,7 @@ namespace Kesa.Engine.Runtime
     /// <summary>제출이 어디서 끝났나 (spec S6, spec-gaps G131). 앞의 단계에서 멈추면 뒤 단계는 돌지 않는다.</summary>
     public enum SubmitOutcome
     {
-        /// <summary>모든 검사를 통과했다. 본문 실행은 아직 없다 (G117 2단계).</summary>
+        /// <summary>모든 검사를 통과하고 본문을 실행했다 (G132).</summary>
         Succeeded,
 
         /// <summary>자유 커맨드(<c>free=True</c>)가 아니라 Request 없이 낼 수 없다 (S6 "기본 거부").</summary>
@@ -78,7 +78,7 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>
         /// 커맨드를 제출한다: 자유 커맨드 확인 → 인자 검사(G115) → 입구 <c>may_act(issuer, acts_for(인자))</c>(G122) →
-        /// 전제 조건(G110) 순서다. 본문 실행은 아직 없다. <paramref name="issuer"/>는 호스트가 연결에 붙인 불투명한 꼬리표다 (G119).
+        /// 전제 조건(G110) → 본문(G132) 순서다. <paramref name="issuer"/>는 호스트가 연결에 붙인 불투명한 꼬리표다 (G119).
         /// 없는 커맨드 id만 호출자 오류(<see cref="WorldException"/>)이고 나머지는 모두 결과로 돌려준다 (G131).
         /// </summary>
         public SubmitResult Submit(string issuer, string command, IReadOnlyDictionary<string, Value> args)
@@ -101,7 +101,8 @@ namespace Kesa.Engine.Runtime
             {
                 var target = ActsFor(decl, checkedArgs);
                 if (!MayAct(issuer, target, command)) return Copy(result, SubmitOutcome.GateDenied, target);
-                var report = EvaluateRequires(decl, checkedArgs);
+                // 본문이 중간에 실패하면 그때까지의 쓰기를 되감는다 (C8, G133)
+                var report = Atomically(() => EvaluateRequires(decl, checkedArgs, runBody: true));
                 if (!report.Passed) return Copy(result, SubmitOutcome.PreconditionsFailed, target, report);
                 return Copy(result, SubmitOutcome.Succeeded, target, report);
             }

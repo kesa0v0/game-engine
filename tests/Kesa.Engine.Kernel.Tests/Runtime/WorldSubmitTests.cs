@@ -172,7 +172,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var r = _world.Submit("alice", "banking.Crash", new Dictionary<string, Value> { ["party"] = new EntityValue(_red) });
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
-            Assert.That(r.Error!.Message, Does.StartWith("computing the preconditions of banking.Crash: "));
+            Assert.That(r.Error!.Message, Does.StartWith("computing the command banking.Crash: "));
         }
 
         [Test]

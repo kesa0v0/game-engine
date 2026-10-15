@@ -1,10 +1,10 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-15. 브랜치 `spec-v0.5-scaffold`, 테스트 1099개 통과(커널 1071, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-15. 브랜치 `spec-v0.5-scaffold`, 테스트 1121개 통과(커널 1093, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
-spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G108에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기(G95~G104)를 `World`에 연결했다: `derived` 읽기와 형제 접근(G103), 재진입 감지·깊이 상한(G100), 기여 행 API와 `contribs`(G98), 읽은 값 근거 `Explain`(G105), 함수 기본값과 `derived` 원천 `default_from`(G106). `check`는 함수 본문의 이름 오타도 잡는다(G108). 그 뒤 실행기를 검토해 파이썬과 결과가 다르거나 spec과 어긋난 곳 6가지를 재현하고 고쳤다(아래 "실행기 검토"). 이어서 S6 커맨드 첫 슬라이스를 시작해 선언·사전 검사·인자 검사·쓰기 판정까지 왔다(G109~G118, 아래 "S6 커맨드 진행 상황"). 본문 실행은 아직 없다. 그 뒤 옛 컨텍스트 바구니(`^Self` 등)가 새 spec에서 어디로 갔는지 대조해 제출자·행위자·입구 정책·`ask` 대상·UI의 나·상태 안 값 목록을 정했다(G119~G129, 문서만).
+spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G108에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기(G95~G104)를 `World`에 연결했다: `derived` 읽기와 형제 접근(G103), 재진입 감지·깊이 상한(G100), 기여 행 API와 `contribs`(G98), 읽은 값 근거 `Explain`(G105), 함수 기본값과 `derived` 원천 `default_from`(G106). `check`는 함수 본문의 이름 오타도 잡는다(G108). 그 뒤 실행기를 검토해 파이썬과 결과가 다르거나 spec과 어긋난 곳 6가지를 재현하고 고쳤다(아래 "실행기 검토"). 이어서 S6 커맨드 첫 슬라이스를 시작해 선언·사전 검사·인자 검사·쓰기 판정까지 왔다(G109~G118, 아래 "S6 커맨드 진행 상황"). 그 뒤 옛 컨텍스트 바구니(`^Self` 등)가 새 spec에서 어디로 갔는지 대조해 제출자·행위자·입구 정책·`ask` 대상·UI의 나·상태 안 값 목록을 정했다(G119~G129). 마지막으로 첫 슬라이스를 마쳤다: 입구 선언(G130), 제출 API `World.Submit`(G131), 본문 실행(G132), 런타임 안전망(G117 보강), 커맨드 단위 롤백(G133). 이제 자유 커맨드가 게임 상태를 바꿀 수 있다.
 
 ## 구현된 것 (`src/Kesa.Engine.Kernel/`)
 
@@ -100,10 +100,12 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 | G129 | 키 컴포넌트에 `int` 키 허용(항상 `listed`), 커널 헬퍼 `replace_rows`·`append_row`, 번호 다시 매기기 = 지우고 새로 만들기(그 줄의 기여 행도 지움). 리스트 칼럼·상태 안 맵은 안 엶 |
 | G130 | `acts_for` 람다는 커맨드 매개변수를 이름으로 골라 받음(`lambda unit: unit.owner`), 자유 커맨드에만. 정책은 `@submit_policy`(교체 `override=True`), `(issuer, target)`. **코드 반영함** |
 | G131 | `Submit`의 결과는 모두 값 `SubmitResult`(성공·Request 필요·인자 거절·입구 거부·전제 조건 실패·스크립트 오류), 예외는 없는 커맨드 id뿐. 채운 전체 인자를 담음. 정책 필수는 호스트 옵션. **코드 반영함** |
+| G132 | 본문의 속성 대입 = `World.Set`과 같은 검사의 상태 쓰기, 키 컴포넌트는 있는 줄만. 사전 조건과 본문은 한 실행(지역 변수 이어짐). 리스트 `+=`는 상태에 리스트가 없어 생기지 않음. **코드 반영함** |
+| G133 | 롤백은 되돌리기 기록(undo 로그): 커맨드 실행 중 값 칸·`keys="all"` 줄 기록·역방향 색인 변경을 기록, 예외면 되감음. **코드 반영함** |
 
 **로더 쪽 구현 (G130, 2026-10-15):** `acts_for` 람다는 커맨드 매개변수를 이름으로 골라 받는다(`acts_for=lambda unit: unit.owner`). 자유 커맨드에 `acts_for`가 없거나, 자유 커맨드가 아닌데 있거나, 람다가 커맨드에 없는 이름을 받으면 `CMD001`이다(`CommandDecl.ActsFor`, `CommandSignatures.CheckActsFor`). 정책 함수는 `@submit_policy`/`@submit_policy(override=True)`이고 `(issuer, target)` 두 매개변수를 받는다. 개수·교체는 Def 교체와 같은 규칙으로 `BuildDefs` 고정점 안에서 판정한다(`ContentLoader.RegisterPolicy`, `CMD005`). 결과는 `ContentLoadResult.SubmitPolicy`, 쓰기 함수면 `CMD004`다. 테스트는 `Loading/SubmitGateDeclarationTests`.
 
-**제출 API (G131, 2026-10-15):** `World.Submit(issuer, command, args)` → `SubmitResult`(`Runtime/World.Submit.cs`). 순서는 자유 커맨드 확인 → 인자 검사 → `acts_for` → `may_act` → 전제 조건이다. `Outcome`은 `Succeeded`/`NeedsRequest`/`ArgumentsRejected`/`GateDenied`/`PreconditionsFailed`/`ScriptError`이고, 결과에 채운 전체 인자(`Arguments`), 대상(`Target`), `Preconditions`, `Error`를 담는다. 예외는 없는 커맨드 id뿐이다. `new World(loaded, requireSubmitPolicy: true)`에 정책이 없으면 `RUN016`이다. 테스트는 `Runtime/WorldSubmitTests`. **본문은 아직 실행하지 않는다**: `Succeeded`는 지금 "모든 검사 통과"의 뜻이고, 본문 실행(다음 할 일 2)이 이 자리에 붙는다.
+**제출 API (G131, 2026-10-15):** `World.Submit(issuer, command, args)` → `SubmitResult`(`Runtime/World.Submit.cs`). 순서는 자유 커맨드 확인 → 인자 검사 → `acts_for` → `may_act` → 전제 조건이다. `Outcome`은 `Succeeded`/`NeedsRequest`/`ArgumentsRejected`/`GateDenied`/`PreconditionsFailed`/`ScriptError`이고, 결과에 채운 전체 인자(`Arguments`), 대상(`Target`), `Preconditions`, `Error`를 담는다. 예외는 없는 커맨드 id뿐이다. `new World(loaded, requireSubmitPolicy: true)`에 정책이 없으면 `RUN016`이다. 테스트는 `Runtime/WorldSubmitTests`. 전제 조건을 통과하면 본문까지 실행한다(G132), 실패하면 되감는다(G133).
 
 **아직 안 정한 것:**
 
@@ -119,16 +121,23 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 - 기본값 없는 `const`(리스트·맵 제외)는 필수다(G67). `extend`가 더한 `const`와 `keys="all"` 키 컴포넌트의 `const`는 기본값이 있어야 한다(G74·G77). 그래서 동결본은 구멍이 없다. 런타임도 생성 순간에 구멍을 막는다(G93).
 - 동결본은 `abstract`를 뺀다(G70). 안 적힌 `keys="all"` 줄은 `FrozenDef.TryGetRow`가 기본값으로 채워 돌려준다.
 
-## 다음 할 일: G117 2단계 — 커맨드 본문 실행
-
-S6 첫 슬라이스에서 남은 것, 이 순서로 하나씩 짚는다(spec 빈칸은 선택지와 추천을 내고 사용자가 고른다):
+## S6 첫 슬라이스 마무리 (끝남, 2026-10-15)
 
 1. ~~**제출 API의 모양**~~: G130·G131로 정하고 구현함(`World.Submit`, 위 "제출 API").
-2. **본문 실행:** 실행기에 속성 대입 → `World.Set` 연결(복합 대입 포함). 쓸 수 있는 칸은 `field`·Ref(`const`·`derived`는 `World`가 이미 거부). 리스트 칼럼의 `+=`, 키 줄 쓰기(`h.Skill[k].level = …`)를 이번에 열지 정한다.
-3. **런타임 안전망(G117에 규칙이 적혀 있음):** 실행 프레임마다 순수/쓰기 모드. `derived` 읽기·사전 조건·`Cond` 호출·순수 함수에서 시작한 호출은 커맨드 실행 중이라도 쓰기를 거부. 최상위 대입으로 숨긴 커맨드(`x = Heal`) 호출도 여기서 막는다(G118).
-4. **커맨드 단위 롤백(C8):** 스크립트 오류가 나면 효과를 남기지 않는다. 방식(쓰기 로그 되감기 vs 스냅샷)을 정한다. spec 9절 벤치 항목과 관련.
+2. ~~**본문 실행**~~: G132로 정하고 구현함. `PureEvaluator.RunCommand`가 사전 조건 → 본문을 한 실행으로 돌리고, 본문의 속성 대입은 `IRuntimeAssignable`(컴포넌트·줄 뷰) → `World.WriteMember` → `Set`/`SetRow`. 테스트 `Runtime/WorldCommandBodyTests`.
+3. ~~**런타임 안전망**~~: 구현함(G117 보강). `Frame.Writable`: 커맨드 본문, 쓰기 모드 프레임이 문장으로 부른 쓰기 함수만 쓰기 모드. 순수 함수 `apply(f, u)`를 거쳐 쓰기 함수 값이 쓰던 구멍을 재현하고 막음(`RUN003`). 최상위 대입으로 숨긴 커맨드(`x = Heal`)는 재현해 보니 이미 로드 때 `CMD004`로 잡힘. 함수 값으로 커맨드를 부르는 런타임 방어선은 넣었지만 그 길을 만들 방법을 찾지 못해 테스트가 없다.
+4. ~~**커맨드 단위 롤백(C8)**~~: G133으로 정하고 구현함(`Runtime/World.Undo.cs`의 `Atomically`·`Assign`·`Journal`). 테스트는 롤백을 끈 채로 실패하는 것까지 확인함.
 5. ~~**`me`의 정체(S2 ❓)**~~: G119~G127로 정함(`me` 없음). 위 "제출자·행위자 정리".
-6. 미룸: `ask`/`wait`(Flow 중단·재개), `cost`·`choose`, 반응(S5), 저장(S8), 엔티티 생성·삭제·컴포넌트 부착을 스크립트에서 하는 길.
+
+## 다음 할 일 (사용자와 고를 것)
+
+첫 슬라이스로 자유 커맨드가 상태를 바꿀 수 있게 됐다. 다음 후보(미룬 것):
+
+- **스크립트에서 엔티티 생성·삭제·컴포넌트 부착·줄 붙이기**: G129 헬퍼(`replace_rows`·`append_row`, `int` 키)와 함께. 이 연산들도 되돌리기 기록(G133)에 넣어야 한다.
+- **`ask`/`wait`(Flow 중단·재개)**와 응답 커맨드(G125·G126, `NeedsRequest`가 지금 받는 자리): C1~C3과 시나리오 ①②④의 전제.
+- `cost`·`choose`(사전 조건 블록 안, 지금 “미지원”).
+- 반응(S5), 저장(S8).
+- 로직용 `.pyi`(아래 남은 일 2): 쓰기 API 모양이 정해졌으므로 이제 해도 다시 고칠 일이 적다.
 
 ### (참고) 첫 슬라이스를 시작할 때의 합의 (2026-10-15)
 
@@ -139,7 +148,7 @@ spec 척추 기준으로 어디까지 왔나:
 | S1 로딩, S9 진단(일부), CLI | 끝남 |
 | S4 데이터 층(`World`), `derived`·기여 행 | 끝남 |
 | S2 순수 함수(읽기만) | 끝남, 검토 마침 |
-| S6 커맨드 | 선언·사전 검사·인자 검사·쓰기 판정까지(G109~G118), 본문 실행·롤백 없음 |
+| S6 커맨드 | 자유 커맨드의 선언·입구·사전 검사·본문 실행·롤백까지 끝남(G109~G133). 응답 커맨드, `cost`·`choose` 없음 |
 | S2 Flow(쓰기 실행, `ask`, `wait`, 재개) · S5 반응 · S8 저장 | 없음 |
 
 spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거의 모두 Flow·커맨드·저장을 요구하므로 아직 하나도 검증하지 못했다. 엔진은 콘텐츠를 읽고 값을 계산할 수 있지만 게임을 진행시킬 수는 없다. 로직용 `.pyi`(남은 일 2번)는 스크립트의 쓰기 API 모양이 정해진 뒤에 하는 편이 다시 고칠 일이 적다.
@@ -172,7 +181,6 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1099개 통과(커널 1071, CLI 28)를 확인한다.
-2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G129), `docs/spine-spec.md` S2·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Commands.cs`, `Script/Execution/PureEvaluator.cs`(`RunPreconditions`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
-3. 위 "다음 할 일"(G117 2단계)의 1번부터 시작한다.
-   예: "커맨드 본문 실행을 시작하자. handoff의 다음 할 일 1번(제출 API 모양)부터 짚어 줘."
+1. `git pull` 후 `dotnet test`로 1121개 통과(커널 1093, CLI 28)를 확인한다.
+2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G133), `docs/spine-spec.md` S2·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
+3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.

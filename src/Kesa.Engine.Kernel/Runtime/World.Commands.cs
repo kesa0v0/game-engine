@@ -116,8 +116,12 @@ namespace Kesa.Engine.Runtime
             return EvaluateRequires(decl, checkedArgs);
         }
 
-        /// <summary>인자 검사를 통과한 인자로 <c>require</c>를 평가한다. 스크립트 오류는 <see cref="WorldException"/>이다.</summary>
-        private PreconditionReport EvaluateRequires(CommandDecl decl, SortedDictionary<string, Value> checkedArgs)
+        /// <summary>
+        /// 인자 검사를 통과한 인자로 <c>require</c>를 평가한다. <paramref name="runBody"/>면 모두 통과했을 때 본문까지 실행한다
+        /// (G132, 예산은 커맨드 하나에 하나). 스크립트 오류는 <see cref="WorldException"/>이다.
+        /// </summary>
+        private PreconditionReport EvaluateRequires(CommandDecl decl, SortedDictionary<string, Value> checkedArgs,
+            bool runBody = false)
         {
             string command = decl.Id;
             var scriptArgs = new SortedDictionary<string, Value>(StringComparer.Ordinal);
@@ -127,7 +131,9 @@ namespace Kesa.Engine.Runtime
             if (outermost) _meter = new StepMeter(_stepBudget);
             try
             {
-                var raw = Evaluator.RunPreconditions(decl.Function, scriptArgs, decl.Span, _meter);
+                var raw = runBody
+                    ? Evaluator.RunCommand(decl.Function, scriptArgs, decl.Span, _meter)
+                    : Evaluator.RunPreconditions(decl.Function, scriptArgs, decl.Span, _meter);
                 var requires = new List<RequireOutcome>(raw.Count);
                 foreach (var r in raw)
                 {
@@ -140,7 +146,7 @@ namespace Kesa.Engine.Runtime
             }
             catch (ScriptRuntimeException e)
             {
-                throw ToWorldException(e, "the preconditions of " + command);
+                throw ToWorldException(e, (runBody ? "the command " : "the preconditions of ") + command);
             }
             finally
             {

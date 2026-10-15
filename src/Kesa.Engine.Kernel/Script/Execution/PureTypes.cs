@@ -68,6 +68,15 @@ namespace Kesa.Engine.Script
         Value GetAttribute(string name);
     }
 
+    /// <summary>
+    /// <c>x.name = 값</c>을 받는 런타임 값 (엔티티 컴포넌트, 키 컴포넌트의 줄). 커맨드 본문에서만 불린다 (spec-gaps G117·G132).
+    /// 쓸 수 없으면 <see cref="ScriptRuntimeException"/>을 던진다.
+    /// </summary>
+    public interface IRuntimeAssignable
+    {
+        void SetAttribute(string name, Value value);
+    }
+
     /// <summary><c>x[key]</c>를 받는 런타임 값 (키 컴포넌트의 줄 등).</summary>
     public interface IRuntimeIndexable
     {
