@@ -175,6 +175,19 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(V(_red), Is.EqualTo(9));
         }
 
+        // 이어서 실행하는 사본에서도 람다는 파이썬처럼 만든 함수의 지역 변수를 늦게 읽는다 (G104)
+        [Test]
+        public void ALambdaSeesLocalsAssignedAfterResume()
+        {
+            Mod("banking", schema: Schema, defs: "Party(\"Red\")\n@command(free=True, acts_for=None)\ndef Late(p: Ref[Party]):\n" +
+                "    k = lambda: n\n    n = 1\n    r = ask(p, \"Q\", choices=[\"a\"])\n    n = 2\n    p.Score.v = k()\n");
+            var world = new World(LoadClean());
+            var red = world.Create("Red");
+            var q = world.Submit("host", "banking.Late", new Dictionary<string, Value> { ["p"] = new EntityValue(red) }).OpenedRequest!;
+            Assert.That(world.Answer("host", q.Id, red, 0).Succeeded, Is.True);
+            Assert.That(((IntValue)world.Get(red, world.Member("Score", "v"))).Value, Is.EqualTo(2));
+        }
+
         // ---- 거절 (C9) ----
 
         [Test]

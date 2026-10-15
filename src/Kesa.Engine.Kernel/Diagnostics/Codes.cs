@@ -123,6 +123,11 @@ namespace Kesa.Engine.Diagnostics
         // 제출 입구 (spec S6, spec-gaps G124): 호스트가 정책 필수를 켰는데 정책 함수가 없다
         public const string RunNoSubmitPolicy = "RUN016";
 
+        // 저장과 불러오기 (spec S8, spec-gaps G140): 깨졌거나 형식이 다른 저장 / 지금 내용과 어긋나는 저장 / 모드 목록이 달라짐(경고)
+        public const string SaveCorrupt = "SAV001";
+        public const string SaveMismatch = "SAV002";
+        public const string SaveModsChanged = "SAV003";
+
         // 커맨드 선언 (spec S6, spec-gaps G109)
         public const string CmdBadDecorator = "CMD001";
         public const string CmdPreconditions = "CMD002";

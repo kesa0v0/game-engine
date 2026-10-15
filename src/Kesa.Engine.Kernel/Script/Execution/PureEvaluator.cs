@@ -146,6 +146,13 @@ namespace Kesa.Engine.Script
         /// <summary><c>def</c>마다 지역 변수 이름 (한 번 계산해 둔다).</summary>
         private readonly Dictionary<FunctionDef, SortedSet<string>> _localNames = new Dictionary<FunctionDef, SortedSet<string>>();
 
+        /// <summary>이 실행기의 내장 함수 표 (저장이 내장 함수 값을 이름으로 적고 다시 찾는다).</summary>
+        internal IReadOnlyDictionary<string, Value> Builtins => _builtins;
+
+        /// <summary>불러온 멈춘 실행의 프레임 (저장, spec S8). 지역 변수 이름 전체는 함수 정의에서 다시 계산한다.</summary>
+        internal Frame NewFrame(FunctionValue function, SortedDictionary<string, Value> locals) =>
+            new Frame(function, locals, LocalNamesOf(function.Definition!));
+
         private SortedSet<string> LocalNamesOf(FunctionDef def)
         {
             if (!_localNames.TryGetValue(def, out var names))
@@ -305,8 +312,54 @@ namespace Kesa.Engine.Script
             /// <summary>멈춘 실행의 사본을 스택에 올리고 답을 받을 변수에 넣는다.</summary>
             public void Restore(Suspended from, Value answer)
             {
-                foreach (var frame in from.Frames) _stack.Add(frame.Copy());
+                _stack.AddRange(CopyStack(from.Frames));
                 if (from.AnswerTo != null) _stack[_stack.Count - 1].Locals[from.AnswerTo] = answer;
+            }
+
+            /// <summary>
+            /// 프레임 스택의 사본. 람다는 만든 프레임의 지역 변수 사전을 잡고 늦게 읽으므로(G104), 사본 안의 람다는 사본의 사전을
+            /// 잡도록 바꾼다. 스택에 없는 프레임(이미 끝난 함수)이 만든 람다의 사전은 더 바뀌지 않으니 그대로 나눠 쓴다.
+            /// </summary>
+            private static List<Frame> CopyStack(List<Frame> frames)
+            {
+                var copies = new List<Frame>(frames.Count);
+                foreach (var frame in frames) copies.Add(frame.Copy());
+
+                Value Remap(Value value)
+                {
+                    switch (value)
+                    {
+                        case ClosureValue closure:
+                            for (int i = 0; i < frames.Count; i++)
+                            {
+                                if (ReferenceEquals(closure.Captured, frames[i].Locals))
+                                    return new ClosureValue(closure.Function, copies[i].Locals, closure.CapturedLocals);
+                            }
+                            return value;
+                        case ListValue list:
+                            return new ListValue(RemapAll(list.Items));
+                        case DictValue dict:
+                            var entries = new List<DictItem>(dict.Items.Count);
+                            foreach (var item in dict.Items) entries.Add(new DictItem(item.Key, Remap(item.Value), item.Span));
+                            return new DictValue(entries);
+                    }
+                    return value;
+                }
+
+                List<Value> RemapAll(IReadOnlyList<Value> items)
+                {
+                    var result = new List<Value>(items.Count);
+                    foreach (var item in items) result.Add(Remap(item));
+                    return result;
+                }
+
+                foreach (var copy in copies)
+                {
+                    foreach (var name in new List<string>(copy.Locals.Keys)) copy.Locals[name] = Remap(copy.Locals[name]);
+                    foreach (var block in copy.Blocks)
+                        if (block.Items != null) block.Items = RemapAll(block.Items);
+                }
+                return copies;
             }
 
             public void RunToEnd()

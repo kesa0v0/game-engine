@@ -230,8 +230,11 @@ namespace Kesa.Engine.Runtime
             return a.Value.Same(b.Value);
         }
 
-        private sealed class ContributionView : Value, IRuntimeAttributes
+        private sealed class ContributionView : Value, IRuntimeAttributes, IValueEquality
         {
+            /// <summary>같은 기여 행이면 같다 (G142).</summary>
+            public bool ValueEquals(Value other) => other is ContributionView v && v._row.Id == _row.Id;
+
             private readonly World _world;
             private readonly Contribution _row;
 
@@ -242,6 +245,8 @@ namespace Kesa.Engine.Runtime
             }
 
             public override string KindName => "contribution";
+
+            public Contribution Row => _row;
 
             public Value GetAttribute(string name)
             {

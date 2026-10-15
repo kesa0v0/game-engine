@@ -266,8 +266,22 @@ namespace Kesa.Engine.Runtime
             return new ComponentInitValue(component, values);
         }
 
-        private sealed class ComponentInitValue : Value
+        private sealed class ComponentInitValue : Value, IValueEquality
         {
+            /// <summary>같은 컴포넌트에 같은 값들을 줬으면 같다(준 순서는 상관없다, G142).</summary>
+            public bool ValueEquals(Value other)
+            {
+                if (!(other is ComponentInitValue c) || c.Component != Component || c._values.Count != _values.Count) return false;
+                foreach (var mine in _values)
+                {
+                    bool found = false;
+                    foreach (var theirs in c._values)
+                        if (theirs.Key == mine.Key) found = PureOps.ValuesEqual(mine.Value, theirs.Value);
+                    if (!found) return false;
+                }
+                return true;
+            }
+
             private readonly IReadOnlyList<KeyValuePair<MemberDecl, Value>> _values;
 
             public ComponentInitValue(ComponentType component, IReadOnlyList<KeyValuePair<MemberDecl, Value>> values)
@@ -277,6 +291,7 @@ namespace Kesa.Engine.Runtime
             }
 
             public ComponentType Component { get; }
+            public IReadOnlyList<KeyValuePair<MemberDecl, Value>> Values => _values;
             public override string KindName => Component.Name + "(...)";
 
             public Init[] Inits()

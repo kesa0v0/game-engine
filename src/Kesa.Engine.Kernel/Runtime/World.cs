@@ -45,6 +45,7 @@ namespace Kesa.Engine.Runtime
         public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget, bool requireSubmitPolicy = false)
             : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, loaded.SubmitPolicy)
         {
+            _mods = loaded.Mods;
             if (requireSubmitPolicy && loaded.SubmitPolicy == null)
                 throw new WorldException(Codes.RunNoSubmitPolicy,
                     "the host requires a submit policy, but no active mod declares one",

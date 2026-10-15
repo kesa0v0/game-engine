@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1205개 통과(커널 1177, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1243개 통과(커널 1215, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -149,19 +149,40 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 2. **실행기 리팩터링(끝남, 동작 불변):** `PureEvaluator`의 문장 실행을 데이터로 옮겼다. `Frame.Blocks`(블록마다 다음 문장 번호, `for`면 굳힌 항목·위치), `Frame.Result`(버림·지역 변수·호스트)와 실행 고리 `RunUntil`/`Step`. 문장 수준 `def` 호출은 프레임만 쌓고, 식 안의 호출은 끝까지 실행한다. 단계 수를 고정한 테스트(`TheStepCountOfAProgramIsPinned`, 667)가 리팩터링 전후로 같다.
 3. **G137(확인):** 선택 방법(창·지도 강조 클릭)은 스크립트가 `hint=`로 제안만 하고 UI 모듈이 정한다. 커널은 해석하지 않는다. 질문에 자유 데이터 `data=`. 근거는 TR의 고정 클래스(`PendingChoiceData`) 문제.
 4. **G138(확인):** `ask(who, title, choices=[...], responses=[...], hint=, data=)`, 돌려받는 `r.response`·`r.index`·`r.choice`·`r.by`.
-5. **`ask`(choices만) 구현(끝남, 커밋 전):** `Runtime/World.Flows.cs`.
+5. **`ask`(choices만) 구현(끝남):** `Runtime/World.Flows.cs`.
    - `ask`는 `PureBuiltin { Writes, Suspends }`라 로드 판정은 쓰는 내장과 같다. 메시지만 "waits for an answer".
    - 실행기는 질문을 들고 멈추고(`PureEvaluator.Suspended` = 프레임 스택 + 답을 받을 변수), 이어서 실행할 때는 사본에서 돈다(`Resume`).
    - `World`가 Flow 표(`_flows`, 번호 카운터 `_nextFlow`·`_nextRequest`, 모두 되돌리기 기록)를 들고 있다.
    - `Submit` 결과의 `OpenedRequest`, `World.OpenRequests`.
    - `World.Answer(issuer, request, by, choice)` → `AnswerResult`(`UnknownRequest`·`NotListed`·`GateDenied`·`BadChoice`·`ScriptError`). 이어서 실행한 구간이 실패하면 효과와 Flow가 되감기고 질문은 그대로 열려 있다.
    - 테스트는 `Runtime/WorldAskTests`(C2·C3·C8·C9). Flow 되감기 기록을 빼면 실패하는 것까지 확인했다.
-6. **G139(확인)와 응답 커맨드 구현(끝남, 커밋 전):**
+6. **G139(확인)와 응답 커맨드 구현(끝남):**
    - `acts_for`는 모든 커맨드에 필수가 되었다. 응답 커맨드는 `None`을 쓸 수 없다. 기존 테스트의 맨 `@command`는 `@command(free=True, acts_for=None)`으로 바꿨다.
    - `ask(..., responses=["Pass", "Bid"])`: 이름은 부른 함수의 모드에서 찾고(`PureBuiltin.CallerBody`가 부른 쪽 모드를 받음), 다른 모드 것은 `"모드.이름"`. 없는 커맨드나 자유 커맨드는 실행 중 오류다(로드 시점 리터럴 검사는 아직 없음).
    - `World.Respond(issuer, request, command, args)` 순서: 질문 → 받는 커맨드인가(`NotAccepted`) → 인자 → `acts_for` → 목록 → 정책 → 사전 조건 → 본문 → Flow 재개, 모두 한 트랜잭션. `r.response`는 `ask`에 적은 이름.
    - 응답 커맨드 본문이 `ask`하면 아직 오류다(spec은 "기다리던 Flow의 스택 위에서 실행"이라 중첩 멈춤이 가능해야 함). 단계 예산은 응답 본문과 재개 구간이 따로다.
-7. **남은 것:** 시간(`blocks_time`·`deadline`·`on_timeout`·`wait`·`advance`), 저장(C1), 고를 수 없는 선택지 표시, 동시 고르기(시나리오 ②), 엔티티가 죽은 뒤의 Flow(`on_stale`).
+7. **남은 것:** 시간(`blocks_time`·`deadline`·`on_timeout`·`wait`·`advance`), 고를 수 없는 선택지 표시, 동시 고르기(시나리오 ②), 엔티티가 죽은 뒤의 Flow(`on_stale`). 저장은 아래 저장 슬라이스.
+8. 재개 뒤 람다가 재개 전 사본의 지역 변수를 보던 버그를 재현해 고쳤다(`CopyStack`이 클로저를 사본 프레임으로 다시 이음, 테스트 `ALambdaSeesLocalsAssignedAfterResume`).
+
+## 저장 슬라이스 (진행 중, 2026-10-16)
+
+G140(정규형 JSON을 엔진이 직접 씀)·G141(멈춘 Flow의 런타임 값도 전부 저장)을 사용자가 골랐다. 네 항목으로 나눠 하나씩 한다: ① 월드 상태(C4) ② 람다를 뺀 Flow(C1) ③ 람다 ④ 함수 본문 해시와 C5 거부.
+
+1. **① 월드 상태(끝남, 커밋 전):** `Runtime/CanonicalJson.cs`(손으로 쓴 쓰기·읽기, 수는 `long`만, 들여쓰기 2칸 고정)와 `Runtime/World.Save.cs`.
+   - `World.Save()` → `byte[]`. 커맨드·함수 실행 중이면 거부하고, 멈춘 Flow가 있으면 아직 거부한다(②에서 채움).
+   - 형식: `format`·`mods`(id, version)·`counters`(entity·contribution·flow·request)·`entities`(id 순, `def`·`runtime`·`values`(컴포넌트·멤버 이름 순, 쓴 값만)·`rows`(`key`·`attached`·`values`))·`contributions`. 값 태그는 null·bool·수(int)·문자열·배열(리스트)·`{"fixed": raw}`·`{"entity": id}`·`{"dict": [[k, v]]}`·`{"text", "args"}`.
+   - `World.Load(loaded, bytes)` → `WorldLoadResult`(예외 대신 진단). 원본 기록을 채운 뒤 색인(`_byType`·`_inverse`·`_keyHolders`·기여 색인)을 훑어 다시 만든다. `SAV001` 깨진 저장, `SAV002` 지금 내용과 어긋남(없어진 Def·컴포넌트·멤버, 타입이 바뀐 값, 없어진 키 Def, 새로 생겼는데 정적 기본값이 없는 멤버. 모두 모아 한 번에), `SAV003` 모드 목록 차이(경고만, S8 "Def 값 변경은 항상 허용").
+   - 테스트 `Runtime/WorldSaveTests`: 고약한 월드로 C4 바이트 동일, 불러온 월드가 같게 읽힘, 카운터 유지, 색인 재구성, 골든 JSON, 어긋남 목록, 2^53+1 보존.
+   - 범위(`min`·`max`)도 불러올 때 다시 검사한다(G92 보강, 사용자가 G92를 짚어 줌).
+2. **G142(확인):** `==`는 뷰·답·`range`·컴포넌트 값·기여 행을 가리키는 대상이나 내용으로 비교한다(전에는 객체 비교라 `u.Health == u.Health`가 거짓이었고, 저장 뒤 `x == y`가 바뀌어 C1이 깨질 뻔했다). 테스트 `Runtime/WorldEqualityTests`.
+3. **② 람다를 뺀 Flow(끝남, 커밋 전):** `Runtime/World.SaveFlows.cs`. 저장에 `flows`가 생겼다(골든도 갱신).
+   - Flow마다 `id`·`command`·`request`(질문 전체)·`frames`. 프레임은 `mod`·`function`(그 이름이 그 함수에 묶여 있는지 저장 때 확인)·`locals`·`blocks`(`next`, `if` 갈래 번호 `branch`, `for`면 `index`와 `items`나 `range`).
+   - 부른 위치·결과 자리(`x = f()`의 x)·쓰기 모드·답 변수는 부른 문장에서 다시 계산한다(`Relink`). 저장할 때 계산이 실제 프레임과 다르면 엔진 결함으로 예외.
+   - 지역 변수 값 태그: `entity_view`(상태의 `entity`와 구별), `component`(엔티티·이름·줄 키), `rows`, `def_view`, `answer`, `component_value`, `contribution`, `range`, `function`(모드·이름), `builtin`. 람다(`ClosureValue`)는 저장이 예외(③).
+   - 불러올 때 함수·커맨드·응답 커맨드·컴포넌트가 없거나 멈춘 자리가 본문에 없으면 `SAV002`.
+   - 테스트 `Runtime/WorldSaveFlowTests`: 시나리오를 저장 없이 한 번, 대기 지점마다 저장→새 내용으로 불러오기→이어서 한 번씩 돌려 걸음별 결과(오류 문구 포함)·열린 질문·최종 저장 바이트가 같은지(C1)와 저장 순간의 C4. 일부러 고장(쓰기 모드, 엔티티 뷰)을 넣어 실패하는 것도 확인했다.
+   - 한계: 모드 최상위 이름이 아닌 로드 시점 값(Def 리터럴 등)이 지역 변수에 있으면 저장이 예외다.
+   - 사용자에게 아직 묻지 않은 것: 칼럼 삭제(지금 거부, S8 최종은 고아 영역), Def가 더 이상 적지 않는 Def 줄 기록(보이지 않게 남음), 새 멤버의 함수 기본값·`default_from`(지금 거부), 모드 내용 해시(④와 함께?).
 
 ## 다음 할 일 (사용자와 고를 것)
 

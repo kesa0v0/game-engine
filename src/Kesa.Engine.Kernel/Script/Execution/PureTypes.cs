@@ -107,8 +107,16 @@ namespace Kesa.Engine.Script
     }
 
     /// <summary><c>range(...)</c>의 결과. 원소를 만들어 두지 않고 반복할 때 센다.</summary>
-    public sealed class RangeValue : Value
+    public sealed class RangeValue : Value, IValueEquality
     {
+        /// <summary>파이썬처럼 같은 원소를 같은 순서로 내면 같다 (G142): <c>range(0) == range(5, 5)</c>.</summary>
+        public bool ValueEquals(Value other)
+        {
+            if (!(other is RangeValue r) || r.Count != Count) return false;
+            if (Count == 0) return true;
+            return Start == r.Start && (Count == 1 || Step == r.Step);
+        }
+
         public RangeValue(long start, long step, long count)
         {
             Start = start;

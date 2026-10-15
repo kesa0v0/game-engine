@@ -290,8 +290,12 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>컴포넌트 하나(키 컴포넌트면 줄 하나). 자기 멤버, 형제 컴포넌트, <c>entity</c>, <c>key</c>를 읽는다 (G103).</summary>
-        private sealed class ComponentView : ComponentViewBase, IRuntimeAttributes, IRuntimeAssignable
+        private sealed class ComponentView : ComponentViewBase, IRuntimeAttributes, IRuntimeAssignable, IValueEquality
         {
+            /// <summary>같은 엔티티의 같은 컴포넌트(같은 줄)면 같다 (G142).</summary>
+            public bool ValueEquals(Value other) =>
+                other is ComponentView v && v._id == _id && v.Component == Component && SameRow(v._row, _row);
+
             private readonly World _world;
             private readonly EntityId _id;
             private readonly RowKey? _row;
@@ -340,8 +344,11 @@ namespace Kesa.Engine.Runtime
         /// 파이썬 <c>dict</c>처럼 <c>len</c>은 줄 수, <c>k in h.Skill</c>은 그 키의 줄이 있는가, 비면 거짓이다 (G104).
         /// 컴포넌트가 붙어 있는지는 <c>h.Skill is not None</c>으로 따로 묻는다.
         /// </remarks>
-        private sealed class RowsView : ComponentViewBase, IRuntimeAttributes, IRuntimeIndexable, IRuntimeCollection
+        private sealed class RowsView : ComponentViewBase, IRuntimeAttributes, IRuntimeIndexable, IRuntimeCollection, IValueEquality
         {
+            /// <summary>같은 엔티티의 같은 키 컴포넌트면 같다 (G142).</summary>
+            public bool ValueEquals(Value other) => other is RowsView v && v._id == _id && v._component == _component;
+
             private readonly World _world;
             private readonly EntityId _id;
             private readonly ComponentType _component;
@@ -430,8 +437,11 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>엔티티의 Def 타입 바로 아래 <c>const</c>들 (Def마다 하나의 값, 엔티티가 공유한다).</summary>
-        private sealed class DefView : Value, IRuntimeAttributes
+        private sealed class DefView : Value, IRuntimeAttributes, IValueEquality
         {
+            /// <summary>같은 엔티티의 같은 Def 타입이면 같다 (G142).</summary>
+            public bool ValueEquals(Value other) => other is DefView v && v._id == _id && v._type == _type;
+
             private readonly World _world;
             private readonly long _id;
             private readonly DefType _type;
@@ -444,6 +454,9 @@ namespace Kesa.Engine.Runtime
             }
 
             public override string KindName => _type.Name;
+
+            public long Id => _id;
+            public DefType Type => _type;
 
             public Value GetAttribute(string name) => _world.DefConst(_id, _type, name);
         }

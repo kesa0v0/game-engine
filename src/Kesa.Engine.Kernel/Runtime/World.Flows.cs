@@ -538,8 +538,13 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary><c>ask</c>가 돌려주는 값 (G138): <c>r.response</c>·<c>r.index</c>·<c>r.choice</c>·<c>r.by</c>.</summary>
-        private sealed class AnswerValue : Value, IRuntimeAttributes
+        private sealed class AnswerValue : Value, IRuntimeAttributes, IValueEquality
         {
+            /// <summary>같은 응답·번호·선택지·답한 엔티티면 같다 (G142).</summary>
+            public bool ValueEquals(Value other) =>
+                other is AnswerValue a && a._response == _response && a._index == _index && a._by == _by &&
+                (a._choice == null ? _choice == null : _choice != null && PureOps.ValuesEqual(a._choice, _choice));
+
             private readonly World _world;
             private readonly string? _response;
             private readonly long? _index;
@@ -556,6 +561,11 @@ namespace Kesa.Engine.Runtime
             }
 
             public override string KindName => "answer";
+
+            public string? Response => _response;
+            public long? Index => _index;
+            public Value? Choice => _choice;
+            public EntityId? By => _by;
 
             public Value GetAttribute(string name)
             {
