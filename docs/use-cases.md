@@ -20,8 +20,8 @@
 ## U1. 자기 것만 조작한다
 - **상황:** "자기 유닛만 움직일 수 있다", "AP를 1 써야 한다" (WG 이동·후퇴, TR 시위)
 - **이전 처리:** 커맨드 조건에 `Condition_IsOwnedBy { target: ^Subject, expectedOwner: ^Self }`, `Condition_CompareResource { target: ^Self, resource: AP }`. **`^Self`는 커맨드를 보낸 issuer 자신인 `Instance`(진영 엔티티)였다** (ENG `CommandEnvelope.IssuerId`는 `Instance.UniqueId`, `CommandProcessor.SubmitCommandAsync(Instance issuer, …)`).
-- **교훈:** spec 예제의 `me.Points`, `u.owner == me`는 이 `^Self`를 옮긴 것이다. 이전에는 issuer가 엔티티라서 문제가 없었다. spec S6이 issuer를 불투명한 문자열로 바꾸면서 이 둘이 어긋났다.
-- **spec:** S2 `me` 메모(❓), S6 권한 3층.
+- **교훈:** 옛 spec 예제의 `me.Points`, `u.owner == me`는 이 `^Self`를 옮긴 것이었다. 이전에는 라우터가 연결을 진영 엔티티로 바꿔 issuer로 넘겼기 때문에(TR `SessionCommandRouter` 34~39행) 연결과 진영이 같은 값이었다. spec S6이 issuer를 불투명한 문자열로 바꾸면서 둘이 어긋났다. 정리(G119~G122): issuer는 연결일 뿐이고, 행동하는 진영과 비용 지불자는 인자(`party`)나 인자에서 끌어낸 값(`unit.owner`)이며, "자기 유닛만"은 전제 조건 `require(unit.owner == party)`, "이 연결이 이 진영을 맡나"는 입구의 정책 함수다.
+- **spec:** S2 `me` 메모, S6 권한 3층.
 
 ## U2. 차례 권한
 - **상황:** 지금 차례인 진영만 명령을 낼 수 있다. 유닛이 보낸 명령도 그 유닛을 소유한 진영의 차례일 때만 받는다 (WG).
@@ -31,7 +31,7 @@
   3. 커맨드의 도메인 조건 (`CanExecute`)
 
   시스템 커맨드(`isSystemCommand`)는 1·2를 건너뛰었다. 이와 별도로 커맨드 조건에도 `Condition_HasTurnAuthority`를 넣어 UI 비활성 표시에 썼다. 그래서 같은 검사가 두 군데에 있었다.
-- **교훈:** spec S6 권한 3층(인증 → 허용 목록 → `preconditions`)의 원형이다. spec은 "차례"를 특별한 개념으로 두지 않고 Request의 `accepts` 목록으로 일반화했고, "본문에 권한 검사를 반복하지 않는다"고 정했다. 이 결정은 위의 중복 검사에서 나왔다. 다만 **소유 체인**(유닛 → 진영)을 issuer 검사에 쓰던 요구는 spec에 아직 자리가 없다.
+- **교훈:** spec S6 권한 3층(인증 → 허용 목록 → `preconditions`)의 원형이다. spec은 "차례"를 특별한 개념으로 두지 않고 Request의 `accepts` 목록으로 일반화했고, "본문에 권한 검사를 반복하지 않는다"고 정했다. 이 결정은 위의 중복 검사에서 나왔다. **소유 체인**(유닛 → 진영)을 issuer 검사에 쓰던 요구는 둘로 나눴다(G122): "이 연결이 진영 P를 맡나"는 입구의 정책 함수 하나, "이 유닛이 P의 것인가"와 "지금 P의 차례인가"는 커맨드의 전제 조건. 각 검사가 한 곳에만 있어 UI 비활성 사유에도 그대로 쓰인다.
 - **spec:** S6, X1 `accepts`, S2 `me` 메모.
 
 ## U3. 턴·페이즈·스텝 파이프라인
@@ -65,7 +65,7 @@
 ## U6. 해소 도중의 선택과 대상 지정
 - **상황:** TR 시위 주사위가 1이 나오면 "거점 제거 / 유닛 철수" 중 하나를 고른다. 7 이상이면 "거점 2개 / 안건 이동"을 고르고, 안건 이동을 고르면 이어서 안건과 목적지(거리 3 이내)를 지정한다.
 - **이전 처리:** `Effect_Choice { choosingParty, titleKey, options[{labelKey, effects}] }`가 `Cmd_SubmitChoice`(issuer별)를 기다렸다. `Effect_SelectTarget { targetKey, targetConditions }`는 `ValidTargetIds`를 미리 계산해 두고 대상을 기다렸다. 선택은 주사위 결과 분기 안에 **중첩**되어 있었다.
-- **교훈:** spec S2 "`ask`는 값을 돌려주는 문장, 지역 변수는 그대로 이어진다"와 X1 Request(`options`, 허용 제출자)의 원형이다. 중첩된 YAML 효과 트리를 스크립트의 `if`/`match`로 펴는 것이 새 언어의 동기다.
+- **교훈:** spec S2 "`ask`는 값을 돌려주는 문장, 지역 변수는 그대로 이어진다"와 X1 Request(`options`, 답할 수 있는 엔티티 목록)의 원형이다. `choosingParty`가 정당 엔티티였듯 새 `ask`도 엔티티에게 묻는다(G125). 중첩된 YAML 효과 트리를 스크립트의 `if`/`match`로 펴는 것이 새 언어의 동기다.
 - **spec:** S2 `ask`, X1, C2.
 
 ## U7. 동시 선택 후 공개
@@ -163,6 +163,6 @@
 
 ## 이 문서로 풀리거나 바뀐 spec 빈틈
 
-- **`me`의 출처** (S2 메모): U1, U2. 이전에는 issuer가 엔티티(`^Self`)였고 소유 체인으로 권한을 검사했다. 새 spec은 issuer를 불투명한 인식표로 바꿨다. 남은 결정은 "규칙이 요청자 엔티티에 닿는 방법"과 "소유 체인 검사를 어디에 둘지"이다.
+- ~~**`me`의 출처** (S2 메모): U1, U2~~ → G119~G126으로 정함(`me` 없음, issuer는 연결, 행위자는 인자, 입구 정책 함수, 질문은 엔티티에게). 남은 것은 UI의 "나"(보고 있는 엔티티, S10).
 - **행의 맵 값** (S2 리스트·맵 표): U5 추정. 스택 노드 컨텍스트를 행으로 표현하려면 맵이 필요했다.
 - **턴제에서 틱의 의미** (X2): U3. 턴제에서는 틱이 논리적 진행 카운터로 쓰였다.

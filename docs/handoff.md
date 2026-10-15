@@ -81,6 +81,29 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 
 진단 코드: CMD001 데코레이터, CMD002 사전 조건 블록, CMD003 매개변수 타입·기본값, CMD004 함수 효과.
 
+### 제출자·행위자 정리 (G119~G126, 2026-10-15, 문서만 — 코드 미반영)
+
+옛 엔진의 `ScopeContext`(키 → 값 바구니)가 하던 일이 새 spec에서 어디로 흩어졌는지 대조하다가, `^Self` 하나가 맡던 다섯 역할(보낸 연결 · 행동하는 진영 · 비용 지불자 · 질문받는 쪽 · UI의 나)이 spec에서 `me` 하나로 뭉쳐 ❓로 남은 것을 정리했다. spine-spec S2·S6·X1·X2와 use-cases U1·U2·U6을 고쳤다.
+
+| G | 정한 것 |
+|---|---|
+| G119 | issuer는 "어느 연결에서 왔나"이고 행동하는 진영이 아니다. `me.Points` 같은 표기는 틀림 |
+| G120 | 엔진은 행위자를 넣어 주지 않는다. 행동하는 진영·비용 지불자는 인자(`party`)나 인자에서 끌어낸 값(`unit.owner`), 고르는 것은 모더 |
+| G121 | "연결 A가 진영 P를 맡는다"는 게임 상태 안의 **모드 데이터**(담당 칼럼·상속 규칙·정책은 std나 본편 모드). 커널은 입구에서 모드의 검사를 부를 자리만 연다 |
+| G122 | 자리의 모양: 커맨드가 `acts_for`(인자 → 엔티티)를 선언, 모드 하나가 정책 함수 `may_act(issuer, 엔티티)`를 선언. 소유·차례 검사는 전제 조건. 근거 OpenTTD(`client_playas` 일치 검사 + 커맨드마다 `CheckOwnership`), Factorio(권한 그룹은 동작 종류만) |
+| G123 | 자유 커맨드는 `acts_for` 필수, 누구로서도 아니면 `acts_for=None`(정책은 `None`으로 불림). 빠지면 로드 오류 |
+| G124 | 정책 함수가 없으면 모두 허용(호스트가 "정책 필수"를 켜면 시작 거부). 최대 하나, 교체는 `override=True` |
+| G125 | `ask`는 엔티티에게 묻는다. `accepts`는 엔티티 목록, 담당 확인은 응답이 올 때. `ask`는 답한 엔티티를 돌려줌 |
+| G126 | 응답은 어느 엔티티로서인지 늘 명시. 시간 초과 주입은 엔티티 `None` |
+
+**코드와 어긋나는 점:** 지금 로더는 `@command(free=True)`를 `acts_for` 없이 받는다(G109 구현). G123대로라면 로드 오류가 되어야 하고, 기존 테스트의 자유 커맨드에도 `acts_for`를 붙여야 한다. 아래 다음 할 일 1번에서 함께 한다.
+
+**아직 안 정한 것:**
+
+- **UI의 "나"**(다섯 번째 역할): 제안은 "UI 로컬의 보고 있는 엔티티, 후보는 정책 함수로 구함, 시뮬레이션 상태에 두지 않음"(핫시트에서 같은 연결의 "나"가 바뀌므로). 사용자 답을 받기 전에 멈췄다.
+- **Def·Flow 경계를 넘는 값 넘기기:** 옛 바구니는 통째 복사(`CopyTo`)로 값이 따라갔다(TR `PaidExtraOP`를 커맨드에서 ActionDef로, 주사위 `DiceResults`를 스택 노드에 두고 상대의 재굴림이 `PeekUnder`로 고침). 새 spec은 통째 복사를 없앴고, 이런 값을 Action 함수 인자로 넘길지 스택 노드를 상태로 둘지는 비어 있다(S2 리스트·맵 표의 "키 컴포넌트 줄의 맵" ❓, U5).
+- 표기: `acts_for`·`submit_policy` 이름, `ask` 반환값의 필드 이름.
+
 ## 핵심 규칙 (자세한 것은 spec-gaps)
 
 - Def 참조는 id 문자열이다(S2). ⑤는 존재·타입·보이는 범위·`abstract` 금지만 검사한다.
@@ -93,11 +116,12 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 
 S6 첫 슬라이스에서 남은 것, 이 순서로 하나씩 짚는다(spec 빈칸은 선택지와 추천을 내고 사용자가 고른다):
 
-1. **제출 API의 모양:** `World`에 커맨드를 제출해 사전 검사 → 본문 실행까지 하는 입구(이름 후보 `Submit`). 돌려주는 결과(거절 / 성공 / 스크립트 오류), issuer 인자, 자유 커맨드(`free`)만 받을지, 채운 전체 인자(G116)를 결과에 담을지.
+0. **먼저 남은 설계 하나:** 위 "아직 안 정한 것"의 UI의 "나"를 사용자와 정한다(제안이 이미 나가 있음). Def·Flow 경계 값 넘기기는 `ask`/스택을 만들 때 정해도 된다.
+1. **제출 API의 모양:** `World`에 커맨드를 제출해 입구(G122: `acts_for` + 정책 함수) → 사전 검사 → 본문 실행까지 하는 입구(이름 후보 `Submit`). issuer는 불투명한 문자열 인자(G119). 돌려주는 결과(입구 거부 / 전제 조건 거절 / 성공 / 스크립트 오류), 자유 커맨드(`free`)만 받을지, 채운 전체 인자(G116)를 결과에 담을지. `acts_for` 필수(G123)와 정책 함수 선언·개수 규칙(G124)의 로더 쪽 구현도 여기서.
 2. **본문 실행:** 실행기에 속성 대입 → `World.Set` 연결(복합 대입 포함). 쓸 수 있는 칸은 `field`·Ref(`const`·`derived`는 `World`가 이미 거부). 리스트 칼럼의 `+=`, 키 줄 쓰기(`h.Skill[k].level = …`)를 이번에 열지 정한다.
 3. **런타임 안전망(G117에 규칙이 적혀 있음):** 실행 프레임마다 순수/쓰기 모드. `derived` 읽기·사전 조건·`Cond` 호출·순수 함수에서 시작한 호출은 커맨드 실행 중이라도 쓰기를 거부. 최상위 대입으로 숨긴 커맨드(`x = Heal`) 호출도 여기서 막는다(G118).
 4. **커맨드 단위 롤백(C8):** 스크립트 오류가 나면 효과를 남기지 않는다. 방식(쓰기 로그 되감기 vs 스냅샷)을 정한다. spec 9절 벤치 항목과 관련.
-5. **`me`의 정체(S2 ❓):** 시나리오 ②③④로 정한다(이 슬라이스나 다음).
+5. ~~**`me`의 정체(S2 ❓)**~~: G119~G126으로 정함(`me` 없음). 위 "제출자·행위자 정리".
 6. 미룸: `ask`/`wait`(Flow 중단·재개), `cost`·`choose`, 반응(S5), 저장(S8), 엔티티 생성·삭제·컴포넌트 부착을 스크립트에서 하는 길.
 
 ### (참고) 첫 슬라이스를 시작할 때의 합의 (2026-10-15)
@@ -143,6 +167,6 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 ## 새 세션에서 시작하는 법
 
 1. `git pull` 후 `dotnet test`로 1057개 통과(커널 1029, CLI 28)를 확인한다.
-2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G118), `docs/spine-spec.md` S2·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Commands.cs`, `Script/Execution/PureEvaluator.cs`(`RunPreconditions`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
-3. 위 "다음 할 일"(G117 2단계)의 1번부터 시작한다.
-   예: "커맨드 본문 실행을 시작하자. handoff의 다음 할 일 1번(제출 API 모양)부터 짚어 줘."
+2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G126), `docs/spine-spec.md` S2·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Commands.cs`, `Script/Execution/PureEvaluator.cs`(`RunPreconditions`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
+3. 위 "다음 할 일"(G117 2단계)의 0번(UI의 "나")부터 시작한다.
+   예: "handoff의 다음 할 일 0번, UI의 '나'부터 짚어 줘."
