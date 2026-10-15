@@ -128,6 +128,9 @@ namespace Kesa.Engine.Diagnostics
         public const string SaveMismatch = "SAV002";
         public const string SaveModsChanged = "SAV003";
 
+        // 멈춘 Flow의 함수(프레임의 함수, 람다가 든 함수)의 본문이 저장 뒤에 바뀜 (spec S8·C5, spec-gaps G144)
+        public const string SaveFunctionChanged = "SAV004";
+
         // 커맨드 선언 (spec S6, spec-gaps G109)
         public const string CmdBadDecorator = "CMD001";
         public const string CmdPreconditions = "CMD002";

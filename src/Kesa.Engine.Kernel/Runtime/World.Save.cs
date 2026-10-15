@@ -644,6 +644,14 @@ namespace Kesa.Engine.Runtime
                 _diagnostics.Add(new Diagnostic(Codes.SaveMismatch, Severity.Error, message, null, SourceSpan.None,
                     "the content changed in a way the save cannot follow (spec S8)"));
             }
+
+            /// <summary>멈춘 Flow의 함수 본문이 저장 뒤에 바뀜 (C5, G144). 위치를 옮겨 보지 않고 거부한다.</summary>
+            public void FunctionChanged(string message)
+            {
+                if (!_seen.Add(message)) return;
+                _diagnostics.Add(new Diagnostic(Codes.SaveFunctionChanged, Severity.Error, message, null, SourceSpan.None,
+                    "a paused flow resumes only in the exact body it paused in; finish the flow before updating the mod (spec S8)"));
+            }
         }
     }
 

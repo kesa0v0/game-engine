@@ -69,6 +69,7 @@ namespace Kesa.Engine.Runtime
             var place = LambdaPlace(closure.Function);
             entry.Add("lambda", new JsonArray()
                 .Add(new JsonString(place.Mod)).Add(new JsonString(place.Root)).Add(new JsonNumber(place.Ordinal)));
+            entry.Add("hash", new JsonString(place.Hash));
 
             JsonNode env = JsonNull.Instance;
             for (int i = 0; i < writer.Frames.Count && env is JsonNull; i++)
@@ -106,16 +107,20 @@ namespace Kesa.Engine.Runtime
 
         private readonly struct LambdaSite
         {
-            public LambdaSite(string mod, string root, int ordinal)
+            public LambdaSite(string mod, string root, int ordinal, string hash)
             {
                 Mod = mod;
                 Root = root;
                 Ordinal = ordinal;
+                Hash = hash;
             }
 
             public string Mod { get; }
             public string Root { get; }
             public int Ordinal { get; }
+
+            /// <summary>든 함수의 본문 해시 (순서 번호는 그 구조에 기댄다, G144).</summary>
+            public string Hash { get; }
         }
 
         /// <summary>람다 식 → (든 함수의 모드·이름, 그 안의 순서 번호). 처음 쓸 때 모든 모드의 함수에서 만든다.</summary>
@@ -133,8 +138,10 @@ namespace Kesa.Engine.Runtime
                         if (!pair.Value.TryGet(name, out var bound, out _) || !(bound is FunctionValue fn) || fn.Mod != pair.Key) continue;
                         if (fn.Definition != null && fn.Name != name) continue; // 별칭이 아닌 제 이름으로만
                         var found = LambdaOrdinals.Of(fn);
+                        if (found.Count == 0) continue;
+                        string hash = BodyHash.Of(fn);
                         for (int i = 0; i < found.Count; i++)
-                            if (!_lambdaSites.ContainsKey(found[i])) _lambdaSites.Add(found[i], new LambdaSite(pair.Key, name, i));
+                            if (!_lambdaSites.ContainsKey(found[i])) _lambdaSites.Add(found[i], new LambdaSite(pair.Key, name, i, hash));
                     }
                 }
             }
@@ -218,6 +225,7 @@ namespace Kesa.Engine.Runtime
             return new JsonObject()
                 .Add("mod", new JsonString(fn.Mod))
                 .Add("function", new JsonString(fn.Name))
+                .Add("hash", new JsonString(BodyHash.Of(fn)))
                 .Add("locals", locals)
                 .Add("blocks", blocks);
         }
@@ -464,7 +472,13 @@ namespace Kesa.Engine.Runtime
                     var fn = PausedFunction(f, where, problems);
                     if (fn != null) frames.Add(Evaluator.NewFrame(fn, new SortedDictionary<string, Value>(StringComparer.Ordinal)));
                 }
-                if (frames.Count != frameNodes.Count) continue;
+                if (frames.Count != frameNodes.Count)
+                {
+                    // 바뀐 함수를 한 번에 모두 보이도록 람다가 든 함수도 마저 본다 (S8 "바뀐 함수 목록")
+                    foreach (var c in AsArray(Field(obj, "closures"), "closures").Items)
+                        SavedLambda(AsObject(c, "a closure"), where, problems, out _);
+                    continue;
+                }
 
                 var envNodes = new List<JsonObject>();
                 var envs = new List<KeyValuePair<SortedDictionary<string, Value>, SortedSet<string>>>();
@@ -515,12 +529,7 @@ namespace Kesa.Engine.Runtime
             foreach (var node in saved.Items)
             {
                 var entry = AsObject(node, "a closure");
-                var site = AsArray(Field(entry, "lambda"), "a lambda");
-                if (site.Items.Count != 3) throw new JsonFormatException("a lambda should be [mod, function, number]");
-                string mod = Text(site.Items[0], "a lambda mod");
-                string root = Text(site.Items[1], "a lambda function");
-                long ordinal = Long(site.Items[2], "a lambda number");
-
+                var lambda = SavedLambda(entry, where, problems, out string mod);
                 var env = AsObject(Field(entry, "env"), "a lambda env");
                 if (env.Members.Count != 1) throw new JsonFormatException("a lambda env should be {\"frame\": i} or {\"env\": i}");
                 long index = Long(env.Members[0].Value, "a lambda env");
@@ -542,19 +551,38 @@ namespace Kesa.Engine.Runtime
                         throw new JsonFormatException("a lambda env should be {\"frame\": i} or {\"env\": i}");
                 }
 
-                List<LambdaExpr>? found = null;
-                if (_scopes.TryGetValue(mod, out var scope) && scope.TryGet(root, out var bound, out _) && bound is FunctionValue fn)
-                    found = LambdaOrdinals.Of(fn);
-                if (found == null || ordinal < 0 || ordinal >= found.Count)
-                {
-                    problems.Add(where + ": the lambda " + ordinal.ToString(CultureInfo.InvariantCulture) + " of '" + mod + "." + root +
-                                 "' that the flow holds no longer exists");
-                    broken = true;
-                    continue;
-                }
-                closures.Add(new ClosureValue(new FunctionValue(found[(int)ordinal], mod), captured, names));
+                if (lambda == null) broken = true;
+                else closures.Add(new ClosureValue(new FunctionValue(lambda, mod), captured, names));
             }
             return broken ? null : closures;
+        }
+
+        /// <summary>
+        /// 저장된 람다의 식: 든 함수를 찾아 본문 해시를 맞춰 보고(G144) 순서 번호로 고른다. 함수가 없거나 바뀌었으면 문제로 적고 null.
+        /// </summary>
+        private LambdaExpr? SavedLambda(JsonObject entry, string where, LoadProblems problems, out string mod)
+        {
+            var site = AsArray(Field(entry, "lambda"), "a lambda");
+            if (site.Items.Count != 3) throw new JsonFormatException("a lambda should be [mod, function, number]");
+            mod = Text(site.Items[0], "a lambda mod");
+            string root = Text(site.Items[1], "a lambda function");
+            long ordinal = Long(site.Items[2], "a lambda number");
+            string hash = Text(Field(entry, "hash"), "a lambda function hash");
+
+            List<LambdaExpr>? found = null;
+            if (_scopes.TryGetValue(mod, out var scope) && scope.TryGet(root, out var bound, out _) && bound is FunctionValue fn)
+            {
+                if (!string.Equals(BodyHash.Of(fn), hash, StringComparison.Ordinal))
+                {
+                    problems.FunctionChanged(where + ": the function '" + mod + "." + root + "' changed since the save");
+                    return null;
+                }
+                found = LambdaOrdinals.Of(fn);
+            }
+            if (found != null && ordinal >= 0 && ordinal < found.Count) return found[(int)ordinal];
+            problems.Add(where + ": the lambda " + ordinal.ToString(CultureInfo.InvariantCulture) + " of '" + mod + "." + root +
+                         "' that the flow holds no longer exists");
+            return null;
         }
 
         /// <summary>멈춘 프레임의 함수. 지금 내용에 없으면 문제로 적고 null.</summary>
@@ -562,10 +590,15 @@ namespace Kesa.Engine.Runtime
         {
             string mod = Text(Field(obj, "mod"), "a frame mod");
             string name = Text(Field(obj, "function"), "a frame function");
-            if (_scopes.TryGetValue(mod, out var scope) && scope.TryGet(name, out var bound, out _) &&
-                bound is FunctionValue fn && fn.Definition != null && fn.Name == name)
-                return fn;
-            problems.Add(where + ": the paused function '" + mod + "." + name + "' no longer exists");
+            string hash = Text(Field(obj, "hash"), "a frame function hash");
+            if (!(_scopes.TryGetValue(mod, out var scope) && scope.TryGet(name, out var bound, out _) &&
+                  bound is FunctionValue fn && fn.Definition != null && fn.Name == name))
+            {
+                problems.Add(where + ": the paused function '" + mod + "." + name + "' no longer exists");
+                return null;
+            }
+            if (string.Equals(BodyHash.Of(fn), hash, StringComparison.Ordinal)) return fn;
+            problems.FunctionChanged(where + ": the function '" + mod + "." + name + "' changed since the save");
             return null;
         }
 
