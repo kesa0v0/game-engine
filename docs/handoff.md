@@ -4,7 +4,7 @@
 
 ## 한 줄 요약
 
-spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G108에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기(G95~G104)를 `World`에 연결했다: `derived` 읽기와 형제 접근(G103), 재진입 감지·깊이 상한(G100), 기여 행 API와 `contribs`(G98), 읽은 값 근거 `Explain`(G105), 함수 기본값과 `derived` 원천 `default_from`(G106). `check`는 함수 본문의 이름 오타도 잡는다(G108). 그 뒤 실행기를 검토해 파이썬과 결과가 다르거나 spec과 어긋난 곳 6가지를 재현하고 고쳤다(아래 "실행기 검토"). 이어서 S6 커맨드 첫 슬라이스를 시작해 선언·사전 검사·인자 검사·쓰기 판정까지 왔다(G109~G118, 아래 "S6 커맨드 진행 상황"). 본문 실행은 아직 없다.
+spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G108에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기(G95~G104)를 `World`에 연결했다: `derived` 읽기와 형제 접근(G103), 재진입 감지·깊이 상한(G100), 기여 행 API와 `contribs`(G98), 읽은 값 근거 `Explain`(G105), 함수 기본값과 `derived` 원천 `default_from`(G106). `check`는 함수 본문의 이름 오타도 잡는다(G108). 그 뒤 실행기를 검토해 파이썬과 결과가 다르거나 spec과 어긋난 곳 6가지를 재현하고 고쳤다(아래 "실행기 검토"). 이어서 S6 커맨드 첫 슬라이스를 시작해 선언·사전 검사·인자 검사·쓰기 판정까지 왔다(G109~G118, 아래 "S6 커맨드 진행 상황"). 본문 실행은 아직 없다. 그 뒤 옛 컨텍스트 바구니(`^Self` 등)가 새 spec에서 어디로 갔는지 대조해 제출자·행위자·입구 정책·`ask` 대상·UI의 나·상태 안 값 목록을 정했다(G119~G129, 문서만).
 
 ## 구현된 것 (`src/Kesa.Engine.Kernel/`)
 
@@ -81,9 +81,9 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 
 진단 코드: CMD001 데코레이터, CMD002 사전 조건 블록, CMD003 매개변수 타입·기본값, CMD004 함수 효과.
 
-### 제출자·행위자 정리 (G119~G127, 2026-10-15, 문서만 — 코드 미반영)
+### 제출자·행위자 정리와 컨텍스트 바구니 해체 (G119~G129, 2026-10-15, 문서만 — 코드 미반영)
 
-옛 엔진의 `ScopeContext`(키 → 값 바구니)가 하던 일이 새 spec에서 어디로 흩어졌는지 대조하다가, `^Self` 하나가 맡던 다섯 역할(보낸 연결 · 행동하는 진영 · 비용 지불자 · 질문받는 쪽 · UI의 나)이 spec에서 `me` 하나로 뭉쳐 ❓로 남은 것을 정리했다. spine-spec S2·S6·X1·X2와 use-cases U1·U2·U6을 고쳤다.
+옛 엔진의 `ScopeContext`(키 → 값 바구니)가 하던 일이 새 spec에서 어디로 흩어졌는지 대조하다가, `^Self` 하나가 맡던 다섯 역할(보낸 연결 · 행동하는 진영 · 비용 지불자 · 질문받는 쪽 · UI의 나)이 spec에서 `me` 하나로 뭉쳐 ❓로 남은 것을 정리했다(G119~G127). 이어서 바구니가 통째 복사로 넘기던 값(스택 노드, 주사위 눈)의 자리를 정했다(G128·G129). spine-spec S2·S4·S6·S10·X1·X2, schema-design 3.3.2, use-cases U1·U2·U5·U6을 고쳤다.
 
 | G | 정한 것 |
 |---|---|
@@ -96,12 +96,15 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 | G125 | `ask`는 엔티티에게 묻는다. `accepts`는 엔티티 목록, 담당 확인은 응답이 올 때. `ask`는 답한 엔티티를 돌려줌 |
 | G126 | 응답은 어느 엔티티로서인지 늘 명시. 시간 초과 주입은 엔티티 `None` |
 | G127 | UI의 "나" = 클라이언트가 보고 있는 엔티티, UI 로컬(시뮬레이션 상태 아님). 호스트·UI가 설정, 후보는 정책 함수로. 근거: 옛 `"Player"` 세션 별칭, OpenTTD `_local_company` |
+| G128 | `std.stack`의 대기 행동 표현은 모드 몫(방향: 노드 엔티티에 행동 Def id + 인자, 해소 때 Def의 `Action` 함수 호출). 커널 몫은 이걸 커널 기능만으로 만들 수 있게 하는 것. Flow 사이 대기 기능은 지금 안 넣음 |
+| G129 | 키 컴포넌트에 `int` 키 허용(항상 `listed`), 커널 헬퍼 `replace_rows`·`append_row`, 번호 다시 매기기 = 지우고 새로 만들기(그 줄의 기여 행도 지움). 리스트 칼럼·상태 안 맵은 안 엶 |
 
 **코드와 어긋나는 점:** 지금 로더는 `@command(free=True)`를 `acts_for` 없이 받는다(G109 구현). G123대로라면 로드 오류가 되어야 하고, 기존 테스트의 자유 커맨드에도 `acts_for`를 붙여야 한다. 아래 다음 할 일 1번에서 함께 한다.
 
 **아직 안 정한 것:**
 
-- **Def·Flow 경계를 넘는 값 넘기기:** 옛 바구니는 통째 복사(`CopyTo`)로 값이 따라갔다(TR `PaidExtraOP`를 커맨드에서 ActionDef로, 주사위 `DiceResults`를 스택 노드에 두고 상대의 재굴림이 `PeekUnder`로 고침). 새 spec은 통째 복사를 없앴고, 이런 값을 Action 함수 인자로 넘길지 스택 노드를 상태로 둘지는 비어 있다(S2 리스트·맵 표의 "키 컴포넌트 줄의 맵" ❓, U5).
+- ~~**Def·Flow 경계를 넘는 값 넘기기**~~ → 정리됨. 같은 실행 안(TR `PaidExtraOP`)은 `Action` 함수 인자, `ask`를 사이에 둔 값은 Flow 지역 변수(S2), 다른 Flow·참가자가 보고 고치는 값(스택 노드, 주사위 눈)은 상태: 노드 표현은 `std.stack` 몫(G128), 인자 묶음은 런타임 컴포넌트, 값 목록은 `int` 키 컴포넌트(G129). 스택의 취소·환불은 `std.stack`을 만들 때 정한다(모드 몫).
+- **G129 구현 메모:** `int` 키, `replace_rows`·`append_row`, 줄 삭제 시 그 줄 대상 기여 행 삭제. 스크립트에서 줄을 붙이고 떼는 길(아래 다음 할 일 6 "미룸")과 함께 한다.
 - 표기: `acts_for`·`submit_policy` 이름, `ask` 반환값의 필드 이름.
 
 ## 핵심 규칙 (자세한 것은 spec-gaps)
@@ -166,6 +169,6 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 ## 새 세션에서 시작하는 법
 
 1. `git pull` 후 `dotnet test`로 1057개 통과(커널 1029, CLI 28)를 확인한다.
-2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G127), `docs/spine-spec.md` S2·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Commands.cs`, `Script/Execution/PureEvaluator.cs`(`RunPreconditions`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
-3. 위 "다음 할 일"(G117 2단계)의 1번부터 시작한다. Def·Flow 경계 값 넘기기("아직 안 정한 것")는 `ask`/스택을 만들 때 정해도 된다.
+2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G129), `docs/spine-spec.md` S2·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Commands.cs`, `Script/Execution/PureEvaluator.cs`(`RunPreconditions`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
+3. 위 "다음 할 일"(G117 2단계)의 1번부터 시작한다.
    예: "커맨드 본문 실행을 시작하자. handoff의 다음 할 일 1번(제출 API 모양)부터 짚어 줘."
