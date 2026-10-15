@@ -318,31 +318,55 @@ namespace Kesa.Engine.Script
 
             /// <summary>
             /// 프레임 스택의 사본. 람다는 만든 프레임의 지역 변수 사전을 잡고 늦게 읽으므로(G104), 사본 안의 람다는 사본의 사전을
-            /// 잡도록 바꾼다. 스택에 없는 프레임(이미 끝난 함수)이 만든 람다의 사전은 더 바뀌지 않으니 그대로 나눠 쓴다.
+            /// 잡도록 바꾼다. 원본 람다 하나에 사본 하나라 같은 람다를 든 두 변수는 사본에서도 같은 객체다 (G143).
+            /// 이미 끝난 함수의 사전은 더 바뀌지 않지만 스택의 사전을 잡은 람다를 들 수 있어서 함께 옮긴 사본을 쓴다.
             /// </summary>
             private static List<Frame> CopyStack(List<Frame> frames)
             {
                 var copies = new List<Frame>(frames.Count);
                 foreach (var frame in frames) copies.Add(frame.Copy());
+                var closures = new Dictionary<ClosureValue, ClosureValue>();
+                var envs = new Dictionary<IReadOnlyDictionary<string, Value>, SortedDictionary<string, Value>>();
+
+                IReadOnlyDictionary<string, Value> Env(IReadOnlyDictionary<string, Value> captured)
+                {
+                    for (int i = 0; i < frames.Count; i++)
+                        if (ReferenceEquals(captured, frames[i].Locals)) return copies[i].Locals;
+                    if (envs.TryGetValue(captured, out var copied)) return copied;
+                    copied = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+                    envs.Add(captured, copied); // 채우기 전에 등록한다: 사전이 자기를 잡은 람다를 들 수 있다
+                    var names = new SortedSet<string>(StringComparer.Ordinal);
+                    foreach (var pair in captured) names.Add(pair.Key);
+                    foreach (var name in names) copied[name] = Remap(captured[name]);
+                    return copied;
+                }
 
                 Value Remap(Value value)
                 {
                     switch (value)
                     {
                         case ClosureValue closure:
-                            for (int i = 0; i < frames.Count; i++)
-                            {
-                                if (ReferenceEquals(closure.Captured, frames[i].Locals))
-                                    return new ClosureValue(closure.Function, copies[i].Locals, closure.CapturedLocals);
-                            }
-                            return value;
+                            if (closures.TryGetValue(closure, out var copy)) return copy;
+                            // 사전을 옮기는 동안 같은 람다를 다시 만날 수 있으니 먼저 만들 자리를 잡을 수 없다: 사전부터 옮긴다
+                            var env = Env(closure.Captured);
+                            if (closures.TryGetValue(closure, out copy)) return copy;
+                            copy = new ClosureValue(closure.Function, env, closure.CapturedLocals);
+                            closures.Add(closure, copy);
+                            return copy;
                         case ListValue list:
                             return new ListValue(RemapAll(list.Items));
                         case DictValue dict:
                             var entries = new List<DictItem>(dict.Items.Count);
-                            foreach (var item in dict.Items) entries.Add(new DictItem(item.Key, Remap(item.Value), item.Span));
+                            foreach (var item in dict.Items) entries.Add(new DictItem(Remap(item.Key), Remap(item.Value), item.Span));
                             return new DictValue(entries);
+                        case TextValue text:
+                            var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+                            foreach (var pair in text.Args) args[pair.Key] = Remap(pair.Value);
+                            return new TextValue(text.Key, args);
+                        case IValueContainer container:
+                            return container.MapValues(Remap);
                     }
+                    // 저장(SaveScriptValue)이 들어가는 곳은 여기도 모두 들어간다: 두 길이 같아야 C1이다
                     return value;
                 }
 

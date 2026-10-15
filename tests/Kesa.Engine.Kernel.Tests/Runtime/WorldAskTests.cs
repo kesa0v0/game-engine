@@ -188,6 +188,47 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(((IntValue)world.Get(red, world.Member("Score", "v"))).Value, Is.EqualTo(2));
         }
 
+        private long RunLate(string body)
+        {
+            Mod("banking", schema: Schema, defs: "Party(\"Red\")\n" +
+                "def make(h):\n    k = lambda: h()\n    return k\n" +
+                "@command(free=True, acts_for=None)\ndef Late(p: Ref[Party]):\n" + body);
+            var world = new World(LoadClean());
+            var red = world.Create("Red");
+            var s = world.Submit("host", "banking.Late", new Dictionary<string, Value> { ["p"] = new EntityValue(red) });
+            Assert.That(s.Succeeded, Is.True, s.Error?.ToString());
+            var a = world.Answer("host", s.OpenedRequest!.Id, red, 0);
+            Assert.That(a.Succeeded, Is.True, a.Error?.ToString());
+            return ((IntValue)world.Get(red, world.Member("Score", "v"))).Value;
+        }
+
+        // 람다는 파이썬처럼 객체로 비교하고, 이어서 실행해도 같은 객체다 (G143)
+        [Test]
+        public void ALambdaKeepsItsIdentityAcrossResume()
+        {
+            Assert.That(RunLate(
+                "    f = lambda: 1\n    g = f\n    h = lambda: 1\n    r = ask(p, \"Q\", choices=[\"a\"])\n" +
+                "    p.Score.v = (10 if f == g else 0) + (1 if f == h else 0)\n"), Is.EqualTo(10));
+        }
+
+        // 컴포넌트 값·text 안의 람다도 이어서 실행한 사본에서 같은 객체다 (G143)
+        [Test]
+        public void ALambdaInsideAValueKeepsItsIdentityAcrossResume()
+        {
+            Assert.That(RunLate(
+                "    lam = lambda: 1\n    c = Score(v=lam)\n    t = text(\"k\", f=lam)\n    r = ask(p, \"Q\", choices=[\"a\"])\n" +
+                "    p.Score.v = (10 if c == Score(v=lam) else 0) + (1 if t == text(\"k\", f=lam) else 0)\n"), Is.EqualTo(11));
+        }
+
+        // 끝난 함수의 지역 변수가 잡은 람다도 이어서 실행한 사본의 지역 변수를 읽는다 (G143)
+        [Test]
+        public void ALambdaHeldByAFinishedFunctionSeesLocalsAfterResume()
+        {
+            Assert.That(RunLate(
+                "    n = 1\n    h = lambda: n\n    k = make(h)\n    r = ask(p, \"Q\", choices=[\"a\"])\n    n = 2\n    p.Score.v = k()\n"),
+                Is.EqualTo(2));
+        }
+
         // ---- 거절 (C9) ----
 
         [Test]

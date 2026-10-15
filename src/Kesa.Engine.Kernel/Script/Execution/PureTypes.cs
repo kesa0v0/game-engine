@@ -100,6 +100,15 @@ namespace Kesa.Engine.Script
         bool ContainsKey(Value key);
     }
 
+    /// <summary>
+    /// 다른 값을 담은 런타임 값 (컴포넌트 값 <c>Wounded(turns=...)</c>). 이어서 실행할 프레임 사본을 만들 때 안에 든 람다도
+    /// 사본의 것으로 바꿔야 해서(G143) 담은 값을 바꾼 새 값을 만든다.
+    /// </summary>
+    public interface IValueContainer
+    {
+        Value MapValues(Func<Value, Value> map);
+    }
+
     /// <summary>값 동등 비교를 스스로 정하는 값 (엔티티 id 등). 그 밖의 값은 참조 동등이다.</summary>
     public interface IValueEquality
     {
@@ -201,8 +210,17 @@ namespace Kesa.Engine.Script
     /// 화면에 나갈 메시지: 텍스트 키와 이름 있는 인자 (<c>text("msg.walls_full", walls=3)</c>, spec S2 텍스트 키 타입·X4 P1,
     /// spec-gaps G113). 번역은 하지 않는다: 키와 인자만 들고 다니고 화면이 번역한다.
     /// </summary>
-    public sealed class TextValue : Value
+    public sealed class TextValue : Value, IValueEquality
     {
+        /// <summary>같은 키에 같은 인자들이면 같다 (G142).</summary>
+        public bool ValueEquals(Value other)
+        {
+            if (!(other is TextValue t) || t.Key != Key || t.Args.Count != Args.Count) return false;
+            foreach (var pair in Args)
+                if (!t.Args.TryGetValue(pair.Key, out var v) || !PureOps.ValuesEqual(pair.Value, v)) return false;
+            return true;
+        }
+
         public TextValue(string key, IReadOnlyDictionary<string, Value> args)
         {
             Key = key;

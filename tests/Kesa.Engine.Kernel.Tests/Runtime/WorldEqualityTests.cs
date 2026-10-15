@@ -35,6 +35,9 @@ namespace Kesa.Engine.Tests.Runtime
         [TestCase("Wounded(turns=3) == Wounded(turns=4)", false)]
         [TestCase("Wounded(turns=3) == Wounded(turns=3, depth=0)", false)]
         [TestCase("u.Health in [v.Health, u.Health]", true)]
+        [TestCase("text(\"a\", n=1, m=u) == text(\"a\", m=u, n=1)", true)]
+        [TestCase("text(\"a\", n=1) == text(\"a\", n=2)", false)]
+        [TestCase("text(\"a\") == text(\"b\")", false)]
         public void RuntimeValuesCompareByWhatTheyPointAtOrHold(string expression, bool equal)
         {
             Mod("banking", schema: Schema,

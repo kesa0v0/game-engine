@@ -635,6 +635,9 @@ namespace Kesa.Engine.Runtime
             /// <summary>Def가 없어져 만들지 못한 엔티티. 그것을 가리키는 줄·기여 행은 따로 보고하지 않는다(로드는 어차피 실패한다).</summary>
             public HashSet<long> Skipped { get; } = new HashSet<long>();
 
+            /// <summary>지금 불러오는 Flow의 람다 목록 (값의 <c>{"closure": n}</c>이 가리킨다, G143).</summary>
+            public IReadOnlyList<ClosureValue>? Closures { get; set; }
+
             public void Add(string message)
             {
                 if (!_seen.Add(message)) return;

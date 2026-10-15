@@ -28,15 +28,120 @@ namespace Kesa.Engine.Runtime
                 if (answerTo != run.AnswerTo)
                     throw new InvalidOperationException("engine: the answer variable of flow " + flow.Id + " does not match its ask statement");
 
+                var writer = new FlowWriter(run.Frames);
                 var frames = new JsonArray();
-                foreach (var frame in run.Frames) frames.Add(SaveFrame(frame));
+                foreach (var frame in run.Frames) frames.Add(SaveFrame(frame, writer));
                 flows.Add(new JsonObject()
                     .Add("id", new JsonNumber(flow.Id))
                     .Add("command", new JsonString(flow.Command))
                     .Add("request", SaveRequest(flow.Request))
-                    .Add("frames", frames));
+                    .Add("frames", frames)
+                    .Add("closures", writer.Closures)
+                    .Add("envs", writer.Envs));
             }
             return flows;
+        }
+
+        /// <summary>
+        /// Flow 하나를 적는 동안의 람다 목록과 잡은 지역 변수 묶음 목록 (G143). 처음 만난 순서로 번호를 매긴다: 같은 람다 객체는 같은 번호라
+        /// 불러온 뒤에도 같은 객체다. 목록에 먼저 자리를 잡고 채우므로 자기를 잡은 람다(묶음 안에 자기 람다)도 적힌다.
+        /// </summary>
+        private sealed class FlowWriter
+        {
+            public FlowWriter(List<PureEvaluator.Frame> frames) => Frames = frames;
+
+            public List<PureEvaluator.Frame> Frames { get; }
+            public Dictionary<ClosureValue, int> ClosureIds { get; } = new Dictionary<ClosureValue, int>();
+            public JsonArray Closures { get; } = new JsonArray();
+            public Dictionary<IReadOnlyDictionary<string, Value>, int> EnvIds { get; } =
+                new Dictionary<IReadOnlyDictionary<string, Value>, int>();
+            public JsonArray Envs { get; } = new JsonArray();
+        }
+
+        private JsonNode SaveClosure(ClosureValue closure, FlowWriter writer)
+        {
+            if (writer.ClosureIds.TryGetValue(closure, out int id)) return Tag("closure", new JsonNumber(id));
+            id = writer.Closures.Items.Count;
+            writer.ClosureIds.Add(closure, id);
+            var entry = new JsonObject();
+            writer.Closures.Add(entry);
+
+            var place = LambdaPlace(closure.Function);
+            entry.Add("lambda", new JsonArray()
+                .Add(new JsonString(place.Mod)).Add(new JsonString(place.Root)).Add(new JsonNumber(place.Ordinal)));
+
+            JsonNode env = JsonNull.Instance;
+            for (int i = 0; i < writer.Frames.Count && env is JsonNull; i++)
+            {
+                if (!ReferenceEquals(closure.Captured, writer.Frames[i].Locals)) continue;
+                if (!ReferenceEquals(closure.CapturedLocals, writer.Frames[i].LocalNames))
+                    throw new InvalidOperationException("engine: a lambda's local names are not its frame's");
+                env = Tag("frame", new JsonNumber(i));
+            }
+            if (env is JsonNull) env = Tag("env", new JsonNumber(SaveEnv(closure, writer)));
+            entry.Add("env", env);
+            return Tag("closure", new JsonNumber(id));
+        }
+
+        /// <summary>이미 끝난 함수의 지역 변수 묶음 (더 바뀌지 않는다). 지역 변수 이름 목록과 값을 적는다.</summary>
+        private int SaveEnv(ClosureValue closure, FlowWriter writer)
+        {
+            var captured = closure.Captured;
+            if (writer.EnvIds.TryGetValue(captured, out int id)) return id;
+            id = writer.Envs.Items.Count;
+            writer.EnvIds.Add(captured, id);
+            var entry = new JsonObject();
+            writer.Envs.Add(entry);
+
+            var names = new JsonArray();
+            foreach (var name in closure.CapturedLocals) names.Add(new JsonString(name));
+            entry.Add("names", names);
+            var sorted = new SortedSet<string>(StringComparer.Ordinal);
+            foreach (var pair in captured) sorted.Add(pair.Key);
+            var locals = new JsonObject();
+            entry.Add("locals", locals);
+            foreach (var name in sorted) locals.Add(name, SaveScriptValue(captured[name], writer));
+            return id;
+        }
+
+        private readonly struct LambdaSite
+        {
+            public LambdaSite(string mod, string root, int ordinal)
+            {
+                Mod = mod;
+                Root = root;
+                Ordinal = ordinal;
+            }
+
+            public string Mod { get; }
+            public string Root { get; }
+            public int Ordinal { get; }
+        }
+
+        /// <summary>람다 식 → (든 함수의 모드·이름, 그 안의 순서 번호). 처음 쓸 때 모든 모드의 함수에서 만든다.</summary>
+        private Dictionary<LambdaExpr, LambdaSite>? _lambdaSites;
+
+        private LambdaSite LambdaPlace(FunctionValue lambda)
+        {
+            if (_lambdaSites == null)
+            {
+                _lambdaSites = new Dictionary<LambdaExpr, LambdaSite>();
+                foreach (var pair in _scopes)
+                {
+                    foreach (var name in pair.Value.Names)
+                    {
+                        if (!pair.Value.TryGet(name, out var bound, out _) || !(bound is FunctionValue fn) || fn.Mod != pair.Key) continue;
+                        if (fn.Definition != null && fn.Name != name) continue; // 별칭이 아닌 제 이름으로만
+                        var found = LambdaOrdinals.Of(fn);
+                        for (int i = 0; i < found.Count; i++)
+                            if (!_lambdaSites.ContainsKey(found[i])) _lambdaSites.Add(found[i], new LambdaSite(pair.Key, name, i));
+                    }
+                }
+            }
+            if (lambda.Lambda == null || !_lambdaSites.TryGetValue(lambda.Lambda, out var site) || site.Mod != lambda.Mod)
+                throw new InvalidOperationException("a paused flow holds a lambda that is not inside a named function of its mod, " +
+                                                    "so it cannot be saved yet");
+            return site;
         }
 
         private static JsonObject SaveRequest(Request request)
@@ -60,7 +165,7 @@ namespace Kesa.Engine.Runtime
                 .Add("data", SaveValue(request.Data));
         }
 
-        private JsonObject SaveFrame(PureEvaluator.Frame frame)
+        private JsonObject SaveFrame(PureEvaluator.Frame frame, FlowWriter writer)
         {
             var fn = frame.Function;
             if (fn.Definition == null)
@@ -70,7 +175,7 @@ namespace Kesa.Engine.Runtime
                                                     "' cannot be saved: that name in its mod now holds something else");
 
             var locals = new JsonObject();
-            foreach (var pair in frame.Locals) locals.Add(pair.Key, SaveScriptValue(pair.Value));
+            foreach (var pair in frame.Locals) locals.Add(pair.Key, SaveScriptValue(pair.Value, writer));
 
             var blocks = new JsonArray();
             for (int i = 0; i < frame.Blocks.Count; i++)
@@ -99,7 +204,7 @@ namespace Kesa.Engine.Runtime
                             else
                             {
                                 var items = new JsonArray();
-                                foreach (var item in block.Items!) items.Add(SaveScriptValue(item));
+                                foreach (var item in block.Items!) items.Add(SaveScriptValue(item, writer));
                                 obj.Add("items", items);
                             }
                             break;
@@ -215,7 +320,7 @@ namespace Kesa.Engine.Runtime
         /// 함수 본문이 들고 있는 값 하나 (G141). 월드 상태의 값(<see cref="SaveValue"/>)에 더해 뷰·답·컴포넌트 값·기여 행·<c>range</c>·
         /// 함수 값을 가리키는 대상으로 적는다. 엔티티 뷰(<c>{"entity_view": id}</c>)와 상태 값의 엔티티(<c>{"entity": id}</c>)는 구별한다.
         /// </summary>
-        private JsonNode SaveScriptValue(Value value)
+        private JsonNode SaveScriptValue(Value value, FlowWriter writer)
         {
             switch (value)
             {
@@ -223,18 +328,18 @@ namespace Kesa.Engine.Runtime
                     return Tag("entity_view", new JsonNumber(v.Id.Value));
                 case ListValue l:
                     var items = new JsonArray();
-                    foreach (var item in l.Items) items.Add(SaveScriptValue(item));
+                    foreach (var item in l.Items) items.Add(SaveScriptValue(item, writer));
                     return items;
                 case DictValue d:
                     var pairs = new JsonArray();
                     foreach (var item in d.Items)
-                        pairs.Add(new JsonArray().Add(SaveScriptValue(item.Key)).Add(SaveScriptValue(item.Value)));
+                        pairs.Add(new JsonArray().Add(SaveScriptValue(item.Key, writer)).Add(SaveScriptValue(item.Value, writer)));
                     return Tag("dict", pairs);
                 case TextValue t:
                     var names = new SortedSet<string>(StringComparer.Ordinal);
                     foreach (var pair in t.Args) names.Add(pair.Key);
                     var args = new JsonObject();
-                    foreach (var name in names) args.Add(name, SaveScriptValue(t.Args[name]));
+                    foreach (var name in names) args.Add(name, SaveScriptValue(t.Args[name], writer));
                     return new JsonObject().Add("text", new JsonString(t.Key)).Add("args", args);
                 case ComponentView c:
                     return Tag("component", new JsonObject()
@@ -258,7 +363,7 @@ namespace Kesa.Engine.Runtime
                 case ComponentInitValue c:
                     var given = new JsonArray();
                     foreach (var pair in c.Values)
-                        given.Add(new JsonArray().Add(new JsonString(pair.Key.Name)).Add(SaveScriptValue(pair.Value)));
+                        given.Add(new JsonArray().Add(new JsonString(pair.Key.Name)).Add(SaveScriptValue(pair.Value, writer)));
                     return Tag("component_value", new JsonObject()
                         .Add("name", new JsonString(c.Component.Name))
                         .Add("values", given));
@@ -284,8 +389,8 @@ namespace Kesa.Engine.Runtime
                     if (Evaluator.Builtins.TryGetValue(b.Name, out var builtin) && ReferenceEquals(builtin, b))
                         return Tag("builtin", new JsonString(b.Name));
                     break;
-                case ClosureValue _:
-                    throw new InvalidOperationException("saving a paused flow that holds a lambda is not supported yet");
+                case ClosureValue closure:
+                    return SaveClosure(closure, writer);
                 default:
                     return SaveValue(value);
             }
@@ -348,16 +453,42 @@ namespace Kesa.Engine.Runtime
                 string? hint = hintNode is JsonNull ? null : Text(hintNode, "a hint");
                 var data = LoadValue(Field(r, "data"));
 
+                // 람다는 프레임이나 묶음의 사전을 잡고, 사전은 람다를 든다(자기를 잡을 수도 있다).
+                // 그래서 빈 프레임 → 빈 묶음 → 람다 → 값 채우기 순서로 만든다 (G143)
+                var frameNodes = new List<JsonObject>();
+                foreach (var f in AsArray(Field(obj, "frames"), "frames").Items) frameNodes.Add(AsObject(f, "a frame"));
+                if (frameNodes.Count == 0) throw new JsonFormatException(where + " has no frames");
                 var frames = new List<PureEvaluator.Frame>();
-                bool broken = false;
-                foreach (var f in AsArray(Field(obj, "frames"), "frames").Items)
+                foreach (var f in frameNodes)
                 {
-                    var frame = RestoreFrame(AsObject(f, "a frame"), where, problems);
-                    if (frame == null) broken = true;
-                    else frames.Add(frame);
+                    var fn = PausedFunction(f, where, problems);
+                    if (fn != null) frames.Add(Evaluator.NewFrame(fn, new SortedDictionary<string, Value>(StringComparer.Ordinal)));
                 }
+                if (frames.Count != frameNodes.Count) continue;
+
+                var envNodes = new List<JsonObject>();
+                var envs = new List<KeyValuePair<SortedDictionary<string, Value>, SortedSet<string>>>();
+                foreach (var e in AsArray(Field(obj, "envs"), "envs").Items)
+                {
+                    var env = AsObject(e, "an env");
+                    var envNames = new SortedSet<string>(StringComparer.Ordinal);
+                    foreach (var n in AsArray(Field(env, "names"), "env names").Items) envNames.Add(Text(n, "a local name"));
+                    envNodes.Add(env);
+                    envs.Add(new KeyValuePair<SortedDictionary<string, Value>, SortedSet<string>>(
+                        new SortedDictionary<string, Value>(StringComparer.Ordinal), envNames));
+                }
+
+                var closures = RestoreClosures(AsArray(Field(obj, "closures"), "closures"), frames, envs, where, problems);
+                if (closures == null) continue;
+                problems.Closures = closures;
+                for (int k = 0; k < envNodes.Count; k++)
+                    foreach (var pair in AsObject(Field(envNodes[k], "locals"), "env locals").Members)
+                        envs[k].Key[pair.Key] = LoadScriptValue(pair.Value, where, problems);
+                bool broken = false;
+                for (int i = 0; i < frames.Count; i++)
+                    broken |= RestoreFrame(frames[i], frameNodes[i], where, problems) == null;
+                problems.Closures = null;
                 if (broken) continue;
-                if (frames.Count == 0) throw new JsonFormatException(where + " has no frames");
                 if (!Relink(command, frames, out var answerTo, check: false))
                 {
                     problems.Add(where + ": the function '" + frames[0].Function.Name +
@@ -372,21 +503,80 @@ namespace Kesa.Engine.Runtime
             }
         }
 
-        private PureEvaluator.Frame? RestoreFrame(JsonObject obj, string where, LoadProblems problems)
+        /// <summary>
+        /// 람다 목록. 람다 식은 (든 함수, 순서 번호)로 다시 찾고 잡은 사전은 프레임이나 묶음의 것을 잇는다.
+        /// 람다를 찾을 수 없으면 문제로 적고 null.
+        /// </summary>
+        private List<ClosureValue>? RestoreClosures(JsonArray saved, List<PureEvaluator.Frame> frames,
+            List<KeyValuePair<SortedDictionary<string, Value>, SortedSet<string>>> envs, string where, LoadProblems problems)
+        {
+            var closures = new List<ClosureValue>();
+            bool broken = false;
+            foreach (var node in saved.Items)
+            {
+                var entry = AsObject(node, "a closure");
+                var site = AsArray(Field(entry, "lambda"), "a lambda");
+                if (site.Items.Count != 3) throw new JsonFormatException("a lambda should be [mod, function, number]");
+                string mod = Text(site.Items[0], "a lambda mod");
+                string root = Text(site.Items[1], "a lambda function");
+                long ordinal = Long(site.Items[2], "a lambda number");
+
+                var env = AsObject(Field(entry, "env"), "a lambda env");
+                if (env.Members.Count != 1) throw new JsonFormatException("a lambda env should be {\"frame\": i} or {\"env\": i}");
+                long index = Long(env.Members[0].Value, "a lambda env");
+                IReadOnlyDictionary<string, Value> captured;
+                SortedSet<string> names;
+                switch (env.Members[0].Key)
+                {
+                    case "frame":
+                        if (index < 0 || index >= frames.Count) throw new JsonFormatException("a lambda env frame is out of range");
+                        captured = frames[(int)index].Locals;
+                        names = frames[(int)index].LocalNames;
+                        break;
+                    case "env":
+                        if (index < 0 || index >= envs.Count) throw new JsonFormatException("a lambda env is out of range");
+                        captured = envs[(int)index].Key;
+                        names = envs[(int)index].Value;
+                        break;
+                    default:
+                        throw new JsonFormatException("a lambda env should be {\"frame\": i} or {\"env\": i}");
+                }
+
+                List<LambdaExpr>? found = null;
+                if (_scopes.TryGetValue(mod, out var scope) && scope.TryGet(root, out var bound, out _) && bound is FunctionValue fn)
+                    found = LambdaOrdinals.Of(fn);
+                if (found == null || ordinal < 0 || ordinal >= found.Count)
+                {
+                    problems.Add(where + ": the lambda " + ordinal.ToString(CultureInfo.InvariantCulture) + " of '" + mod + "." + root +
+                                 "' that the flow holds no longer exists");
+                    broken = true;
+                    continue;
+                }
+                closures.Add(new ClosureValue(new FunctionValue(found[(int)ordinal], mod), captured, names));
+            }
+            return broken ? null : closures;
+        }
+
+        /// <summary>멈춘 프레임의 함수. 지금 내용에 없으면 문제로 적고 null.</summary>
+        private FunctionValue? PausedFunction(JsonObject obj, string where, LoadProblems problems)
         {
             string mod = Text(Field(obj, "mod"), "a frame mod");
             string name = Text(Field(obj, "function"), "a frame function");
-            if (!_scopes.TryGetValue(mod, out var scope) || !scope.TryGet(name, out var bound, out _) ||
-                !(bound is FunctionValue fn) || fn.Definition == null || fn.Name != name)
-            {
-                problems.Add(where + ": the paused function '" + mod + "." + name + "' no longer exists");
-                return null;
-            }
+            if (_scopes.TryGetValue(mod, out var scope) && scope.TryGet(name, out var bound, out _) &&
+                bound is FunctionValue fn && fn.Definition != null && fn.Name == name)
+                return fn;
+            problems.Add(where + ": the paused function '" + mod + "." + name + "' no longer exists");
+            return null;
+        }
 
-            var locals = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+        /// <summary>빈 프레임에 지역 변수와 블록을 채운다. 멈춘 자리가 본문에 없으면 문제로 적고 null.</summary>
+        private PureEvaluator.Frame? RestoreFrame(PureEvaluator.Frame frame, JsonObject obj, string where, LoadProblems problems)
+        {
+            var fn = frame.Function;
+            string mod = fn.Mod;
+            string name = fn.Name;
             foreach (var pair in AsObject(Field(obj, "locals"), "locals").Members)
-                locals[pair.Key] = LoadScriptValue(pair.Value, where, problems);
-            var frame = Evaluator.NewFrame(fn, locals);
+                frame.Locals[pair.Key] = LoadScriptValue(pair.Value, where, problems);
 
             string changed = where + ": the function '" + mod + "." + name +
                              "' changed, so the paused position no longer exists";
@@ -396,7 +586,7 @@ namespace Kesa.Engine.Runtime
                 var b = AsObject(blocks[i], "a block");
                 long next = Long(Field(b, "next"), "a block position");
                 PureEvaluator.Block block;
-                if (i == 0) block = new PureEvaluator.Block(fn.Definition.Body);
+                if (i == 0) block = new PureEvaluator.Block(fn.Definition!.Body);
                 else
                 {
                     switch (Opener(frame.Blocks[i - 1]))
@@ -563,6 +753,14 @@ namespace Kesa.Engine.Runtime
                         }
                         case "range":
                             return LoadRange(tag.Value);
+                        case "closure":
+                        {
+                            long index = Long(tag.Value, "a lambda number");
+                            var closures = problems.Closures;
+                            if (closures == null || index < 0 || index >= closures.Count)
+                                throw new JsonFormatException("a lambda number is out of range");
+                            return closures[(int)index];
+                        }
                         case "function":
                         {
                             var v = AsArray(tag.Value, "a function");

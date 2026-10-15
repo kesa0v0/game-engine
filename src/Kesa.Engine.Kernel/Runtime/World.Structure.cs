@@ -266,8 +266,15 @@ namespace Kesa.Engine.Runtime
             return new ComponentInitValue(component, values);
         }
 
-        private sealed class ComponentInitValue : Value, IValueEquality
+        private sealed class ComponentInitValue : Value, IValueEquality, IValueContainer
         {
+            public Value MapValues(Func<Value, Value> map)
+            {
+                var mapped = new List<KeyValuePair<MemberDecl, Value>>(_values.Count);
+                foreach (var pair in _values) mapped.Add(new KeyValuePair<MemberDecl, Value>(pair.Key, map(pair.Value)));
+                return new ComponentInitValue(Component, mapped);
+            }
+
             /// <summary>같은 컴포넌트에 같은 값들을 줬으면 같다(준 순서는 상관없다, G142).</summary>
             public bool ValueEquals(Value other)
             {
