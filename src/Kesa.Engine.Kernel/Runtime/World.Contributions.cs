@@ -59,6 +59,9 @@ namespace Kesa.Engine.Runtime
         public long AddContribution(EntityId target, MemberHandle member, EntityId key, string op, Value value, EntityId? source = null) =>
             AddContribution(target, member, RowKey.Entity(key), op, value, source);
 
+        public long AddContribution(EntityId target, MemberHandle member, long key, string op, Value value, EntityId? source = null) =>
+            AddContribution(target, member, RowKey.Int(key), op, value, source);
+
         private long AddContribution(EntityId target, MemberHandle member, RowKey? key, string op, Value value, EntityId? source)
         {
             var entity = Record(target);
@@ -88,9 +91,13 @@ namespace Kesa.Engine.Runtime
             if (source != null) Record(source.Value);
 
             long id = _nextContribution++;
-            _contributions.Add(id, new Contribution(id, target.Value, component, key, member.Member, op, amount, source?.Value));
-            Index(_contribByTarget, target.Value, id);
-            if (source != null) Index(_contribBySource, source.Value.Value, id);
+            var row = new Contribution(id, target.Value, component, key, member.Member, op, amount, source?.Value);
+            PutContribution(row);
+            Journal(() =>
+            {
+                DropContributionUnjournaled(row);
+                _nextContribution = id;
+            });
             return id;
         }
 
@@ -143,11 +150,25 @@ namespace Kesa.Engine.Runtime
             return count;
         }
 
+        /// <summary>행 하나를 지운다. 커맨드 실행 중이면 되살리는 동작을 기록한다 (G133).</summary>
         private void DropContribution(Contribution row)
+        {
+            DropContributionUnjournaled(row);
+            Journal(() => PutContribution(row));
+        }
+
+        private void DropContributionUnjournaled(Contribution row)
         {
             _contributions.Remove(row.Id);
             Unindex(_contribByTarget, row.Target, row.Id);
             if (row.Source != null) Unindex(_contribBySource, row.Source.Value, row.Id);
+        }
+
+        private void PutContribution(Contribution row)
+        {
+            _contributions.Add(row.Id, row);
+            Index(_contribByTarget, row.Target, row.Id);
+            if (row.Source != null) Index(_contribBySource, row.Source.Value, row.Id);
         }
 
         private static void Index(Dictionary<long, SortedSet<long>> index, long entity, long id)
@@ -206,7 +227,7 @@ namespace Kesa.Engine.Runtime
         private static bool SameRow(RowKey? a, RowKey? b)
         {
             if (a == null || b == null) return a == null && b == null;
-            return a.Value.IsEntity == b.Value.IsEntity && a.Value.EntityKey == b.Value.EntityKey && a.Value.DefKey == b.Value.DefKey;
+            return a.Value.Same(b.Value);
         }
 
         private sealed class ContributionView : Value, IRuntimeAttributes

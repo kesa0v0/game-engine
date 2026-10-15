@@ -219,6 +219,12 @@ namespace Kesa.Engine.Schema
 
         /// <summary><c>key=Ref["Faction"]</c>: 그 타입의 엔티티마다 한 줄. 항상 listed, 줄은 런타임에만 생긴다.</summary>
         Entity,
+
+        /// <summary>
+        /// <c>key=int</c>: 이름 없는 값의 순서 있는 목록 (spec-gaps G129). 항상 listed, 줄은 런타임에만 생기고
+        /// <c>replace_rows</c>·<c>append_row</c>로 리스트처럼 쓴다.
+        /// </summary>
+        Int,
     }
 
     public sealed class ComponentDecl
@@ -239,7 +245,7 @@ namespace Kesa.Engine.Schema
         public SourceSpan Span { get; }
         public string Mod { get; }
 
-        /// <summary>키 컴포넌트의 키 타입 (<c>key="SkillDef"</c> 또는 <c>key=Ref["Faction"]</c>).</summary>
+        /// <summary>키 컴포넌트의 키 타입 (<c>key="SkillDef"</c> 또는 <c>key=Ref["Faction"]</c>). <c>key=int</c>면 없다.</summary>
         public NameRef? Key { get; }
 
         public KeyKind KeyKind { get; }
@@ -316,11 +322,14 @@ namespace Kesa.Engine.Schema
         public IReadOnlyList<MemberDecl> Members => Decl.Members;
         public KeysMode Keys => Decl.Keys;
 
-        /// <summary>키 컴포넌트면 키 타입.</summary>
+        /// <summary>키 컴포넌트면 키 타입 (<c>key=int</c>면 없다).</summary>
         public DefType? Key { get; internal set; }
 
-        public bool IsKeyed => Decl.Key != null;
+        public bool IsKeyed => Decl.Key != null || Decl.KeyKind == KeyKind.Int;
         public KeyKind KeyKind => Decl.KeyKind;
+
+        /// <summary>메시지에 쓰는 키 이름: 키 타입 이름, 또는 <c>int</c>.</summary>
+        public string KeyDisplay => KeyKind == KeyKind.Int ? "int" : Key?.Name ?? Decl.Key?.Name ?? "?";
 
         public bool TryGetMember(string name, out MemberDecl member) => _members.TryGetValue(name, out member!);
     }

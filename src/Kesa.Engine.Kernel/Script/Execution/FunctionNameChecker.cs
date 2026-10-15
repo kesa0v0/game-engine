@@ -24,6 +24,11 @@ namespace Kesa.Engine.Script
 
         /// <summary><c>@submit_policy</c>로 선언한 정책 함수 (G122). 모드 안에서 둘 이상이면 로드 오류다.</summary>
         public List<SubmitPolicyDecl> Policies { get; } = new List<SubmitPolicyDecl>();
+
+        /// <summary>
+        /// 함수 본문에서 내장 <c>spawn("Def id", ...)</c>에 리터럴로 적은 Def id (G134). 이름 검사가 모으고 ⑤ 링크가 본다.
+        /// </summary>
+        public List<KeyValuePair<string, SourceSpan>> SpawnedDefs { get; } = new List<KeyValuePair<string, SourceSpan>>();
     }
 
     /// <summary>
@@ -36,14 +41,17 @@ namespace Kesa.Engine.Script
     public static class FunctionNameChecker
     {
         /// <param name="isLoadTimeName">콘텐츠 파일에서만 뜻이 있는 이름인가 (<c>field</c>, <c>patch</c>, Def 생성자 등)</param>
+        /// <param name="isSchemaRuntimeName">로직에서도 쓰는 스키마 이름인가 (이 모드에 보이는 컴포넌트의 값 생성자, G134)</param>
+        /// <param name="notVisible">다른 모드의 것이라 보이지 않는 이름이면 그 안내 (SCH003)</param>
         public static void Check(ModFunctions functions, ModScope scope, Func<string, bool> isLoadTimeName,
-            CallContext context)
+            CallContext context, Func<string, bool>? isSchemaRuntimeName = null, Func<string, string?>? notVisible = null)
         {
             var globals = new SortedSet<string>(scope.Names, StringComparer.Ordinal);
             globals.UnionWith(functions.TopLevelNames);
             foreach (var function in functions.Functions)
             {
-                var walker = new Walker(globals, isLoadTimeName, context);
+                var walker = new Walker(globals, isLoadTimeName, context, isSchemaRuntimeName ?? (_ => false),
+                    notVisible ?? (_ => null), functions.SpawnedDefs);
                 if (function.Definition != null)
                     walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
                 else
@@ -57,11 +65,20 @@ namespace Kesa.Engine.Script
             private readonly Func<string, bool> _isLoadTimeName;
             private readonly CallContext _context;
 
-            public Walker(SortedSet<string> globals, Func<string, bool> isLoadTimeName, CallContext context)
+            private readonly Func<string, bool> _isSchemaRuntimeName;
+            private readonly Func<string, string?> _notVisible;
+            private readonly List<KeyValuePair<string, SourceSpan>> _spawned;
+
+            public Walker(SortedSet<string> globals, Func<string, bool> isLoadTimeName, CallContext context,
+                Func<string, bool> isSchemaRuntimeName, Func<string, string?> notVisible,
+                List<KeyValuePair<string, SourceSpan>> spawned)
             {
                 _globals = globals;
                 _isLoadTimeName = isLoadTimeName;
                 _context = context;
+                _isSchemaRuntimeName = isSchemaRuntimeName;
+                _notVisible = notVisible;
+                _spawned = spawned;
             }
 
             public void Block(IReadOnlyList<Stmt> body, SortedSet<string> locals)
@@ -163,6 +180,11 @@ namespace Kesa.Engine.Script
                         Expr(unary.Operand, locals);
                         break;
                     case CallExpr call:
+                        // 덮어쓰지 않은 spawn에 리터럴로 적은 Def id는 ⑤ 링크가 본다 (G134)
+                        if (call.Callee is NameExpr callee && callee.Name == PureBuiltins.SpawnName &&
+                            !IsShadowed(callee.Name, locals) && call.Arguments.Count > 0 &&
+                            call.Arguments[0].Name == null && call.Arguments[0].Value is StringLiteral id)
+                            _spawned.Add(new KeyValuePair<string, SourceSpan>(id.Value, id.Span));
                         Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
                         break;
@@ -199,7 +221,13 @@ namespace Kesa.Engine.Script
             private void Name(NameExpr name, SortedSet<string> locals)
             {
                 string n = name.Name;
-                if (locals.Contains(n) || _globals.Contains(n) || PureBuiltins.IsRuntimeName(n)) return;
+                if (locals.Contains(n) || _globals.Contains(n) || PureBuiltins.IsRuntimeName(n) || _isSchemaRuntimeName(n)) return;
+                var hidden = _notVisible(n);
+                if (hidden != null)
+                {
+                    _context.Error(Codes.SchNotVisible, hidden, name.Span);
+                    return;
+                }
                 // 덮어쓰지 않은 require 등이 블록의 문장이 아닌 자리에 나왔다 (G111·G112)
                 if (Array.IndexOf(FunctionChecker.PreconditionCalls, n) >= 0)
                 {

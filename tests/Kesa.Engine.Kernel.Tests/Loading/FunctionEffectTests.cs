@@ -32,7 +32,8 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(d.Message, Is.EqualTo("a logic function can only assign to local variables and entity values"));
         }
 
-        [TestCase("def f(u):\n    x = damage(u, 1)\n    return x\n", 4)]
+        [TestCase("def f(u):\n    x = damage(u, 1) + 1\n    return x\n", 4)]
+        [TestCase("def f(u):\n    x = 0\n    x += damage(u, 1)\n    return x\n", 5)]
         [TestCase("def f(u):\n    if damage(u, 1):\n        return 1\n    return 0\n", 4)]
         [TestCase("def f(u):\n    return damage(u, 1)\n", 4)]
         [TestCase("g = lambda u: damage(u, 1)\n", 3)]

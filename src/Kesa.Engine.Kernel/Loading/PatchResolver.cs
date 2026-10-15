@@ -214,13 +214,14 @@ namespace Kesa.Engine.Loading
                         hint: "write " + component.Name + "['id'] for an id with dots");
                 }
                 var keySegment = _segments[1];
-                if (keySegment.IsNumber)
-                    return Fail(Codes.PatBadPathStep, "the key of '" + component.Name + "' is a Def id, not an integer");
                 if (component.KeyKind != KeyKind.Def)
                 {
                     return Fail(Codes.PatBadPathStep,
-                        "rows of '" + component.Name + "' are keyed by entities and exist only at runtime; they cannot be patched");
+                        "rows of '" + component.Name + "' are keyed by " + (component.KeyKind == KeyKind.Int ? "int" : "entities") +
+                        " and exist only at runtime; they cannot be patched");
                 }
+                if (keySegment.IsNumber)
+                    return Fail(Codes.PatBadPathStep, "the key of '" + component.Name + "' is a Def id, not an integer");
 
                 string key = keySegment.Text!;
                 if (!_defs.TryGet(key, out var keyDef) || keyDef.Type != component.Key)

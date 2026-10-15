@@ -143,6 +143,13 @@ namespace Kesa.Engine.Runtime
             _entities.Add(id, entity);
             if (!_byType.TryGetValue(def.Type, out var set)) _byType.Add(def.Type, set = new SortedSet<long>());
             set.Add(id);
+            // 되감으면 엔티티도 id도 쓰지 않은 것이 된다 (G133). 색인은 아래에서 따로 기록된다
+            Journal(() =>
+            {
+                _entities.Remove(id);
+                set.Remove(id);
+                _nextId = id;
+            });
             foreach (var name in def.Components.Keys)
             {
                 def.Components.TryGet(name, out var rc);
@@ -175,16 +182,28 @@ namespace Kesa.Engine.Runtime
             foreach (var component in ComponentsOf(entity)) UnindexRefs(entity, component);
             DropContributionsOf(id.Value);
             _entities.Remove(id.Value);
-            _byType[entity.Def.Type].Remove(id.Value);
+            var set = _byType[entity.Def.Type];
+            set.Remove(id.Value);
+            Journal(() =>
+            {
+                _entities.Add(id.Value, entity);
+                set.Add(id.Value);
+            });
 
             if (_keyHolders.TryGetValue(id.Value, out var holders))
             {
                 foreach (var holder in holders)
                 {
                     if (!_entities.TryGetValue(holder, out var h)) continue;
-                    foreach (var rows in h.Rows.Values) rows.ByEntity.Remove(id.Value);
+                    foreach (var rows in h.Rows.Values)
+                    {
+                        if (!rows.ByEntity.TryGetValue(id.Value, out var row)) continue;
+                        rows.ByEntity.Remove(id.Value);
+                        Journal(() => rows.ByEntity.Add(id.Value, row));
+                    }
                 }
                 _keyHolders.Remove(id.Value);
+                Journal(() => _keyHolders.Add(id.Value, holders));
             }
         }
 
@@ -245,6 +264,12 @@ namespace Kesa.Engine.Runtime
 
             entity.Runtime.Add(component.Name, component);
             values.CopyTo(entity.Values);
+            Journal(() =>
+            {
+                foreach (var member in component.Members) entity.Values.Remove(member);
+                entity.Rows.Remove(component.Name);
+                entity.Runtime.Remove(component.Name);
+            });
             IndexRefs(entity, component);
             if (values.Pending.Count == 0) return;
             try
@@ -271,9 +296,19 @@ namespace Kesa.Engine.Runtime
             if (!entity.Runtime.ContainsKey(componentName))
                 throw new WorldException(Codes.RunNoComponent, id + " has no '" + componentName + "'");
             UnindexRefs(entity, component);
+            var oldValues = new List<KeyValuePair<MemberDecl, Value>>();
+            foreach (var member in component.Members)
+                if (entity.Values.TryGetValue(member, out var v)) oldValues.Add(new KeyValuePair<MemberDecl, Value>(member, v));
+            entity.Rows.TryGetValue(componentName, out var oldRows);
             foreach (var member in component.Members) entity.Values.Remove(member);
             entity.Rows.Remove(componentName);
             entity.Runtime.Remove(componentName);
+            Journal(() =>
+            {
+                entity.Runtime.Add(componentName, component);
+                if (oldRows != null) entity.Rows.Add(componentName, oldRows);
+                foreach (var pair in oldValues) entity.Values[pair.Key] = pair.Value;
+            });
             DropContributionsTo(id.Value, component);
         }
 
@@ -287,6 +322,25 @@ namespace Kesa.Engine.Runtime
         public void SetRow(EntityId id, MemberHandle member, EntityId key, Value value) => SetRow(id, member, RowKey.Entity(key), value);
         public bool HasRow(EntityId id, string componentName, string key) => HasRow(id, componentName, RowKey.Def(key));
         public bool HasRow(EntityId id, string componentName, EntityId key) => HasRow(id, componentName, RowKey.Entity(key));
+
+        // key=int 컴포넌트의 줄 (G129)
+        public Value GetRow(EntityId id, MemberHandle member, long key) => GetRow(id, member, RowKey.Int(key));
+        public void SetRow(EntityId id, MemberHandle member, long key, Value value) => SetRow(id, member, RowKey.Int(key), value);
+        public bool HasRow(EntityId id, string componentName, long key) => HasRow(id, componentName, RowKey.Int(key));
+        public void AddRow(EntityId id, string componentName, long key, params Init[] inits) =>
+            AddRow(id, componentName, RowKey.Int(key), inits);
+        public void RemoveRow(EntityId id, string componentName, long key) => RemoveRow(id, componentName, RowKey.Int(key));
+
+        /// <summary><c>key=int</c> 컴포넌트의 줄 키들 (키 순, 시작 시점의 목록, G129).</summary>
+        public IReadOnlyList<long> RowInts(EntityId id, string componentName)
+        {
+            var entity = Record(id);
+            var component = Keyed(ComponentNamed(componentName), KeyKind.Int);
+            Require(entity, component);
+            var keys = new List<long>();
+            if (entity.Rows.TryGetValue(componentName, out var rows)) keys.AddRange(rows.ByInt.Keys);
+            return keys;
+        }
 
         /// <summary><c>keys="listed"</c>나 엔티티 키 컴포넌트에 줄을 붙인다. 줄의 생성 순간이라 G89·G93이 적용된다.</summary>
         public void AddRow(EntityId id, string componentName, string key, params Init[] inits) =>
@@ -419,14 +473,14 @@ namespace Kesa.Engine.Runtime
         private bool HasRow(EntityId id, string componentName, RowKey key)
         {
             var entity = Record(id);
-            var component = Keyed(ComponentNamed(componentName), key.IsEntity ? KeyKind.Entity : KeyKind.Def);
+            var component = Keyed(ComponentNamed(componentName), key.Kind);
             return Has(entity, component) && FindRow(entity, component, key, out _, out _);
         }
 
         private void AddRow(EntityId id, string componentName, RowKey key, Init[] inits)
         {
             var entity = Record(id);
-            var component = Keyed(ComponentNamed(componentName), key.IsEntity ? KeyKind.Entity : KeyKind.Def);
+            var component = Keyed(ComponentNamed(componentName), key.Kind);
             if (component.KeyKind == KeyKind.Def && component.Keys == KeysMode.All)
                 throw new WorldException(Codes.RunNoRow,
                     "'" + componentName + "' is keys=\"all\": every key already has a row, so rows are not added");
@@ -440,12 +494,14 @@ namespace Kesa.Engine.Runtime
 
             var record = new RowRecord(attached: true);
             values.CopyTo(record.Values);
-            entity.RowsOf(component).Put(key, record);
+            var keyedRows = entity.RowsOf(component);
+            keyedRows.Put(key, record);
+            Journal(() => keyedRows.Remove(key));
             if (key.IsEntity)
             {
                 if (!_keyHolders.TryGetValue(key.EntityKey, out var holders))
                     _keyHolders.Add(key.EntityKey, holders = new SortedSet<long>());
-                holders.Add(id.Value);
+                if (holders.Add(id.Value)) Journal(() => holders.Remove(id.Value));
             }
             if (values.Pending.Count == 0) return;
             try
@@ -467,7 +523,7 @@ namespace Kesa.Engine.Runtime
         private void RemoveRow(EntityId id, string componentName, RowKey key)
         {
             var entity = Record(id);
-            var component = Keyed(ComponentNamed(componentName), key.IsEntity ? KeyKind.Entity : KeyKind.Def);
+            var component = Keyed(ComponentNamed(componentName), key.Kind);
             if (component.KeyKind == KeyKind.Def && component.Keys == KeysMode.All)
                 throw new WorldException(Codes.RunNoRow,
                     "'" + componentName + "' is keys=\"all\": every key always has a row, so rows are not removed");
@@ -476,7 +532,9 @@ namespace Kesa.Engine.Runtime
             if (record == null || !record.Attached)
                 throw new WorldException(Codes.RunNoRow,
                     "the '" + componentName + "' row " + key + " of " + id + " comes from its Def and cannot be removed");
-            entity.Rows[componentName].Remove(key);
+            var keyedRows = entity.Rows[componentName];
+            keyedRows.Remove(key);
+            Journal(() => keyedRows.Put(key, record));
             DropContributionsTo(id.Value, component, key);
         }
 
@@ -492,7 +550,7 @@ namespace Kesa.Engine.Runtime
             Require(entity, component);
             CheckKey(component, key);
             if (entity.Rows.TryGetValue(component.Name, out var rows)) record = rows.Find(key);
-            if (key.IsEntity) return record != null && record.Attached;
+            if (key.Kind != KeyKind.Def) return record != null && record.Attached; // 엔티티·int 키 줄은 런타임에만 있다
 
             if (entity.Def.Components.Contains(component.Name) && entity.Def.TryGetRow(component.Name, key.DefKey!, out var r))
             {
@@ -505,10 +563,10 @@ namespace Kesa.Engine.Runtime
 
         private void CheckKey(ComponentType component, RowKey key)
         {
+            if (component.KeyKind != key.Kind) throw WrongKey(component, key.Kind);
+            if (key.IsInt) return;
             if (key.IsEntity)
             {
-                if (component.KeyKind != KeyKind.Entity)
-                    throw new WorldException(Codes.RunType, "'" + component.Name + "' is keyed by " + component.Key!.Name + " Defs, not entities");
                 if (!_entities.TryGetValue(key.EntityKey, out var keyEntity))
                     throw new WorldException(Codes.RunDeadEntity, "the key " + key + " does not exist");
                 if (keyEntity.Def.Type != component.Key)
@@ -516,8 +574,6 @@ namespace Kesa.Engine.Runtime
                         "the key " + key + " is a " + keyEntity.Def.Type.Name + ", but '" + component.Name + "' is keyed by " + component.Key!.Name);
                 return;
             }
-            if (component.KeyKind != KeyKind.Def)
-                throw new WorldException(Codes.RunType, "'" + component.Name + "' is keyed by " + component.Key!.Name + " entities, not Def ids");
             if (!_defs.TryGet(key.DefKey!, out var keyDef) || keyDef.Type != component.Key)
             {
                 var ids = new List<string>();
@@ -839,11 +895,19 @@ namespace Kesa.Engine.Runtime
         {
             if (!component.IsKeyed)
                 throw new WorldException(Codes.RunNoRow, "'" + component.Name + "' is not a keyed component");
-            if (component.KeyKind != kind)
-                throw new WorldException(Codes.RunType,
-                    "'" + component.Name + "' is keyed by " + component.Key!.Name +
-                    (component.KeyKind == KeyKind.Def ? " Def ids" : " entities"));
+            if (component.KeyKind != kind) throw WrongKey(component, kind);
             return component;
+        }
+
+        private static WorldException WrongKey(ComponentType component, KeyKind given)
+        {
+            static string Kind(ComponentType c, KeyKind k) =>
+                k == KeyKind.Def ? (c.KeyKind == KeyKind.Def ? c.KeyDisplay + " Def ids" : "Def ids")
+                : k == KeyKind.Entity ? (c.KeyKind == KeyKind.Entity ? c.KeyDisplay + " entities" : "entities")
+                : "int";
+            return new WorldException(Codes.RunType,
+                "'" + component.Name + "' is keyed by " + Kind(component, component.KeyKind) + ", not " + Kind(component, given),
+                component.KeyKind == KeyKind.Int ? "rows of an int-keyed component are read as " + component.Name + "[i]" : null);
         }
 
         private IEnumerable<string> OwnerNames()
@@ -930,23 +994,29 @@ namespace Kesa.Engine.Runtime
             public SortedDictionary<string, RowRecord> ByDef { get; } = new SortedDictionary<string, RowRecord>(StringComparer.Ordinal);
             public SortedDictionary<long, RowRecord> ByEntity { get; } = new SortedDictionary<long, RowRecord>();
 
+            /// <summary><c>key=int</c> 컴포넌트의 줄 (키 순, G129).</summary>
+            public SortedDictionary<long, RowRecord> ByInt { get; } = new SortedDictionary<long, RowRecord>();
+
             public RowRecord? Find(RowKey key)
             {
                 RowRecord? record;
-                if (key.IsEntity) ByEntity.TryGetValue(key.EntityKey, out record);
+                if (key.IsEntity) ByEntity.TryGetValue(key.Number, out record);
+                else if (key.IsInt) ByInt.TryGetValue(key.Number, out record);
                 else ByDef.TryGetValue(key.DefKey!, out record);
                 return record;
             }
 
             public void Put(RowKey key, RowRecord record)
             {
-                if (key.IsEntity) ByEntity[key.EntityKey] = record;
+                if (key.IsEntity) ByEntity[key.Number] = record;
+                else if (key.IsInt) ByInt[key.Number] = record;
                 else ByDef[key.DefKey!] = record;
             }
 
             public void Remove(RowKey key)
             {
-                if (key.IsEntity) ByEntity.Remove(key.EntityKey);
+                if (key.IsEntity) ByEntity.Remove(key.Number);
+                else if (key.IsInt) ByInt.Remove(key.Number);
                 else ByDef.Remove(key.DefKey!);
             }
         }
@@ -961,20 +1031,33 @@ namespace Kesa.Engine.Runtime
 
         private readonly struct RowKey
         {
-            private RowKey(string? defKey, long entityKey)
+            private RowKey(KeyKind kind, string? defKey, long number)
             {
+                Kind = kind;
                 DefKey = defKey;
-                EntityKey = entityKey;
+                Number = number;
             }
 
-            public static RowKey Def(string key) => new RowKey(key, 0);
-            public static RowKey Entity(EntityId key) => new RowKey(null, key.Value);
+            public static RowKey Def(string key) => new RowKey(KeyKind.Def, key, 0);
+            public static RowKey Entity(EntityId key) => new RowKey(KeyKind.Entity, null, key.Value);
+            public static RowKey Int(long key) => new RowKey(KeyKind.Int, null, key);
 
+            public KeyKind Kind { get; }
             public string? DefKey { get; }
-            public long EntityKey { get; }
-            public bool IsEntity => DefKey == null;
 
-            public override string ToString() => IsEntity ? new EntityId(EntityKey).ToString() : "'" + DefKey + "'";
+            /// <summary>엔티티 키의 엔티티 id, 또는 int 키.</summary>
+            public long Number { get; }
+
+            public long EntityKey => Number;
+            public bool IsEntity => Kind == KeyKind.Entity;
+            public bool IsInt => Kind == KeyKind.Int;
+
+            public bool Same(RowKey other) => Kind == other.Kind && Number == other.Number && DefKey == other.DefKey;
+
+            public override string ToString() =>
+                Kind == KeyKind.Def ? "'" + DefKey + "'"
+                : Kind == KeyKind.Entity ? new EntityId(Number).ToString()
+                : Number.ToString(CultureInfo.InvariantCulture);
         }
     }
 }

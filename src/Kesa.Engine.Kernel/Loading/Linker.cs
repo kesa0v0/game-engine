@@ -35,9 +35,17 @@ namespace Kesa.Engine.Loading
         }
 
         public static void Check(ResolvedDefs resolved, DefRegistry defs, SchemaSet schema, ModVisibility visibility,
-            Func<string, ModManifest?> manifest, StageDiagnostics stage, IReadOnlyList<CommandDecl>? commands = null)
+            Func<string, ModManifest?> manifest, StageDiagnostics stage, IReadOnlyList<CommandDecl>? commands = null,
+            IEnumerable<KeyValuePair<string, ModFunctions>>? functions = null)
         {
             var linker = new Linker(defs, schema, visibility, manifest, stage);
+            // spawn("Def id")에 리터럴로 적은 id: 엔티티가 되는 Def여야 한다. 책임은 함수를 쓴 모드다 (G134)
+            if (functions != null)
+            {
+                foreach (var pair in functions)
+                foreach (var spawned in pair.Value.SpawnedDefs)
+                    linker.CheckId(new ValueBlame(pair.Key, spawned.Value, Array.Empty<string>()), spawned.Key, null);
+            }
             foreach (var def in resolved.Defs) linker.CheckDef(def);
             // 스키마가 선언한 기본값도 Def 값과 같은 규칙으로 본다. 책임은 선언한 모드다 (G73)
             foreach (var decl in MemberDefaults.DeclaredDefaults(schema))
@@ -135,7 +143,8 @@ namespace Kesa.Engine.Loading
         private void CheckId(ResolvedValue origin, string id, string typeName, SourceSpan literal, SourceSpan fallback) =>
             CheckId(ValueBlame.Of(origin, literal, fallback), id, typeName);
 
-        private void CheckId(ValueBlame blame, string id, string typeName)
+        /// <param name="typeName">기대하는 Def 타입. null이면 엔티티가 되는 Def 아무것이다 (<c>spawn</c>의 Def id, G134)</param>
+        private void CheckId(ValueBlame blame, string id, string? typeName)
         {
             string mod = blame.Mod;
             var guards = blame.Guards;
@@ -151,9 +160,21 @@ namespace Kesa.Engine.Loading
             {
                 var ids = new List<string>();
                 foreach (var d in _defs.Defs)
-                    if (d.Type.Name == typeName) ids.Add(d.Id);
-                Fail(Codes.LnkNotFound, "there is no " + typeName + " '" + id + "'", Suggest.Hint(id, ids));
+                    if (typeName == null ? !d.Type.IsDataOnly && !d.IsAbstract : d.Type.Name == typeName) ids.Add(d.Id);
+                Fail(Codes.LnkNotFound, "there is no " + (typeName ?? "Def") + " '" + id + "'", Suggest.Hint(id, ids));
                 return;
+            }
+
+            if (typeName == null)
+            {
+                if (record.Type.IsDataOnly)
+                {
+                    Fail(Codes.LnkWrongType,
+                        "'" + id + "' is a " + record.Type.Name + ", a data-only Def type with no components, so it cannot be spawned",
+                        related: new[] { record.Span });
+                    return;
+                }
+                typeName = record.Type.Name;
             }
 
             if (record.Type.Name != typeName)

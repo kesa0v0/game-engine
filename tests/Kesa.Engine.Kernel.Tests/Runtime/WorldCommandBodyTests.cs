@@ -46,7 +46,12 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\n" +
             "def ViaExpression(unit: Ref[Unit]):\n" +
             "    f = count\n" +
+            "    n = f(unit) + 1\n" + // 대입의 오른쪽 전체가 아닌 식 안 (G135)
+            "@command(free=True, acts_for=None)\n" +
+            "def ViaAssignment(unit: Ref[Unit]):\n" +
+            "    f = count\n" +
             "    n = f(unit)\n" +
+            "    unit.Moves.left += n\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Step(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
@@ -141,6 +146,15 @@ namespace Kesa.Engine.Tests.Runtime
             _world.Set(_scout, _left, new IntValue(30));
             Assert.That(Submit("Dash").Succeeded, Is.True);
             Assert.That(Left, Is.EqualTo(15));
+        }
+
+        [Test]
+        public void AWriteFunctionValueCalledAsTheWholeRightSideOfAnAssignmentWrites()
+        {
+            // count는 left를 1로 쓰고 1을 돌려준다: 5 → 1 → 1 + 1 (G135)
+            _world.Set(_scout, _left, new IntValue(5));
+            Assert.That(Submit("ViaAssignment").Succeeded, Is.True);
+            Assert.That(Left, Is.EqualTo(2));
         }
 
         [Test]

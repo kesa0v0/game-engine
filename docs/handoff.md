@@ -1,10 +1,10 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-15. 브랜치 `spec-v0.5-scaffold`, 테스트 1121개 통과(커널 1093, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1171개 통과(커널 1143, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
-spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G108에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기(G95~G104)를 `World`에 연결했다: `derived` 읽기와 형제 접근(G103), 재진입 감지·깊이 상한(G100), 기여 행 API와 `contribs`(G98), 읽은 값 근거 `Explain`(G105), 함수 기본값과 `derived` 원천 `default_from`(G106). `check`는 함수 본문의 이름 오타도 잡는다(G108). 그 뒤 실행기를 검토해 파이썬과 결과가 다르거나 spec과 어긋난 곳 6가지를 재현하고 고쳤다(아래 "실행기 검토"). 이어서 S6 커맨드 첫 슬라이스를 시작해 선언·사전 검사·인자 검사·쓰기 판정까지 왔다(G109~G118, 아래 "S6 커맨드 진행 상황"). 그 뒤 옛 컨텍스트 바구니(`^Self` 등)가 새 spec에서 어디로 갔는지 대조해 제출자·행위자·입구 정책·`ask` 대상·UI의 나·상태 안 값 목록을 정했다(G119~G129). 마지막으로 첫 슬라이스를 마쳤다: 입구 선언(G130), 제출 API `World.Submit`(G131), 본문 실행(G132), 런타임 안전망(G117 보강), 커맨드 단위 롤백(G133). 이제 자유 커맨드가 게임 상태를 바꿀 수 있다.
+spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engine check`·`dump`·`stubs`), 런타임 데이터 층 `World`의 첫 슬라이스가 구현되었다. 결정은 `docs/spec-gaps.md`의 G34~G108에 있고, spec 본문(S1·S2·S4·S9, schema-design, use-cases U16)에도 반영했다. 순수 함수 실행기(G95~G104)를 `World`에 연결했다: `derived` 읽기와 형제 접근(G103), 재진입 감지·깊이 상한(G100), 기여 행 API와 `contribs`(G98), 읽은 값 근거 `Explain`(G105), 함수 기본값과 `derived` 원천 `default_from`(G106). `check`는 함수 본문의 이름 오타도 잡는다(G108). 그 뒤 실행기를 검토해 파이썬과 결과가 다르거나 spec과 어긋난 곳 6가지를 재현하고 고쳤다(아래 "실행기 검토"). 이어서 S6 커맨드 첫 슬라이스를 시작해 선언·사전 검사·인자 검사·쓰기 판정까지 왔다(G109~G118, 아래 "S6 커맨드 진행 상황"). 그 뒤 옛 컨텍스트 바구니(`^Self` 등)가 새 spec에서 어디로 갔는지 대조해 제출자·행위자·입구 정책·`ask` 대상·UI의 나·상태 안 값 목록을 정했다(G119~G129). 마지막으로 첫 슬라이스를 마쳤다: 입구 선언(G130), 제출 API `World.Submit`(G131), 본문 실행(G132), 런타임 안전망(G117 보강), 커맨드 단위 롤백(G133). 이제 자유 커맨드가 게임 상태를 바꿀 수 있다. 이어서 스크립트의 구조 변경(`spawn`·`destroy`·`attach`·`detach`·`add_row`·`remove_row`, G134), 쓰기 함수의 결과 받기(G135), 구조 변경의 롤백, `int` 키 컴포넌트와 `replace_rows`·`append_row`(G129 구현)를 했다(아래 "구조 변경 슬라이스").
 
 ## 구현된 것 (`src/Kesa.Engine.Kernel/`)
 
@@ -26,7 +26,8 @@ spine-spec S1의 6단계 콘텐츠 로딩 파이프라인(①~⑥)과 CLI(`engin
 | 함수 본문 이름 검사 (②b 끝, 모드마다) | `Script/Execution/FunctionNameChecker`(`ModFunctions`에 인터프리터가 함수와 최상위 이름을 모음), `PureBuiltins.RuntimeNames` | G108 |
 | 런타임 월드 | `Runtime/World`(+ `World.Derived`·`World.Contributions`·`World.Explain`·`World.Commands` 부분 클래스), `RuntimeTypes`(`EntityId`, `EntityValue`, `MemberHandle`, `Init`, `WorldException`) | G86~G93, G98, G100, G103, G105, G106 |
 | 커맨드 선언·사전 검사·인자 검사 | `Script/CommandDecl`(`CommandParameter`), `Interpreter.DeclareCommand`, `FunctionChecker`(`with preconditions:`), `Loading/CommandSignatures`(어노테이션·기본값), `PureEvaluator.RunPreconditions`, `World.CheckPreconditions`(`PreconditionReport`, `ArgumentRejection`) | G109~G116 |
-| 함수 효과(쓰기 함수) 판정 (②b 끝, 모드마다) | `Script/Execution/FunctionEffects`, `FunctionValue.WriteWitness`·`IsCommand`, `PatchOperationCheck.Mismatch`(Cond 자리) | G117·G118 |
+| 함수 효과(쓰기 함수) 판정 (②b 끝, 모드마다) | `Script/Execution/FunctionEffects`, `FunctionValue.WriteWitness`·`IsCommand`, `PatchOperationCheck.Mismatch`(Cond 자리) | G117·G118·G135 |
+| 스크립트의 구조 변경, 컴포넌트 값 생성자, `int` 키 줄 헬퍼 | `Runtime/World.Structure`(내장 8개, `ComponentInitValue`), `PureBuiltins.WritingNames`, `PureBuiltin.Writes`, `spawn` 리터럴 링크는 `FunctionNameChecker`가 모아 `Linker`가 봄 | G129·G134·G135 |
 
 CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 
@@ -110,7 +111,7 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 **아직 안 정한 것:**
 
 - ~~**Def·Flow 경계를 넘는 값 넘기기**~~ → 정리됨. 같은 실행 안(TR `PaidExtraOP`)은 `Action` 함수 인자, `ask`를 사이에 둔 값은 Flow 지역 변수(S2), 다른 Flow·참가자가 보고 고치는 값(스택 노드, 주사위 눈)은 상태: 노드 표현은 `std.stack` 몫(G128), 인자 묶음은 런타임 컴포넌트, 값 목록은 `int` 키 컴포넌트(G129). 스택의 취소·환불은 `std.stack`을 만들 때 정한다(모드 몫).
-- **G129 구현 메모:** `int` 키, `replace_rows`·`append_row`, 줄 삭제 시 그 줄 대상 기여 행 삭제. 스크립트에서 줄을 붙이고 떼는 길(아래 다음 할 일 6 "미룸")과 함께 한다.
+- ~~**G129 구현**~~: 구현함(아래 "구조 변경 슬라이스").
 - 표기: `ask` 반환값의 필드 이름. (`acts_for`·`submit_policy`는 G130으로 정함)
 
 ## 핵심 규칙 (자세한 것은 spec-gaps)
@@ -129,11 +130,21 @@ CLI(`src/Kesa.Engine.Cli/Commands.cs`, 테스트 `tests/Kesa.Engine.Cli.Tests`):
 4. ~~**커맨드 단위 롤백(C8)**~~: G133으로 정하고 구현함(`Runtime/World.Undo.cs`의 `Atomically`·`Assign`·`Journal`). 테스트는 롤백을 끈 채로 실패하는 것까지 확인함.
 5. ~~**`me`의 정체(S2 ❓)**~~: G119~G127로 정함(`me` 없음). 위 "제출자·행위자 정리".
 
+## 구조 변경 슬라이스 (끝남, 2026-10-16)
+
+결정은 사용자와 정했다(G134·G135 `확인`). 테스트는 `Runtime/WorldStructureTests`, `Runtime/WorldStructureRollbackTests`, `Runtime/WorldIntKeyTests`.
+
+1. **표기 (G134):** 이름 붙은 커널 내장 `u = spawn("Def", Health=Health(current=3))`, `destroy(u)`, `attach(u, Wounded(turns=3))`, `detach(u.Wounded)`, `add_row(u.Skill, key, Skill(...))`, `remove_row(u.Skill, key)`. 컴포넌트 값 생성자는 로직에서도 쓰는 이름(그 모드에 보이는 것만, 아니면 SCH003). `spawn`의 리터럴 Def id는 ⑤가 검사(없음·데이터 전용·abstract·안 보임). 키 줄은 `spawn`에 넣지 않고 `add_row`로.
+2. **쓰기 판정 (G135):** 쓰기 함수는 한 줄 전체나 이름 대입의 오른쪽 전체(`u = make_scout(c)`)로 부른다. 쓰는 내장을 부르면 쓰기 함수로 판정(로드 시점 CMD004). 함수 값으로 우회하면 실행 중 안전망(RUN003). `pay(...)`는 `paid = pay(...)` 뒤 `if paid:`.
+3. **롤백:** 6가지 구조 변경이 모두 흔적을 남기던 것을 재현하고 고쳤다. 생성(엔티티·타입 목록·id 카운터: 실패한 커맨드는 id를 쓰지 않음), 삭제(기여 행·남의 엔티티 키 줄), 부착·분리(값·줄·역방향 색인·기여 행), 줄(값·기여 행·키 보유 색인), 기여 행 추가를 되돌리기 기록에 넣었다. 연산이 스스로 실패해 정리한 뒤 되감기가 다시 지워도 같은 상태(테스트 있음).
+4. **G129 구현:** `component("Die", key=int, ...)`는 항상 listed(`keys="all"`은 SCH004), Def 리터럴·패치에 줄을 적을 수 없음(런타임 목록). 스크립트는 `node.Die[i]`, 키 순 순회, `row.key`는 int, 없는 칸은 None. `replace_rows(node.Die, [Die(...), ...])`는 원소를 모두 검사한 뒤 줄을 지우고 0부터 다시 만들고(그 줄의 기여 행도 지워짐), `append_row(node.Die[, Die(...)])`는 가장 큰 키 + 1. 리스트 원소는 컴포넌트 값 모양(G134 표기를 따름, 사용자 동의). 호스트 API는 `long` 키 오버로드와 `RowInts`.
+
+**알려진 한계:** `RemoveRow`(엔티티 키)는 키 보유 색인(`_keyHolders`)에서 지우지 않는다(삭제 때 건너뛰므로 동작은 맞음). 키 줄 안의 Ref 역방향 색인은 여전히 없다.
+
 ## 다음 할 일 (사용자와 고를 것)
 
-첫 슬라이스로 자유 커맨드가 상태를 바꿀 수 있게 됐다. 다음 후보(미룬 것):
+자유 커맨드가 값과 구조를 바꿀 수 있게 됐다. 다음 후보(미룬 것):
 
-- **스크립트에서 엔티티 생성·삭제·컴포넌트 부착·줄 붙이기**: G129 헬퍼(`replace_rows`·`append_row`, `int` 키)와 함께. 이 연산들도 되돌리기 기록(G133)에 넣어야 한다.
 - **`ask`/`wait`(Flow 중단·재개)**와 응답 커맨드(G125·G126, `NeedsRequest`가 지금 받는 자리): C1~C3과 시나리오 ①②④의 전제.
 - `cost`·`choose`(사전 조건 블록 안, 지금 “미지원”).
 - 반응(S5), 저장(S8).
@@ -148,7 +159,7 @@ spec 척추 기준으로 어디까지 왔나:
 | S1 로딩, S9 진단(일부), CLI | 끝남 |
 | S4 데이터 층(`World`), `derived`·기여 행 | 끝남 |
 | S2 순수 함수(읽기만) | 끝남, 검토 마침 |
-| S6 커맨드 | 자유 커맨드의 선언·입구·사전 검사·본문 실행·롤백까지 끝남(G109~G133). 응답 커맨드, `cost`·`choose` 없음 |
+| S6 커맨드 | 자유 커맨드의 선언·입구·사전 검사·본문 실행·롤백, 스크립트의 구조 변경까지 끝남(G109~G135). 응답 커맨드, `cost`·`choose` 없음 |
 | S2 Flow(쓰기 실행, `ask`, `wait`, 재개) · S5 반응 · S8 저장 | 없음 |
 
 spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거의 모두 Flow·커맨드·저장을 요구하므로 아직 하나도 검증하지 못했다. 엔진은 콘텐츠를 읽고 값을 계산할 수 있지만 게임을 진행시킬 수는 없다. 로직용 `.pyi`(남은 일 2번)는 스크립트의 쓰기 API 모양이 정해진 뒤에 하는 편이 다시 고칠 일이 적다.
@@ -181,6 +192,6 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1121개 통과(커널 1093, CLI 28)를 확인한다.
-2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G133), `docs/spine-spec.md` S2·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
+1. `git pull` 후 `dotnet test`로 1171개 통과(커널 1143, CLI 28)를 확인한다.
+2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G135), `docs/spine-spec.md` S2·S4·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.

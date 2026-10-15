@@ -285,10 +285,15 @@ namespace Kesa.Engine.Loading
             }
             run.Expanded = InheritanceExpander.Expand(run.Defs, run.Schema, run.Visibility, mod => environments[mod], stage, run.Log, conflicted);
             var commands = new List<CommandDecl>();
+            var functions = new List<KeyValuePair<string, ModFunctions>>();
             foreach (var u in units)
-                if (!u.Failed) commands.AddRange(u.Functions.Commands);
+            {
+                if (u.Failed) continue;
+                commands.AddRange(u.Functions.Commands);
+                functions.Add(new KeyValuePair<string, ModFunctions>(u.Manifest.Id, u.Functions));
+            }
             Linker.Check(run.Expanded, run.Defs, run.Schema, run.Visibility, id => units.Find(u => u.Manifest.Id == id)?.Manifest, stage,
-                commands);
+                commands, functions);
             Validator.Check(run.Expanded, run.Schema, run.Visibility, stage);
 
             var failedBefore = new HashSet<string>(StringComparer.Ordinal);
@@ -480,7 +485,11 @@ namespace Kesa.Engine.Loading
         private static void CheckFunctionNames(ModUnit u, DefBuiltins builtins) =>
             FunctionNameChecker.Check(u.Functions, u.Scope,
                 name => name == Interpreter.InheritName || builtins.Lookup(name) != null || builtins.Explain(name) != null,
-                new CallContext(u.Manifest.Id, u.Bag));
+                new CallContext(u.Manifest.Id, u.Bag), builtins.IsVisibleComponent,
+                // Explain은 Lookup이 못 찾은 이름에만 맞다 (보이는지는 보지 않는다)
+                name => builtins.Lookup(name) == null && builtins.Explain(name) is { } e && e.Code == Codes.SchNotVisible
+                    ? e.Message
+                    : null);
 
         /// <summary>
         /// 필수 의존 중 실패한 모드가 있으면 이 모드를 비활성화한다 (MOD009). 로드 순서상 의존 대상이 앞에 있으므로

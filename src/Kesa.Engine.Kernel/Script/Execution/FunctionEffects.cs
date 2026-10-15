@@ -62,14 +62,22 @@ namespace Kesa.Engine.Script
                     new[] { use.Callee.Definition!.Span });
             }
 
+            const string statementHint =
+                "call it on its own line, or as 'x = ...(...)', in a @command body or in another function that changes " +
+                "the world (spec-gaps G117, G135)";
             foreach (var body in bodies)
             foreach (var call in body.ExpressionCalls)
             {
                 if (!call.Callee.Writes || call.Callee.IsCommand) continue;
                 context.Error(Codes.CmdWriteEffect,
                     "'" + call.Callee.Name + "' changes the world, so it can only be called as a statement", call.Span,
-                    "call it on its own line in a @command body or in another function that changes the world (spec-gaps G117)",
-                    new[] { call.Callee.WriteWitness!.Value });
+                    statementHint, new[] { call.Callee.WriteWitness!.Value });
+            }
+            foreach (var body in bodies)
+            foreach (var call in body.BuiltinExpressionCalls)
+            {
+                context.Error(Codes.CmdWriteEffect,
+                    call.Key + "() changes the world, so it can only be called as a statement", call.Value, statementHint);
             }
 
             // 입구 검사는 순수하다: 거부가 상태를 건드리지 않는다 (C10, G122)
@@ -152,6 +160,10 @@ namespace Kesa.Engine.Script
 
             /// <summary>본문에서 커맨드 이름을 쓴 곳 (호출이든 값이든, G118).</summary>
             public List<Call> CommandUses { get; } = new List<Call>();
+
+            /// <summary>식 안에서 부른 쓰는 내장 (이름, 위치; G135).</summary>
+            public List<KeyValuePair<string, SourceSpan>> BuiltinExpressionCalls { get; } =
+                new List<KeyValuePair<string, SourceSpan>>();
         }
 
         private sealed class Walker
@@ -177,6 +189,27 @@ namespace Kesa.Engine.Script
                 return null;
             }
 
+            /// <summary>덮어쓰지 않은 쓰는 내장의 이름이면 그 이름 (G112의 덮어쓰기와 같은 규칙).</summary>
+            private string? WritingBuiltin(Expr callee, SortedSet<string> locals)
+            {
+                if (!(callee is NameExpr name) || locals.Contains(name.Name) || _scope.TryGet(name.Name, out _, out _))
+                    return null;
+                return PureBuiltins.IsWritingName(name.Name) ? name.Name : null;
+            }
+
+            /// <summary>문장 자리의 호출: 한 줄 전체이거나 이름 대입의 오른쪽 전체 (G117·G135).</summary>
+            private void StatementCall(CallExpr call, SortedSet<string> locals)
+            {
+                var callee = Resolve(call.Callee, locals);
+                if (callee != null) _body.StatementCalls.Add(new Call(callee, call.Span));
+                else if (WritingBuiltin(call.Callee, locals) != null)
+                {
+                    if (_body.FirstWrite == null) _body.FirstWrite = call.Span;
+                }
+                else if (!(call.Callee is NameExpr)) Expr(call.Callee, locals);
+                foreach (var arg in call.Arguments) Expr(arg.Value, locals);
+            }
+
             public void Block(IReadOnlyList<Stmt> body, SortedSet<string> locals)
             {
                 foreach (var stmt in body)
@@ -184,13 +217,7 @@ namespace Kesa.Engine.Script
                     switch (stmt)
                     {
                         case ExprStmt es:
-                            if (es.Expr is CallExpr call)
-                            {
-                                var callee = Resolve(call.Callee, locals);
-                                if (callee != null) _body.StatementCalls.Add(new Call(callee, call.Span));
-                                else if (!(call.Callee is NameExpr)) Expr(call.Callee, locals);
-                                foreach (var arg in call.Arguments) Expr(arg.Value, locals);
-                            }
+                            if (es.Expr is CallExpr call) StatementCall(call, locals);
                             else Expr(es.Expr, locals);
                             break;
                         case AssignStmt assign:
@@ -199,7 +226,10 @@ namespace Kesa.Engine.Script
                                 if (_body.FirstWrite == null) _body.FirstWrite = assign.Span;
                                 Expr(target.Target, locals);
                             }
-                            Expr(assign.Value, locals);
+                            if (assign.Op == "=" && assign.Target is NameExpr && assign.Value is CallExpr assigned)
+                                StatementCall(assigned, locals);
+                            else
+                                Expr(assign.Value, locals);
                             break;
                         case IfStmt ifs:
                             foreach (var branch in ifs.Branches)
@@ -234,7 +264,10 @@ namespace Kesa.Engine.Script
                 {
                     case CallExpr call:
                         var callee = Resolve(call.Callee, locals);
+                        var builtin = callee == null ? WritingBuiltin(call.Callee, locals) : null;
                         if (callee != null) _body.ExpressionCalls.Add(new Call(callee, call.Span));
+                        else if (builtin != null)
+                            _body.BuiltinExpressionCalls.Add(new KeyValuePair<string, SourceSpan>(builtin, call.Span));
                         else if (!(call.Callee is NameExpr)) Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
                         break;

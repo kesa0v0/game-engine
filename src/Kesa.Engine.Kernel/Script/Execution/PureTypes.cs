@@ -170,6 +170,11 @@ namespace Kesa.Engine.Script
         /// <summary>키워드 인자를 받으면 있다. 없으면 키워드 인자는 오류다.</summary>
         public Func<IReadOnlyList<Value>, IReadOnlyDictionary<string, Value>, Value>? KeywordBody { get; }
 
+        /// <summary>
+        /// 월드를 바꾸는 내장인가 (<c>spawn</c> 등, spec-gaps G134). 쓰기 모드 프레임의 문장(또는 이름 대입의 오른쪽 전체)으로만 부를 수 있다 (G117·G135).
+        /// </summary>
+        public bool Writes { get; set; }
+
         public override string KindName => "built-in function";
     }
 

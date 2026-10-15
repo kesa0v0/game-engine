@@ -146,15 +146,21 @@ namespace Kesa.Engine.Schema
                         key = entity.Target;
                         keyKind = KeyKind.Entity;
                         break;
+                    case PrimitiveTypeRef p when ReferenceEquals(p, PrimitiveTypeRef.Int):
+                        // 이름 없는 값의 순서 있는 목록 (G129)
+                        keyKind = KeyKind.Int;
+                        break;
                     default:
                         throw ctx.Fail(Codes.EvlType,
-                            "key must be a Def type name or an entity reference, not " + keyArg.Value.KindName,
-                            keyArg.Span, hint: "write key=\"SkillDef\" (a row per Def) or key=Ref[\"Faction\"] (a row per entity)");
+                            "key must be a Def type name, an entity reference or int, not " + keyArg.Value.KindName,
+                            keyArg.Span, hint: "write key=\"SkillDef\" (a row per Def), key=Ref[\"Faction\"] (a row per entity) " +
+                                               "or key=int (an ordered list of values)");
                 }
             }
 
-            // 엔티티 키는 항상 listed다: 엔티티는 런타임에 생기므로 "모든 키의 줄"이 없다
-            var keys = keyKind == KeyKind.Entity ? KeysMode.Listed : KeysMode.All;
+            // 엔티티 키와 int 키는 항상 listed다: 줄이 런타임에 생기므로 "모든 키의 줄"이 없다
+            bool runtimeKeys = keyKind != KeyKind.Def;
+            var keys = runtimeKeys ? KeysMode.Listed : KeysMode.All;
             var keysArg = r.Take("keys");
             RejectReservedOption(ctx, keysArg, Component);
             if (keysArg != null)
@@ -166,11 +172,12 @@ namespace Kesa.Engine.Schema
                     default:
                         throw ctx.Fail(Codes.SchBadDeclaration, "keys must be \"all\" or \"listed\"", keysArg.Span);
                 }
-                if (key == null)
+                if (keyArg == null)
                     throw ctx.Fail(Codes.SchBadDeclaration, "keys= is only meaningful on a keyed component",
                         keysArg.Span, hint: "add key=\"DefType\"");
-                if (keyKind == KeyKind.Entity && keys == KeysMode.All)
-                    throw ctx.Fail(Codes.SchBadDeclaration, "a component keyed by entities is always keys=\"listed\"",
+                if (runtimeKeys && keys == KeysMode.All)
+                    throw ctx.Fail(Codes.SchBadDeclaration,
+                        "a component keyed by " + (keyKind == KeyKind.Int ? "int" : "entities") + " is always keys=\"listed\"",
                         keysArg.Span, hint: "remove keys=\"all\"");
             }
 

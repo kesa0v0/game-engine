@@ -181,6 +181,10 @@ namespace Kesa.Engine.Loading
             return null;
         }
 
+        /// <summary>이 모드에 보이는 컴포넌트 이름인가. 컴포넌트 값 생성자는 로직 함수에서도 쓴다 (spec-gaps G134).</summary>
+        public bool IsVisibleComponent(string name) =>
+            _schema.TryGetComponent(name, out var c) && _visibility.CanSee(_mod, c.Mod);
+
         public IEnumerable<string> Names
         {
             get
@@ -338,12 +342,13 @@ namespace Kesa.Engine.Loading
 
             private static bool CheckComponentValue(CallContext ctx, ArgValue arg, ComponentType component)
             {
-                if (component.KeyKind == KeyKind.Entity)
+                if (component.KeyKind != KeyKind.Def)
                 {
-                    // 로드 시점에는 엔티티가 없다
+                    // 로드 시점에는 엔티티가 없다. int 키 줄은 런타임 목록이다 (G129)
                     ctx.Error(Codes.DefBadValue,
-                        "'" + arg.Name + "' is keyed by " + component.Decl.Key!.Value.Name +
-                        " entities; its rows are created at runtime and cannot be written in a Def", arg.Span);
+                        "'" + arg.Name + "' is keyed by " +
+                        (component.KeyKind == KeyKind.Int ? "int" : component.Decl.Key!.Value.Name + " entities") +
+                        "; its rows are created at runtime and cannot be written in a Def", arg.Span);
                     return false;
                 }
                 switch (arg.Value)

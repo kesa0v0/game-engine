@@ -17,14 +17,40 @@ namespace Kesa.Engine.Script
         /// <summary>기여 행을 읽는 내장 함수 (G98). 월드가 있어야 하므로 런타임(<c>World</c>)이 이 이름으로 더한다.</summary>
         public const string ContribsName = "contribs";
 
+        /// <summary>월드의 구조를 바꾸는 내장 (spec-gaps G134, int 키 줄 헬퍼는 G129). 몸체는 월드가 준다.</summary>
+        public const string SpawnName = "spawn";
+        public const string DestroyName = "destroy";
+        public const string AttachName = "attach";
+        public const string DetachName = "detach";
+        public const string AddRowName = "add_row";
+        public const string RemoveRowName = "remove_row";
+        public const string ReplaceRowsName = "replace_rows";
+        public const string AppendRowName = "append_row";
+
+        /// <summary>월드를 바꾸는 내장. 부르면 쓰기다 (G135). 이름 집합보다 먼저 초기화되어야 한다.</summary>
+        private static readonly string[] WritingNameArray =
+        {
+            SpawnName, DestroyName, AttachName, DetachName, AddRowName, RemoveRowName, ReplaceRowsName, AppendRowName,
+        };
+
+        public static IReadOnlyList<string> WritingNames => WritingNameArray;
+
+        public static bool IsWritingName(string name) => Array.IndexOf(WritingNameArray, name) >= 0;
+
         /// <summary>
-        /// 실행 중 함수 본문에서 보이는 내장 이름 전체: <see cref="Create"/>의 이름과 <see cref="ContribsName"/>.
+        /// 실행 중 함수 본문에서 보이는 내장 이름 전체: <see cref="Create"/>의 이름, <see cref="ContribsName"/>, 쓰는 내장.
         /// 로드 시점 이름 검사(G108)가 실행기와 같은 목록을 쓰도록 여기 한 곳에 둔다.
         /// </summary>
         public static IReadOnlyList<string> RuntimeNames => new List<string>(RuntimeNameSet);
 
-        private static readonly SortedSet<string> RuntimeNameSet =
-            new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName };
+        private static readonly SortedSet<string> RuntimeNameSet = NameSet();
+
+        private static SortedSet<string> NameSet()
+        {
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName };
+            set.UnionWith(WritingNameArray);
+            return set;
+        }
 
         public static bool IsRuntimeName(string name) => RuntimeNameSet.Contains(name);
 

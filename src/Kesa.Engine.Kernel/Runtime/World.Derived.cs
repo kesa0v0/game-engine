@@ -54,6 +54,7 @@ namespace Kesa.Engine.Runtime
         {
             var table = PureBuiltins.Create();
             table.Add(PureBuiltins.ContribsName, new PureBuiltin(PureBuiltins.ContribsName, ContribsBuiltin));
+            AddStructureBuiltins(table);
             return table;
         }
 
@@ -351,6 +352,8 @@ namespace Kesa.Engine.Runtime
                 _component = component;
             }
 
+            public EntityId Id => _id;
+            public ComponentType Component => _component;
             public override string KindName => _component.Name + " rows";
 
             public Value GetAttribute(string name) =>
@@ -371,9 +374,10 @@ namespace Kesa.Engine.Runtime
                 {
                     case StrValue s: return RowKey.Def(s.Value);
                     case IEntityReference r: return RowKey.Entity(r.EntityId);
+                    case IntValue n: return RowKey.Int(n.Value);
                 }
                 throw new ScriptRuntimeException(Codes.RunType,
-                    "'" + _component.Name + "' rows are keyed by " + _component.Key!.Name + ", not " + key.KindName);
+                    "'" + _component.Name + "' rows are keyed by " + _component.KeyDisplay + ", not " + key.KindName);
             }
         }
 
@@ -459,8 +463,9 @@ namespace Kesa.Engine.Runtime
             if (component.TryGetMember(name, out var member)) return ToScript(ReadMemberTraced(entity, component, view.Row, member));
             if (name == "entity") return new EntityView(this, view.Id);
             if (name == "key" && view.Row != null)
-                return view.Row.Value.IsEntity ? (Value)new EntityView(this, new EntityId(view.Row.Value.EntityKey))
-                                               : new StrValue(view.Row.Value.DefKey!);
+                return view.Row.Value.IsEntity ? new EntityView(this, new EntityId(view.Row.Value.EntityKey))
+                    : view.Row.Value.IsInt ? new IntValue(view.Row.Value.Number)
+                    : (Value)new StrValue(view.Row.Value.DefKey!);
             if (_schema.TryGetComponent(name, out var sibling)) return SiblingOrNone(entity, sibling);
             if (_schema.TryGetType(name, out var defType)) return DefOrNone(entity, defType);
 
@@ -487,13 +492,17 @@ namespace Kesa.Engine.Runtime
         private IReadOnlyList<Value> RowKeyValues(EntityId id, ComponentType component)
         {
             var keys = new List<Value>();
-            if (component.KeyKind == KeyKind.Def)
+            switch (component.KeyKind)
             {
-                foreach (var key in RowKeys(id, component.Name)) keys.Add(new StrValue(key));
-            }
-            else
-            {
-                foreach (var key in RowEntities(id, component.Name)) keys.Add(new EntityView(this, key));
+                case KeyKind.Def:
+                    foreach (var key in RowKeys(id, component.Name)) keys.Add(new StrValue(key));
+                    break;
+                case KeyKind.Entity:
+                    foreach (var key in RowEntities(id, component.Name)) keys.Add(new EntityView(this, key));
+                    break;
+                default:
+                    foreach (var key in RowInts(id, component.Name)) keys.Add(new IntValue(key));
+                    break;
             }
             return keys;
         }

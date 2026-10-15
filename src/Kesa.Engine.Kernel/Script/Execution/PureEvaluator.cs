@@ -209,6 +209,13 @@ namespace Kesa.Engine.Script
                     case ClosureValue c:
                         return CallFunction(c.Function, c.Captured, c.CapturedLocals, positional, keywords, site, writable);
                     case PureBuiltin b:
+                        if (b.Writes && !writable)
+                        {
+                            throw Fail(Codes.RunNotWritable,
+                                b.Name + "() changes the world, so it cannot be called here",
+                                "call it on its own line (or as 'x = " + b.Name + "(...)') in a @command body or in a " +
+                                "function that changes the world called on its own line from it (spec-gaps G117, G135)");
+                        }
                         if (b.KeywordBody != null) return b.KeywordBody(positional, keywords);
                         if (keywords.Count > 0) throw Fail(Codes.RunScript, b.Name + "() does not take keyword arguments");
                         return b.Body(positional);
@@ -509,7 +516,10 @@ namespace Kesa.Engine.Script
 
                 if (assign.Op == "=")
                 {
-                    frame.Locals[target.Name] = Eval(assign.Value, frame);
+                    // 이름 대입의 오른쪽 전체인 호출은 문장이다: 쓰기 함수의 결과를 받을 수 있다 (G135)
+                    frame.Locals[target.Name] = assign.Value is CallExpr call
+                        ? EvalCallTraced(call, frame)
+                        : Eval(assign.Value, frame);
                     return;
                 }
 
@@ -713,7 +723,24 @@ namespace Kesa.Engine.Script
                 throw Fail(Codes.RunScript, "'" + target.KindName + "' cannot be indexed");
             }
 
-            /// <param name="statement">이 호출이 문장 하나 전체인가 (쓰기 함수는 문장으로만 부른다, G117).</param>
+            /// <summary>문장 자리의 호출을 <see cref="Eval"/>처럼 단계를 세고 오류 위치를 붙여 평가한다.</summary>
+            private Value EvalCallTraced(CallExpr call, Frame frame)
+            {
+                try
+                {
+                    Tick();
+                    return EvalCall(call, frame, statement: true);
+                }
+                catch (ScriptRuntimeException e)
+                {
+                    Attach(e, call.Span);
+                    throw;
+                }
+            }
+
+            /// <param name="statement">
+            /// 이 호출이 문장 하나 전체이거나 이름 대입의 오른쪽 전체인가 (쓰기 함수는 이 자리에서만 부른다, G117·G135).
+            /// </param>
             private Value EvalCall(CallExpr call, Frame frame, bool statement = false)
             {
                 var callee = Eval(call.Callee, frame);

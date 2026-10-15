@@ -578,13 +578,15 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         [TestCase("def f(h) -> int:\n    return field\n", "field")]
-        [TestCase("def f(h) -> int:\n    return C(hp=1)\ncomponent(\"C\", hp=field(int, default=0))\n", "C")]
+        // 컴포넌트 값 생성자(C(hp=1))는 로직에서도 쓰는 이름이다 (G134). Def 생성자는 로드 시점에만 있다
+        [TestCase("def f(h) -> int:\n    return T(\"x\")\ndeftype(\"T\")\n", "T")]
         [TestCase("def f(h) -> int:\n    patch.set(\"X\", \"n\", 1)\n    return 1\n", "patch")]
         [TestCase("def f(h) -> int:\n    return int(h)\n", "int")]
         public void LoadTimeNamesInAFunctionBodyAreExplained(string schema, string name)
         {
             Mod("core", schema: schema);
             var result = Load(out var diags);
+            Assert.That(diags.Count(x => x.Code == Codes.EvlUnknownName), Is.EqualTo(1), string.Join("\n", diags));
             var d = diags.Single(x => x.Code == Codes.EvlUnknownName);
             Assert.That(d.Message, Is.EqualTo("'" + name + "' is only available while content files load, not inside a logic function"));
             Assert.That(d.Hint, Does.Contain("contribs"));
