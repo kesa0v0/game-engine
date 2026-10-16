@@ -45,14 +45,20 @@ namespace Kesa.Engine.Runtime
         /// <param name="maxSignalDepth">
         /// 신호 연쇄의 세대 상한 (spec-gaps G147·G150). 이보다 깊은 신호는 핸들러를 돌리지 않고 결과에 알린다.
         /// </param>
+        /// <param name="maxAdvancePerCall">
+        /// 제출·답·응답 한 번 안에서 스크립트 <c>advance()</c>로 진행할 수 있는 틱의 합 (spec-gaps G168). 넘기려는 Flow는 오류로 버린다.
+        /// </param>
         public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget, bool requireSubmitPolicy = false,
-            int maxSignalDepth = DefaultMaxSignalDepth)
+            int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall)
             : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, loaded.SubmitPolicy)
         {
             _mods = loaded.Mods;
             if (maxSignalDepth < 1)
                 throw new ArgumentOutOfRangeException(nameof(maxSignalDepth), maxSignalDepth, "the signal depth limit must be at least 1");
             _maxSignalDepth = maxSignalDepth;
+            if (maxAdvancePerCall < 1)
+                throw new ArgumentOutOfRangeException(nameof(maxAdvancePerCall), maxAdvancePerCall, "the advance limit must be at least 1");
+            _maxAdvancePerCall = maxAdvancePerCall;
             SetHandlers(loaded.Handlers);
             if (requireSubmitPolicy && loaded.SubmitPolicy == null)
                 throw new WorldException(Codes.RunNoSubmitPolicy,
@@ -190,6 +196,7 @@ namespace Kesa.Engine.Runtime
             var entity = Record(id);
             foreach (var component in ComponentsOf(entity)) UnindexRefs(entity, component);
             DropContributionsOf(id.Value);
+            _destroyedSinceSweep = true; // 멈춘 Flow의 대상을 다음 확인 때 본다 (G164). 되감겨도 한 번 더 볼 뿐이다
             _entities.Remove(id.Value);
             var set = _byType[entity.Def.Type];
             set.Remove(id.Value);

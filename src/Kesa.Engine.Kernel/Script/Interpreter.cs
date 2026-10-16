@@ -200,6 +200,14 @@ namespace Kesa.Engine.Script
         public const string CommandName = "command";
         public const string SubmitPolicyName = "submit_policy";
         public const string ActsForName = "acts_for";
+
+        /// <summary>S5의 <c>on_stale=</c>. 이름만 예약했다: 지금은 기본 취소만 있다 (spec-gaps G166).</summary>
+        public const string OnStaleName = "on_stale";
+
+        private void OnStaleNotSupported(string decorator, Argument arg) =>
+            _context.Error(Codes.CmdBadDecorator, decorator + "(on_stale=...) is not supported yet: a paused flow whose subject is " +
+                                                  "destroyed is always canceled", arg.Span,
+                hint: "to keep going when an entity is destroyed, leave it out of about= on wait() or ask() (spec-gaps G165, G166)");
         public const string OnName = "on";
 
         /// <summary>
@@ -242,6 +250,11 @@ namespace Kesa.Engine.Script
                     // 핸들러는 제출자가 없어 입구 검사가 없다. 누구인지는 신호 인자에서 꺼낸다 (spec-gaps G149)
                     _context.Error(Codes.CmdBadDecorator, "@on has no acts_for: nobody submits a handler, so there is no gate to check",
                         arg.Span, hint: "take whom it is about from the signal's values, like def f(target): ... (spec-gaps G149)");
+                    return;
+                }
+                if (arg.Name == OnStaleName)
+                {
+                    OnStaleNotSupported("@on", arg);
                     return;
                 }
                 _context.Error(Codes.CmdBadDecorator, "@on has no argument '" + arg.Name + "'", arg.Span,
@@ -354,6 +367,11 @@ namespace Kesa.Engine.Script
                             return;
                         }
                         actsFor = arg;
+                    }
+                    else if (arg.Name == OnStaleName)
+                    {
+                        OnStaleNotSupported("@command", arg);
+                        return;
                     }
                     else
                     {

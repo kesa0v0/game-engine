@@ -54,6 +54,12 @@ namespace Kesa.Engine.Runtime
         /// <summary>마감이 지나 기본 답을 받은 Flow 항목의 신호 자리 (G161).</summary>
         public const string TimeoutSignal = "timeout";
 
+        /// <summary>대상이 사라져 취소된 멈춘 Flow 항목의 신호 자리 (G164).</summary>
+        public const string StaleSignal = "stale";
+
+        /// <summary><c>advance(n)</c>으로 시간을 흘린 뒤 이어 간 Flow 항목의 신호 자리 (G167).</summary>
+        public const string AdvanceSignal = "advance";
+
         /// <summary>깨어난 Flow 항목이면 그 Flow 번호.</summary>
         public long? Flow { get; internal set; }
 
@@ -153,17 +159,21 @@ namespace Kesa.Engine.Runtime
         private List<Reaction> RunReactions()
         {
             var reactions = new List<Reaction>();
-            if (_emitted.Count == 0) return reactions;
-            // 앞에서 지우지 않고 읽는 자리만 옮긴다: 핸들러 트랜잭션의 되감기가 대기열 끝의 위치로 지운다.
-            // 엔진 결함으로 중간에 빠져나가도 다음 제출이 옛 신호를 다시 돌리지 않게 반드시 비운다
-            try
+            if (_emitted.Count > 0)
             {
-                Drain(reactions);
+                // 앞에서 지우지 않고 읽는 자리만 옮긴다: 핸들러 트랜잭션의 되감기가 대기열 끝의 위치로 지운다.
+                // 엔진 결함으로 중간에 빠져나가도 다음 제출이 옛 신호를 다시 돌리지 않게 반드시 비운다
+                try
+                {
+                    Drain(reactions);
+                }
+                finally
+                {
+                    _emitted.Clear();
+                }
             }
-            finally
-            {
-                _emitted.Clear();
-            }
+            // 실행과 그 신호 처리가 끝났다: 사라진 대상을 가진 멈춘 Flow를 버린다 (G164)
+            SweepStale(reactions);
             return reactions;
         }
 
@@ -221,7 +231,7 @@ namespace Kesa.Engine.Runtime
                         Evaluator.RunCommand(h.Function, args, out var suspended, h.Span, _meter);
                         if (suspended == null) return ((long?, Request?))(null, null);
                         long flow = _nextFlow;
-                        return (flow, OpenFlow(id, suspended, handler: true)); // 질문, 또는 wait면 null
+                        return (flow, OpenFlow(id, suspended, SubjectsOf(args.Values), handler: true)); // 질문, 또는 wait면 null
                     }
                     catch (ScriptRuntimeException ex)
                     {

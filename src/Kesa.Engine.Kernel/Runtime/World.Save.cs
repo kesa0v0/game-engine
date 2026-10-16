@@ -169,13 +169,13 @@ namespace Kesa.Engine.Runtime
         /// 모드 목록이 달라진 것은 경고로만 알린다(Def 값 변경은 항상 허용, S8).
         /// </summary>
         public static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, int stepBudget = DefaultStepBudget,
-            bool requireSubmitPolicy = false, int maxSignalDepth = DefaultMaxSignalDepth)
+            bool requireSubmitPolicy = false, int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall)
         {
             var diagnostics = new List<Diagnostic>();
             World world;
             try
             {
-                world = new World(loaded, stepBudget, requireSubmitPolicy, maxSignalDepth);
+                world = new World(loaded, stepBudget, requireSubmitPolicy, maxSignalDepth, maxAdvancePerCall);
             }
             catch (WorldException e)
             {

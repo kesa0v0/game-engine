@@ -36,6 +36,9 @@ namespace Kesa.Engine.Script
         /// <summary>틱이 지날 때까지 멈추는 내장 (spec X2·S5 "자는 Flow"). 자리 규칙은 <c>ask</c>와 같다 (G136).</summary>
         public const string WaitName = "wait";
 
+        /// <summary>시간을 흘리는 내장 (spec X2, spec-gaps G167). <c>wait</c>처럼 멈추고, 엔진이 틱을 진행한 뒤 이어 간다.</summary>
+        public const string AdvanceName = "advance";
+
         /// <summary>신호를 내는 내장 (spec S5). 받은 핸들러가 상태를 바꾸므로 자리 규칙은 쓰는 내장과 같다 (spec-gaps G146).</summary>
         public const string EmitName = "emit";
 
@@ -45,7 +48,7 @@ namespace Kesa.Engine.Script
         private static readonly string[] WritingNameArray =
         {
             SpawnName, DestroyName, AttachName, DetachName, AddRowName, RemoveRowName, ReplaceRowsName, AppendRowName,
-            AskName, WaitName, EmitName,
+            AskName, WaitName, AdvanceName, EmitName,
         };
 
         public static IReadOnlyList<string> WritingNames => WritingNameArray;
@@ -55,6 +58,7 @@ namespace Kesa.Engine.Script
         /// <summary>오류 메시지에서 쓰는 내장이 하는 일: "changes the world", "waits for an answer", "sends a signal".</summary>
         public static string EffectPhrase(string name) =>
             name == AskName ? "waits for an answer" : name == WaitName ? "waits for time to pass" :
+            name == AdvanceName ? "makes time pass" :
             name == EmitName ? "sends a signal" : "changes the world";
 
         /// <summary>

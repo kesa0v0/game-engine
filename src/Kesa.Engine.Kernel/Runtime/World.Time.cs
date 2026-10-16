@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Schema;
 using Kesa.Engine.Script;
@@ -53,25 +54,97 @@ namespace Kesa.Engine.Runtime
         public AdvanceResult Advance(int ticks = 1)
         {
             if (ticks < 1) throw new ArgumentOutOfRangeException(nameof(ticks), ticks, "advance needs at least one tick");
-            if (_undo != null || _meter != null)
+            if (_undo != null || _meter != null || _advancing)
                 throw new InvalidOperationException("time cannot advance while a command or a function is running");
             var reactions = new List<Reaction>();
+            int advanced = AdvanceTicks(ticks, reactions, out var blocking);
+            return new AdvanceResult(advanced, _tick, reactions) { BlockedBy = blocking };
+        }
+
+        /// <summary>시간이 흐르는 중인가: 이 안에서 깨어난 Flow·틱 핸들러는 <c>advance()</c>를 부를 수 없다 (G167).</summary>
+        private bool _advancing;
+
+        /// <summary>틱을 흘린다. 실제로 간 틱 수를 돌려주고, 막는 질문에서 멈췄으면 그 질문들을 준다.</summary>
+        private int AdvanceTicks(long ticks, List<Reaction> reactions, out IReadOnlyList<Request> blockedBy)
+        {
+            blockedBy = Array.Empty<Request>();
             var tick = _schema.TryGetSignal(EngineSignals.Tick, out var t) ? t : null;
-            for (int i = 0; i < ticks; i++)
+            _advancing = true;
+            try
             {
-                // 매 틱 전에 다시 본다: 앞 틱에서 열린 질문도 막는다 (X2)
-                var blocking = BlockingRequests();
-                if (blocking.Count > 0) return new AdvanceResult(i, _tick, reactions) { BlockedBy = blocking };
-                _tick++;
-                WakeSleepers(reactions);
-                // 엔진이 낸 신호는 1세대다. 핸들러마다 각자 트랜잭션이라 핸들러가 실패해도 틱은 진행된다 (S5)
-                if (tick != null)
+                for (int i = 0; i < ticks; i++)
                 {
-                    _emitted.Add(new Emitted(new SignalValue(this, tick, new List<KeyValuePair<SignalField, Value>>()), 1, null, null));
-                    reactions.AddRange(RunReactions());
+                    // 호스트가 실행 밖에서 지운 엔티티도 있다: 죽은 질문이 시간을 막지 않게 먼저 버린다 (G164)
+                    SweepStale(reactions);
+                    // 매 틱 전에 다시 본다: 앞 틱에서 열린 질문도 막는다 (X2)
+                    var blocking = BlockingRequests();
+                    if (blocking.Count > 0)
+                    {
+                        blockedBy = blocking;
+                        return i;
+                    }
+                    _tick++;
+                    WakeSleepers(reactions);
+                    // 엔진이 낸 신호는 1세대다. 핸들러마다 각자 트랜잭션이라 핸들러가 실패해도 틱은 진행된다 (S5)
+                    if (tick != null)
+                    {
+                        _emitted.Add(new Emitted(new SignalValue(this, tick, new List<KeyValuePair<SignalField, Value>>()), 1, null, null));
+                        reactions.AddRange(RunReactions());
+                    }
                 }
+                return (int)ticks;
             }
-            return new AdvanceResult(ticks, _tick, reactions);
+            finally
+            {
+                _advancing = false;
+            }
+        }
+
+        public const int DefaultMaxAdvancePerCall = 10000;
+
+        private readonly int _maxAdvancePerCall = DefaultMaxAdvancePerCall;
+
+        /// <summary><c>advance(n)</c>에서 멈춘 Flow, 멈춘 순서대로 (G167).</summary>
+        private readonly List<long> _advancers = new List<long>();
+
+        /// <summary>
+        /// 제출·답·응답 하나가 끝난 뒤: 신호를 처리하고, <c>advance(n)</c>에서 멈춘 Flow가 있으면 멈춘 순서대로 n틱을 진행한 뒤 그 Flow를
+        /// 이어 간다 (G167). 이어 간 Flow가 다시 <c>advance</c>하면 또 진행한다.
+        /// </summary>
+        private List<Reaction> AfterRun()
+        {
+            var reactions = RunReactions();
+            long used = 0;
+            while (_advancers.Count > 0)
+            {
+                long id = _advancers[0];
+                _advancers.RemoveAt(0);
+                if (!_flows.TryGetValue(id, out var flow)) continue; // 그 사이 대상이 사라져 취소되었다 (결과에 이미 있다)
+                long want = flow.AdvanceBy!.Value;
+                if (used + want > _maxAdvancePerCall)
+                {
+                    // 호출 하나가 호스트를 끝없이 붙잡지 않게 자른다. 그때까지 간 틱과 효과는 남는다 (G168)
+                    DropFlow(flow);
+                    reactions.Add(new Reaction(Reaction.AdvanceSignal, new SortedDictionary<string, Value>(StringComparer.Ordinal),
+                        flow.Command, 0, ReactionOutcome.ScriptError)
+                    {
+                        Flow = flow.Id,
+                        Error = new WorldException(Codes.RunScript,
+                            "the " + (flow.Handler ? "handler " : "command ") + flow.Command + " called advance(" +
+                            want.ToString(CultureInfo.InvariantCulture) + ") after " + used.ToString(CultureInfo.InvariantCulture) +
+                            " ticks asked in this call, past the limit of " + _maxAdvancePerCall.ToString(CultureInfo.InvariantCulture) +
+                            " ticks per call, so the flow was dropped",
+                            "a loop of advance() should pause on a question each turn; a host that needs more can raise maxAdvancePerCall (spec-gaps G168)"),
+                    });
+                    continue;
+                }
+                int advanced = AdvanceTicks(want, reactions, out _);
+                used += want; // 막혀서 덜 갔어도 요청한 만큼 센다: 막힌 채 도는 루프도 끝나게
+                if (!_flows.ContainsKey(id)) continue; // 진행 중에 취소되었다
+                Resume(flow, Reaction.AdvanceSignal, new IntValue(advanced), "after advancing", reactions);
+                reactions.AddRange(RunReactions());
+            }
+            return reactions;
         }
 
         /// <summary>
@@ -90,30 +163,50 @@ namespace Kesa.Engine.Runtime
                 var values = new SortedDictionary<string, Value>(StringComparer.Ordinal);
                 var asked = flow.Request;
                 string signal = asked == null ? Reaction.WakeSignal : Reaction.TimeoutSignal;
-                try
+                // 대상이 사라졌으면 깨우지 않고 취소한다. 오류가 아니다 (S5 on_stale 기본 취소, G163)
+                var stale = StaleReason(flow);
+                if (stale != null)
                 {
-                    var opened = asked == null
-                        ? Atomically(() => Continue(flow, NoneValue.Instance, "after waking"))
-                        : Atomically(() => Continue(flow, TimeoutAnswer(asked), "after its deadline"));
-                    bool asleep = _flows.ContainsKey(flow.Id);
-                    reactions.Add(new Reaction(signal, values, flow.Command, 0,
-                        asleep ? ReactionOutcome.Suspended : ReactionOutcome.Finished)
+                    DropFlow(flow);
+                    reactions.Add(new Reaction(signal, values, flow.Command, 0, ReactionOutcome.Canceled)
                     {
                         Flow = flow.Id,
-                        OpenedRequest = opened,
-                        SleepsUntil = SleepsUntil(flow.Id),
+                        Message = "flow " + flow.Id.ToString(CultureInfo.InvariantCulture) + " was canceled: " + stale,
                     });
+                    continue;
                 }
-                catch (WorldException e)
-                {
-                    DropFlow(flow); // 되감기가 되돌려 놓은 Flow를 버린다. 트랜잭션 밖이라 기록하지 않는다
-                    reactions.Add(new Reaction(signal, values, flow.Command, 0, ReactionOutcome.ScriptError)
-                    {
-                        Flow = flow.Id,
-                        Error = e,
-                    });
-                }
+                if (asked == null) Resume(flow, signal, NoneValue.Instance, "after waking", reactions);
+                else Resume(flow, signal, TimeoutAnswer(asked), "after its deadline", reactions);
                 reactions.AddRange(RunReactions());
+            }
+        }
+
+        /// <summary>
+        /// 엔진이 Flow를 이어 간다(깨우기·마감·<c>advance</c> 뒤). 각자 트랜잭션이고 결과 목록에 남긴다. 실패하면 그 구간을 되감고 Flow를
+        /// 버린다 (G157): 다시 두면 매번 같은 오류가 난다.
+        /// </summary>
+        private void Resume(FlowRecord flow, string signal, Value answer, string after, List<Reaction> reactions)
+        {
+            var values = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+            try
+            {
+                var opened = Atomically(() => Continue(flow, answer, after));
+                bool paused = _flows.ContainsKey(flow.Id);
+                reactions.Add(new Reaction(signal, values, flow.Command, 0, paused ? ReactionOutcome.Suspended : ReactionOutcome.Finished)
+                {
+                    Flow = flow.Id,
+                    OpenedRequest = opened,
+                    SleepsUntil = SleepsUntil(flow.Id),
+                });
+            }
+            catch (WorldException e)
+            {
+                DropFlow(flow); // 되감기가 되돌려 놓은 Flow를 버린다. 트랜잭션 밖이라 기록하지 않는다
+                reactions.Add(new Reaction(signal, values, flow.Command, 0, ReactionOutcome.ScriptError)
+                {
+                    Flow = flow.Id,
+                    Error = e,
+                });
             }
         }
 

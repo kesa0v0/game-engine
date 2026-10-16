@@ -36,8 +36,20 @@ namespace Kesa.Engine.Runtime
                     .Add("id", new JsonNumber(flow.Id))
                     .Add(flow.Handler ? "handler" : "command", new JsonString(flow.Command));
                 if (flow.Request != null) saved.Add("request", SaveRequest(flow.Request));
-                else saved.Add("wake_at", new JsonNumber(flow.WakeAt!.Value));
+                else if (flow.WakeAt != null) saved.Add("wake_at", new JsonNumber(flow.WakeAt.Value));
+                else throw new InvalidOperationException("engine: flow " + flow.Id + " is paused at advance(), which finishes within its call");
+                var subjects = new JsonArray();
+                foreach (var s in flow.Subjects) subjects.Add(new JsonNumber(s.Value));
+                JsonNode about = JsonNull.Instance;
+                if (flow.About != null)
+                {
+                    var list = new JsonArray();
+                    foreach (var s in flow.About) list.Add(new JsonNumber(s.Value));
+                    about = list;
+                }
                 flows.Add(saved
+                    .Add("subjects", subjects)
+                    .Add("about", about)
                     .Add("frames", frames)
                     .Add("closures", writer.Closures)
                     .Add("envs", writer.Envs));
@@ -522,7 +534,21 @@ namespace Kesa.Engine.Runtime
                     : new AskPayload(request.Who, request.Title, request.Choices, request.Responses, request.ResponseNames,
                         request.Hint, request.Data) { BlocksTime = request.BlocksTime };
                 var run = new PureEvaluator.Suspended(frames, answerTo, payload);
-                _flows.Add(id, new FlowRecord(id, command, run, request, handler, wakeAt));
+                var subjects = new List<EntityId>();
+                foreach (var s in AsArray(Field(obj, "subjects"), "flow subjects").Items)
+                    subjects.Add(new EntityId(SavedId(s, "a flow subject")));
+                List<EntityId>? about = null;
+                var aboutNode = Field(obj, "about");
+                if (!(aboutNode is JsonNull))
+                {
+                    about = new List<EntityId>();
+                    foreach (var s in AsArray(aboutNode, "flow about").Items) about.Add(new EntityId(SavedId(s, "a flow about entity")));
+                }
+                var record = new FlowRecord(id, command, run, request, handler, wakeAt) { Subjects = subjects, About = about };
+                // 실행이 끝날 때마다 버리므로 대상이 사라진 Flow는 저장에 있을 수 없다 (G164)
+                var stale = StaleReason(record);
+                if (stale != null) throw new JsonFormatException(where + " should have been canceled: " + stale);
+                _flows.Add(id, record);
             }
         }
 

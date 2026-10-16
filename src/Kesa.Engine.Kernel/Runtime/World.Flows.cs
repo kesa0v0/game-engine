@@ -179,6 +179,19 @@ namespace Kesa.Engine.Runtime
 
             /// <summary>질문을 기다리면 그 질문. 자는 Flow면 null.</summary>
             public Request? Request { get; }
+
+            /// <summary>
+            /// Flow의 대상: 만들 때 받은 커맨드 인자·핸들러 매개변수 중 엔티티 (S5, spec-gaps G163). 본문이 변수를 바꿔도 그대로다.
+            /// </summary>
+            public IReadOnlyList<EntityId> Subjects { get; set; } = Array.Empty<EntityId>();
+
+            /// <summary>
+            /// 이번 멈춤의 <c>about=</c>(G165). 있으면 <see cref="Subjects"/> 대신 이것을 본다. 다음 멈춤에서는 그 멈춤이 정한다.
+            /// </summary>
+            public IReadOnlyList<EntityId>? About { get; set; }
+
+            /// <summary><c>advance(n)</c>에서 멈췄으면 n (G167). 같은 호출 안에서 진행하고 이어 가므로 저장되지 않는다.</summary>
+            public long? AdvanceBy { get; set; }
         }
 
         /// <summary>멈춘 Flow, 번호 순 (실행 순서가 결정론적이다, X1).</summary>
@@ -201,22 +214,34 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>새 Flow를 만들어 멈춘 실행과 질문을 담는다. 되돌리기 기록에 남는다.</summary>
         /// <returns>연 질문. <c>wait</c>로 잠들었으면 null.</returns>
-        private Request? OpenFlow(string command, PureEvaluator.Suspended run, bool handler = false)
+        private Request? OpenFlow(string command, PureEvaluator.Suspended run, IReadOnlyList<EntityId> subjects, bool handler = false)
         {
             long id = _nextFlow;
             _nextFlow++;
             Journal(() => _nextFlow = id);
-            return Park(id, command, run, handler);
+            return Park(id, command, run, handler, subjects);
         }
 
         /// <summary>
         /// Flow <paramref name="id"/>가 <paramref name="run"/>에서 새 질문을 들고 기다리거나(<c>ask</c>) 깨울 틱까지 잔다(<c>wait</c>).
         /// </summary>
-        private Request? Park(long id, string command, PureEvaluator.Suspended run, bool handler)
+        private Request? Park(long id, string command, PureEvaluator.Suspended run, bool handler, IReadOnlyList<EntityId> subjects)
         {
+            if (run.Request is AdvancePayload advance)
+            {
+                // 이 호출이 끝나기 전에 시간을 흘리고 이어 간다 (G167). 저장되는 일은 없다
+                _flows.Add(id, new FlowRecord(id, command, run, null, handler) { Subjects = subjects, AdvanceBy = advance.Ticks });
+                _advancers.Add(id);
+                Journal(() =>
+                {
+                    _flows.Remove(id);
+                    _advancers.Remove(id);
+                });
+                return null;
+            }
             if (run.Request is WaitPayload sleep)
             {
-                _flows.Add(id, new FlowRecord(id, command, run, null, handler, _tick + sleep.Ticks));
+                _flows.Add(id, new FlowRecord(id, command, run, null, handler, _tick + sleep.Ticks) { Subjects = subjects, About = sleep.About });
                 Journal(() => _flows.Remove(id));
                 return null;
             }
@@ -232,9 +257,70 @@ namespace Kesa.Engine.Runtime
                 TimeoutChoice = ask.TimeoutChoice,
                 TimeoutResponse = ask.TimeoutResponse,
             };
-            _flows.Add(id, new FlowRecord(id, command, run, request, handler));
+            _flows.Add(id, new FlowRecord(id, command, run, request, handler) { Subjects = subjects, About = ask.About });
             Journal(() => _flows.Remove(id));
             return request;
+        }
+
+        /// <summary>지난 확인 뒤에 엔티티가 파괴되었나 (G164).</summary>
+        private bool _destroyedSinceSweep;
+
+        /// <summary>
+        /// 엔티티가 파괴되었으면 멈춘 Flow 전부의 대상을 보고, 사라졌으면 Flow를 버린다 (S5 on_stale 기본 취소, G163·G164).
+        /// 실행 하나(와 그 신호 처리)가 끝난 뒤, 트랜잭션 밖에서 부른다. 오류가 아니라 <see cref="ReactionOutcome.Canceled"/>로 남긴다.
+        /// </summary>
+        private void SweepStale(List<Reaction> reactions)
+        {
+            if (!_destroyedSinceSweep) return;
+            _destroyedSinceSweep = false;
+            var stale = new List<KeyValuePair<FlowRecord, string>>();
+            foreach (var flow in _flows.Values)
+            {
+                var reason = StaleReason(flow);
+                if (reason != null) stale.Add(new KeyValuePair<FlowRecord, string>(flow, reason));
+            }
+            foreach (var pair in stale)
+            {
+                var flow = pair.Key;
+                DropFlow(flow);
+                reactions.Add(new Reaction(Reaction.StaleSignal, new SortedDictionary<string, Value>(StringComparer.Ordinal),
+                    flow.Command, 0, ReactionOutcome.Canceled)
+                {
+                    Flow = flow.Id,
+                    Message = "flow " + flow.Id.ToString(CultureInfo.InvariantCulture) + " was canceled: " + pair.Value,
+                });
+            }
+        }
+
+        /// <summary>
+        /// 호출이 끝났을 때 Flow <paramref name="id"/>가 들고 있는 질문. 끝났거나 잠들었거나 대상 소멸로 취소되었으면(G164) null.
+        /// <c>advance</c> 뒤 같은 호출 안에서 연 질문도 여기 나온다 (G167).
+        /// </summary>
+        private Request? HeldRequest(long id) => _flows.TryGetValue(id, out var f) ? f.Request : null;
+
+        /// <summary>입구의 인자 중 엔티티, 처음 나온 순서로 한 번씩 (G163).</summary>
+        private static List<EntityId> SubjectsOf(IEnumerable<Value> args)
+        {
+            var subjects = new List<EntityId>();
+            foreach (var v in args)
+                if (v is IEntityReference e && !subjects.Contains(e.EntityId)) subjects.Add(e.EntityId);
+            return subjects;
+        }
+
+        /// <summary>
+        /// Flow의 대상이 사라졌으면 그 이유, 아니면 null (S5, G163): 대상 중 하나가 사라졌거나, 질문을 든 Flow의 답할 엔티티가 모두 사라졌다.
+        /// </summary>
+        private string? StaleReason(FlowRecord flow)
+        {
+            foreach (var id in flow.About ?? flow.Subjects)
+                if (!IsAlive(id)) return "its subject " + id + " was destroyed";
+            if (flow.Request != null)
+            {
+                foreach (var id in flow.Request.Who)
+                    if (IsAlive(id)) return null;
+                return "everyone who could answer request " + flow.Request.Id.ToString(CultureInfo.InvariantCulture) + " was destroyed";
+            }
+            return null;
         }
 
         /// <summary>Flow <paramref name="id"/>가 <c>wait</c>로 자고 있으면 깨울 틱 (G158). 질문을 들었거나 끝났으면 null.</summary>
@@ -272,7 +358,7 @@ namespace Kesa.Engine.Runtime
                 var opened = Atomically(() => Continue(flow, new AnswerValue(this, null, choice, open.Choices[(int)choice], by)));
                 return new AnswerResult(request, issuer, AnswerOutcome.Succeeded)
                 {
-                    OpenedRequest = opened, SleepsUntil = SleepsUntil(flow.Id), Reactions = RunReactions(),
+                    Reactions = AfterRun(), OpenedRequest = HeldRequest(flow.Id), SleepsUntil = SleepsUntil(flow.Id),
                 };
             }
             catch (WorldException e)
@@ -339,7 +425,7 @@ namespace Kesa.Engine.Runtime
                     if (!r.Passed) return r; // 본문이 돌지 않았다: 쓴 것이 없다
                     if (inner != null)
                     {
-                        string at = inner.Request is WaitPayload ? "wait()" : "ask()";
+                        string at = inner.Request is WaitPayload ? "wait()" : inner.Request is AdvancePayload ? "advance()" : "ask()";
                         throw new WorldException(Codes.RunScript,
                             "the response command " + command + " stopped at " + at + ", which is not supported yet",
                             "ask from the command that is waiting instead (spec-gaps G139)");
@@ -350,8 +436,8 @@ namespace Kesa.Engine.Runtime
                 var outcome = report.Passed ? AnswerOutcome.Succeeded : AnswerOutcome.PreconditionsFailed;
                 return new AnswerResult(request, issuer, outcome)
                 {
-                    Arguments = checkedArgs, Preconditions = report, OpenedRequest = opened, SleepsUntil = SleepsUntil(flow.Id),
-                    Reactions = RunReactions(),
+                    Arguments = checkedArgs, Preconditions = report, Reactions = AfterRun(),
+                    OpenedRequest = HeldRequest(flow.Id), SleepsUntil = SleepsUntil(flow.Id),
                 };
             }
             catch (WorldException e)
@@ -404,7 +490,7 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var next = Evaluator.Resume(flow.Run, answer, _meter);
-                return next == null ? null : Park(flow.Id, flow.Command, next, flow.Handler);
+                return next == null ? null : Park(flow.Id, flow.Command, next, flow.Handler, flow.Subjects);
             }
             catch (ScriptRuntimeException e)
             {
@@ -429,27 +515,88 @@ namespace Kesa.Engine.Runtime
                 });
             table.Add(PureBuiltins.WaitName,
                 new PureBuiltin(PureBuiltins.WaitName, (p, k) => Wait(p, k)) { Writes = true, Suspends = true });
+            table.Add(PureBuiltins.AdvanceName,
+                new PureBuiltin(PureBuiltins.AdvanceName, (p, k) => ScriptAdvance(p, k)) { Writes = true, Suspends = true });
         }
 
         /// <summary><c>wait(ticks=n)</c> (spec X2·S5): n은 1 이상. 멈추는 것은 실행기가 하고, 깨어나면 None을 돌려준다.</summary>
-        private static Value Wait(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        private Value Wait(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
             const string usage = "wait(ticks=3)";
-            if (positional.Count > 0 || keywords.Count != 1 || !keywords.TryGetValue("ticks", out var ticks))
-                throw new ScriptRuntimeException(Codes.RunScript, "wait() takes only ticks=, like " + usage, "write " + usage);
+            if (positional.Count > 0 || !keywords.TryGetValue("ticks", out var ticks))
+                throw new ScriptRuntimeException(Codes.RunScript, "wait() takes ticks= and an optional about=, like " + usage, "write " + usage);
+            foreach (var pair in keywords)
+                if (pair.Key != "ticks" && pair.Key != "about")
+                    throw new ScriptRuntimeException(Codes.RunScript, "wait() has no argument '" + pair.Key + "'",
+                        Suggest.Hint(pair.Key, new[] { "ticks", "about" }));
             if (!(ticks is IntValue n))
                 throw new ScriptRuntimeException(Codes.RunType, "ticks= of wait() must be an int, not " + ticks.KindName, "write " + usage);
             if (n.Value < 1)
                 throw new ScriptRuntimeException(Codes.RunScript,
                     "ticks= of wait() must be at least 1, got " + n.Value.ToString(CultureInfo.InvariantCulture), "spec X2");
-            return new WaitPayload(n.Value);
+            return new WaitPayload(n.Value) { About = keywords.TryGetValue("about", out var about) ? About("wait", about) : null };
         }
 
-        /// <summary><c>wait</c>가 실행기에 넘기는 것: 잘 틱 수.</summary>
+        /// <summary>
+        /// <c>about=</c>: 이번 멈춤 동안의 대상 (S5, spec-gaps G165). 엔티티 하나나 엔티티 목록이고, 이미 사라진 엔티티는 오류다.
+        /// </summary>
+        private List<EntityId> About(string fn, Value value)
+        {
+            var subjects = new List<EntityId>();
+            void One(Value v)
+            {
+                if (!(v is IEntityReference e))
+                    throw new ScriptRuntimeException(Codes.RunType, "about= of " + fn + "() takes entities, not " + v.KindName,
+                        "write about=[ruler] for what this pause depends on (spec-gaps G165)");
+                if (!IsAlive(e.EntityId))
+                    throw new ScriptRuntimeException(Codes.RunScript,
+                        "about= of " + fn + "() names " + e.EntityId + ", which is already destroyed");
+                if (!subjects.Contains(e.EntityId)) subjects.Add(e.EntityId);
+            }
+            if (value is ListValue list)
+                foreach (var item in list.Items) One(item);
+            else One(value);
+            return subjects;
+        }
+
+        /// <summary>
+        /// <c>advance(n)</c> (spec X2, spec-gaps G167): Flow를 멈추고, 이 호출의 신호 처리가 끝난 뒤 엔진이 n틱을 진행하고 이어 간다.
+        /// 시간이 흐르는 중이거나 신호 핸들러 안에서는 부를 수 없다.
+        /// </summary>
+        private Value ScriptAdvance(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
+            const string usage = "advance(1)";
+            if (positional.Count != 1 || keywords.Count != 0)
+                throw new ScriptRuntimeException(Codes.RunScript, "advance() takes the number of ticks, like " + usage, "write " + usage);
+            if (!(positional[0] is IntValue n) || n.Value < 1)
+                throw new ScriptRuntimeException(Codes.RunType,
+                    "advance() needs a number of ticks of at least 1, not " + Show(positional[0]), "write " + usage);
+            if (_advancing)
+                throw new ScriptRuntimeException(Codes.RunScript, "advance() cannot be called while time is already advancing",
+                    "a woken flow or a tick handler runs inside an advance; call advance() from a command or after an answer (spec-gaps G167)");
+            if (_reacting != null)
+                throw new ScriptRuntimeException(Codes.RunScript, "advance() cannot be called from a signal handler",
+                    "call advance() from a command or after an answer (spec-gaps G167)");
+            return new AdvancePayload(n.Value);
+        }
+
+        /// <summary><c>advance</c>가 실행기에 넘기는 것: 진행할 틱 수.</summary>
+        private sealed class AdvancePayload : Value
+        {
+            public AdvancePayload(long ticks) => Ticks = ticks;
+            public long Ticks { get; }
+            public override string KindName => "advance";
+        }
+
+        /// <summary><c>wait</c>가 실행기에 넘기는 것: 잘 틱 수와 이번 멈춤의 대상.</summary>
         private sealed class WaitPayload : Value
         {
             public WaitPayload(long ticks) => Ticks = ticks;
             public long Ticks { get; }
+
+            /// <summary><c>about=</c>으로 적은 대상. 적지 않았으면 null (입구 인자를 본다, G165).</summary>
+            public List<EntityId>? About { get; set; }
+
             public override string KindName => "wait";
         }
 
@@ -500,6 +647,7 @@ namespace Kesa.Engine.Runtime
             bool? blocksTime = null; // 적지 않으면 마감 유무로 정한다 (G159)
             long? deadline = null;
             Value? onTimeout = null;
+            List<EntityId>? about = null;
             foreach (var pair in keywords)
             {
                 switch (pair.Key)
@@ -554,12 +702,15 @@ namespace Kesa.Engine.Runtime
                                 "deadline=3 closes it 3 ticks after it opens; for a fixed tick write deadline=tick - now() (spec-gaps G160)");
                         deadline = n.Value;
                         break;
+                    case "about":
+                        about = About("ask", pair.Value);
+                        break;
                     case "on_timeout":
                         onTimeout = pair.Value;
                         break;
                     default:
                         throw new ScriptRuntimeException(Codes.RunScript, "ask() has no argument '" + pair.Key + "'",
-                            Suggest.Hint(pair.Key, new[] { "choices", "responses", "hint", "data", "blocks_time", "deadline", "on_timeout" }));
+                            Suggest.Hint(pair.Key, new[] { "choices", "responses", "hint", "data", "blocks_time", "deadline", "on_timeout", "about" }));
                 }
             }
             long? timeoutChoice = null, timeoutResponse = null;
@@ -580,6 +731,7 @@ namespace Kesa.Engine.Runtime
                 DeadlineIn = deadline,
                 TimeoutChoice = timeoutChoice,
                 TimeoutResponse = timeoutResponse,
+                About = about,
             };
         }
 
@@ -696,6 +848,9 @@ namespace Kesa.Engine.Runtime
 
             public long? TimeoutChoice { get; set; }
             public long? TimeoutResponse { get; set; }
+
+            /// <summary><c>about=</c>으로 적은 대상 (G165). 적지 않았으면 null.</summary>
+            public List<EntityId>? About { get; set; }
 
             public override string KindName => "question";
         }

@@ -128,16 +128,17 @@ namespace Kesa.Engine.Runtime
                     if (suspended != null)
                     {
                         flow = _nextFlow;
-                        opened = OpenFlow(command, suspended);
+                        opened = OpenFlow(command, suspended, SubjectsOf(checkedArgs.Values));
                     }
                     return r;
                 });
                 if (!report.Passed) return Copy(result, SubmitOutcome.PreconditionsFailed, target, report);
                 var done = Copy(result, SubmitOutcome.Succeeded, target, report);
-                done.OpenedRequest = opened;
-                done.SleepsUntil = flow == null ? null : SleepsUntil(flow.Value);
                 // 커맨드의 트랜잭션이 끝난 뒤 핸들러를 각자의 트랜잭션으로 돌린다 (S5, G148)
-                done.Reactions = RunReactions();
+                done.Reactions = AfterRun();
+                // 신호 처리와 대상 소멸 확인(G164)이 끝난 뒤의 상태: 그 사이 취소된 Flow의 질문·잠은 보이지 않는다
+                done.OpenedRequest = flow == null ? null : HeldRequest(flow.Value);
+                done.SleepsUntil = flow == null ? null : SleepsUntil(flow.Value);
                 return done;
             }
             catch (WorldException e)
