@@ -18,6 +18,9 @@ namespace Kesa.Engine.Runtime
 
         /// <summary><c>now()</c>로 지금 틱을 읽었다 (G155). <see cref="ExplainNode.Value"/>가 그 틱이다.</summary>
         Time,
+
+        /// <summary><c>query(...)</c>로 엔티티 목록을 읽었다 (G193). <see cref="ExplainNode.Member"/>가 출처 이름들, <see cref="ExplainNode.Value"/>가 그 목록이다.</summary>
+        Query,
     }
 
     /// <summary>
@@ -42,6 +45,13 @@ namespace Kesa.Engine.Runtime
 
         internal static ExplainNode Time(Value tick) =>
             new ExplainNode(ExplainKind.Time, default, "", null, "", tick, new List<ExplainNode>());
+
+        internal static ExplainNode Query(IReadOnlyList<string> names, ListValue result)
+        {
+            var quoted = new List<string>();
+            foreach (var n in names) quoted.Add("\"" + n + "\"");
+            return new ExplainNode(ExplainKind.Query, default, "", null, string.Join(", ", quoted), result, new List<ExplainNode>());
+        }
 
         public ExplainKind Kind { get; }
         public EntityId Entity { get; }
@@ -75,6 +85,12 @@ namespace Kesa.Engine.Runtime
             if (Kind == ExplainKind.Time)
             {
                 text.Append("now() = ").Append(World.Show(Value));
+            }
+            else if (Kind == ExplainKind.Query)
+            {
+                var ids = new List<string>();
+                foreach (var item in ((ListValue)Value).Items) ids.Add(((IEntityReference)item).EntityId.ToString());
+                text.Append("query(").Append(Member).Append(") = [").Append(string.Join(", ", ids)).Append(']');
             }
             else if (Kind == ExplainKind.Contribution)
             {

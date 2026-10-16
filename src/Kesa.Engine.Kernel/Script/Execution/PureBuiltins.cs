@@ -20,6 +20,9 @@ namespace Kesa.Engine.Script
         /// <summary>지금 틱을 읽는 내장 (spec X2, spec-gaps G154·G155). 월드가 있어야 하므로 런타임이 더한다.</summary>
         public const string NowName = "now";
 
+        /// <summary>Def 타입·컴포넌트로 엔티티 목록을 읽는 전역 순회 (spec S3, spec-gaps G192·G193). 런타임이 더한다.</summary>
+        public const string QueryName = "query";
+
         /// <summary>월드의 구조를 바꾸는 내장 (spec-gaps G134, int 키 줄 헬퍼는 G129). 몸체는 월드가 준다.</summary>
         public const string SpawnName = "spawn";
         public const string DestroyName = "destroy";
@@ -80,7 +83,7 @@ namespace Kesa.Engine.Script
 
         private static SortedSet<string> NameSet()
         {
-            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, RandomName };
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, RandomName };
             set.UnionWith(WritingNameArray);
             return set;
         }

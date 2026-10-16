@@ -172,6 +172,7 @@ namespace Kesa.Engine.Runtime
             if (!_byType.TryGetValue(def.Type, out var set)) _byType.Add(def.Type, set = new SortedSet<long>());
             set.Add(id);
             Touch(id);
+            TouchSources(entity); // 그 타입과 컴포넌트의 query 목록이 바뀐다 (G193)
             // 되감으면 엔티티도 id도 쓰지 않은 것이 된다 (G133). 색인은 아래에서 따로 기록된다
             Journal(() =>
             {
@@ -212,6 +213,7 @@ namespace Kesa.Engine.Runtime
             DropContributionsOf(id.Value);
             _destroyedSinceSweep = true; // 멈춘 Flow의 대상을 다음 확인 때 본다 (G164). 되감겨도 한 번 더 볼 뿐이다
             Touch(id.Value); // 이 엔티티를 읽거나 Ref로 가리킨 조건을 다시 본다
+            TouchSources(entity);
             _entities.Remove(id.Value);
             var set = _byType[entity.Def.Type];
             set.Remove(id.Value);
@@ -295,6 +297,7 @@ namespace Kesa.Engine.Runtime
             if (!component.IsKeyed) PlanMembers(values, component, null, given, "adding '" + componentName + "' to " + id);
 
             Touch(id.Value);
+            TouchSource(component.Name);
             entity.Runtime.Add(component.Name, component);
             values.CopyTo(entity.Values);
             Journal(() =>
@@ -334,6 +337,7 @@ namespace Kesa.Engine.Runtime
                 if (entity.Values.TryGetValue(member, out var v)) oldValues.Add(new KeyValuePair<MemberDecl, Value>(member, v));
             entity.Rows.TryGetValue(componentName, out var oldRows);
             Touch(id.Value);
+            TouchSource(componentName);
             foreach (var member in component.Members) entity.Values.Remove(member);
             entity.Rows.Remove(componentName);
             entity.Runtime.Remove(componentName);

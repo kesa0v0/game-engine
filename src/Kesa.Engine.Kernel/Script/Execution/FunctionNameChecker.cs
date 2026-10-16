@@ -35,6 +35,11 @@ namespace Kesa.Engine.Script
         /// 함수 본문에서 내장 <c>spawn("Def id", ...)</c>에 리터럴로 적은 Def id (G134). 이름 검사가 모으고 ⑤ 링크가 본다.
         /// </summary>
         public List<KeyValuePair<string, SourceSpan>> SpawnedDefs { get; } = new List<KeyValuePair<string, SourceSpan>>();
+
+        /// <summary>
+        /// 함수 본문의 <c>query(...)</c> 호출마다 리터럴로 적은 출처 이름 (G192). 이름 검사가 모으고 ⑤ 링크가 본다.
+        /// </summary>
+        public List<List<KeyValuePair<string, SourceSpan>>> QueriedNames { get; } = new List<List<KeyValuePair<string, SourceSpan>>>();
     }
 
     /// <summary>
@@ -58,7 +63,8 @@ namespace Kesa.Engine.Script
             foreach (var function in functions.Functions)
             {
                 var walker = new Walker(globals, isLoadTimeName, context, isSchemaRuntimeName ?? (_ => false),
-                    notVisible ?? (_ => null), functions.SpawnedDefs, schemaRuntimeNames ?? Array.Empty<string>());
+                    notVisible ?? (_ => null), functions.SpawnedDefs, schemaRuntimeNames ?? Array.Empty<string>(),
+                    functions.QueriedNames);
                 if (function.Definition != null)
                     walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
                 else
@@ -75,12 +81,15 @@ namespace Kesa.Engine.Script
             private readonly Func<string, bool> _isSchemaRuntimeName;
             private readonly Func<string, string?> _notVisible;
             private readonly List<KeyValuePair<string, SourceSpan>> _spawned;
+            private readonly List<List<KeyValuePair<string, SourceSpan>>> _queried;
             private readonly IEnumerable<string> _schemaRuntimeNames;
 
             public Walker(SortedSet<string> globals, Func<string, bool> isLoadTimeName, CallContext context,
                 Func<string, bool> isSchemaRuntimeName, Func<string, string?> notVisible,
-                List<KeyValuePair<string, SourceSpan>> spawned, IEnumerable<string> schemaRuntimeNames)
+                List<KeyValuePair<string, SourceSpan>> spawned, IEnumerable<string> schemaRuntimeNames,
+                List<List<KeyValuePair<string, SourceSpan>>> queried)
             {
+                _queried = queried;
                 _globals = globals;
                 _isLoadTimeName = isLoadTimeName;
                 _context = context;
@@ -195,6 +204,27 @@ namespace Kesa.Engine.Script
                 }
             }
 
+            /// <summary><c>query</c>는 위치 인자로 출처 이름을 하나 이상 받는다. 리터럴 이름은 모아서 ⑤ 링크가 본다 (G192).</summary>
+            private void CheckQuery(CallExpr call)
+            {
+                const string usage = "write query(\"Unit\"), query(\"Wounded\") or query(\"Unit\", \"Wounded\")";
+                foreach (var arg in call.Arguments)
+                {
+                    if (arg.Name == null) continue;
+                    _context.Error(Codes.EvlArguments, "query() takes no keyword arguments", arg.Span, usage);
+                    return;
+                }
+                if (call.Arguments.Count == 0)
+                {
+                    _context.Error(Codes.EvlArguments, "query() needs at least one Def type or component name", call.Span, usage);
+                    return;
+                }
+                var names = new List<KeyValuePair<string, SourceSpan>>();
+                foreach (var arg in call.Arguments)
+                    if (arg.Value is StringLiteral s) names.Add(new KeyValuePair<string, SourceSpan>(s.Value, s.Span));
+                if (names.Count > 0) _queried.Add(names);
+            }
+
             private int _quietPreconditionNames;
 
             private bool IsShadowed(string name, SortedSet<string> locals) => locals.Contains(name) || _globals.Contains(name);
@@ -219,6 +249,9 @@ namespace Kesa.Engine.Script
                             !IsShadowed(callee.Name, locals) && call.Arguments.Count > 0 &&
                             call.Arguments[0].Name == null && call.Arguments[0].Value is StringLiteral id)
                             _spawned.Add(new KeyValuePair<string, SourceSpan>(id.Value, id.Span));
+                        // 덮어쓰지 않은 query에 리터럴로 적은 출처 이름은 ⑤ 링크가 본다 (G192)
+                        if (call.Callee is NameExpr query && query.Name == PureBuiltins.QueryName && !IsShadowed(query.Name, locals))
+                            CheckQuery(call);
                         // 엔진 신호의 값은 스크립트가 만들 수 없다 (G156)
                         if (call.Callee is NameExpr signal && Schema.EngineSignals.IsEngine(signal.Name) && !IsShadowed(signal.Name, locals))
                             _context.Error(Codes.CmdWriteEffect, Schema.EngineSignals.Why(signal.Name), call.Span);

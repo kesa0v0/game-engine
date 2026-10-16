@@ -45,6 +45,9 @@ namespace Kesa.Engine.Loading
                 foreach (var pair in functions)
                 foreach (var spawned in pair.Value.SpawnedDefs)
                     linker.CheckId(new ValueBlame(pair.Key, spawned.Value, Array.Empty<string>()), spawned.Key, null);
+                foreach (var pair in functions)
+                foreach (var names in pair.Value.QueriedNames)
+                    linker.CheckQuery(pair.Key, names);
             }
             foreach (var def in resolved.Defs) linker.CheckDef(def);
             // 스키마가 선언한 기본값도 Def 값과 같은 규칙으로 본다. 책임은 선언한 모드다 (G73)
@@ -213,6 +216,55 @@ namespace Kesa.Engine.Loading
             {
                 Fail(Codes.LnkAbstract, "'" + id + "' is abstract: a template cannot be referenced",
                     "use a concrete " + typeName + " (a Def without abstract=True)", new[] { record.Span });
+            }
+        }
+
+        /// <summary>
+        /// <c>query(...)</c>에 리터럴로 적은 출처 이름 (G192): 엔티티가 되는 Def 타입이나 컴포넌트여야 하고, 그 모드에 보여야 하며,
+        /// 한 호출에 Def 타입은 하나까지다. 책임은 함수를 쓴 모드다.
+        /// </summary>
+        private void CheckQuery(string mod, List<KeyValuePair<string, SourceSpan>> names)
+        {
+            string? typeName = null;
+            foreach (var pair in names)
+            {
+                string name = pair.Key;
+                var span = pair.Value;
+                string owner;
+                if (_schema.TryGetComponent(name, out var component)) owner = component.Mod;
+                else if (_schema.TryGetType(name, out var type))
+                {
+                    if (type.IsDataOnly)
+                    {
+                        _stage.Error(mod, Codes.LnkWrongType,
+                            "'" + name + "' is a data-only Def type with no components, so it has no entities to query", span);
+                        continue;
+                    }
+                    if (typeName != null && typeName != name)
+                    {
+                        _stage.Error(mod, Codes.LnkWrongType,
+                            "query() was given two Def types ('" + typeName + "' and '" + name + "'); an entity has only one", span,
+                            "give one Def type and any number of components");
+                        continue;
+                    }
+                    typeName = name;
+                    owner = type.Mod;
+                }
+                else
+                {
+                    var candidates = new List<string>();
+                    foreach (var t in _schema.Types)
+                        if (!t.IsDataOnly) candidates.Add(t.Name);
+                    foreach (var c in _schema.Components) candidates.Add(c.Name);
+                    string what = _schema.TryGetSignal(name, out _) ? "'" + name + "' is a signal, not a Def type or component"
+                        : "there is no Def type or component '" + name + "'";
+                    _stage.Error(mod, Codes.LnkNotFound, what, span, Suggest.Hint(name, candidates));
+                    continue;
+                }
+                if (!_visibility.CanSee(mod, owner))
+                    _stage.Error(mod, Codes.LnkNotVisible,
+                        "'" + name + "' belongs to mod '" + owner + "', which mod '" + mod + "' does not depend on", span,
+                        "add \"" + owner + "\" to dependencies in mod.py");
             }
         }
 

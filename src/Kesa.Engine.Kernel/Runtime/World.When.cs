@@ -186,6 +186,9 @@ namespace Kesa.Engine.Runtime
                 else Forget(id, pending);
             }
             _whenTouched.Clear();
+            foreach (var name in _whenTouchedSources)
+                if (_whenSourceReaders.TryGetValue(name, out var readers)) eval.UnionWith(readers);
+            _whenTouchedSources.Clear();
             if (_whenAll || WhenFullScan)
             {
                 _whenAll = false;
@@ -281,13 +284,14 @@ namespace Kesa.Engine.Runtime
             public override int GetHashCode() => Order * 397 ^ Target.GetHashCode();
         }
 
-        /// <summary>조건의 지난 평가: 값, 그때 읽은 엔티티, <c>now()</c>를 읽었는지. 오류였으면 <see cref="Ok"/>가 거짓이다.</summary>
+        /// <summary>조건의 지난 평가: 값, 그때 읽은 엔티티, <c>now()</c>를 읽었는지, <c>query</c>로 읽은 출처. 오류였으면 <see cref="Ok"/>가 거짓이다.</summary>
         private sealed class WhenCache
         {
             public bool Ok;
             public bool Value;
             public long[] Reads = Array.Empty<long>();
             public bool Tick;
+            public string[] Sources = Array.Empty<string>();
         }
 
         private readonly Dictionary<WhenKey, WhenCache> _whenCache = new Dictionary<WhenKey, WhenCache>();
@@ -297,6 +301,16 @@ namespace Kesa.Engine.Runtime
 
         /// <summary><c>now()</c>를 읽은 조건: 틱이 바뀌면 다시 본다.</summary>
         private readonly SortedSet<WhenKey> _whenTickReaders = new SortedSet<WhenKey>();
+
+        /// <summary><c>query</c>의 출처 이름(Def 타입·컴포넌트) → 그 목록을 읽은 조건 (G193).</summary>
+        private readonly Dictionary<string, SortedSet<WhenKey>> _whenSourceReaders =
+            new Dictionary<string, SortedSet<WhenKey>>(StringComparer.Ordinal);
+
+        /// <summary>지난 정착 뒤 목록이 바뀌었을 수 있는 출처: 그 타입의 엔티티가 생기거나 죽었고, 그 컴포넌트가 붙거나 떨어졌다.</summary>
+        private readonly SortedSet<string> _whenTouchedSources = new SortedSet<string>(StringComparer.Ordinal);
+
+        /// <summary>조건을 평가하는 중이면 <c>query</c>로 읽은 출처를 모은다.</summary>
+        private SortedSet<string>? _whenReadsSources;
 
         /// <summary>지난 평가가 오류였던 조건: 정착마다 다시 본다.</summary>
         private readonly SortedSet<WhenKey> _whenUnknown = new SortedSet<WhenKey>();
@@ -341,7 +355,9 @@ namespace Kesa.Engine.Runtime
             if (!_whenCache.TryGetValue(key, out var cache)) _whenCache.Add(key, cache = new WhenCache());
             Unlink(key, cache);
             var reads = new SortedSet<long>();
+            var sources = new SortedSet<string>(StringComparer.Ordinal);
             _whenReads = reads;
+            _whenReadsSources = sources;
             _whenReadsTick = false;
             try
             {
@@ -359,9 +375,18 @@ namespace Kesa.Engine.Runtime
             finally
             {
                 _whenReads = null;
+                _whenReadsSources = null;
                 cache.Reads = new long[reads.Count];
                 reads.CopyTo(cache.Reads);
                 cache.Tick = _whenReadsTick;
+                cache.Sources = new string[sources.Count];
+                sources.CopyTo(cache.Sources);
+                foreach (var name in cache.Sources)
+                {
+                    if (!_whenSourceReaders.TryGetValue(name, out var readers))
+                        _whenSourceReaders.Add(name, readers = new SortedSet<WhenKey>());
+                    readers.Add(key);
+                }
                 foreach (long id in cache.Reads)
                 {
                     if (!_whenReaders.TryGetValue(id, out var readers)) _whenReaders.Add(id, readers = new SortedSet<WhenKey>());
@@ -381,6 +406,12 @@ namespace Kesa.Engine.Runtime
                 {
                     readers.Remove(key);
                     if (readers.Count == 0) _whenReaders.Remove(id);
+                }
+            foreach (var name in cache.Sources)
+                if (_whenSourceReaders.TryGetValue(name, out var readers))
+                {
+                    readers.Remove(key);
+                    if (readers.Count == 0) _whenSourceReaders.Remove(name);
                 }
             _whenTickReaders.Remove(key);
         }
