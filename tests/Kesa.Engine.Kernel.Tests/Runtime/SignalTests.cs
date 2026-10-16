@@ -79,7 +79,7 @@ namespace Kesa.Engine.Tests.Runtime
         [TestCase("@on\ndef f():\n    return None\n", "@on needs the signal it handles")]
         [TestCase("@on()\ndef f():\n    return None\n", "@on needs the signal it handles")]
         [TestCase("@on(Damaged, Damaged)\ndef f():\n    return None\n", "@on takes one signal")]
-        [TestCase("@on(Damaged, stage=\"core.x\")\ndef f():\n    return None\n", "@on has no argument 'stage' yet | stages are not supported yet (spec S5)")]
+        [TestCase("@on(Damaged, stge=\"core.x\")\ndef f():\n    return None\n", "@on has no argument 'stge' | did you mean 'stage'?")]
         [TestCase("@on(Damaged, acts_for=lambda target: target)\ndef f(target):\n    return None\n",
             "@on has no acts_for: nobody submits a handler, so there is no gate to check | take whom it is about from the signal's values")]
         [TestCase("@on(Damaged)\ndef f(amout):\n    return None\n", "signal 'Damaged' has no value 'amout' | did you mean 'amount'?")]

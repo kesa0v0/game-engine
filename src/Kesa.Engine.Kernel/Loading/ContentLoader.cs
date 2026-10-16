@@ -243,6 +243,7 @@ namespace Kesa.Engine.Loading
                 FunctionEffects.Check(u.Functions, u.Scope, schema, new CallContext(u.Manifest.Id, u.Bag));
                 CommandSignatures.Resolve(u.Functions.Commands, schema, visibility, u.Scope,
                     new CallContext(u.Manifest.Id, u.Bag));
+                HandlerStages.Check(u.Functions.Handlers, schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
                 // 로드되지 않은 모드의 가드 안에서 건너뛴 패치는 조용히 사라지지 않게 알린다 (G38)
                 foreach (var skipped in u.Skipped)
                 {

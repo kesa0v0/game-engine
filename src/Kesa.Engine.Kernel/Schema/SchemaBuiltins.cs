@@ -16,6 +16,7 @@ namespace Kesa.Engine.Schema
         public const string Component = "component";
         public const string Extend = "extend";
         public const string Signal = "signal";
+        public const string Stage = "stage";
 
         /// <summary>Def 생성자 키워드 중 필드 이름으로 쓸 수 없는 것 (spec S1 상속·중복 ID).</summary>
         public static readonly IReadOnlyList<string> ReservedDefKeywords = new[] { "abstract", "override", "parent" };
@@ -43,6 +44,7 @@ namespace Kesa.Engine.Schema
             Add(new BuiltinFunction(Component, DeclareComponent));
             Add(new BuiltinFunction(Extend, DeclareExtension));
             Add(new BuiltinFunction(Signal, DeclareSignal));
+            Add(new BuiltinFunction(Stage, DeclareStage));
             Add(new BuiltinFunction("const", MakeConst));
             Add(new BuiltinFunction("field", MakeField));
             Add(new BuiltinFunction("derived", MakeDerived));
@@ -59,6 +61,7 @@ namespace Kesa.Engine.Schema
                 yield return Component;
                 yield return Extend;
                 yield return Signal;
+                yield return Stage;
                 yield return "const";
                 yield return "field";
                 yield return "derived";
@@ -216,6 +219,40 @@ namespace Kesa.Engine.Schema
                 fields.Add(new SignalField(arg.Name!, type, arg.Span));
             }
             _target.Signals.Add(new SignalDecl(name.Name, name.Span, ctx.Mod, fields));
+            return NoneValue.Instance;
+        }
+
+        /// <summary>
+        /// <c>stage("core.economy", after=[...], before=[...], optional_after=[...], optional_before=[...])</c> (spec S5, spec-gaps G152).
+        /// id는 이 모드의 접두사가 붙어야 한다. 참조 풀이와 정렬은 <see cref="SchemaBuilder"/>가 한다.
+        /// </summary>
+        private Value DeclareStage(CallContext ctx, SourceSpan span, IReadOnlyList<ArgValue> args)
+        {
+            const string usage = "stage(\"mod.name\", after=[\"other.stage\"], before=[...])";
+            var r = new ArgReader(ctx, Stage, span, args);
+            r.ExpectPositional(1, usage);
+            var idArg = r.Positional[0];
+            string id = r.String(idArg, "the stage id");
+            var idSpan = ArgReader.SpanOf(idArg);
+            string prefix = ctx.Mod + ".";
+            if (!id.StartsWith(prefix, StringComparison.Ordinal) || id.Length == prefix.Length)
+                throw ctx.Fail(Codes.SchBadDeclaration, "the stage id '" + id + "' must start with this mod's id: '" + prefix + "…'", idSpan,
+                    hint: "a mod declares only its own stages, and puts them between others with after= and before= (spec-gaps G152)");
+
+            List<NameRef> List(string name)
+            {
+                var result = new List<NameRef>();
+                var arg = r.Take(name);
+                if (arg == null) return result;
+                foreach (var (s, sSpan) in r.StringList(arg, name)) result.Add(new NameRef(s, sSpan));
+                return result;
+            }
+            var after = List("after");
+            var before = List("before");
+            var optionalAfter = List("optional_after");
+            var optionalBefore = List("optional_before");
+            r.RejectRest(new[] { "after", "before", "optional_after", "optional_before" });
+            _target.Stages.Add(new StageDecl(id, idSpan, ctx.Mod, after, before, optionalAfter, optionalBefore));
             return NoneValue.Instance;
         }
 

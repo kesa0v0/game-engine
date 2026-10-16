@@ -77,6 +77,8 @@ namespace Kesa.Engine.Stubs
             "def component(name: str, /, *, key: Any = ..., keys: Literal[\"all\", \"listed\"] = ..., **members: MemberDecl) -> None: ...\n" +
             "def extend(type_name: str, /, *, components: list[str] = ..., **consts: MemberDecl) -> None: ...\n" +
             "def signal(name: str, /, **values: Any) -> None: ...\n" +
+            "def stage(id: str, /, *, after: list[str] = ..., before: list[str] = ..., optional_after: list[str] = ..., " +
+            "optional_before: list[str] = ...) -> None: ...\n" +
             "def const(type: Any, /, *, default: Any = ..., min: int | float = ..., max: int | float = ..., " +
             "merge: Literal[\"replace\", \"append\"] = ...) -> MemberDecl: ...\n" +
             "def field(type: Any, /, *, default: Any = ..., default_from: str = ..., min: int | float = ..., " +

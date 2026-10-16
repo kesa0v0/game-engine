@@ -214,9 +214,29 @@ namespace Kesa.Engine.Script
                 _context.Error(Codes.CmdBadDecorator, "@on needs the signal it handles", decorator.Span, hint: usage);
                 return;
             }
+            string? stage = null;
+            var stageSpan = SourceSpan.None;
+            int positional = 0;
             foreach (var arg in call.Arguments)
             {
-                if (arg.Name == null) continue;
+                if (arg.Name == null)
+                {
+                    positional++;
+                    continue;
+                }
+                if (arg.Name == "stage")
+                {
+                    // 단계 id는 문자열이다. 있는지·보이는지는 스키마가 정해진 뒤 로더가 본다 (spec-gaps G152·G153)
+                    if (!(Evaluate(arg.Value) is StrValue s))
+                    {
+                        _context.Error(Codes.CmdBadDecorator, "stage= takes a stage id string, like stage=\"core.economy\"", arg.Span,
+                            hint: "stages are declared with stage(\"mod.name\", after=[...]) in a schema file (spec-gaps G152)");
+                        return;
+                    }
+                    stage = s.Value;
+                    stageSpan = arg.Value.Span;
+                    continue;
+                }
                 if (arg.Name == "acts_for")
                 {
                     // 핸들러는 제출자가 없어 입구 검사가 없다. 누구인지는 신호 인자에서 꺼낸다 (spec-gaps G149)
@@ -224,13 +244,14 @@ namespace Kesa.Engine.Script
                         arg.Span, hint: "take whom it is about from the signal's values, like def f(target): ... (spec-gaps G149)");
                     return;
                 }
-                _context.Error(Codes.CmdBadDecorator, "@on has no argument '" + arg.Name + "' yet", arg.Span,
-                    hint: arg.Name == "stage" ? "stages are not supported yet (spec S5)" : usage);
+                _context.Error(Codes.CmdBadDecorator, "@on has no argument '" + arg.Name + "'", arg.Span,
+                    hint: Suggest.Hint(arg.Name, new[] { "stage" }) ?? usage);
                 return;
             }
-            if (call.Arguments.Count != 1)
+            if (positional != 1 || call.Arguments[0].Name != null)
             {
-                _context.Error(Codes.CmdBadDecorator, "@on takes one signal", call.Arguments[1].Span, hint: usage);
+                _context.Error(Codes.CmdBadDecorator, positional == 0 ? "@on needs the signal it handles" : "@on takes one signal",
+                    positional == 0 ? decorator.Span : call.Arguments[1].Span, hint: usage);
                 return;
             }
             var value = Evaluate(call.Arguments[0].Value);
@@ -261,7 +282,12 @@ namespace Kesa.Engine.Script
                     ok = false;
                 }
             }
-            if (ok) _context.Functions.Handlers.Add(new HandlerDecl(_context.Mod, function, signal.Signal, decorator.Span));
+            if (ok)
+                _context.Functions.Handlers.Add(new HandlerDecl(_context.Mod, function, signal.Signal, decorator.Span)
+                {
+                    Stage = stage,
+                    StageSpan = stageSpan,
+                });
         }
 
         /// <summary>

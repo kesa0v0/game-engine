@@ -88,9 +88,23 @@ namespace Kesa.Engine.Runtime
 
         private string? _reactingHandler;
 
+        /// <summary>
+        /// 핸들러를 실행 순서로 둔다 (spec S5, G152): 단계의 위상 정렬 순서, 같은 단계 안에서는 로드 순서 → 정의 순서(받은 순서),
+        /// <c>stage=</c>가 없는 핸들러는 맨 뒤에 받은 순서로. 신호마다 거르기만 하면 그 신호의 순서가 된다.
+        /// </summary>
         private void SetHandlers(IReadOnlyList<HandlerDecl> handlers)
         {
-            _handlers = handlers;
+            var keyed = new List<KeyValuePair<long, HandlerDecl>>(handlers.Count);
+            for (int i = 0; i < handlers.Count; i++)
+            {
+                var h = handlers[i];
+                long stage = h.Stage == null ? int.MaxValue : _schema.StageIndex(h.Stage);
+                keyed.Add(new KeyValuePair<long, HandlerDecl>(stage * handlers.Count + i, h));
+            }
+            keyed.Sort((a, b) => a.Key.CompareTo(b.Key));
+            var ordered = new List<HandlerDecl>(keyed.Count);
+            foreach (var pair in keyed) ordered.Add(pair.Value);
+            _handlers = ordered;
             foreach (var h in handlers) _handlerById[HandlerId(h)] = h;
         }
 

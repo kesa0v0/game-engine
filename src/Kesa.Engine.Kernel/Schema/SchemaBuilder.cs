@@ -46,7 +46,132 @@ namespace Kesa.Engine.Schema
                 ApplyExtensions();
                 CheckMembers();
                 RegisterInverses();
+                OrderStages();
                 return _set;
+            }
+
+            // 단계 (spec S5, G152·G153): 중복 → 참조 풀이(필수는 의존 필요, 선택은 없으면 무시) → 위상 정렬(동률은 id 순) → 사이클 오류
+            private void OrderStages()
+            {
+                var first = new SortedDictionary<string, StageDecl>(StringComparer.Ordinal);
+                foreach (var m in _mods)
+                {
+                    foreach (var s in m.Stages)
+                    {
+                        if (first.TryGetValue(s.Id, out var earlier))
+                        {
+                            Error(s.Mod, Codes.SchDuplicateName, "stage '" + s.Id + "' is declared more than once", s.Span,
+                                related: new[] { earlier.Span });
+                            continue;
+                        }
+                        first[s.Id] = s;
+                        _set.AddStage(s);
+                    }
+                }
+
+                // 간선 a → b: a가 b보다 먼저. 위치는 그 간선을 적은 곳 (사이클 보고용)
+                var next = new SortedDictionary<string, SortedDictionary<string, SourceSpan>>(StringComparer.Ordinal);
+                var incoming = new SortedDictionary<string, int>(StringComparer.Ordinal);
+                foreach (var id in first.Keys)
+                {
+                    next[id] = new SortedDictionary<string, SourceSpan>(StringComparer.Ordinal);
+                    incoming[id] = 0;
+                }
+                void Edge(string from, string to, SourceSpan span)
+                {
+                    if (next[from].ContainsKey(to)) return;
+                    next[from][to] = span;
+                    incoming[to]++;
+                }
+                foreach (var s in first.Values)
+                {
+                    foreach (var r in s.After) if (Resolve(s, r, optional: false)) Edge(r.Name, s.Id, r.Span);
+                    foreach (var r in s.OptionalAfter) if (Resolve(s, r, optional: true)) Edge(r.Name, s.Id, r.Span);
+                    foreach (var r in s.Before) if (Resolve(s, r, optional: false)) Edge(s.Id, r.Name, r.Span);
+                    foreach (var r in s.OptionalBefore) if (Resolve(s, r, optional: true)) Edge(s.Id, r.Name, r.Span);
+                }
+
+                var ready = new SortedSet<string>(StringComparer.Ordinal);
+                foreach (var pair in incoming)
+                    if (pair.Value == 0) ready.Add(pair.Key);
+                while (ready.Count > 0)
+                {
+                    string id = ready.Min!;
+                    ready.Remove(id);
+                    _set.OrderStage(first[id]);
+                    foreach (var to in next[id].Keys)
+                        if (--incoming[to] == 0) ready.Add(to);
+                }
+                if (_set.StageOrder.Count == first.Count) return;
+
+                // 남은 단계마다 남은 앞 단계가 하나 이상 있다. 그래서 앞 단계를 거슬러 가면 반드시 되돌아오고, 그 고리가 사이클이다
+                // (사이클 뒤에 매달려 남은 단계에서 출발해도 사이클에 닿는다)
+                var left = new SortedSet<string>(StringComparer.Ordinal);
+                foreach (var id in first.Keys)
+                    if (_set.StageIndex(id) < 0) left.Add(id);
+                var previous = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var from in left)
+                    foreach (var to in next[from].Keys)
+                        if (left.Contains(to) && !previous.ContainsKey(to)) previous[to] = from;
+                var reported = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var start in left)
+                {
+                    if (reported.Contains(start)) continue;
+                    var path = new List<string>();
+                    var at = new Dictionary<string, int>(StringComparer.Ordinal);
+                    string cur = start;
+                    while (!at.ContainsKey(cur))
+                    {
+                        at[cur] = path.Count;
+                        path.Add(cur);
+                        cur = previous[cur];
+                    }
+                    var cycle = path.GetRange(at[cur], path.Count - at[cur]);
+                    cycle.Reverse(); // 거슬러 모았으니 앞 → 뒤 순서로
+                    // 가장 작은 id에서 시작해 같은 사이클은 늘 같은 문구로
+                    int min = 0;
+                    for (int i = 1; i < cycle.Count; i++)
+                        if (string.CompareOrdinal(cycle[i], cycle[min]) < 0) min = i;
+                    var rotated = cycle.GetRange(min, cycle.Count - min);
+                    rotated.AddRange(cycle.GetRange(0, min));
+                    cycle = rotated;
+                    if (cycle.Exists(reported.Contains)) continue;
+                    foreach (var id in cycle) reported.Add(id);
+                    var related = new List<SourceSpan>();
+                    for (int i = 0; i < cycle.Count; i++) related.Add(next[cycle[i]][cycle[(i + 1) % cycle.Count]]);
+                    var head = first[cycle[0]];
+                    Error(head.Mod, Codes.SchBadDeclaration,
+                        "stages are ordered in a cycle: " + string.Join(" → ", cycle) + " → " + cycle[0], head.Span,
+                        hint: "each arrow is an after= or before=; drop one of them (spec S5)", related: related);
+                }
+            }
+
+            /// <summary>단계 참조 하나. 필수는 있어야 하고 그 모드에 의존해야 한다. 선택은 없으면 조용히 빠진다.</summary>
+            private bool Resolve(StageDecl from, NameRef r, bool optional)
+            {
+                if (r.Name == from.Id)
+                {
+                    Error(from.Mod, Codes.SchBadDeclaration, "stage '" + from.Id + "' cannot be ordered against itself", r.Span);
+                    return false;
+                }
+                if (!_set.TryGetStage(r.Name, out var target))
+                {
+                    if (optional) return false;
+                    var ids = new List<string>();
+                    foreach (var m in _mods)
+                        foreach (var s in m.Stages) ids.Add(s.Id);
+                    Error(from.Mod, Codes.SchUnknownName, "unknown stage '" + r.Name + "'", r.Span,
+                        hint: Suggest.Hint(r.Name, ids) ?? "use optional_after= or optional_before= for a stage that may not be there (spec S5)");
+                    return false;
+                }
+                if (!optional && !_visibility.CanSee(from.Mod, target.Mod))
+                {
+                    Error(from.Mod, Codes.SchNotVisible,
+                        "stage '" + r.Name + "' belongs to mod '" + target.Mod + "', which mod '" + from.Mod + "' does not depend on",
+                        r.Span, hint: "add \"" + target.Mod + "\" to dependencies in mod.py, or use optional_after= / optional_before= (spec-gaps G153)");
+                    return false;
+                }
+                return true;
             }
 
             // 1. Def 타입과 컴포넌트는 한 이름 공간이다: 둘 다 Def 파일에서 생성자 이름이 된다.

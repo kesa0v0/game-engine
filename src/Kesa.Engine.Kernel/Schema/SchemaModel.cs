@@ -307,6 +307,33 @@ namespace Kesa.Engine.Schema
         public IReadOnlyList<SignalField> Fields { get; }
     }
 
+    /// <summary>
+    /// <c>stage("core.economy", after=[...], before=[...], optional_after=[...], optional_before=[...])</c>
+    /// (spec S5, spec-gaps G152·G153). id는 선언한 모드의 접두사가 붙은 문자열이다.
+    /// </summary>
+    public sealed class StageDecl
+    {
+        internal StageDecl(string id, SourceSpan span, string mod, IReadOnlyList<NameRef> after, IReadOnlyList<NameRef> before,
+            IReadOnlyList<NameRef> optionalAfter, IReadOnlyList<NameRef> optionalBefore)
+        {
+            Id = id;
+            Span = span;
+            Mod = mod;
+            After = after;
+            Before = before;
+            OptionalAfter = optionalAfter;
+            OptionalBefore = optionalBefore;
+        }
+
+        public string Id { get; }
+        public SourceSpan Span { get; }
+        public string Mod { get; }
+        public IReadOnlyList<NameRef> After { get; }
+        public IReadOnlyList<NameRef> Before { get; }
+        public IReadOnlyList<NameRef> OptionalAfter { get; }
+        public IReadOnlyList<NameRef> OptionalBefore { get; }
+    }
+
     /// <summary><c>extend("Unit", components=[...], x=const(...))</c> (schema-design 4.2).</summary>
     public sealed class ExtensionDecl
     {
@@ -337,6 +364,7 @@ namespace Kesa.Engine.Schema
         public List<ComponentDecl> Components { get; } = new List<ComponentDecl>();
         public List<ExtensionDecl> Extensions { get; } = new List<ExtensionDecl>();
         public List<SignalDecl> Signals { get; } = new List<SignalDecl>();
+        public List<StageDecl> Stages { get; } = new List<StageDecl>();
     }
 
     /// <summary>
@@ -493,6 +521,28 @@ namespace Kesa.Engine.Schema
         {
             _signals.Add(signal.Name, signal);
             _signalList.Add(signal);
+        }
+
+        private readonly Dictionary<string, StageDecl> _stages = new Dictionary<string, StageDecl>(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> _stageIndex = new Dictionary<string, int>(StringComparer.Ordinal);
+        private readonly List<StageDecl> _stageOrder = new List<StageDecl>();
+
+        /// <summary>
+        /// 단계를 위상 정렬한 순서 (spec S5, G152). 순서 관계가 없는 단계끼리는 id 순. 사이클에 걸린 단계는 빠진다(로드 오류).
+        /// </summary>
+        public IReadOnlyList<StageDecl> StageOrder => _stageOrder;
+
+        public bool TryGetStage(string id, out StageDecl stage) => _stages.TryGetValue(id, out stage!);
+
+        /// <summary>정렬된 순서에서의 위치. 정렬되지 않은 단계(사이클)는 -1.</summary>
+        public int StageIndex(string id) => _stageIndex.TryGetValue(id, out var i) ? i : -1;
+
+        internal void AddStage(StageDecl stage) => _stages.Add(stage.Id, stage);
+
+        internal void OrderStage(StageDecl stage)
+        {
+            _stageIndex[stage.Id] = _stageOrder.Count;
+            _stageOrder.Add(stage);
         }
     }
 }

@@ -88,6 +88,11 @@ namespace Kesa.Engine.Script
 
         /// <summary><c>@on</c> 데코레이터의 위치.</summary>
         public SourceSpan Span { get; }
+
+        /// <summary><c>stage="core.economy"</c>의 단계 id (spec S5, spec-gaps G152). 없으면 그 신호의 단계 핸들러가 모두 끝난 뒤에 돈다.</summary>
+        public string? Stage { get; internal set; }
+
+        public SourceSpan StageSpan { get; internal set; }
     }
 
     /// <summary>커맨드 매개변수 하나: 이름과 타입 (spec-gaps G114).</summary>

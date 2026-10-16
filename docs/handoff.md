@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1321개 통과(커널 1293, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1337개 통과(커널 1309, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -199,7 +199,7 @@ G140(정규형 JSON을 엔진이 직접 씀)·G141(멈춘 Flow의 런타임 값�
 
 ## 반응 슬라이스 (진행 중, 2026-10-16)
 
-사용자가 반응(S5)을 골랐다. 셋으로 나눠 한다: ① `@on` + `emit` + `stage` ② `when` + 정착 ③ 시간(`advance`, `tick`, `wait`, 마감). 지금 ①.
+사용자가 반응(S5)을 골랐다. 셋으로 나눠 한다: ① `@on` + `emit` + `stage` ② `when` + 정착 ③ 시간(`advance`, `tick`, `wait`, 마감). ① 끝남, 다음은 ②나 ③.
 
 1. **신호 선언과 핸들러 선언(끝남, 커밋 전), G145(확인):**
    - 스키마 `signal("Damaged", target=Ref["Unit"], amount=int)`: `Schema/SchemaModel`(`SignalDecl`, `SignalField`, `SignalType`, `SchemaSet.Signals`), `SchemaBuiltins.DeclareSignal`, `SchemaBuilder`(Def 타입·컴포넌트와 한 이름 공간, 필드 타입 이름 검사).
@@ -217,13 +217,18 @@ G140(정규형 JSON을 엔진이 직접 씀)·G141(멈춘 Flow의 런타임 값�
    - 테스트 `Runtime/WorldReactionTests`(시점, 순서와 연쇄, 실패 격리, 실패한 커맨드, `ask`로 멈춘 커맨드, 핸들러의 `ask`와 답, 기본 상한 64, 호스트 상한, 상호 고리 경로, 넓은 연쇄는 안 셈, 저장·불러오기 C1·C4, 핸들러 삭제 `SAV002`).
    - 재현해 본 것: 같은 모드의 같은 이름 핸들러는 이미 로드 오류(EVL004).
 4. **사라진 대상, G151(확인, 끝남, 커밋 전):** 핸들러가 받는 매개변수 중 사라진 엔티티가 있으면 돌리지 않고 `ReactionOutcome.Canceled`(오류 아님, 이유 메시지). 받지 않는 값은 보지 않는다. 테스트 `WorldReactionTests`의 "사라진 대상". `on_stale=` 옵션과 멈춘 Flow의 대상 소멸은 시간 슬라이스로.
-   - **다음:** `stage`(위상 정렬, 사이클 오류, `optional_after`·`optional_before`, 동률 규칙, `stage=` 없는 핸들러는 맨 뒤).
+5. **단계(stage), G152(문자열 id + 모드 접두사, 스키마 파일에서 선언)·G153(필수 참조는 의존 필요, 선택 참조는 불필요), 모두 확인, 끝남, 커밋 전:**
+   - `Schema/SchemaModel.cs`의 `StageDecl`, `SchemaSet.StageOrder`·`TryGetStage`·`StageIndex`. `SchemaBuiltins.DeclareStage`(접두사 검사). `SchemaBuilder.OrderStages`(중복 SCH001, 없는 단계 SCH002 + 후보, 의존 없음 SCH003, 자기 참조·사이클 SCH004; Kahn 정렬, 동률은 id 순; 사이클은 앞 단계를 거슬러 찾아 가장 작은 id부터 보고).
+   - 핸들러 `@on(Tick, stage="core.economy")`: `Interpreter.DeclareHandler`가 문자열만 받고, `Loading/HandlerStages.Check`가 ②b에서 있는지·의존을 본다. `World.SetHandlers`가 단계 순서 → 받은 순서(로드 → 정의), 단계 없는 핸들러는 맨 뒤로 정렬.
+   - 스키마 스텁에 `def stage(...)`.
+   - 테스트 `Runtime/StageTests`(정렬과 동률, 끼워 넣기, 접두사, 중복, 오타 후보, 자기 참조, 인자 오타, 의존, 선택 참조, 사이클 경로·관련 위치, 모드를 건넌 사이클, 핸들러 stage 검사, 실행 순서). 정렬을 끄면 순서 테스트가 실패하는 것까지 확인했다.
+   - 반응 ①(`@on`·`emit`·`stage`)이 끝났다. **다음:** 반응 ②(`when` + 정착) 또는 ③(시간). 사용자와 고른다.
 
 ## 다음 할 일 (사용자와 고를 것)
 
 Flow(`ask`·응답 커맨드)와 저장(C1·C4·C5)까지 끝났고 반응(S5)을 진행 중이다(위 "반응 슬라이스").
 
-**다음 세션에서 바로 할 것:** 핸들러 실행과 사라진 대상 취소까지 끝났다(G145~G151). 다음은 `stage`(위상 정렬, 사이클 오류, `optional_after`, 동률 규칙).
+**다음 세션에서 바로 할 것:** 반응 ①(`@on`·`emit`·`stage`, G145~G153)이 끝났다. 다음은 반응 ②(`when` + 정착) 또는 ③(시간: `advance`·`tick`·`wait`·마감)을 사용자와 고른다.
 
 그 밖의 후보:
 
@@ -273,7 +278,7 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1321개 통과(커널 1293, CLI 28)를 확인한다.
+1. `git pull` 후 `dotnet test`로 1337개 통과(커널 1309, CLI 28)를 확인한다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G135), `docs/spine-spec.md` S2·S4·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.
 
