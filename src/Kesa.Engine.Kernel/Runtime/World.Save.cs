@@ -28,6 +28,8 @@ namespace Kesa.Engine.Runtime
         {
             if (_undo != null || _meter != null)
                 throw new InvalidOperationException("the world cannot be saved while a command or a function is running");
+            if (_emitted.Count > 0) // 제출·답·응답이 끝나기 전에 비우므로 여기 오면 엔진 결함이다 (G148)
+                throw new InvalidOperationException("engine: emitted signals are still waiting for their handlers");
 
             var mods = new JsonArray();
             if (_mods != null)
@@ -166,13 +168,13 @@ namespace Kesa.Engine.Runtime
         /// 모드 목록이 달라진 것은 경고로만 알린다(Def 값 변경은 항상 허용, S8).
         /// </summary>
         public static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, int stepBudget = DefaultStepBudget,
-            bool requireSubmitPolicy = false)
+            bool requireSubmitPolicy = false, int maxSignalDepth = DefaultMaxSignalDepth)
         {
             var diagnostics = new List<Diagnostic>();
             World world;
             try
             {
-                world = new World(loaded, stepBudget, requireSubmitPolicy);
+                world = new World(loaded, stepBudget, requireSubmitPolicy, maxSignalDepth);
             }
             catch (WorldException e)
             {

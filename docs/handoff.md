@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1291개 통과(커널 1263, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1321개 통과(커널 1293, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -204,17 +204,26 @@ G140(정규형 JSON을 엔진이 직접 씀)·G141(멈춘 Flow의 런타임 값�
 1. **신호 선언과 핸들러 선언(끝남, 커밋 전), G145(확인):**
    - 스키마 `signal("Damaged", target=Ref["Unit"], amount=int)`: `Schema/SchemaModel`(`SignalDecl`, `SignalField`, `SignalType`, `SchemaSet.Signals`), `SchemaBuiltins.DeclareSignal`, `SchemaBuilder`(Def 타입·컴포넌트와 한 이름 공간, 필드 타입 이름 검사).
    - `@on(Damaged)`: `Interpreter.DeclareHandler` → `HandlerDecl`(`Script/CommandDecl.cs`), `ContentLoadResult.Handlers`(로드 순서 → 정의 순서). 매개변수는 신호 인자 중 고른 이름만, 기본값·타입 표기 불가. `stage=`는 "아직".
-   - 핸들러는 커맨드가 아니다(`FunctionDef.IsHandler`, `IsCommand`에서 빠짐, 사전 조건 없음). 로직에서 부르거나 값으로 쓰는 것은 커맨드처럼 막았다(`FunctionValue.IsEntry`, 메시지 `@on handler`). **이 선은 사용자에게 확인받을 것.**
+   - 핸들러는 커맨드가 아니다(`FunctionDef.IsHandler`, `IsCommand`에서 빠짐, 사전 조건 없음). 로직에서 부르거나 값으로 쓰는 것은 커맨드처럼 막았다(`FunctionValue.IsEntry`, 메시지 `@on handler`). 사용자가 확인함(G145 보강).
    - 신호 값 `Damaged(target=u, amount=3)`: `Runtime/World.Signals.cs`. 인자는 모두 필수(G145 A), 커맨드 인자 검사(`Fit`, G115)로 맞춤, 저장 가능한 값으로 들고 `d.amount`로 읽음, `==`는 내용(G142), 저장 태그 `signal{name, values}`(불러올 때 지금 선언과 다시 맞춰 어긋나면 `SAV002`). Def 파일 최상위에서 만들면 오류. `.pyi` 스텁에 신호 클래스.
    - 함수 본문의 컴포넌트·신호 이름 오타에 "혹시 …?" 후보가 없던 것을 재현해 고쳤다(`FunctionNameChecker`의 후보에 보이는 스키마 이름).
    - 테스트: `Runtime/SignalTests.cs`, C1 시나리오에 신호 값(`"signal"` 태그, 로그 `G`).
-   - **다음:** `emit`의 효과 등급(쓰기처럼 문장 수준만?), 실행 시점과 연쇄, 핸들러 Flow의 `acts_for`, 결과 보고. 그다음 `stage`.
+2. **`emit`의 자리(끝남, 커밋 전), G146(확인):** `emit`은 쓰는 내장(`PureBuiltins.EmitName`, `Writes`)이라 판정은 `spawn` 등과 같고 메시지만 "sends a signal". 인자는 신호 값 하나. `World._emitted` 대기열(발생 순서, 되돌리기 기록), `World.PendingSignalCount`. 테스트 `SignalTests`의 `emit` 부분(되감기 기록을 빼면 실패하는 것까지 확인).
+3. **핸들러 실행(끝남, 커밋 전), G147(연쇄 세대 상한)·G148(결과 `Reactions`)·G149(핸들러에 `acts_for` 없음)·G150(상한은 호스트 API `maxSignalDepth`, 기본 64), 모두 확인:** `Runtime/World.Reactions.cs`.
+   - `Submit`·`Answer`·`Respond`가 트랜잭션을 마친 뒤(성공이나 `ask`로 멈춤) `RunReactions`가 대기열을 앞에서부터 비운다. 신호마다 핸들러를 로드 순서 → 정의 순서로, 각자 새 Flow·각자 트랜잭션(`Atomically`)·각자 단계 예산으로. 핸들러가 낸 신호는 뒤에 붙고 세대 + 1. 답·응답이 이어서 실행한 구간이 낸 신호는 1세대. 대기열은 `finally`로 반드시 비운다.
+   - 결과 `Reaction`(신호, 값, 핸들러 id, 세대, `Finished`·`Suspended`(질문)·`ScriptError`·`Dropped`(메시지에 고리 경로, 힌트에 `wait`·`tick`·`maxSignalDepth`)).
+   - 핸들러가 `ask`로 멈추면 Flow가 남는다(`FlowRecord.Handler`, `Request.Command`는 핸들러 id). 저장은 `"handler": id`(커맨드 Flow는 그대로 `"command"`), 핸들러가 없어지면 `SAV002`.
+   - `@on(..., acts_for=)`는 로드 오류.
+   - 테스트 `Runtime/WorldReactionTests`(시점, 순서와 연쇄, 실패 격리, 실패한 커맨드, `ask`로 멈춘 커맨드, 핸들러의 `ask`와 답, 기본 상한 64, 호스트 상한, 상호 고리 경로, 넓은 연쇄는 안 셈, 저장·불러오기 C1·C4, 핸들러 삭제 `SAV002`).
+   - 재현해 본 것: 같은 모드의 같은 이름 핸들러는 이미 로드 오류(EVL004).
+4. **사라진 대상, G151(확인, 끝남, 커밋 전):** 핸들러가 받는 매개변수 중 사라진 엔티티가 있으면 돌리지 않고 `ReactionOutcome.Canceled`(오류 아님, 이유 메시지). 받지 않는 값은 보지 않는다. 테스트 `WorldReactionTests`의 "사라진 대상". `on_stale=` 옵션과 멈춘 Flow의 대상 소멸은 시간 슬라이스로.
+   - **다음:** `stage`(위상 정렬, 사이클 오류, `optional_after`·`optional_before`, 동률 규칙, `stage=` 없는 핸들러는 맨 뒤).
 
 ## 다음 할 일 (사용자와 고를 것)
 
 Flow(`ask`·응답 커맨드)와 저장(C1·C4·C5)까지 끝났고 반응(S5)을 진행 중이다(위 "반응 슬라이스").
 
-**다음 세션에서 바로 할 것:** 사용자에게 물어 둔 질문의 답을 받는다. "핸들러를 일반 함수처럼 불러도 되나?" A(막음, 추천, 지금 구현 상태) / B(허용). A면 G145에 한 줄 보강, B면 `FunctionValue.IsEntry`를 커맨드만으로 되돌린다. 그다음 `emit`의 빈칸을 하나씩: 효과 등급(쓰기처럼 Flow 본문의 문장 수준만?), 실행 시점(S5: 현재 Flow가 막히거나 끝난 뒤 발생 순서)과 연쇄·깊이 상한, 핸들러 Flow의 `acts_for`(누구로서 행동하나), 핸들러가 `ask`로 막히거나 오류를 냈을 때 제출 결과에 어떻게 알리나(S5: 핸들러 오류는 그 핸들러만 롤백).
+**다음 세션에서 바로 할 것:** 핸들러 실행과 사라진 대상 취소까지 끝났다(G145~G151). 다음은 `stage`(위상 정렬, 사이클 오류, `optional_after`, 동률 규칙).
 
 그 밖의 후보:
 
@@ -264,6 +273,13 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1291개 통과(커널 1263, CLI 28)를 확인한다.
+1. `git pull` 후 `dotnet test`로 1321개 통과(커널 1293, CLI 28)를 확인한다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G135), `docs/spine-spec.md` S2·S4·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.
+
+## 메모: 저장소 구조와 속도 (2026-10-16, 논의만, 결정 아님)
+
+- 지금 월드 저장은 ECS식 struct 배열이 아니다. `World`가 `Dictionary<long, EntityRecord>`와 엔티티마다 `Dictionary<MemberDecl, Value>`(바뀐 값만), 줄은 `SortedDictionary`, 색인은 `SortedSet`으로 들고 있다(결정론 때문에 정렬 컬렉션). 값은 `Value` 객체다.
+- 스크립트 `@on("tick")` 핸들러가 System 자리이고, 엔티티 순회는 본문이 직접 한다.
+- 저장 접근이 `World.cs`·`World.Derived.cs`·`World.Save.cs`·`World.Commands.cs`·`World.Explain.cs` 다섯 파일에 있다. 저장소 인터페이스는 아직 없다(spec P6은 "인터페이스 뒤 격리"). 단순 맵 교체는 쉽지만 컴포넌트별 배열로 가려면 값 표현·undo·역방향 색인·저장 불러오기를 함께 건드려야 한다.
+- 벤치가 아직 없어 병목이 저장인지 인터프리터인지 모른다. 저장을 바꾸기 전에 임시 벤치(엔티티 N개를 `tick`에서 갱신)로 먼저 재고, 저장이 병목이면 인터페이스 추출 → 교체 순으로 한다.

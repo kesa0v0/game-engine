@@ -12,8 +12,20 @@ namespace Kesa.Engine.Runtime
     /// </summary>
     public sealed partial class World
     {
+        /// <summary>
+        /// 낸 신호의 대기열(발생 순서). 커맨드나 핸들러가 실패하면 되감기로 빠진다(C8). 제출·답·응답이 끝날 때 비운다(G148).
+        /// </summary>
+        private readonly List<Emitted> _emitted = new List<Emitted>();
+
+        /// <summary>아직 핸들러로 처리하지 않은 신호 수 (테스트·진단용).</summary>
+        public int PendingSignalCount => _emitted.Count;
+
         private void AddSignalBuiltins(SortedDictionary<string, Value> table)
         {
+            // emit(Damaged(...)): 쓰는 내장이라 쓰기 모드 프레임의 문장으로만 불린다 (G146)
+            table.Add(PureBuiltins.EmitName,
+                new PureBuiltin(PureBuiltins.EmitName, (p, k) => Guard(() => Emit(p, k))) { Writes = true });
+
             // 이름 검사(G108)가 그 모드에 보이는 신호만 통과시킨다
             foreach (var signal in _schema.Signals)
             {
@@ -21,6 +33,23 @@ namespace Kesa.Engine.Runtime
                 if (table.ContainsKey(s.Name)) continue; // 내장과 같은 이름의 신호는 생성자로 쓸 수 없다
                 table.Add(s.Name, new PureBuiltin(s.Name, (p, k) => ConstructSignal(s, p, k)));
             }
+        }
+
+        private Value Emit(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
+            const string usage = "emit(Signal(name=value, ...))";
+            if (positional.Count != 1 || keywords.Count > 0)
+                throw new ScriptRuntimeException(Codes.RunScript,
+                    "emit() takes one signal value, got " + positional.Count + " positional and " + keywords.Count + " named arguments",
+                    "write " + usage);
+            if (!(positional[0] is SignalValue signal))
+                throw new ScriptRuntimeException(Codes.RunType,
+                    "emit() takes a signal value, not " + positional[0].KindName, "write " + usage + " (spec-gaps G145)");
+            int at = _emitted.Count;
+            // 핸들러가 낸 신호는 그 핸들러가 받은 신호보다 한 세대 깊다 (G147)
+            _emitted.Add(new Emitted(signal, _reacting == null ? 1 : _reacting.Generation + 1, _reactingHandler, _reacting));
+            Journal(() => _emitted.RemoveAt(at));
+            return NoneValue.Instance;
         }
 
         private Value ConstructSignal(SignalType signal, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
@@ -95,6 +124,22 @@ namespace Kesa.Engine.Runtime
             public IReadOnlyList<KeyValuePair<SignalField, Value>> Values { get; }
 
             public override string KindName => Signal.Name + "(...)";
+
+            /// <summary>이름으로 저장 가능한 값 하나 (선언에 있는 이름만).</summary>
+            public Value Value(string name)
+            {
+                foreach (var pair in Values)
+                    if (pair.Key.Name == name) return pair.Value;
+                throw new InvalidOperationException("engine: signal " + Signal.Name + " has no value '" + name + "'");
+            }
+
+            /// <summary>결과에 담을 값들 (이름 순).</summary>
+            public IReadOnlyDictionary<string, Value> Plain()
+            {
+                var map = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+                foreach (var pair in Values) map[pair.Key.Name] = pair.Value;
+                return map;
+            }
 
             /// <summary>같은 신호에 같은 값들이면 같다 (G142).</summary>
             public bool ValueEquals(Value other)

@@ -40,7 +40,7 @@ namespace Kesa.Engine.Runtime
         /// <summary>질문을 들고 멈춘 Flow의 번호.</summary>
         public long Flow { get; }
 
-        /// <summary>Flow를 만든 커맨드 id.</summary>
+        /// <summary>Flow를 만든 커맨드 id, 또는 신호 핸들러가 만든 Flow면 핸들러 id (둘 다 <c>모드id.함수이름</c>, S5).</summary>
         public string Command { get; }
 
         /// <summary>답할 수 있는 엔티티 (G125). 질문이 열릴 때 굳는다.</summary>
@@ -118,6 +118,9 @@ namespace Kesa.Engine.Runtime
         /// <summary>응답 커맨드의 기본값까지 채운 전체 인자 (G116). 인자 검사를 통과했을 때만 있다.</summary>
         public IReadOnlyDictionary<string, Value>? Arguments { get; internal set; }
 
+        /// <summary>이어서 실행한 구간(과 응답 커맨드 본문)이 낸 신호로 돈 핸들러들, 돈 순서대로 (spec S5, spec-gaps G148).</summary>
+        public IReadOnlyList<Reaction> Reactions { get; internal set; } = Array.Empty<Reaction>();
+
         /// <summary>응답 커맨드의 인자 거절 (G115).</summary>
         public IReadOnlyList<ArgumentRejection> ArgumentRejections { get; internal set; } = Array.Empty<ArgumentRejection>();
 
@@ -134,16 +137,22 @@ namespace Kesa.Engine.Runtime
     {
         private sealed class FlowRecord
         {
-            public FlowRecord(long id, string command, PureEvaluator.Suspended run, Request request)
+            public FlowRecord(long id, string command, PureEvaluator.Suspended run, Request request, bool handler)
             {
                 Id = id;
                 Command = command;
                 Run = run;
                 Request = request;
+                Handler = handler;
             }
 
             public long Id { get; }
+
+            /// <summary>Flow를 만든 커맨드 id, 또는 핸들러면 핸들러 id (<c>모드id.함수이름</c>, G148).</summary>
             public string Command { get; }
+
+            /// <summary>신호 핸들러가 만든 Flow인가 (S5).</summary>
+            public bool Handler { get; }
             public PureEvaluator.Suspended Run { get; }
             public Request Request { get; }
         }
@@ -166,16 +175,16 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>새 Flow를 만들어 멈춘 실행과 질문을 담는다. 되돌리기 기록에 남는다.</summary>
-        private Request OpenFlow(string command, PureEvaluator.Suspended run)
+        private Request OpenFlow(string command, PureEvaluator.Suspended run, bool handler = false)
         {
             long id = _nextFlow;
             _nextFlow++;
             Journal(() => _nextFlow = id);
-            return Park(id, command, run);
+            return Park(id, command, run, handler);
         }
 
         /// <summary>Flow <paramref name="id"/>가 <paramref name="run"/>에서 새 질문을 들고 기다리게 한다.</summary>
-        private Request Park(long id, string command, PureEvaluator.Suspended run)
+        private Request Park(long id, string command, PureEvaluator.Suspended run, bool handler)
         {
             var ask = (AskPayload)run.Request;
             long requestId = _nextRequest;
@@ -183,7 +192,7 @@ namespace Kesa.Engine.Runtime
             Journal(() => _nextRequest = requestId);
             var request = new Request(requestId, id, command, ask.Who, ask.Title, ask.Choices, ask.Responses, ask.ResponseNames,
                 ask.Hint, ask.Data);
-            _flows.Add(id, new FlowRecord(id, command, run, request));
+            _flows.Add(id, new FlowRecord(id, command, run, request, handler));
             Journal(() => _flows.Remove(id));
             return request;
         }
@@ -218,7 +227,7 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var opened = Atomically(() => Continue(flow, new AnswerValue(this, null, choice, open.Choices[(int)choice], by)));
-                return new AnswerResult(request, issuer, AnswerOutcome.Succeeded) { OpenedRequest = opened };
+                return new AnswerResult(request, issuer, AnswerOutcome.Succeeded) { OpenedRequest = opened, Reactions = RunReactions() };
             }
             catch (WorldException e)
             {
@@ -294,7 +303,7 @@ namespace Kesa.Engine.Runtime
                 var outcome = report.Passed ? AnswerOutcome.Succeeded : AnswerOutcome.PreconditionsFailed;
                 return new AnswerResult(request, issuer, outcome)
                 {
-                    Arguments = checkedArgs, Preconditions = report, OpenedRequest = opened,
+                    Arguments = checkedArgs, Preconditions = report, OpenedRequest = opened, Reactions = RunReactions(),
                 };
             }
             catch (WorldException e)
@@ -347,11 +356,11 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var next = Evaluator.Resume(flow.Run, answer, _meter);
-                return next == null ? null : Park(flow.Id, flow.Command, next);
+                return next == null ? null : Park(flow.Id, flow.Command, next, flow.Handler);
             }
             catch (ScriptRuntimeException e)
             {
-                throw ToWorldException(e, "the command " + flow.Command + " (after an answer)");
+                throw ToWorldException(e, (flow.Handler ? "the handler " : "the command ") + flow.Command + " (after an answer)");
             }
             finally
             {

@@ -42,10 +42,18 @@ namespace Kesa.Engine.Runtime
         /// <param name="requireSubmitPolicy">
         /// 멀티 게임처럼 제출 정책 함수가 꼭 있어야 하는 호스트가 켠다. 켰는데 정책이 없으면 만들지 않는다 (spec-gaps G124).
         /// </param>
-        public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget, bool requireSubmitPolicy = false)
+        /// <param name="maxSignalDepth">
+        /// 신호 연쇄의 세대 상한 (spec-gaps G147·G150). 이보다 깊은 신호는 핸들러를 돌리지 않고 결과에 알린다.
+        /// </param>
+        public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget, bool requireSubmitPolicy = false,
+            int maxSignalDepth = DefaultMaxSignalDepth)
             : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, loaded.SubmitPolicy)
         {
             _mods = loaded.Mods;
+            if (maxSignalDepth < 1)
+                throw new ArgumentOutOfRangeException(nameof(maxSignalDepth), maxSignalDepth, "the signal depth limit must be at least 1");
+            _maxSignalDepth = maxSignalDepth;
+            SetHandlers(loaded.Handlers);
             if (requireSubmitPolicy && loaded.SubmitPolicy == null)
                 throw new WorldException(Codes.RunNoSubmitPolicy,
                     "the host requires a submit policy, but no active mod declares one",

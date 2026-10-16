@@ -76,6 +76,11 @@ namespace Kesa.Engine.Runtime
         /// 본문이 <c>ask</c>에서 멈춰 연 질문 (spec X1). 커맨드는 거기까지 실행되어 효과가 남았고, 나머지는 답이 오면 이어서 실행된다.
         /// </summary>
         public Request? OpenedRequest { get; internal set; }
+
+        /// <summary>
+        /// 본문이 낸 신호로 돈 핸들러들, 돈 순서대로 (spec S5, spec-gaps G148). 핸들러가 실패해도 <see cref="Outcome"/>은 그대로다.
+        /// </summary>
+        public IReadOnlyList<Reaction> Reactions { get; internal set; } = Array.Empty<Reaction>();
     }
 
     /// <summary>커맨드 제출 (spec S6 권한 3층, spec-gaps G122~G124·G131).</summary>
@@ -120,6 +125,8 @@ namespace Kesa.Engine.Runtime
                 if (!report.Passed) return Copy(result, SubmitOutcome.PreconditionsFailed, target, report);
                 var done = Copy(result, SubmitOutcome.Succeeded, target, report);
                 done.OpenedRequest = opened;
+                // 커맨드의 트랜잭션이 끝난 뒤 핸들러를 각자의 트랜잭션으로 돌린다 (S5, G148)
+                done.Reactions = RunReactions();
                 return done;
             }
             catch (WorldException e)

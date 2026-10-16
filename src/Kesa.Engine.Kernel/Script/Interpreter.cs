@@ -217,6 +217,13 @@ namespace Kesa.Engine.Script
             foreach (var arg in call.Arguments)
             {
                 if (arg.Name == null) continue;
+                if (arg.Name == "acts_for")
+                {
+                    // 핸들러는 제출자가 없어 입구 검사가 없다. 누구인지는 신호 인자에서 꺼낸다 (spec-gaps G149)
+                    _context.Error(Codes.CmdBadDecorator, "@on has no acts_for: nobody submits a handler, so there is no gate to check",
+                        arg.Span, hint: "take whom it is about from the signal's values, like def f(target): ... (spec-gaps G149)");
+                    return;
+                }
                 _context.Error(Codes.CmdBadDecorator, "@on has no argument '" + arg.Name + "' yet", arg.Span,
                     hint: arg.Name == "stage" ? "stages are not supported yet (spec S5)" : usage);
                 return;

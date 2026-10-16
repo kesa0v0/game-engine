@@ -24,7 +24,7 @@ namespace Kesa.Engine.Runtime
             foreach (var flow in _flows.Values)
             {
                 var run = flow.Run;
-                Relink(flow.Command, run.Frames, out var answerTo, check: true);
+                Relink(EntrySpan(flow.Command, flow.Handler), run.Frames, out var answerTo, check: true);
                 if (answerTo != run.AnswerTo)
                     throw new InvalidOperationException("engine: the answer variable of flow " + flow.Id + " does not match its ask statement");
 
@@ -33,7 +33,7 @@ namespace Kesa.Engine.Runtime
                 foreach (var frame in run.Frames) frames.Add(SaveFrame(frame, writer));
                 flows.Add(new JsonObject()
                     .Add("id", new JsonNumber(flow.Id))
-                    .Add("command", new JsonString(flow.Command))
+                    .Add(flow.Handler ? "handler" : "command", new JsonString(flow.Command))
                     .Add("request", SaveRequest(flow.Request))
                     .Add("frames", frames)
                     .Add("closures", writer.Closures)
@@ -263,7 +263,10 @@ namespace Kesa.Engine.Runtime
         /// 프레임마다 부른 위치·결과 자리·쓰기 모드와 맨 위 프레임의 답 변수를 부른 문장에서 계산한다. <paramref name="check"/>면 실제
         /// 프레임과 비교만 하고(다르면 엔진 결함), 아니면 채운다(불러오기). 부른 문장이 호출이 아니면 false(함수 본문이 바뀌었다).
         /// </summary>
-        private bool Relink(string command, List<PureEvaluator.Frame> frames, out string? answerTo, bool check)
+        /// <summary>Flow를 만든 입구(커맨드나 핸들러)의 위치: 맨 아래 프레임의 부른 위치다.</summary>
+        private SourceSpan EntrySpan(string id, bool handler) => handler ? _handlerById[id].Span : _commands[id].Span;
+
+        private bool Relink(SourceSpan entry, List<PureEvaluator.Frame> frames, out string? answerTo, bool check)
         {
             answerTo = null;
             for (int i = 0; i < frames.Count; i++)
@@ -275,7 +278,7 @@ namespace Kesa.Engine.Runtime
                 bool writable;
                 if (i == 0)
                 {
-                    site = _commands[command].Span;
+                    site = entry;
                     writable = true;
                 }
                 else
@@ -435,11 +438,16 @@ namespace Kesa.Engine.Runtime
                 if (id <= lastFlow || id >= _nextFlow)
                     throw new JsonFormatException("flow ids must be increasing and below counters.flow");
                 lastFlow = id;
-                string command = Text(Field(obj, "command"), "a flow command");
+                // 핸들러가 만든 Flow는 "command" 대신 "handler"를 적는다 (G148)
+                var handlerNode = obj.Get("handler");
+                bool handler = handlerNode != null;
+                string command = handler
+                    ? Text(handlerNode!, "a flow handler")
+                    : Text(Field(obj, "command"), "a flow command");
                 string where = "flow " + id.ToString(CultureInfo.InvariantCulture) + " (" + command + ")";
-                if (!_commands.ContainsKey(command))
+                if (handler ? !_handlerById.ContainsKey(command) : !_commands.ContainsKey(command))
                 {
-                    problems.Add(where + ": the command no longer exists");
+                    problems.Add(where + (handler ? ": the handler no longer exists" : ": the command no longer exists"));
                     continue;
                 }
 
@@ -509,7 +517,7 @@ namespace Kesa.Engine.Runtime
                     broken |= RestoreFrame(frames[i], frameNodes[i], where, problems) == null;
                 problems.Closures = null;
                 if (broken) continue;
-                if (!Relink(command, frames, out var answerTo, check: false))
+                if (!Relink(EntrySpan(command, handler), frames, out var answerTo, check: false))
                 {
                     problems.Add(where + ": the function '" + frames[0].Function.Name +
                                  "' or a function it called changed, so the paused position no longer exists");
@@ -519,7 +527,7 @@ namespace Kesa.Engine.Runtime
                 var payload = new AskPayload(who, title, choices, responses, names, hint, data);
                 var run = new PureEvaluator.Suspended(frames, answerTo, payload);
                 var request = new Request(requestId, id, command, who, title, choices, responses, names, hint, data);
-                _flows.Add(id, new FlowRecord(id, command, run, request));
+                _flows.Add(id, new FlowRecord(id, command, run, request, handler));
             }
         }
 

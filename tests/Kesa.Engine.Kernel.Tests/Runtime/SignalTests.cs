@@ -80,6 +80,8 @@ namespace Kesa.Engine.Tests.Runtime
         [TestCase("@on()\ndef f():\n    return None\n", "@on needs the signal it handles")]
         [TestCase("@on(Damaged, Damaged)\ndef f():\n    return None\n", "@on takes one signal")]
         [TestCase("@on(Damaged, stage=\"core.x\")\ndef f():\n    return None\n", "@on has no argument 'stage' yet | stages are not supported yet (spec S5)")]
+        [TestCase("@on(Damaged, acts_for=lambda target: target)\ndef f(target):\n    return None\n",
+            "@on has no acts_for: nobody submits a handler, so there is no gate to check | take whom it is about from the signal's values")]
         [TestCase("@on(Damaged)\ndef f(amout):\n    return None\n", "signal 'Damaged' has no value 'amout' | did you mean 'amount'?")]
         [TestCase("@on(Damaged)\ndef f(amount: int):\n    return None\n", "a handler's parameter takes its type from the signal, so it has no type annotation")]
         [TestCase("@on(Damaged)\ndef f(amount=1):\n    return None\n", "a handler's parameter takes its type from the signal, so it has no default")]
@@ -169,6 +171,77 @@ namespace Kesa.Engine.Tests.Runtime
             Run("    d = " + expression + "\n", out var r);
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
             Assert.That(r.Error!.Message, Does.Contain(message));
+        }
+
+        // ---- emit (G146) ----
+
+        [Test]
+        public void ASignalWithoutHandlersIsDoneWhenTheSubmitEnds()
+        {
+            var world = Run("    emit(Damaged(target=u, amount=3))\n    emit(Damaged(target=v, amount=1))\n", out var r);
+            Assert.That(r.Succeeded, Is.True, r.Error?.ToString());
+            Assert.That(r.Reactions, Is.Empty);
+            Assert.That(world.PendingSignalCount, Is.EqualTo(0));
+            Assert.That(() => world.Save(), Throws.Nothing);
+        }
+
+        [Test]
+        public void AFailedCommandTakesBackItsSignals()
+        {
+            var world = Run("    emit(Damaged(target=u, amount=3))\n    d = Damaged(target=u)\n", out var r);
+            Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(world.PendingSignalCount, Is.EqualTo(0), "a command that fails sends no signal (C8)");
+        }
+
+        [TestCase("emit(3)", "emit() takes a signal value, not int")]
+        [TestCase("emit()", "emit() takes one signal value, got 0 positional and 0 named arguments")]
+        [TestCase("emit(Damaged(target=u, amount=1), Damaged(target=u, amount=2))", "emit() takes one signal value, got 2 positional")]
+        [TestCase("emit(signal=Damaged(target=u, amount=1))", "emit() takes one signal value, got 0 positional and 1 named")]
+        public void BadEmitCallsAreScriptErrors(string call, string message)
+        {
+            var world = Run("    " + call + "\n", out var r);
+            Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(r.Error!.Message, Does.Contain(message));
+            Assert.That(world.PendingSignalCount, Is.EqualTo(0));
+        }
+
+        [TestCase("def f(u):\n    n = [emit(Damaged(target=u, amount=1))]\n")]
+        [TestCase("def f(u):\n    if emit(Damaged(target=u, amount=1)):\n        pass\n")]
+        [TestCase("g = lambda u: emit(Damaged(target=u, amount=1))\n")]
+        [TestCase("@command(free=True, acts_for=None)\ndef F(u: Ref[Unit]):\n    with preconditions:\n" +
+                  "        x = emit(Damaged(target=u, amount=1))\n    pass\n")]
+        public void EmitInsideAnExpressionIsALoadError(string logic)
+        {
+            var errors = Errors(logic);
+            Assert.That(errors, Has.Some.StartWith(Codes.CmdWriteEffect + " emit() sends a signal, so it can only be called as a statement"),
+                string.Join("\n", errors));
+        }
+
+        [Test]
+        public void AFunctionThatEmitsCannotBeCalledInAnExpression()
+        {
+            var errors = Errors("def warn(u):\n    emit(Damaged(target=u, amount=1))\n    return 1\n" +
+                                "@command(free=True, acts_for=None)\ndef F(u: Ref[Unit]):\n    n = warn(u) + 1\n");
+            Assert.That(errors, Has.Some.StartWith(Codes.CmdWriteEffect + " 'warn' changes the world"), string.Join("\n", errors));
+        }
+
+        [Test]
+        public void AFunctionThatEmitsCannotBeADerivedFunction()
+        {
+            var errors = Errors("Unit(\"Scout\")\n", Schema +
+                "def warn(h):\n    emit(Damaged(target=h.entity, amount=1))\n    return 1\n" +
+                "component(\"Alarm\", value=derived(int, warn))\n");
+            Assert.That(errors, Has.Some.Contains("'warn'"), string.Join("\n", errors));
+        }
+
+        [Test]
+        public void EmitReachedThroughAPureCallIsARuntimeError()
+        {
+            var world = Run("    f = warn\n    n = f(u) + 1\n" +
+                            "def warn(u):\n    emit(Damaged(target=u, amount=1))\n    return 1\n", out var r);
+            Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(r.Error!.Message, Does.Contain("emit() sends a signal, so it cannot be called here"));
+            Assert.That(world.PendingSignalCount, Is.EqualTo(0));
         }
 
         [Test]
