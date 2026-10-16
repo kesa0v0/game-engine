@@ -44,9 +44,13 @@ namespace Kesa.Engine.Runtime
 
         private void Journal(Action undo) => _undo?.Add(undo);
 
-        /// <summary>값 칸 하나에 쓴다. 커맨드 실행 중이면 원래 값(또는 "값 없음")을 기록한다.</summary>
-        private void Assign(Dictionary<MemberDecl, Value> values, MemberDecl member, Value value)
+        /// <summary>
+        /// <paramref name="owner"/> 엔티티의 값 칸 하나에 쓴다. 커맨드 실행 중이면 원래 값(또는 "값 없음")을 기록한다. 그 엔티티를 읽은
+        /// <c>when</c> 조건을 다음 정착에서 다시 보게 표시한다 (S5).
+        /// </summary>
+        private void Assign(long owner, Dictionary<MemberDecl, Value> values, MemberDecl member, Value value)
         {
+            Touch(owner);
             if (_undo != null)
             {
                 if (values.TryGetValue(member, out var old)) Journal(() => values[member] = old);

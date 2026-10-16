@@ -239,6 +239,7 @@ namespace Kesa.Engine.Runtime
                 throw new ScriptRuntimeException(Codes.RunScript, "now() takes no arguments, got " + positional.Count);
             var value = new IntValue(_tick);
             _trace?.Add(ExplainNode.Time(value));
+            if (_whenReads != null) _whenReadsTick = true; // when 조건이 틱을 읽었다: 틱마다 다시 본다
             return value;
         }
     }

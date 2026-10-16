@@ -7,9 +7,9 @@ using Kesa.Engine.Script;
 namespace Kesa.Engine.Runtime
 {
     /// <summary>
-    /// <c>@when</c> 반응과 정착 (spec S5, spec-gaps G169~G171). 정착 지점(제출·답·응답이 끝난 뒤, 틱의 마지막 단계)에서 모든 조건을
-    /// 평가하고 거짓→참이 된 것의 본문을 각자 Flow·트랜잭션으로 돌린다. 발동한 것이 있으면 다시 평가하고, 새로 발동한 것이 없으면 끝난다.
-    /// 지금은 매 정착마다 모든 조건을 다시 평가한다(조건이 순수하므로 "읽은 칸이 바뀔 때만"과 결과가 같다).
+    /// <c>@when</c> 반응과 정착 (spec S5, spec-gaps G169~G175). 정착 지점(제출·답·응답이 끝난 뒤, 틱의 마지막 단계)에서 조건을
+    /// 보고 거짓→참이 된 것의 본문을 각자 Flow·트랜잭션으로 돌린다. 본문 하나가 끝날 때마다 다시 보고, 새로 발동한 것이 없으면 끝난다.
+    /// 다시 평가하는 것은 읽은 엔티티에 쓰기가 있었거나 틱이 바뀌어 값이 바뀌었을 수 있는 조건뿐이다(S5 "읽은 칸이 바뀔 때만", 단위는 엔티티).
     /// </summary>
     public sealed partial class World
     {
@@ -67,6 +67,14 @@ namespace Kesa.Engine.Runtime
             var ordered = new List<WhenDecl>(keyed.Count);
             foreach (var pair in keyed) ordered.Add(pair.Value);
             _whens = ordered;
+            for (int order = 0; order < ordered.Count; order++)
+            {
+                var w = ordered[order];
+                _whenOrder[w.Id] = order;
+                if (w.Subject == null) continue;
+                if (!_whenBySubject.TryGetValue(w.Subject, out var orders)) _whenBySubject.Add(w.Subject, orders = new List<int>());
+                orders.Add(order);
+            }
         }
 
         /// <summary>발동을 기다리는 (반응, 대상): 회차(세대)와, 이것을 참으로 만든 앞 발동 (고리를 보이는 데 쓴다).</summary>
@@ -116,6 +124,7 @@ namespace Kesa.Engine.Runtime
                     // 남은 것은 모두 상한을 넘었다. 참으로 기록하지 않는다: 다음 정착 지점에서 다시 시도되어 고리가 드러난다 (G171)
                     var left = new List<Pending>(pending.Values);
                     left.Sort((a, b) => Earlier(a, b) ? -1 : Earlier(b, a) ? 1 : 0);
+                    foreach (var p in left) _whenRetry.Add(new WhenKey(p.Order, p.Target));
                     foreach (var p in left)
                         reactions.Add(new Reaction(Reaction.WhenSignal, WhenValues(p.When, p.Target), p.When.Id, 0, ReactionOutcome.Dropped)
                         {
@@ -128,7 +137,7 @@ namespace Kesa.Engine.Runtime
                 }
                 pending.Remove(Key(next.When, next.Target));
                 if (next.When.Repeat) repeated.Add(Key(next.When, next.Target));
-                else _whenTrue[next.When.Id].Add(next.Target);
+                else if (next.When.Once == WhenOnce.None) _whenTrue[next.When.Id].Add(next.Target); // 한 번 쓴 것은 늘 거짓으로 본다 (G175)
                 if (next.When.Cooldown != null)
                 {
                     // 본문이 실패해도 발동한 것이다 (G172·G174)
@@ -153,52 +162,247 @@ namespace Kesa.Engine.Runtime
             a.Round != b.Round ? a.Round < b.Round : a.Order != b.Order ? a.Order < b.Order : a.Target < b.Target;
 
         /// <summary>
-        /// 모든 조건을 지금 상태로 본다. 참이고 기록이 없으면 기다리는 목록에 넣고(이미 있으면 회차를 그대로 둔다), 거짓이면 기록과 목록에서 뺀다.
-        /// <c>repeat=True</c> 반응은 틱 끝에만 보고, 기록 대신 이 정착에서 이미 돌았는지를 본다 (G173).
+        /// 조건을 지금 상태로 본다 (G172). 다시 평가하는 것은 바뀌었을 수 있는 것만이다(S5 "읽은 칸이 바뀔 때만"): 지난번 평가 뒤 쓰기가 있었던
+        /// 엔티티를 읽은 조건, 틱이 바뀌었으면 <c>now()</c>를 읽은 조건, 아직 평가하지 않은 (반응, 엔티티), 오류가 났던 것. 나머지는 지난 값을 쓴다.
+        /// 그다음 값이 바뀌었을 수 있는 것(다시 평가한 것, 쿨다운 중인 것, 기다리는 것, 틱 끝이면 참인 repeat 반응)만 판정한다:
+        /// 참이고 기록이 없으면 기다리는 목록에 넣고(이미 있으면 회차를 그대로 둔다), 거짓이면 기록과 목록에서 뺀다.
+        /// <c>repeat=True</c> 반응은 틱 끝에만 판정하고, 기록 대신 이 정착에서 이미 돌았는지를 본다 (G173).
         /// </summary>
         private void Look(SortedDictionary<string, Pending> pending, Pending? fired, SortedSet<string> failed, SortedSet<string> repeated,
             bool tickEnd, List<Reaction> reactions)
         {
             int round = fired == null ? 1 : fired.Round + 1;
+            var eval = new SortedSet<WhenKey>();
+            foreach (long id in _whenTouched)
+            {
+                if (_whenReaders.TryGetValue(id, out var readers)) eval.UnionWith(readers);
+                if (_entities.TryGetValue(id, out var entity))
+                {
+                    // 새 엔티티(또는 아직 본 적 없는 것)는 그 타입을 보는 반응마다 처음 평가한다
+                    if (_whenBySubject.TryGetValue(entity.Def.Type.Name, out var orders))
+                        foreach (int order in orders)
+                            if (!_whenCache.ContainsKey(new WhenKey(order, id))) eval.Add(new WhenKey(order, id));
+                }
+                else Forget(id, pending);
+            }
+            _whenTouched.Clear();
+            if (_whenAll || WhenFullScan)
+            {
+                _whenAll = false;
+                for (int order = 0; order < _whens.Count; order++)
+                {
+                    var w = _whens[order];
+                    if (w.Subject == null) eval.Add(new WhenKey(order, GlobalTarget));
+                    else if (_schema.TryGetType(w.Subject, out var type) && _byType.TryGetValue(type, out var set))
+                        foreach (long id in set) eval.Add(new WhenKey(order, id));
+                }
+            }
+            if (_tick != _whenSeenTick) eval.UnionWith(_whenTickReaders);
+            _whenSeenTick = _tick;
+            eval.UnionWith(_whenUnknown);
+
+            foreach (var key in eval)
+            {
+                var w = _whens[key.Order];
+                if (w.Subject != null && !_entities.ContainsKey(key.Target)) continue;
+                if (failed.Contains(Key(w, key.Target)) || Done(w, key.Target)) continue;
+                try
+                {
+                    Evaluate(key, w);
+                }
+                catch (WorldException e)
+                {
+                    failed.Add(Key(w, key.Target));
+                    reactions.Add(new Reaction(Reaction.WhenSignal, WhenValues(w, key.Target), w.Id, 0, ReactionOutcome.ScriptError) { Error = e });
+                }
+            }
+
+            // 판정: 값이 바뀌었을 수 있는 것만
+            var decide = eval;
+            foreach (var pair in _whenCooldown)
+                if (_whenOrder.TryGetValue(pair.Key, out int order))
+                    foreach (long target in pair.Value.Keys) decide.Add(new WhenKey(order, target));
+            // 기다리는 것은 다시 평가했거나(위) 방금 once로 막혔을 때만 바뀐다
+            if (fired != null && fired.When.Once != WhenOnce.None)
+                foreach (var p in pending.Values)
+                    if (p.Order == fired.Order) decide.Add(new WhenKey(p.Order, p.Target));
+            if (tickEnd) decide.UnionWith(_whenRepeatTrue);
+            decide.UnionWith(_whenRetry);
+            _whenRetry.Clear();
+            foreach (var key in decide)
+            {
+                var w = _whens[key.Order];
+                long target = key.Target;
+                string skey = Key(w, target);
+                if (w.Repeat && !tickEnd) continue;
+                if (w.Subject != null && !_entities.ContainsKey(target))
+                {
+                    pending.Remove(skey);
+                    continue;
+                }
+                if (failed.Contains(skey))
+                {
+                    pending.Remove(skey);
+                    continue;
+                }
+                // 쿨다운 중이거나 한 번 쓴 것은 거짓으로 본다: 쿨다운이 끝난 뒤에도 참이면 그때 거짓→참이다 (G174·G175)
+                bool now = _whenCache.TryGetValue(key, out var cached) && cached.Ok && cached.Value &&
+                           !Done(w, target) && !Cooling(w, target);
+                SortedSet<long>? record = null;
+                if (!w.Repeat && !_whenTrue.TryGetValue(w.Id, out record)) _whenTrue.Add(w.Id, record = new SortedSet<long>());
+                if (!now)
+                {
+                    record?.Remove(target);
+                    pending.Remove(skey);
+                    continue;
+                }
+                if ((record != null && record.Contains(target)) || repeated.Contains(skey) || pending.ContainsKey(skey)) continue;
+                pending.Add(skey, new Pending(w, key.Order, target, round, fired));
+            }
+        }
+
+        // ---- 다시 평가할 조건 고르기 (S5 "읽은 칸이 바뀔 때만 재평가") ----
+
+        /// <summary>(반응 자리, 대상). 반응 자리는 <see cref="_whens"/>의 순서다.</summary>
+        private readonly struct WhenKey : IComparable<WhenKey>, IEquatable<WhenKey>
+        {
+            public WhenKey(int order, long target)
+            {
+                Order = order;
+                Target = target;
+            }
+
+            public int Order { get; }
+            public long Target { get; }
+
+            public int CompareTo(WhenKey other) => Order != other.Order ? Order.CompareTo(other.Order) : Target.CompareTo(other.Target);
+            public bool Equals(WhenKey other) => Order == other.Order && Target == other.Target;
+            public override bool Equals(object? obj) => obj is WhenKey other && Equals(other);
+            public override int GetHashCode() => Order * 397 ^ Target.GetHashCode();
+        }
+
+        /// <summary>조건의 지난 평가: 값, 그때 읽은 엔티티, <c>now()</c>를 읽었는지. 오류였으면 <see cref="Ok"/>가 거짓이다.</summary>
+        private sealed class WhenCache
+        {
+            public bool Ok;
+            public bool Value;
+            public long[] Reads = Array.Empty<long>();
+            public bool Tick;
+        }
+
+        private readonly Dictionary<WhenKey, WhenCache> _whenCache = new Dictionary<WhenKey, WhenCache>();
+
+        /// <summary>엔티티 → 그 엔티티를 읽은 조건.</summary>
+        private readonly Dictionary<long, SortedSet<WhenKey>> _whenReaders = new Dictionary<long, SortedSet<WhenKey>>();
+
+        /// <summary><c>now()</c>를 읽은 조건: 틱이 바뀌면 다시 본다.</summary>
+        private readonly SortedSet<WhenKey> _whenTickReaders = new SortedSet<WhenKey>();
+
+        /// <summary>지난 평가가 오류였던 조건: 정착마다 다시 본다.</summary>
+        private readonly SortedSet<WhenKey> _whenUnknown = new SortedSet<WhenKey>();
+
+        /// <summary>지난 값이 참인 <c>repeat=True</c> 반응: 틱 끝마다 판정한다.</summary>
+        private readonly SortedSet<WhenKey> _whenRepeatTrue = new SortedSet<WhenKey>();
+
+        /// <summary>상한에 걸려 돌지 못한 것: 참으로 기록하지 않았으니 다음 정착에서 다시 판정한다 (G171).</summary>
+        private readonly SortedSet<WhenKey> _whenRetry = new SortedSet<WhenKey>();
+
+        /// <summary>지난 정착 뒤 쓰기가 있었던 엔티티 (값·줄·컴포넌트·생성·삭제·역방향 컬렉션·기여 행).</summary>
+        private readonly SortedSet<long> _whenTouched = new SortedSet<long>();
+
+        /// <summary>아직 아무것도 평가하지 않았다(새 월드, 불러온 월드): 다음 정착에서 모두 평가한다.</summary>
+        private bool _whenAll = true;
+
+        private long _whenSeenTick;
+
+        /// <summary>Def 타입 이름 → 그 타입의 엔티티마다 보는 반응 자리.</summary>
+        private readonly Dictionary<string, List<int>> _whenBySubject = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+
+        /// <summary>반응 id → 반응 자리.</summary>
+        private readonly Dictionary<string, int> _whenOrder = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        /// <summary>조건을 평가하는 중이면 읽은 엔티티를 모은다. 평소에는 null이라 읽기에 비용이 없다.</summary>
+        private SortedSet<long>? _whenReads;
+
+        private bool _whenReadsTick;
+
+        /// <summary>테스트용: 정착 때마다 모든 조건을 다시 평가한다. 고르기가 빠뜨린 것이 없는지 결과를 견주는 데 쓴다.</summary>
+        internal bool WhenFullScan { get; set; }
+
+        /// <summary>엔티티에 쓰기가 있었다: 그 엔티티를 읽은 조건을 다음 정착에서 다시 본다.</summary>
+        private void Touch(long id)
+        {
+            if (_whens.Count > 0) _whenTouched.Add(id);
+        }
+
+        /// <summary>조건 하나를 평가해 값과 읽은 것을 기억한다. 오류면 기억을 "모름"으로 두고 예외를 그대로 던진다.</summary>
+        private void Evaluate(WhenKey key, WhenDecl w)
+        {
+            if (!_whenCache.TryGetValue(key, out var cache)) _whenCache.Add(key, cache = new WhenCache());
+            Unlink(key, cache);
+            var reads = new SortedSet<long>();
+            _whenReads = reads;
+            _whenReadsTick = false;
+            try
+            {
+                cache.Value = Condition(w, key.Target);
+                cache.Ok = true;
+                _whenUnknown.Remove(key);
+            }
+            catch
+            {
+                cache.Ok = false;
+                cache.Value = false;
+                _whenUnknown.Add(key);
+                throw;
+            }
+            finally
+            {
+                _whenReads = null;
+                cache.Reads = new long[reads.Count];
+                reads.CopyTo(cache.Reads);
+                cache.Tick = _whenReadsTick;
+                foreach (long id in cache.Reads)
+                {
+                    if (!_whenReaders.TryGetValue(id, out var readers)) _whenReaders.Add(id, readers = new SortedSet<WhenKey>());
+                    readers.Add(key);
+                }
+                if (cache.Tick) _whenTickReaders.Add(key);
+                if (w.Repeat && cache.Ok && cache.Value) _whenRepeatTrue.Add(key);
+                else _whenRepeatTrue.Remove(key);
+            }
+        }
+
+        /// <summary>조건의 지난 읽기를 색인에서 뺀다.</summary>
+        private void Unlink(WhenKey key, WhenCache cache)
+        {
+            foreach (long id in cache.Reads)
+                if (_whenReaders.TryGetValue(id, out var readers))
+                {
+                    readers.Remove(key);
+                    if (readers.Count == 0) _whenReaders.Remove(id);
+                }
+            _whenTickReaders.Remove(key);
+        }
+
+        /// <summary>사라진 엔티티를 대상으로 한 조건의 기억과 기록을 지운다 (G169).</summary>
+        private void Forget(long id, SortedDictionary<string, Pending> pending)
+        {
             for (int order = 0; order < _whens.Count; order++)
             {
                 var w = _whens[order];
-                if (w.Repeat && !tickEnd) continue;
-                SortedSet<long> record;
-                if (w.Repeat) record = new SortedSet<long>(); // 쓰지 않는다
-                else if (!_whenTrue.TryGetValue(w.Id, out record)) _whenTrue.Add(w.Id, record = new SortedSet<long>());
-                var alive = new SortedSet<long>(Targets(w, record));
-                // 그 사이 사라진 엔티티는 기다리지 않는다
-                var gone = new List<string>();
-                foreach (var pair in pending)
-                    if (pair.Value.When == w && !alive.Contains(pair.Value.Target)) gone.Add(pair.Key);
-                foreach (var key in gone) pending.Remove(key);
-                foreach (long target in alive)
+                if (w.Subject == null) continue;
+                var key = new WhenKey(order, id);
+                if (_whenCache.TryGetValue(key, out var cache))
                 {
-                    string key = Key(w, target);
-                    if (failed.Contains(key)) continue;
-                    bool now;
-                    try
-                    {
-                        // 쿨다운 중에는 거짓으로 본다: 끝난 뒤에도 참이면 그때 거짓→참이다 (G174)
-                        now = !Done(w, target) && !Cooling(w, target) && Condition(w, target);
-                    }
-                    catch (WorldException e)
-                    {
-                        failed.Add(key);
-                        pending.Remove(key);
-                        reactions.Add(new Reaction(Reaction.WhenSignal, WhenValues(w, target), w.Id, 0, ReactionOutcome.ScriptError) { Error = e });
-                        continue;
-                    }
-                    if (!now)
-                    {
-                        record.Remove(target);
-                        pending.Remove(key);
-                        continue;
-                    }
-                    if (record.Contains(target) || repeated.Contains(key) || pending.ContainsKey(key)) continue;
-                    pending.Add(key, new Pending(w, order, target, round, fired));
+                    Unlink(key, cache);
+                    _whenCache.Remove(key);
                 }
+                _whenUnknown.Remove(key);
+                _whenRepeatTrue.Remove(key);
+                if (_whenTrue.TryGetValue(w.Id, out var record)) record.Remove(id);
+                if (_whenCooldown.TryGetValue(w.Id, out var until)) until.Remove(id);
+                pending.Remove(Key(w, id));
             }
         }
 
@@ -211,25 +415,6 @@ namespace Kesa.Engine.Runtime
             for (; c != null && parts.Count < shown; c = c.Cause) parts.Add(c.When.Id);
             parts.Reverse();
             return (c != null ? "… → " : "") + string.Join(" → ", parts);
-        }
-
-        /// <summary>
-        /// 평가할 대상, id 순: 전역이면 <see cref="GlobalTarget"/> 하나, 아니면 그 타입의 살아 있는 엔티티. 사라진 엔티티의 기록은 지운다 (G169).
-        /// </summary>
-        private List<long> Targets(WhenDecl w, SortedSet<long> record)
-        {
-            var targets = new List<long>();
-            if (w.Subject == null)
-            {
-                targets.Add(GlobalTarget);
-                return targets;
-            }
-            var dead = new List<long>();
-            foreach (long id in record)
-                if (!_entities.ContainsKey(id)) dead.Add(id);
-            foreach (long id in dead) record.Remove(id);
-            if (_schema.TryGetType(w.Subject, out var type) && _byType.TryGetValue(type, out var set)) targets.AddRange(set);
-            return targets;
         }
 
         private static SortedDictionary<string, Value> WhenValues(WhenDecl w, long target)

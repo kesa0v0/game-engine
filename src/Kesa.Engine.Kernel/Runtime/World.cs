@@ -166,6 +166,7 @@ namespace Kesa.Engine.Runtime
             _entities.Add(id, entity);
             if (!_byType.TryGetValue(def.Type, out var set)) _byType.Add(def.Type, set = new SortedSet<long>());
             set.Add(id);
+            Touch(id);
             // 되감으면 엔티티도 id도 쓰지 않은 것이 된다 (G133). 색인은 아래에서 따로 기록된다
             Journal(() =>
             {
@@ -205,6 +206,7 @@ namespace Kesa.Engine.Runtime
             foreach (var component in ComponentsOf(entity)) UnindexRefs(entity, component);
             DropContributionsOf(id.Value);
             _destroyedSinceSweep = true; // 멈춘 Flow의 대상을 다음 확인 때 본다 (G164). 되감겨도 한 번 더 볼 뿐이다
+            Touch(id.Value); // 이 엔티티를 읽거나 Ref로 가리킨 조건을 다시 본다
             _entities.Remove(id.Value);
             var set = _byType[entity.Def.Type];
             set.Remove(id.Value);
@@ -222,6 +224,7 @@ namespace Kesa.Engine.Runtime
                     foreach (var rows in h.Rows.Values)
                     {
                         if (!rows.ByEntity.TryGetValue(id.Value, out var row)) continue;
+                        Touch(holder);
                         rows.ByEntity.Remove(id.Value);
                         Journal(() => rows.ByEntity.Add(id.Value, row));
                     }
@@ -265,7 +268,7 @@ namespace Kesa.Engine.Runtime
             Require(entity, component);
             var stored = CheckWrite(member.Display, member.Member, value);
             if (member.Kind == MemberKind.Ref) Reindex(member.Member, id.Value, entity.Values, stored);
-            Assign(entity.Values, member.Member, stored);
+            Assign(id.Value, entity.Values, member.Member, stored);
         }
 
         // ---- 런타임 컴포넌트 ----
@@ -286,6 +289,7 @@ namespace Kesa.Engine.Runtime
             // 키 컴포넌트는 줄 없이 시작한다. 줄의 값은 AddRow가 생성 순간에 검사한다 (keys="all"은 G77·G93이 기본값을 보장)
             if (!component.IsKeyed) PlanMembers(values, component, null, given, "adding '" + componentName + "' to " + id);
 
+            Touch(id.Value);
             entity.Runtime.Add(component.Name, component);
             values.CopyTo(entity.Values);
             Journal(() =>
@@ -324,6 +328,7 @@ namespace Kesa.Engine.Runtime
             foreach (var member in component.Members)
                 if (entity.Values.TryGetValue(member, out var v)) oldValues.Add(new KeyValuePair<MemberDecl, Value>(member, v));
             entity.Rows.TryGetValue(componentName, out var oldRows);
+            Touch(id.Value);
             foreach (var member in component.Members) entity.Values.Remove(member);
             entity.Rows.Remove(componentName);
             entity.Runtime.Remove(componentName);
@@ -491,7 +496,7 @@ namespace Kesa.Engine.Runtime
                 rows.Put(key, record);
                 Journal(() => rows.Remove(key));
             }
-            Assign(record.Values, member.Member, stored);
+            Assign(id.Value, record.Values, member.Member, stored);
         }
 
         private bool HasRow(EntityId id, string componentName, RowKey key)
@@ -519,6 +524,7 @@ namespace Kesa.Engine.Runtime
             var record = new RowRecord(attached: true);
             values.CopyTo(record.Values);
             var keyedRows = entity.RowsOf(component);
+            Touch(id.Value);
             keyedRows.Put(key, record);
             Journal(() => keyedRows.Remove(key));
             if (key.IsEntity)
@@ -557,6 +563,7 @@ namespace Kesa.Engine.Runtime
                 throw new WorldException(Codes.RunNoRow,
                     "the '" + componentName + "' row " + key + " of " + id + " comes from its Def and cannot be removed");
             var keyedRows = entity.Rows[componentName];
+            Touch(id.Value);
             keyedRows.Remove(key);
             Journal(() => keyedRows.Put(key, record));
             DropContributionsTo(id.Value, component, key);
@@ -773,6 +780,8 @@ namespace Kesa.Engine.Runtime
                 throw new WorldException(Codes.RunMissingValue, "'" + display + "' has no value yet",
                     "a default computed at creation can only read members declared before it (spec-gaps G106)");
 
+            // Ref 칸은 대상이 살아 있는지에 따라 읽는 값이 달라진다(G91): when 조건이면 대상도 읽은 것이다
+            if (member.Kind == MemberKind.Ref && value is EntityValue target) _whenReads?.Add(target.Id.Value);
             if (member.Kind == MemberKind.Ref && value is EntityValue ev && !_entities.ContainsKey(ev.Id.Value))
             {
                 if (spec.Optional) return NoneValue.Instance;
@@ -846,11 +855,13 @@ namespace Kesa.Engine.Runtime
             if (!_inverse.TryGetValue(member, out var byTarget))
                 _inverse.Add(member, byTarget = new Dictionary<long, SortedSet<long>>());
             if (!byTarget.TryGetValue(target, out var sources)) byTarget.Add(target, sources = new SortedSet<long>());
+            Touch(target); // 대상의 역방향 컬렉션이 바뀐다
             if (sources.Add(source)) Journal(() => sources.Remove(source));
         }
 
         private void RemoveInverse(MemberDecl member, long target, long source)
         {
+            Touch(target);
             if (_inverse.TryGetValue(member, out var byTarget) && byTarget.TryGetValue(target, out var sources) &&
                 sources.Remove(source))
                 Journal(() => sources.Add(source));
@@ -860,6 +871,7 @@ namespace Kesa.Engine.Runtime
 
         private EntityRecord Record(EntityId id)
         {
+            _whenReads?.Add(id.Value); // when 조건을 평가하는 중이면 이 엔티티를 읽었다 (S5)
             if (_entities.TryGetValue(id.Value, out var entity)) return entity;
             throw new WorldException(Codes.RunDeadEntity,
                 id.Value < 1 || id.Value >= _nextId ? id + " was never created" : id + " was destroyed");

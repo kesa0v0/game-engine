@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1468개 통과(커널 1440, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1473개 통과(커널 1445, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -270,25 +270,31 @@ G140(정규형 JSON을 엔진이 직접 씀)·G141(멈춘 Flow의 런타임 값�
    - 호출당 상한(G168): 제출·답·응답 하나가 `advance`로 요청한 틱의 합이 `maxAdvancePerCall`(호스트 설정, 기본 10000, `World` 생성자·`Load` 인자)을 넘으면 그 Flow를 버리고 `"advance"` ScriptError 항목을 남긴다. 그때까지 간 틱과 효과는 남는다. 막혀서 덜 갔어도 요청한 만큼 센다. 테스트 4개 추가(모두 85개).
    - 시간 슬라이스 끝(커밋 `7b0d5c9`).
 
-## 반응 ②: `when`과 정착 (진행 중, 커밋 전, 2026-10-16)
+## 반응 ②: `when`과 정착 (①~④ 커밋 `e9a65d6`, ⑤ 커밋 전, 2026-10-16)
 
 1. **기본 `when`(끝남), G169(주어: 매개변수 없으면 전역, `Ref[Def타입]` 하나면 그 타입의 엔티티마다)·G170(거짓→참 기록은 저장 구역, 기록 없으면 거짓으로 봄)·G171(정착 상한 `maxSettleRounds`, 기본 64, 넘으면 `Dropped`, 버린 것은 기록 안 함)·G172(본문 하나가 끝날 때마다 모든 조건을 다시 봄, 회차 = 세대), 모두 확인:**
    - 선언: `Interpreter.DeclareWhen` → `WhenDecl`(`Script/CommandDecl.cs`, `Condition`·`Stage`·`Subject`). `FunctionDef.IsWhen`/`FunctionValue.IsWhen`(입구, 로직에서 못 부름, 사전 조건 없음). 조건이 쓰는 함수면 `FunctionEffects`가 CMD 오류. 매개변수 타입은 `CommandSignatures.ResolveWhens`, 단계는 `HandlerStages.Check`(핸들러와 같은 검사). `ContentLoadResult.Whens`.
    - 런타임 `Runtime/World.When.cs`: `Settle`이 `AfterRun` 끝(제출·답·응답 뒤)과 `AdvanceTicks`의 매 틱 끝에서 돈다. `Look`이 모든 조건을 보고 `Pending`(회차, 원인) 목록을 갱신, 가장 이른 회차 → 단계 순서 → 엔티티 순으로 하나씩 `RunWhen`(핸들러처럼 새 Flow·트랜잭션, 결과 신호 자리 `Reaction.WhenSignal` = `"when"`, 세대 0, 본문이 낸 신호는 1세대). 조건 오류는 정착마다 한 번 `ScriptError`. 본문이 실패해도 발동한 것으로 기록한다(매 정착마다 되풀이 안 함).
    - `when` 본문 첫 실행에서는 `advance()` 금지(`_settling`).
    - 저장 최상위 `"when": [{"reaction", "entity"(전역은 null)}]`(골든 갱신). 불러올 때 사라진 반응·엔티티, 전역/엔티티별이 바뀐 반응의 기록은 버린다.
-   - 지금은 정착마다(본문마다) 모든 조건을 다시 평가한다. "읽은 칸이 바뀔 때만"(S5)은 결과가 같은 최적화라 나중에.
+   - 다시 평가는 아래 ⑤처럼 바뀌었을 수 있는 조건만 한다.
    - 테스트 `Runtime/WhenTests`(29개). 재현했던 것: 차례마다 한 번만 보면 부활/저주가 HP 0으로 조용히 끝났다(G172의 이유).
 2. **`repeat=True`(끝남), G173(확인):** 틱 끝 정착에서만 보고 참이면 틱마다 한 번(`WhenDecl.Repeat`, `Settle(..., tickEnd)`). 기록 대신 그 정착에서 돌았는지(`repeated`)만 본다. 저장에 남지 않는다. 테스트 5개(모두 34개).
 3. **`cooldown=N`(끝남), G174(확인):** 발동 뒤 N틱 동안 그 (반응, 대상)의 조건을 거짓으로 본다(`WhenDecl.Cooldown`, `_whenCooldown`, `Cooling`). 끝나는 정착에서 아직 참이면 발동. 저장 최상위 `"when_cooldown"`(골든 갱신). 테스트 6개(모두 40개).
 4. **`once`(끝남), G175(확인):** `once=True`는 (반응, 엔티티)마다, `once="game"`은 반응 전체에 한 번(`WhenDecl.Once`·`WhenOnce`, `_whenDone`, `Done`). `repeat`·`cooldown`과 함께면 로드 오류. 저장 최상위 `"when_once"`(골든 갱신). 테스트 7개(모두 47개).
-   - **다음:** 반응 ② 커밋. 남은 S5 열린 질문: `prevent_default`, `wait` 중 Flow 취소 세부, "읽은 칸이 바뀔 때만 재평가"(성능), `field`가 `derived` 상한을 넘는 경우(schema-design).
+   - 여기까지 커밋 `e9a65d6`.
+5. **S5 남은 열린 질문(커밋 전):**
+   - G176(확인): `prevent_default`(남의 규칙을 미리 막는 훅)는 두지 않는다. G177(확인): `wait` 중 Flow를 취소하는 전용 기능은 두지 않고 상태로 표현한다. 둘 다 문서 결정이라 코드는 없다.
+   - **"읽은 칸이 바뀔 때만 재평가"(S5, 결과가 같은 최적화라 G 번호 없음):** `World.When.cs`의 `Look`. 조건을 평가할 때 읽은 엔티티(`Record`, Ref 값을 읽으면 그 대상도)와 `now()`를 읽었는지를 `WhenCache`에 남기고 색인(`_whenReaders`, `_whenTickReaders`)에 건다. 쓰기는 `Touch(id)`로 표시한다: 값 대입(`Assign`의 owner), 생성·삭제(삭제된 엔티티를 줄 키로 가진 엔티티도), 컴포넌트 붙이기·떼기, 줄 넣기·빼기, 역방향 컬렉션(대상), 기여 행(대상). 정착 때 다시 평가하는 것은 표시된 엔티티를 읽은 조건, 아직 평가하지 않은 (반응, 엔티티), 틱이 바뀌었으면 `now()`를 읽은 조건, 지난번 오류 난 조건뿐이고, 새 월드·불러온 월드는 처음 한 번 모두 평가한다. 판정도 바뀌었을 수 있는 것만(다시 평가한 것, 쿨다운 중인 것, 틱 끝이면 참인 repeat, 상한에 걸려 버린 것 `_whenRetry`, 방금 once로 막힌 반응의 기다리는 것).
+   - 견주기 테스트 `Runtime/WhenTrackingTests`: 같은 무작위 단계 400개(시드 4개)를 `WhenFullScan = true`(매번 모두 평가) 월드와 견주어 단계마다 결과 항목과 저장 바이트가 같은지 본다. 50단계마다 추적 쪽을 저장·불러오기로 바꾼다. `Touch` 12곳과 읽기 기록 3곳을 하나씩 빼면 모두 실패하는 것을 확인했다. 이 테스트로 찾은 차이: once 반응이 발동 뒤 참 기록을 남겨 저장이 달랐다 → once는 참 기록을 남기지 않는다.
+   - 잰 것(임시 측정, 지움): 조용한 틱(엔티티 1000 × 반응 5, 100틱)이 틱당 약 6.7ms → 0ms. 엔티티 1000개가 한꺼번에 발동하는 정착이 1497ms → 48ms.
+   - **다음:** 이 묶음 커밋. 남은 S5 열린 질문: `field`가 `derived` 상한을 넘는 경우(schema-design).
 
 ## 다음 할 일 (사용자와 고를 것)
 
 Flow(`ask`·응답 커맨드)와 저장(C1·C4·C5)까지 끝났고 반응(S5)을 진행 중이다(위 "반응 슬라이스").
 
-**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 전). 다음은 반응 ② 커밋.
+**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 `e9a65d6`). S5 열린 질문 G176·G177과 "읽은 칸이 바뀔 때만 재평가"를 했다(커밋 전). 다음은 이 묶음 커밋, 그다음 남은 S5 열린 질문(`field`가 `derived` 상한을 넘는 경우).
 
 그 밖의 후보:
 
@@ -338,7 +344,7 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1468개 통과(커널 1440, CLI 28)를 확인한다.
+1. `git pull` 후 `dotnet test`로 1473개 통과(커널 1445, CLI 28)를 확인한다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G135), `docs/spine-spec.md` S2·S4·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.
 
