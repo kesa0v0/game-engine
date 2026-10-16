@@ -418,5 +418,57 @@ namespace Kesa.Engine.Tests.Runtime
             Load(out var diags);
             Assert.That(diags.Select(Diag), Has.Some.Contains("'f' is a @when reaction, so logic cannot call it"));
         }
+
+        // ---- G99의 패턴 B: 상한(derived)이 내려가면 정착 반응이 저장값(field)을 자른다 ----
+
+        private const string ClampSchema =
+            "component(\"Health\", base=field(int, default=10), max=derived(int, lambda h: h.base + len(contribs(h, \"max\"))), " +
+            "current=field(int, default=10))\n" +
+            "component(\"Gear\", n=field(int, default=0))\n" +
+            "deftype(\"Unit\", components=[\"Health\"])\n" +
+            "deftype(\"Item\", components=[\"Gear\"])\n";
+
+        private const string ClampDefs =
+            "Unit(\"Scout\")\nItem(\"Ring\")\n" +
+            "@when(lambda u: u.Health.current > u.Health.max)\ndef clamp(u: Ref[Unit]):\n    u.Health.current = u.Health.max\n" +
+            "@command(free=True, acts_for=None)\ndef Heal(u: Ref[Unit]):\n    u.Health.current = u.Health.max\n" +
+            "@command(free=True, acts_for=None)\ndef Drop(i: Ref[Item]):\n    destroy(i)\n";
+
+        [Test]
+        public void ASettleReactionClampsAFieldWhenItsDerivedCapGoesDown()
+        {
+            Mod("core", schema: ClampSchema, defs: ClampDefs);
+            var world = new World(LoadClean());
+            var u = world.Create("Scout");
+            var ring = world.Create("Ring");
+            var max = world.Member("Health", "max");
+            var current = world.Member("Health", "current");
+            long Int(Value v) => ((IntValue)v).Value;
+            Dictionary<string, Value> Arg(string name, EntityId id) => new Dictionary<string, Value> { [name] = new EntityValue(id) };
+
+            // 반지가 상한을 3, 출처 없는 행이 1 올리고, 치료로 14까지 채운다
+            for (int i = 0; i < 3; i++) world.AddContribution(u, max, "add", new IntValue(1), ring);
+            long loose = world.AddContribution(u, max, "add", new IntValue(1));
+            world.Submit("host", "core.Heal", Arg("u", u));
+            Assert.That(Int(world.Get(u, current)), Is.EqualTo(14));
+
+            // 커맨드 안에서 상한이 내려가면(출처가 죽어 행이 지워짐) 그 제출의 정착에서 바로 자른다
+            var r = world.Submit("host", "core.Drop", Arg("i", ring));
+            Assert.That(r.Reactions.Select(Show), Is.EqualTo(new[] { "when core.clamp u=" + u + " Finished" }));
+            Assert.That(Int(world.Get(u, max)), Is.EqualTo(11));
+            Assert.That(Int(world.Get(u, current)), Is.EqualTo(11));
+
+            // 호스트가 커맨드 밖에서 내리면 다음 정착 지점(여기서는 틱 끝)까지는 넘은 채로 읽힌다 (G99의 알려진 한계)
+            world.RemoveContribution(loose);
+            Assert.That(Int(world.Get(u, current)), Is.EqualTo(11));
+            var advanced = world.Advance();
+            Assert.That(advanced.Reactions.Select(Show), Is.EqualTo(new[] { "when core.clamp u=" + u + " Finished" }));
+            Assert.That(Int(world.Get(u, current)), Is.EqualTo(10));
+
+            // 상한이 다시 올라가도 저장값은 돌아오지 않는다 (B는 저장값을 바꾼다. 복원이 필요하면 패턴 D)
+            world.AddContribution(u, max, "add", new IntValue(1));
+            world.Advance();
+            Assert.That(Int(world.Get(u, current)), Is.EqualTo(10));
+        }
     }
 }
