@@ -59,6 +59,8 @@ namespace Kesa.Engine.Tests.Loading
                 "cost: dict[Literal[\"Wood\", \"Iron\"], int] = ..., Health: Health = ..., " +
                 "Skill: dict[Literal[\"Wood\", \"Iron\"], Skill] = ...) -> None: ...\n" +
                 "\n" +
+                "class Tick: ...  # sent by the engine; handle it with @on(Tick)\n" +
+                "\n" +
                 "class patch:\n" +
                 "    @staticmethod\n" +
                 "    def set(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\"], path: str, value: Any) -> None: ...\n" +

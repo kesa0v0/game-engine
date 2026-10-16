@@ -57,6 +57,21 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>UI가 읽을 자유 데이터 (<see cref="DictValue"/>, 없으면 <see cref="NoneValue"/>, G137).</summary>
         public Value Data { get; }
+
+        /// <summary>열려 있는 동안 <see cref="World.Advance"/>가 시간을 흘리지 않는다 (spec X2, spec-gaps G159).</summary>
+        public bool BlocksTime { get; internal set; } = true;
+
+        /// <summary>마감 틱 (spec X2, spec-gaps G160). 질문이 열린 틱 + <c>deadline=</c>. 마감이 없으면 null.</summary>
+        public long? Deadline { get; internal set; }
+
+        /// <summary>마감이 지나면 엔진이 고를 선택지 번호 (<c>on_timeout=</c>, spec-gaps G161). 답한 엔티티는 없다.</summary>
+        public long? TimeoutChoice { get; internal set; }
+
+        /// <summary>마감이 지나면 엔진이 낼 응답의 <see cref="Responses"/> 번호 (G161). 응답 커맨드의 본문은 돌지 않는다.</summary>
+        public long? TimeoutResponse { get; internal set; }
+
+        /// <summary>마감이 지나면 기본 답이 들어간다.</summary>
+        public bool TimesOut => Deadline != null && (TimeoutChoice != null || TimeoutResponse != null);
     }
 
     /// <summary>답이 어디서 끝났나 (spec X1·C9). 앞의 단계에서 멈추면 상태는 그대로다.</summary>
@@ -115,6 +130,9 @@ namespace Kesa.Engine.Runtime
         /// <summary>이어서 실행하다 다시 멈춰 연 질문.</summary>
         public Request? OpenedRequest { get; internal set; }
 
+        /// <summary>이어서 실행하다 <c>wait</c>로 잠들었으면 깨울 틱 (G158).</summary>
+        public long? SleepsUntil { get; internal set; }
+
         /// <summary>응답 커맨드의 기본값까지 채운 전체 인자 (G116). 인자 검사를 통과했을 때만 있다.</summary>
         public IReadOnlyDictionary<string, Value>? Arguments { get; internal set; }
 
@@ -137,14 +155,18 @@ namespace Kesa.Engine.Runtime
     {
         private sealed class FlowRecord
         {
-            public FlowRecord(long id, string command, PureEvaluator.Suspended run, Request request, bool handler)
+            public FlowRecord(long id, string command, PureEvaluator.Suspended run, Request? request, bool handler, long? wakeAt = null)
             {
                 Id = id;
                 Command = command;
                 Run = run;
                 Request = request;
                 Handler = handler;
+                WakeAt = wakeAt;
             }
+
+            /// <summary><c>wait</c>로 자는 Flow면 깨울 틱. 그때 <see cref="Request"/>는 없다 (X2).</summary>
+            public long? WakeAt { get; }
 
             public long Id { get; }
 
@@ -154,7 +176,9 @@ namespace Kesa.Engine.Runtime
             /// <summary>신호 핸들러가 만든 Flow인가 (S5).</summary>
             public bool Handler { get; }
             public PureEvaluator.Suspended Run { get; }
-            public Request Request { get; }
+
+            /// <summary>질문을 기다리면 그 질문. 자는 Flow면 null.</summary>
+            public Request? Request { get; }
         }
 
         /// <summary>멈춘 Flow, 번호 순 (실행 순서가 결정론적이다, X1).</summary>
@@ -169,13 +193,15 @@ namespace Kesa.Engine.Runtime
             get
             {
                 var list = new List<Request>(_flows.Count);
-                foreach (var flow in _flows.Values) list.Add(flow.Request);
+                foreach (var flow in _flows.Values)
+                    if (flow.Request != null) list.Add(flow.Request);
                 return list;
             }
         }
 
         /// <summary>새 Flow를 만들어 멈춘 실행과 질문을 담는다. 되돌리기 기록에 남는다.</summary>
-        private Request OpenFlow(string command, PureEvaluator.Suspended run, bool handler = false)
+        /// <returns>연 질문. <c>wait</c>로 잠들었으면 null.</returns>
+        private Request? OpenFlow(string command, PureEvaluator.Suspended run, bool handler = false)
         {
             long id = _nextFlow;
             _nextFlow++;
@@ -183,19 +209,36 @@ namespace Kesa.Engine.Runtime
             return Park(id, command, run, handler);
         }
 
-        /// <summary>Flow <paramref name="id"/>가 <paramref name="run"/>에서 새 질문을 들고 기다리게 한다.</summary>
-        private Request Park(long id, string command, PureEvaluator.Suspended run, bool handler)
+        /// <summary>
+        /// Flow <paramref name="id"/>가 <paramref name="run"/>에서 새 질문을 들고 기다리거나(<c>ask</c>) 깨울 틱까지 잔다(<c>wait</c>).
+        /// </summary>
+        private Request? Park(long id, string command, PureEvaluator.Suspended run, bool handler)
         {
+            if (run.Request is WaitPayload sleep)
+            {
+                _flows.Add(id, new FlowRecord(id, command, run, null, handler, _tick + sleep.Ticks));
+                Journal(() => _flows.Remove(id));
+                return null;
+            }
             var ask = (AskPayload)run.Request;
             long requestId = _nextRequest;
             _nextRequest++;
             Journal(() => _nextRequest = requestId);
             var request = new Request(requestId, id, command, ask.Who, ask.Title, ask.Choices, ask.Responses, ask.ResponseNames,
-                ask.Hint, ask.Data);
+                ask.Hint, ask.Data)
+            {
+                BlocksTime = ask.BlocksTime,
+                Deadline = ask.DeadlineIn == null ? (long?)null : _tick + ask.DeadlineIn.Value,
+                TimeoutChoice = ask.TimeoutChoice,
+                TimeoutResponse = ask.TimeoutResponse,
+            };
             _flows.Add(id, new FlowRecord(id, command, run, request, handler));
             Journal(() => _flows.Remove(id));
             return request;
         }
+
+        /// <summary>Flow <paramref name="id"/>가 <c>wait</c>로 자고 있으면 깨울 틱 (G158). 질문을 들었거나 끝났으면 null.</summary>
+        private long? SleepsUntil(long id) => _flows.TryGetValue(id, out var f) ? f.WakeAt : null;
 
         private void DropFlow(FlowRecord flow)
         {
@@ -213,7 +256,7 @@ namespace Kesa.Engine.Runtime
             var flow = FindFlow(request);
             if (flow == null) return Unknown(issuer, request);
 
-            var open = flow.Request;
+            var open = flow.Request!;
             var refused = Gate(issuer, open, by);
             if (refused != null) return refused;
 
@@ -227,7 +270,10 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var opened = Atomically(() => Continue(flow, new AnswerValue(this, null, choice, open.Choices[(int)choice], by)));
-                return new AnswerResult(request, issuer, AnswerOutcome.Succeeded) { OpenedRequest = opened, Reactions = RunReactions() };
+                return new AnswerResult(request, issuer, AnswerOutcome.Succeeded)
+                {
+                    OpenedRequest = opened, SleepsUntil = SleepsUntil(flow.Id), Reactions = RunReactions(),
+                };
             }
             catch (WorldException e)
             {
@@ -250,7 +296,7 @@ namespace Kesa.Engine.Runtime
             }
             var flow = FindFlow(request);
             if (flow == null) return Unknown(issuer, request);
-            var open = flow.Request;
+            var open = flow.Request!;
             int accepted = -1;
             for (int i = 0; i < open.Responses.Count; i++)
                 if (open.Responses[i] == command) accepted = i;
@@ -293,8 +339,9 @@ namespace Kesa.Engine.Runtime
                     if (!r.Passed) return r; // 본문이 돌지 않았다: 쓴 것이 없다
                     if (inner != null)
                     {
+                        string at = inner.Request is WaitPayload ? "wait()" : "ask()";
                         throw new WorldException(Codes.RunScript,
-                            "the response command " + command + " stopped at ask(), which is not supported yet",
+                            "the response command " + command + " stopped at " + at + ", which is not supported yet",
                             "ask from the command that is waiting instead (spec-gaps G139)");
                     }
                     opened = Continue(flow, new AnswerValue(this, open.ResponseNames[accepted], null, null, by));
@@ -303,7 +350,8 @@ namespace Kesa.Engine.Runtime
                 var outcome = report.Passed ? AnswerOutcome.Succeeded : AnswerOutcome.PreconditionsFailed;
                 return new AnswerResult(request, issuer, outcome)
                 {
-                    Arguments = checkedArgs, Preconditions = report, OpenedRequest = opened, Reactions = RunReactions(),
+                    Arguments = checkedArgs, Preconditions = report, OpenedRequest = opened, SleepsUntil = SleepsUntil(flow.Id),
+                    Reactions = RunReactions(),
                 };
             }
             catch (WorldException e)
@@ -315,7 +363,7 @@ namespace Kesa.Engine.Runtime
         private FlowRecord? FindFlow(long request)
         {
             foreach (var f in _flows.Values)
-                if (f.Request.Id == request) return f;
+                if (f.Request != null && f.Request.Id == request) return f;
             return null;
         }
 
@@ -348,7 +396,7 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>Flow를 답으로 이어서 실행한다 (한 트랜잭션, S5). 다시 멈추면 같은 Flow가 새 질문을 든다.</summary>
-        private Request? Continue(FlowRecord flow, Value answer)
+        private Request? Continue(FlowRecord flow, Value answer, string after = "after an answer")
         {
             DropFlow(flow);
             bool outermost = _meter == null;
@@ -360,7 +408,7 @@ namespace Kesa.Engine.Runtime
             }
             catch (ScriptRuntimeException e)
             {
-                throw ToWorldException(e, (flow.Handler ? "the handler " : "the command ") + flow.Command + " (after an answer)");
+                throw ToWorldException(e, (flow.Handler ? "the handler " : "the command ") + flow.Command + " (" + after + ")");
             }
             finally
             {
@@ -370,7 +418,8 @@ namespace Kesa.Engine.Runtime
 
         // ---- ask (G138) ----
 
-        private void AddFlowBuiltins(SortedDictionary<string, Value> table) =>
+        private void AddFlowBuiltins(SortedDictionary<string, Value> table)
+        {
             table.Add(PureBuiltins.AskName,
                 new PureBuiltin(PureBuiltins.AskName, (p, k) => Guard(() => Ask("", p, k)))
                 {
@@ -378,6 +427,31 @@ namespace Kesa.Engine.Runtime
                     Suspends = true,
                     CallerBody = (mod, p, k) => Guard(() => Ask(mod, p, k)),
                 });
+            table.Add(PureBuiltins.WaitName,
+                new PureBuiltin(PureBuiltins.WaitName, (p, k) => Wait(p, k)) { Writes = true, Suspends = true });
+        }
+
+        /// <summary><c>wait(ticks=n)</c> (spec X2·S5): n은 1 이상. 멈추는 것은 실행기가 하고, 깨어나면 None을 돌려준다.</summary>
+        private static Value Wait(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
+            const string usage = "wait(ticks=3)";
+            if (positional.Count > 0 || keywords.Count != 1 || !keywords.TryGetValue("ticks", out var ticks))
+                throw new ScriptRuntimeException(Codes.RunScript, "wait() takes only ticks=, like " + usage, "write " + usage);
+            if (!(ticks is IntValue n))
+                throw new ScriptRuntimeException(Codes.RunType, "ticks= of wait() must be an int, not " + ticks.KindName, "write " + usage);
+            if (n.Value < 1)
+                throw new ScriptRuntimeException(Codes.RunScript,
+                    "ticks= of wait() must be at least 1, got " + n.Value.ToString(CultureInfo.InvariantCulture), "spec X2");
+            return new WaitPayload(n.Value);
+        }
+
+        /// <summary><c>wait</c>가 실행기에 넘기는 것: 잘 틱 수.</summary>
+        private sealed class WaitPayload : Value
+        {
+            public WaitPayload(long ticks) => Ticks = ticks;
+            public long Ticks { get; }
+            public override string KindName => "wait";
+        }
 
         /// <summary>
         /// <c>ask(who, title, choices=[...], responses=[...], hint=, data=)</c>의 인자를 검사해 질문의 내용을 만든다 (G138).
@@ -423,6 +497,9 @@ namespace Kesa.Engine.Runtime
             string? hint = null;
             Value data = NoneValue.Instance;
             bool hasChoices = false;
+            bool? blocksTime = null; // 적지 않으면 마감 유무로 정한다 (G159)
+            long? deadline = null;
+            Value? onTimeout = null;
             foreach (var pair in keywords)
             {
                 switch (pair.Key)
@@ -463,14 +540,83 @@ namespace Kesa.Engine.Runtime
                                 "write data={\"amount\": 2} (spec-gaps G137)");
                         data = Savable("data= of ask()", pair.Value);
                         break;
+                    case "blocks_time":
+                        if (!(pair.Value is BoolValue b))
+                            throw new ScriptRuntimeException(Codes.RunType,
+                                "blocks_time= of ask() must be True or False, not " + pair.Value.KindName,
+                                "True stops time until it is answered (spec-gaps G159)");
+                        blocksTime = b.Value;
+                        break;
+                    case "deadline":
+                        if (!(pair.Value is IntValue n) || n.Value < 1)
+                            throw new ScriptRuntimeException(Codes.RunType,
+                                "deadline= of ask() must be a number of ticks of at least 1, not " + Show(pair.Value),
+                                "deadline=3 closes it 3 ticks after it opens; for a fixed tick write deadline=tick - now() (spec-gaps G160)");
+                        deadline = n.Value;
+                        break;
+                    case "on_timeout":
+                        onTimeout = pair.Value;
+                        break;
                     default:
                         throw new ScriptRuntimeException(Codes.RunScript, "ask() has no argument '" + pair.Key + "'",
-                            Suggest.Hint(pair.Key, new[] { "choices", "responses", "hint", "data" }));
+                            Suggest.Hint(pair.Key, new[] { "choices", "responses", "hint", "data", "blocks_time", "deadline", "on_timeout" }));
                 }
             }
+            long? timeoutChoice = null, timeoutResponse = null;
+            if (onTimeout != null) TimeoutAnswer(mod, onTimeout, deadline, choices, responses, out timeoutChoice, out timeoutResponse);
+            else if (deadline != null)
+                throw new ScriptRuntimeException(Codes.RunScript,
+                    "ask() has a deadline but no on_timeout=, so nothing says what happens when the deadline passes",
+                    "add on_timeout= with the choice or response to give then, e.g. a choice that does nothing (spec-gaps G162)");
             if (!hasChoices && responses.Count == 0)
                 throw new ScriptRuntimeException(Codes.RunScript, "ask() needs choices=[...] or responses=[...]", "write " + usage);
-            return new AskPayload(who, title, choices, responses, responseNames, hint, data);
+            if (blocksTime == true && deadline != null)
+                throw new ScriptRuntimeException(Codes.RunScript,
+                    "ask() has blocks_time=True and a deadline, but time stops while it is open, so the deadline is never reached",
+                    "drop blocks_time=True to let time flow until the deadline (spec X2, spec-gaps G159)");
+            return new AskPayload(who, title, choices, responses, responseNames, hint, data)
+            {
+                BlocksTime = blocksTime ?? deadline == null,
+                DeadlineIn = deadline,
+                TimeoutChoice = timeoutChoice,
+                TimeoutResponse = timeoutResponse,
+            };
+        }
+
+        /// <summary>
+        /// <c>on_timeout=</c>이 가리키는 선택지 번호나 응답 번호 (G161). 선택지 값(같은 값이 여럿이면 앞의 것)이나 응답 이름이어야 하고,
+        /// 둘 다에 맞으면 어느 쪽인지 모호하다. 마감이 없으면 닿지 않는다.
+        /// </summary>
+        private void TimeoutAnswer(string mod, Value onTimeout, long? deadline, List<Value> choices, List<string> responses,
+            out long? choice, out long? response)
+        {
+            choice = null;
+            response = null;
+            if (deadline == null)
+                throw new ScriptRuntimeException(Codes.RunScript, "ask() has on_timeout= but no deadline, so it never times out",
+                    "add deadline=n, the number of ticks before the default answer is given (spec-gaps G160, G161)");
+            var value = Savable("on_timeout= of ask()", onTimeout);
+            for (int i = 0; i < choices.Count && choice == null; i++)
+                if (PureOps.ValuesEqual(choices[i], value)) choice = i;
+            if (value is StrValue name)
+            {
+                string id = name.Value.IndexOf('.') >= 0 ? name.Value : mod + "." + name.Value;
+                int at = responses.IndexOf(id);
+                if (at >= 0) response = at;
+            }
+            if (choice != null && response != null)
+                throw new ScriptRuntimeException(Codes.RunScript,
+                    "on_timeout=\"" + ((StrValue)value).Value + "\" of ask() is both a choice and a response, so the default answer is unclear",
+                    "rename the choice or the response command (spec-gaps G161)");
+            if (choice == null && response == null)
+            {
+                var names = new List<string>();
+                foreach (var c in choices) if (c is StrValue s) names.Add(s.Value);
+                foreach (var r in responses) names.Add(r.Substring(r.IndexOf('.') + 1));
+                throw new ScriptRuntimeException(Codes.RunScript,
+                    "on_timeout= of ask() must be one of its choices or responses, not " + Show(value),
+                    value is StrValue missing ? Suggest.Hint(missing.Value, names) : "the default answer is given when the deadline passes (spec-gaps G161)");
+            }
         }
 
         /// <summary>응답 커맨드 이름을 커맨드 id로: 점이 없으면 부른 함수의 모드에서 찾는다. 자유 커맨드는 답이 될 수 없다.</summary>
@@ -543,6 +689,14 @@ namespace Kesa.Engine.Runtime
             public IReadOnlyList<string> ResponseNames { get; }
             public string? Hint { get; }
             public Value Data { get; }
+            public bool BlocksTime { get; set; } = true;
+
+            /// <summary>열린 뒤 몇 틱 뒤가 마감인가 (G160). 질문이 열릴 때 틱으로 굳는다.</summary>
+            public long? DeadlineIn { get; set; }
+
+            public long? TimeoutChoice { get; set; }
+            public long? TimeoutResponse { get; set; }
+
             public override string KindName => "question";
         }
 

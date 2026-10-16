@@ -184,11 +184,22 @@ namespace Kesa.Engine.Schema
                     list.Add((mod, span));
                 }
 
+                // 엔진 신호(Tick)는 먼저 자리를 잡는다. 모드가 같은 이름을 쓰면 그 모드의 오류다 (G154)
+                foreach (var name in EngineSignals.All)
+                    _set.Add(new SignalType(new SignalDecl(name, SourceSpan.None, EngineSignals.Owner, new List<SignalField>())));
+                bool Reserved(string name, string mod, SourceSpan span)
+                {
+                    if (!EngineSignals.IsEngine(name)) return false;
+                    Error(mod, Codes.SchDuplicateName, "'" + name + "' is a signal declared by the engine", span,
+                        hint: "pick another name; handle the engine's signal with @on(" + name + ") (spec-gaps G154)");
+                    return true;
+                }
+
                 foreach (var m in _mods)
                 {
-                    foreach (var t in m.Types) Note(t.Name, t.Mod, t.Span);
-                    foreach (var c in m.Components) Note(c.Name, c.Mod, c.Span);
-                    foreach (var s in m.Signals) Note(s.Name, s.Mod, s.Span);
+                    foreach (var t in m.Types) if (!Reserved(t.Name, t.Mod, t.Span)) Note(t.Name, t.Mod, t.Span);
+                    foreach (var c in m.Components) if (!Reserved(c.Name, c.Mod, c.Span)) Note(c.Name, c.Mod, c.Span);
+                    foreach (var s in m.Signals) if (!Reserved(s.Name, s.Mod, s.Span)) Note(s.Name, s.Mod, s.Span);
                 }
 
                 bool Unique(string name, string mod, SourceSpan span)
@@ -215,12 +226,13 @@ namespace Kesa.Engine.Schema
 
                 foreach (var m in _mods)
                 {
+                    // 엔진 이름과 겹친 선언은 위에서 오류를 냈고 등록하지 않는다
                     foreach (var t in m.Types)
-                        if (Unique(t.Name, t.Mod, t.Span)) _set.Add(new DefType(t));
+                        if (!EngineSignals.IsEngine(t.Name) && Unique(t.Name, t.Mod, t.Span)) _set.Add(new DefType(t));
                     foreach (var c in m.Components)
-                        if (Unique(c.Name, c.Mod, c.Span)) _set.Add(new ComponentType(c));
+                        if (!EngineSignals.IsEngine(c.Name) && Unique(c.Name, c.Mod, c.Span)) _set.Add(new ComponentType(c));
                     foreach (var s in m.Signals)
-                        if (Unique(s.Name, s.Mod, s.Span)) _set.Add(new SignalType(s));
+                        if (!EngineSignals.IsEngine(s.Name) && Unique(s.Name, s.Mod, s.Span)) _set.Add(new SignalType(s));
                 }
             }
 

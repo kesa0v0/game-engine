@@ -170,6 +170,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "      \"version\": \"1.0\"\n" +
                 "    }\n" +
                 "  ],\n" +
+                "  \"tick\": 0,\n" +
                 "  \"counters\": {\n" +
                 "    \"entity\": 3,\n" +
                 "    \"contribution\": 1,\n" +

@@ -53,6 +53,7 @@ namespace Kesa.Engine.Runtime
             var root = new JsonObject()
                 .Add("format", new JsonNumber(SaveFormatVersion))
                 .Add("mods", mods)
+                .Add("tick", new JsonNumber(_tick))
                 .Add("counters", counters)
                 .Add("entities", entities)
                 .Add("contributions", contributions)
@@ -203,6 +204,8 @@ namespace Kesa.Engine.Runtime
                                               ", but this engine reads format " + SaveFormatVersion.ToString(CultureInfo.InvariantCulture));
             CompareMods(AsArray(Field(root, "mods"), "mods"), diagnostics);
 
+            _tick = Long(Field(root, "tick"), "tick");
+            if (_tick < 0) throw new JsonFormatException("tick should not be negative");
             var counters = AsObject(Field(root, "counters"), "counters");
             _nextId = Positive(Field(counters, "entity"), "counters.entity");
             _nextContribution = Positive(Field(counters, "contribution"), "counters.contribution");

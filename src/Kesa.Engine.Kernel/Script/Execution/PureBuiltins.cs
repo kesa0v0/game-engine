@@ -17,6 +17,9 @@ namespace Kesa.Engine.Script
         /// <summary>기여 행을 읽는 내장 함수 (G98). 월드가 있어야 하므로 런타임(<c>World</c>)이 이 이름으로 더한다.</summary>
         public const string ContribsName = "contribs";
 
+        /// <summary>지금 틱을 읽는 내장 (spec X2, spec-gaps G154·G155). 월드가 있어야 하므로 런타임이 더한다.</summary>
+        public const string NowName = "now";
+
         /// <summary>월드의 구조를 바꾸는 내장 (spec-gaps G134, int 키 줄 헬퍼는 G129). 몸체는 월드가 준다.</summary>
         public const string SpawnName = "spawn";
         public const string DestroyName = "destroy";
@@ -30,6 +33,9 @@ namespace Kesa.Engine.Script
         /// <summary>멈춰서 답을 기다리는 내장 (spec X1, spec-gaps G138). 자리 규칙은 쓰는 내장과 같다 (G136).</summary>
         public const string AskName = "ask";
 
+        /// <summary>틱이 지날 때까지 멈추는 내장 (spec X2·S5 "자는 Flow"). 자리 규칙은 <c>ask</c>와 같다 (G136).</summary>
+        public const string WaitName = "wait";
+
         /// <summary>신호를 내는 내장 (spec S5). 받은 핸들러가 상태를 바꾸므로 자리 규칙은 쓰는 내장과 같다 (spec-gaps G146).</summary>
         public const string EmitName = "emit";
 
@@ -39,7 +45,7 @@ namespace Kesa.Engine.Script
         private static readonly string[] WritingNameArray =
         {
             SpawnName, DestroyName, AttachName, DetachName, AddRowName, RemoveRowName, ReplaceRowsName, AppendRowName,
-            AskName, EmitName,
+            AskName, WaitName, EmitName,
         };
 
         public static IReadOnlyList<string> WritingNames => WritingNameArray;
@@ -48,7 +54,8 @@ namespace Kesa.Engine.Script
 
         /// <summary>오류 메시지에서 쓰는 내장이 하는 일: "changes the world", "waits for an answer", "sends a signal".</summary>
         public static string EffectPhrase(string name) =>
-            name == AskName ? "waits for an answer" : name == EmitName ? "sends a signal" : "changes the world";
+            name == AskName ? "waits for an answer" : name == WaitName ? "waits for time to pass" :
+            name == EmitName ? "sends a signal" : "changes the world";
 
         /// <summary>
         /// 실행 중 함수 본문에서 보이는 내장 이름 전체: <see cref="Create"/>의 이름, <see cref="ContribsName"/>, 쓰는 내장.
@@ -60,7 +67,7 @@ namespace Kesa.Engine.Script
 
         private static SortedSet<string> NameSet()
         {
-            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName };
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName };
             set.UnionWith(WritingNameArray);
             return set;
         }

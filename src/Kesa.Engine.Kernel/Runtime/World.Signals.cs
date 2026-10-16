@@ -31,6 +31,13 @@ namespace Kesa.Engine.Runtime
             {
                 var s = signal;
                 if (table.ContainsKey(s.Name)) continue; // 내장과 같은 이름의 신호는 생성자로 쓸 수 없다
+                if (EngineSignals.IsEngine(s.Name))
+                {
+                    // 엔진 신호의 값은 엔진만 만든다. 이름이 적힌 호출은 로드 때 잡히고, 함수 값을 거친 길은 여기서 막는다 (G156)
+                    table.Add(s.Name, new PureBuiltin(s.Name, (p, k) =>
+                        throw new ScriptRuntimeException(Codes.RunScript, EngineSignals.Why(s.Name))));
+                    continue;
+                }
                 table.Add(s.Name, new PureBuiltin(s.Name, (p, k) => ConstructSignal(s, p, k)));
             }
         }

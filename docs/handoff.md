@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1337개 통과(커널 1309, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1385개 통과(커널 1357, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -222,13 +222,43 @@ G140(정규형 JSON을 엔진이 직접 씀)·G141(멈춘 Flow의 런타임 값�
    - 핸들러 `@on(Tick, stage="core.economy")`: `Interpreter.DeclareHandler`가 문자열만 받고, `Loading/HandlerStages.Check`가 ②b에서 있는지·의존을 본다. `World.SetHandlers`가 단계 순서 → 받은 순서(로드 → 정의), 단계 없는 핸들러는 맨 뒤로 정렬.
    - 스키마 스텁에 `def stage(...)`.
    - 테스트 `Runtime/StageTests`(정렬과 동률, 끼워 넣기, 접두사, 중복, 오타 후보, 자기 참조, 인자 오타, 의존, 선택 참조, 사이클 경로·관련 위치, 모드를 건넌 사이클, 핸들러 stage 검사, 실행 순서). 정렬을 끄면 순서 테스트가 실패하는 것까지 확인했다.
-   - 반응 ①(`@on`·`emit`·`stage`)이 끝났다. **다음:** 반응 ②(`when` + 정착) 또는 ③(시간). 사용자와 고른다.
+   - 반응 ①(`@on`·`emit`·`stage`)이 끝났다. 사용자가 ③(시간)을 먼저 골랐다(②의 정착 지점 하나가 틱 끝이라서).
+
+## 시간 슬라이스 (반응 ③, 진행 중, 2026-10-16)
+
+나눠서 한다: ① 틱·`Advance`·`Tick`·`now()` ② `wait(ticks=n)`(자는 Flow, 저장) ③ `blocks_time`·`deadline`·`on_timeout` ④ 멈춘 Flow의 대상 소멸(`on_stale`), 스크립트의 `advance`.
+
+1. **틱과 `Advance`(끝남, 커밋 전), G154(엔진이 `Tick`을 값 없이 선언, 지금 틱은 `now()`)·G155(`now()`는 어디서나, 읽으면 Explain에 `now() = n`)·G156(스크립트는 `Tick()`을 만들 수 없음), 모두 확인:**
+   - `Schema/EngineSignals.cs`(이름 `Tick`, 선언 모드 자리는 `""`). `SchemaBuilder.RegisterNames`가 먼저 등록하고, 모드가 같은 이름(타입·컴포넌트·신호)을 쓰면 SCH001. `ModVisibility.CanSee`는 엔진 것을 모두에게 보인다.
+   - `Tick(...)` 호출: 함수 본문에 적혀 있으면 `FunctionNameChecker`가 CMD004, 함수 값을 거치면 실행 오류. 스텁은 `class Tick: ...`(생성자 없음).
+   - `Runtime/World.Time.cs`: `World.Tick`, `World.Advance(n)` → `AdvanceResult(Advanced, Tick, Reactions)`. 틱마다 +1 → `Tick` 1세대로 대기열 → `RunReactions`. 만료 스윕(표준 모드 몫)·깨우기·정착은 아직 자리만. 커맨드 실행 중이면 호출자 오류.
+   - `now()`(`PureBuiltins.NowName`), `ExplainKind.Time`.
+   - 저장에 최상위 `"tick"`(골든 갱신). 그 전 저장은 SAV001(실제 저장 없음).
+   - 테스트 `Runtime/TimeTests`(11개).
+2. **`wait(ticks=n)`(끝남, 커밋 전), G157(깨어난 Flow가 실패하면 그 구간을 되감고 Flow를 버리고 결과에 남김, 확인):**
+   - 쓰는·멈추는 내장(`PureBuiltins.WaitName`, 문장 자리만, G136). `ticks=`만 받고 1 이상 int. 질문을 열지 않는다.
+   - `FlowRecord.Request`가 null이고 `WakeAt`(멈춘 틱 + n)이 있는 Flow가 "자는 Flow". `OpenRequests`·답·응답은 자는 Flow를 보지 않는다.
+   - `Advance`가 틱 +1 뒤 `WakeSleepers`: `WakeAt <= 틱`인 Flow를 Flow id 순으로 각자 트랜잭션으로 이어서 실행하고, Flow마다 그 뒤 `RunReactions`. 그다음 `Tick` 핸들러. 결과에는 `Reaction`(신호 자리 `Reaction.WakeSignal` = `"wait"`, 핸들러 자리에 Flow를 만든 커맨드·핸들러 id, `Reaction.Flow`에 Flow 번호).
+   - 핸들러가 `wait`하면 `Suspended`(질문 없음). 오류 문구는 "(after waking)".
+   - 저장: 자는 Flow는 `"request"` 대신 `"wake_at"`. 불러올 때 지금 틱 이하면 형식 오류.
+   - 테스트 `TimeTests`에 13개 더(모두 24개). ask와 wait가 저장을 사이에 두고 번갈아 바뀌는 경우, 깨어난 뒤 신호가 1세대로 다시 시작하는 경우 포함.
+   - G158(확인): 잠들었으면 결과에 깨울 틱 `SleepsUntil`. `SubmitResult`·`AnswerResult`(답·응답)·`Reaction`(잠든 핸들러, 다시 잠든 깨어난 Flow). 결과 종류는 그대로 `Succeeded`. 응답 커맨드 자체가 `wait`하면 아직 지원 안 함 오류(문구가 `wait()`를 가리킨다).
+3. **마감(진행 중):**
+   - G159(확인): `ask(..., blocks_time=True/False)`. 적지 않으면 마감 유무로 정한다(지금은 마감이 없어 늘 막음). `Request.BlocksTime`, 저장 `"blocks_time"`.
+   - `Advance`는 매 틱 전에 막는 질문을 보고, 있으면 예외 없이 멈춘다. 결과의 `Advanced`가 실제로 간 틱 수, `BlockedBy`(질문 번호 순)·`Blocked`. spec X2의 "거부"를 이렇게 읽었고 사용자에게 알렸다.
+   - G160(확인): `deadline=n`은 몇 틱 뒤(1 이상 int). 열릴 때 지금 틱 + n으로 굳어 `Request.Deadline`, 저장 `"deadline"`(없으면 null). 마감이 있으면 기본은 막지 않고, `blocks_time=True`와 함께 쓰면 실행 오류.
+   - G161(확인): `on_timeout=`은 선택지 값(같은 값이 여럿이면 앞의 것)이나 응답 이름. `Request.TimeoutChoice`/`TimeoutResponse`(번호)·`TimesOut`, 저장 `"on_timeout": {"choice": i}` 또는 `{"response": i}`. 마감 없이 쓰거나, 어디에도 없거나, 둘 다에 맞으면 실행 오류.
+   - 주입: `WakeSleepers`가 잠이 끝난 Flow와 기본 답 있는 마감이 지난 질문을 함께 Flow id 순으로. 반응 항목 신호 자리 `Reaction.TimeoutSignal` = `"timeout"`, 오류 문구 "(after its deadline)". 응답 이름이면 응답 커맨드 본문은 돌지 않는다. 실패하면 G157과 같이 되감고 Flow를 버린다(사용자에게 알림).
+   - 불러오기 검사: 막으면서 마감 있음, 마감 없이 기본 답, 기본 답 있는 마감이 이미 지남은 형식 오류.
+   - G162(확인): `deadline=`을 쓰면 `on_timeout=`도 적어야 한다(없으면 실행 오류, 불러오기에서는 형식 오류). 그래서 마감이 있는 질문은 늘 기본 답이 있다.
+   - 테스트 `TimeTests`에 24개(모두 48개).
+   - ③ 끝(커밋 전). **다음:** ④ 멈춘 Flow의 대상 소멸(`on_stale`), 스크립트의 `advance`.
 
 ## 다음 할 일 (사용자와 고를 것)
 
 Flow(`ask`·응답 커맨드)와 저장(C1·C4·C5)까지 끝났고 반응(S5)을 진행 중이다(위 "반응 슬라이스").
 
-**다음 세션에서 바로 할 것:** 반응 ①(`@on`·`emit`·`stage`, G145~G153)이 끝났다. 다음은 반응 ②(`when` + 정착) 또는 ③(시간: `advance`·`tick`·`wait`·마감)을 사용자와 고른다.
+**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(`blocks_time`·`deadline`·`on_timeout`, G159~G162)을 했다. 다음은 ④ 멈춘 Flow의 대상 소멸(`on_stale`)과 스크립트의 `advance`. 그 뒤 ④, 그다음 반응 ②(`when` + 정착).
 
 그 밖의 후보:
 
@@ -278,7 +308,7 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1337개 통과(커널 1309, CLI 28)를 확인한다.
+1. `git pull` 후 `dotnet test`로 1385개 통과(커널 1357, CLI 28)를 확인한다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G135), `docs/spine-spec.md` S2·S4·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.
 

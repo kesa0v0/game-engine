@@ -14,7 +14,7 @@ namespace Kesa.Engine.Tests.Runtime
         private const string Schema =
             "component(\"Out\", s=field(str, default=\"\"))\n" +
             "deftype(\"Unit\", components=[\"Out\"])\n" +
-            "signal(\"Tick\", target=Ref[\"Unit\"])\n";
+            "signal(\"Pulse\", target=Ref[\"Unit\"])\n";
 
         private const string Dep = ", dependencies=[\"core\"]";
 
@@ -148,7 +148,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void AHandlerStageMustExist()
         {
             Mod("core", schema: Schema + "stage(\"core.economy\")\n",
-                defs: "@on(Tick, stage=\"core.ecnomy\")\ndef pay(target):\n    pass\n");
+                defs: "@on(Pulse, stage=\"core.ecnomy\")\ndef pay(target):\n    pass\n");
             Assert.That(Errors(), Has.Some.EqualTo(Codes.SchUnknownName + " unknown stage 'core.ecnomy' | did you mean 'core.economy'?"));
         }
 
@@ -169,7 +169,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void AHandlerStageIsAString()
         {
-            Mod("core", schema: Schema, defs: "@on(Tick, stage=3)\ndef pay(target):\n    pass\n");
+            Mod("core", schema: Schema, defs: "@on(Pulse, stage=3)\ndef pay(target):\n    pass\n");
             Assert.That(Errors(), Has.Some.StartWith(Codes.CmdBadDecorator + " stage= takes a stage id string"));
         }
 
@@ -181,15 +181,15 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("core", schema: Schema +
                     "stage(\"core.admin\")\nstage(\"core.economy\", after=[\"core.admin\"])\nstage(\"core.politics\", after=[\"core.economy\"])\n",
                 defs: "Unit(\"Scout\")\n" +
-                      "@command(free=True, acts_for=None)\ndef Go(u: Ref[Unit]):\n    emit(Tick(target=u))\n" +
-                      "@on(Tick)\ndef loose(target):\n    target.Out.s = target.Out.s + \"L\"\n" +
-                      "@on(Tick, stage=\"core.politics\")\ndef vote(target):\n    target.Out.s = target.Out.s + \"P\"\n" +
-                      "@on(Tick, stage=\"core.admin\")\ndef census(target):\n    target.Out.s = target.Out.s + \"A\"\n" +
-                      "@on(Tick, stage=\"core.admin\")\ndef tax(target):\n    target.Out.s = target.Out.s + \"a\"\n");
+                      "@command(free=True, acts_for=None)\ndef Go(u: Ref[Unit]):\n    emit(Pulse(target=u))\n" +
+                      "@on(Pulse)\ndef loose(target):\n    target.Out.s = target.Out.s + \"L\"\n" +
+                      "@on(Pulse, stage=\"core.politics\")\ndef vote(target):\n    target.Out.s = target.Out.s + \"P\"\n" +
+                      "@on(Pulse, stage=\"core.admin\")\ndef census(target):\n    target.Out.s = target.Out.s + \"A\"\n" +
+                      "@on(Pulse, stage=\"core.admin\")\ndef tax(target):\n    target.Out.s = target.Out.s + \"a\"\n");
             Mod("smuggling", schema: "stage(\"smuggling.market\", after=[\"core.economy\"], before=[\"core.politics\"])\n",
-                defs: "@on(Tick)\ndef late(target):\n    target.Out.s = target.Out.s + \"l\"\n" +
-                      "@on(Tick, stage=\"smuggling.market\")\ndef deal(target):\n    target.Out.s = target.Out.s + \"S\"\n" +
-                      "@on(Tick, stage=\"core.admin\")\ndef bribe(target):\n    target.Out.s = target.Out.s + \"b\"\n",
+                defs: "@on(Pulse)\ndef late(target):\n    target.Out.s = target.Out.s + \"l\"\n" +
+                      "@on(Pulse, stage=\"smuggling.market\")\ndef deal(target):\n    target.Out.s = target.Out.s + \"S\"\n" +
+                      "@on(Pulse, stage=\"core.admin\")\ndef bribe(target):\n    target.Out.s = target.Out.s + \"b\"\n",
                 extra: Dep);
             var world = new World(LoadClean());
             var u = world.Create("Scout");

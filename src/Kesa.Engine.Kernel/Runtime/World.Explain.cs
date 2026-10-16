@@ -15,6 +15,9 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>기여 행 하나를 읽었다.</summary>
         Contribution,
+
+        /// <summary><c>now()</c>로 지금 틱을 읽었다 (G155). <see cref="ExplainNode.Value"/>가 그 틱이다.</summary>
+        Time,
     }
 
     /// <summary>
@@ -36,6 +39,9 @@ namespace Kesa.Engine.Runtime
             Op = op;
             Source = source;
         }
+
+        internal static ExplainNode Time(Value tick) =>
+            new ExplainNode(ExplainKind.Time, default, "", null, "", tick, new List<ExplainNode>());
 
         public ExplainKind Kind { get; }
         public EntityId Entity { get; }
@@ -66,7 +72,11 @@ namespace Kesa.Engine.Runtime
         private void Append(StringBuilder text, int depth)
         {
             text.Append(' ', depth * 2);
-            if (Kind == ExplainKind.Contribution)
+            if (Kind == ExplainKind.Time)
+            {
+                text.Append("now() = ").Append(World.Show(Value));
+            }
+            else if (Kind == ExplainKind.Contribution)
             {
                 text.Append("contribution ").Append(Op).Append(' ').Append(World.Show(Value));
                 if (Source != null) text.Append(" from ").Append(Source.Value);

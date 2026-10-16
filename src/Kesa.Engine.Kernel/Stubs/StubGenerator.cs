@@ -154,6 +154,13 @@ namespace Kesa.Engine.Stubs
             /// <summary>신호 (spec-gaps G145): 인자는 모두 필수인 키워드 인자이고 <c>d.amount</c>로 읽는다.</summary>
             private void WriteSignal(SignalType signal)
             {
+                if (EngineSignals.IsEngine(signal.Name))
+                {
+                    // 엔진 신호는 @on으로 받기만 하고 만들 수 없다 (G156): 생성자를 적지 않는다
+                    Line("class " + signal.Name + ": ...  # sent by the engine; handle it with @on(" + signal.Name + ")");
+                    Line();
+                    return;
+                }
                 Line("class " + signal.Name + ":");
                 var parameters = new List<string>();
                 foreach (var field in signal.Fields)

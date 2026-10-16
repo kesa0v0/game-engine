@@ -31,10 +31,13 @@ namespace Kesa.Engine.Runtime
                 var writer = new FlowWriter(run.Frames);
                 var frames = new JsonArray();
                 foreach (var frame in run.Frames) frames.Add(SaveFrame(frame, writer));
-                flows.Add(new JsonObject()
+                // 질문을 든 Flow는 "request", wait로 자는 Flow는 깨울 틱 "wake_at"을 적는다
+                var saved = new JsonObject()
                     .Add("id", new JsonNumber(flow.Id))
-                    .Add(flow.Handler ? "handler" : "command", new JsonString(flow.Command))
-                    .Add("request", SaveRequest(flow.Request))
+                    .Add(flow.Handler ? "handler" : "command", new JsonString(flow.Command));
+                if (flow.Request != null) saved.Add("request", SaveRequest(flow.Request));
+                else saved.Add("wake_at", new JsonNumber(flow.WakeAt!.Value));
+                flows.Add(saved
                     .Add("frames", frames)
                     .Add("closures", writer.Closures)
                     .Add("envs", writer.Envs));
@@ -169,7 +172,12 @@ namespace Kesa.Engine.Runtime
                 .Add("responses", responses)
                 .Add("response_names", names)
                 .Add("hint", request.Hint == null ? (JsonNode)JsonNull.Instance : new JsonString(request.Hint))
-                .Add("data", SaveValue(request.Data));
+                .Add("data", SaveValue(request.Data))
+                .Add("blocks_time", new JsonBool(request.BlocksTime))
+                .Add("deadline", request.Deadline == null ? (JsonNode)JsonNull.Instance : new JsonNumber(request.Deadline.Value))
+                .Add("on_timeout", request.TimeoutChoice != null ? Tag("choice", new JsonNumber(request.TimeoutChoice.Value))
+                    : request.TimeoutResponse != null ? Tag("response", new JsonNumber(request.TimeoutResponse.Value))
+                    : (JsonNode)JsonNull.Instance);
         }
 
         private JsonObject SaveFrame(PureEvaluator.Frame frame, FlowWriter writer)
@@ -313,7 +321,7 @@ namespace Kesa.Engine.Runtime
             var top = frames[frames.Count - 1];
             if (top.Blocks.Count == 0 || !CallStatement(Opener(top.Blocks[top.Blocks.Count - 1]), out _, out answerTo))
             {
-                if (check) throw new InvalidOperationException("engine: a paused flow is not at an ask statement");
+                if (check) throw new InvalidOperationException("engine: a paused flow is not at an ask or wait statement");
                 return false;
             }
             return true;
@@ -451,29 +459,14 @@ namespace Kesa.Engine.Runtime
                     continue;
                 }
 
-                var r = AsObject(Field(obj, "request"), "a request");
-                long requestId = Long(Field(r, "id"), "a request id");
-                if (requestId < 1 || requestId >= _nextRequest || !requestIds.Add(requestId))
-                    throw new JsonFormatException("request ids must be unique and below counters.request");
-                var who = new List<EntityId>();
-                foreach (var w in AsArray(Field(r, "who"), "who").Items) who.Add(new EntityId(Long(w, "an entity id")));
-                var title = LoadValue(Field(r, "title"));
-                var choices = new List<Value>();
-                foreach (var c in AsArray(Field(r, "choices"), "choices").Items) choices.Add(LoadValue(c));
-                var responses = new List<string>();
-                foreach (var c in AsArray(Field(r, "responses"), "responses").Items)
+                var wakeNode = obj.Get("wake_at");
+                long? wakeAt = null;
+                if (wakeNode != null)
                 {
-                    string response = Text(c, "a response command");
-                    if (!_commands.TryGetValue(response, out var decl) || decl.Free)
-                        problems.Add(where + ": the response command " + response + " no longer exists or is now free");
-                    responses.Add(response);
+                    wakeAt = Long(wakeNode, "a wake tick");
+                    if (wakeAt.Value <= _tick) throw new JsonFormatException(where + " should have woken by tick " + wakeAt.Value);
                 }
-                var names = new List<string>();
-                foreach (var c in AsArray(Field(r, "response_names"), "response names").Items) names.Add(Text(c, "a response name"));
-                if (names.Count != responses.Count) throw new JsonFormatException("a request has unmatched response names");
-                var hintNode = Field(r, "hint");
-                string? hint = hintNode is JsonNull ? null : Text(hintNode, "a hint");
-                var data = LoadValue(Field(r, "data"));
+                var request = wakeAt == null ? LoadRequest(obj, id, command, where, requestIds, problems) : null;
 
                 // 람다는 프레임이나 묶음의 사전을 잡고, 사전은 람다를 든다(자기를 잡을 수도 있다).
                 // 그래서 빈 프레임 → 빈 묶음 → 람다 → 값 채우기 순서로 만든다 (G143)
@@ -524,11 +517,72 @@ namespace Kesa.Engine.Runtime
                     continue;
                 }
 
-                var payload = new AskPayload(who, title, choices, responses, names, hint, data);
+                Value payload = request == null
+                    ? new WaitPayload(wakeAt!.Value - _tick)
+                    : new AskPayload(request.Who, request.Title, request.Choices, request.Responses, request.ResponseNames,
+                        request.Hint, request.Data) { BlocksTime = request.BlocksTime };
                 var run = new PureEvaluator.Suspended(frames, answerTo, payload);
-                var request = new Request(requestId, id, command, who, title, choices, responses, names, hint, data);
-                _flows.Add(id, new FlowRecord(id, command, run, request, handler));
+                _flows.Add(id, new FlowRecord(id, command, run, request, handler, wakeAt));
             }
+        }
+
+        private Request LoadRequest(JsonObject obj, long flow, string command, string where, HashSet<long> requestIds,
+            LoadProblems problems)
+        {
+            var r = AsObject(Field(obj, "request"), "a request");
+            long requestId = Long(Field(r, "id"), "a request id");
+            if (requestId < 1 || requestId >= _nextRequest || !requestIds.Add(requestId))
+                throw new JsonFormatException("request ids must be unique and below counters.request");
+            var who = new List<EntityId>();
+            foreach (var w in AsArray(Field(r, "who"), "who").Items) who.Add(new EntityId(Long(w, "an entity id")));
+            var title = LoadValue(Field(r, "title"));
+            var choices = new List<Value>();
+            foreach (var c in AsArray(Field(r, "choices"), "choices").Items) choices.Add(LoadValue(c));
+            var responses = new List<string>();
+            foreach (var c in AsArray(Field(r, "responses"), "responses").Items)
+            {
+                string response = Text(c, "a response command");
+                if (!_commands.TryGetValue(response, out var decl) || decl.Free)
+                    problems.Add(where + ": the response command " + response + " no longer exists or is now free");
+                responses.Add(response);
+            }
+            var names = new List<string>();
+            foreach (var c in AsArray(Field(r, "response_names"), "response names").Items) names.Add(Text(c, "a response name"));
+            if (names.Count != responses.Count) throw new JsonFormatException("a request has unmatched response names");
+            var hintNode = Field(r, "hint");
+            string? hint = hintNode is JsonNull ? null : Text(hintNode, "a hint");
+            var data = LoadValue(Field(r, "data"));
+            var request = new Request(requestId, flow, command, who, title, choices, responses, names, hint, data)
+            {
+                BlocksTime = Bool(Field(r, "blocks_time"), "blocks_time"),
+                Deadline = Field(r, "deadline") is JsonNull ? (long?)null : Long(Field(r, "deadline"), "a deadline"),
+            };
+            var timeout = Field(r, "on_timeout");
+            if (!(timeout is JsonNull))
+            {
+                var t = AsObject(timeout, "on_timeout");
+                if (t.Members.Count != 1) throw new JsonFormatException("on_timeout should be {\"choice\": i} or {\"response\": i}");
+                long index = Long(t.Members[0].Value, "an on_timeout index");
+                switch (t.Members[0].Key)
+                {
+                    case "choice" when index >= 0 && index < choices.Count:
+                        request.TimeoutChoice = index;
+                        break;
+                    case "response" when index >= 0 && index < responses.Count:
+                        request.TimeoutResponse = index;
+                        break;
+                    default:
+                        throw new JsonFormatException(where + ": on_timeout is not one of its choices or responses");
+                }
+            }
+            // 열린 질문이 지킬 것 (G159~G161): 막으면서 마감이 있을 수 없고, 기본 답은 마감이 있어야 하며, 기본 답이 있는 마감은 지나지 않았다
+            if (request.BlocksTime && request.Deadline != null)
+                throw new JsonFormatException(where + ": a question that blocks time cannot have a deadline");
+            if ((request.Deadline == null) != (request.TimeoutChoice == null && request.TimeoutResponse == null))
+                throw new JsonFormatException(where + ": a question has a deadline without on_timeout or on_timeout without a deadline");
+            if (request.TimesOut && request.Deadline!.Value <= _tick)
+                throw new JsonFormatException(where + ": the question should have timed out at tick " + request.Deadline.Value);
+            return request;
         }
 
         /// <summary>

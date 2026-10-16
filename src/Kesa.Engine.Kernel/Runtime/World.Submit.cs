@@ -78,6 +78,11 @@ namespace Kesa.Engine.Runtime
         public Request? OpenedRequest { get; internal set; }
 
         /// <summary>
+        /// 본문이 <c>wait</c>로 잠들었으면 깨울 틱 (spec X2, spec-gaps G158). 효과는 거기까지 남았고 결과는 <see cref="SubmitOutcome.Succeeded"/>다.
+        /// </summary>
+        public long? SleepsUntil { get; internal set; }
+
+        /// <summary>
         /// 본문이 낸 신호로 돈 핸들러들, 돈 순서대로 (spec S5, spec-gaps G148). 핸들러가 실패해도 <see cref="Outcome"/>은 그대로다.
         /// </summary>
         public IReadOnlyList<Reaction> Reactions { get; internal set; } = Array.Empty<Reaction>();
@@ -115,16 +120,22 @@ namespace Kesa.Engine.Runtime
                 if (!MayAct(issuer, target, command)) return Copy(result, SubmitOutcome.GateDenied, target);
                 // 본문이 중간에 실패하면 그때까지의 쓰기를 되감는다 (C8, G133)
                 Request? opened = null;
+                long? flow = null;
                 var report = Atomically(() =>
                 {
                     var r = EvaluateRequires(decl, checkedArgs, runBody: true, out var suspended);
-                    // ask에서 멈췄으면 여기까지가 한 트랜잭션이고 Flow가 질문을 들고 남는다 (S5·X1)
-                    if (suspended != null) opened = OpenFlow(command, suspended);
+                    // ask·wait에서 멈췄으면 여기까지가 한 트랜잭션이고 Flow가 질문을 들거나 잠들어 남는다 (S5·X1·X2)
+                    if (suspended != null)
+                    {
+                        flow = _nextFlow;
+                        opened = OpenFlow(command, suspended);
+                    }
                     return r;
                 });
                 if (!report.Passed) return Copy(result, SubmitOutcome.PreconditionsFailed, target, report);
                 var done = Copy(result, SubmitOutcome.Succeeded, target, report);
                 done.OpenedRequest = opened;
+                done.SleepsUntil = flow == null ? null : SleepsUntil(flow.Value);
                 // 커맨드의 트랜잭션이 끝난 뒤 핸들러를 각자의 트랜잭션으로 돌린다 (S5, G148)
                 done.Reactions = RunReactions();
                 return done;

@@ -12,7 +12,9 @@ namespace Kesa.Engine.Runtime
         /// <summary>끝까지 실행했다.</summary>
         Finished,
 
-        /// <summary><c>ask</c>에서 멈췄다. 효과는 남았고 Flow가 질문을 들고 기다린다 (<see cref="Reaction.OpenedRequest"/>).</summary>
+        /// <summary>
+        /// <c>ask</c>나 <c>wait</c>에서 멈췄다. 효과는 남았고 Flow가 질문을 들고(<see cref="Reaction.OpenedRequest"/>) 기다리거나 잔다.
+        /// </summary>
         Suspended,
 
         /// <summary>스크립트 오류. 그 핸들러의 효과만 되돌렸고 원인이 된 커맨드는 그대로다 (S5).</summary>
@@ -27,7 +29,10 @@ namespace Kesa.Engine.Runtime
         Canceled,
     }
 
-    /// <summary>제출·답·응답이 일으킨 핸들러 실행 하나 (spec S5, spec-gaps G148). 돈 순서대로 결과에 담긴다.</summary>
+    /// <summary>
+    /// 제출·답·응답·시간 진행이 일으킨 핸들러 실행 하나, 또는 <c>wait</c>에서 깨어난 Flow 하나 (spec S5, spec-gaps G148·G157).
+    /// 돈 순서대로 결과에 담긴다.
+    /// </summary>
     public sealed class Reaction
     {
         internal Reaction(string signal, IReadOnlyDictionary<string, Value> values, string handler, int generation,
@@ -40,8 +45,17 @@ namespace Kesa.Engine.Runtime
             Outcome = outcome;
         }
 
-        /// <summary>신호 이름.</summary>
+        /// <summary>신호 이름. <c>wait</c>에서 깨어난 Flow면 <see cref="WakeSignal"/>이다 (G157).</summary>
         public string Signal { get; }
+
+        /// <summary>깨어난 Flow 항목의 신호 자리.</summary>
+        public const string WakeSignal = "wait";
+
+        /// <summary>마감이 지나 기본 답을 받은 Flow 항목의 신호 자리 (G161).</summary>
+        public const string TimeoutSignal = "timeout";
+
+        /// <summary>깨어난 Flow 항목이면 그 Flow 번호.</summary>
+        public long? Flow { get; internal set; }
 
         /// <summary>신호의 값 (저장 가능한 모양, 엔티티는 <see cref="EntityValue"/>).</summary>
         public IReadOnlyDictionary<string, Value> Values { get; }
@@ -49,13 +63,18 @@ namespace Kesa.Engine.Runtime
         /// <summary>핸들러 id (<c>모드id.함수이름</c>).</summary>
         public string Handler { get; }
 
-        /// <summary>신호의 세대: 제출·답이 낸 신호가 1, 핸들러가 낸 신호는 그 핸들러가 받은 신호 + 1 (G147).</summary>
+        /// <summary>
+        /// 신호의 세대: 제출·답·깨어난 Flow가 낸 신호가 1, 핸들러가 낸 신호는 그 핸들러가 받은 신호 + 1 (G147). 깨어난 Flow 항목 자체는 0.
+        /// </summary>
         public int Generation { get; }
 
         public ReactionOutcome Outcome { get; }
 
         /// <summary><see cref="ReactionOutcome.Suspended"/>일 때 연 질문.</summary>
         public Request? OpenedRequest { get; internal set; }
+
+        /// <summary><see cref="ReactionOutcome.Suspended"/>이고 <c>wait</c>로 잠들었으면 깨울 틱 (G158).</summary>
+        public long? SleepsUntil { get; internal set; }
 
         /// <summary><see cref="ReactionOutcome.ScriptError"/>일 때의 오류.</summary>
         public WorldException? Error { get; internal set; }
@@ -200,7 +219,9 @@ namespace Kesa.Engine.Runtime
                     try
                     {
                         Evaluator.RunCommand(h.Function, args, out var suspended, h.Span, _meter);
-                        return suspended == null ? null : OpenFlow(id, suspended, handler: true);
+                        if (suspended == null) return ((long?, Request?))(null, null);
+                        long flow = _nextFlow;
+                        return (flow, OpenFlow(id, suspended, handler: true)); // 질문, 또는 wait면 null
                     }
                     catch (ScriptRuntimeException ex)
                     {
@@ -211,8 +232,12 @@ namespace Kesa.Engine.Runtime
                         if (outermost) _meter = null;
                     }
                 });
-                if (opened == null) return reaction;
-                return new Reaction(reaction.Signal, reaction.Values, id, e.Generation, ReactionOutcome.Suspended) { OpenedRequest = opened };
+                if (opened.Item1 == null) return reaction;
+                return new Reaction(reaction.Signal, reaction.Values, id, e.Generation, ReactionOutcome.Suspended)
+                {
+                    OpenedRequest = opened.Item2,
+                    SleepsUntil = SleepsUntil(opened.Item1.Value),
+                };
             }
             catch (WorldException ex)
             {

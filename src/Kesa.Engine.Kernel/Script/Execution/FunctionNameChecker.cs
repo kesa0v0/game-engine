@@ -191,6 +191,9 @@ namespace Kesa.Engine.Script
                             !IsShadowed(callee.Name, locals) && call.Arguments.Count > 0 &&
                             call.Arguments[0].Name == null && call.Arguments[0].Value is StringLiteral id)
                             _spawned.Add(new KeyValuePair<string, SourceSpan>(id.Value, id.Span));
+                        // 엔진 신호의 값은 스크립트가 만들 수 없다 (G156)
+                        if (call.Callee is NameExpr signal && Schema.EngineSignals.IsEngine(signal.Name) && !IsShadowed(signal.Name, locals))
+                            _context.Error(Codes.CmdWriteEffect, Schema.EngineSignals.Why(signal.Name), call.Span);
                         Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
                         break;
