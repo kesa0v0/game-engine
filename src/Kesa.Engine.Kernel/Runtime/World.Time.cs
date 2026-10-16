@@ -91,6 +91,7 @@ namespace Kesa.Engine.Runtime
                         _emitted.Add(new Emitted(new SignalValue(this, tick, new List<KeyValuePair<SignalField, Value>>()), 1, null, null));
                         reactions.AddRange(RunReactions());
                     }
+                    Settle(reactions, tickEnd: true); // 틱의 마지막 단계 (X2 5단계, S5)
                 }
                 return (int)ticks;
             }
@@ -144,6 +145,7 @@ namespace Kesa.Engine.Runtime
                 Resume(flow, Reaction.AdvanceSignal, new IntValue(advanced), "after advancing", reactions);
                 reactions.AddRange(RunReactions());
             }
+            Settle(reactions, tickEnd: false); // 커맨드 하나가 끝난 뒤의 정착 지점 (S5)
             return reactions;
         }
 

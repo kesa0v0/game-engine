@@ -95,6 +95,67 @@ namespace Kesa.Engine.Script
         public SourceSpan StageSpan { get; internal set; }
     }
 
+    /// <summary>
+    /// <c>@when(조건)</c>으로 선언한 반응 (spec S5, spec-gaps G169). 함수에 매개변수가 없으면 전역 조건, <c>Ref[Def타입]</c> 하나면 그
+    /// 타입의 엔티티마다 따로 평가한다. 조건은 같은 수의 매개변수를 받는 순수 함수다. 정착 지점에서 거짓→참이 되면 본문이 Flow로 돈다.
+    /// </summary>
+    public sealed class WhenDecl
+    {
+        public WhenDecl(string mod, FunctionValue function, FunctionValue condition, SourceSpan span)
+        {
+            Mod = mod;
+            Function = function;
+            Condition = condition;
+            Span = span;
+        }
+
+        /// <summary>반응 id: <c>모드id.함수이름</c>. 거짓→참 기록과 결과 항목이 이 이름을 쓴다.</summary>
+        public string Id => Mod + "." + Function.Definition!.Name;
+
+        public string Mod { get; }
+        public FunctionValue Function { get; }
+        public FunctionValue Condition { get; }
+
+        /// <summary><c>@when</c> 데코레이터의 위치.</summary>
+        public SourceSpan Span { get; }
+
+        /// <summary><c>stage=</c>의 단계 id (G152). 없으면 단계가 있는 반응들 뒤에 돈다.</summary>
+        public string? Stage { get; internal set; }
+
+        public SourceSpan StageSpan { get; internal set; }
+
+        /// <summary>
+        /// <c>repeat=True</c>: 거짓→참이 아니라 참인 동안 틱마다 한 번, 틱 끝 정착에서만 발동한다 (S5, G173). 커맨드 뒤 정착에서는 보지 않는다.
+        /// </summary>
+        public bool Repeat { get; internal set; }
+
+        /// <summary>
+        /// <c>cooldown=N</c>: 발동한 뒤 N틱 동안 그 (반응, 대상)의 조건을 거짓으로 본다 (S5, G174). 끝난 뒤에도 참이면 그때 거짓→참으로 발동한다. 없으면 null.
+        /// </summary>
+        public long? Cooldown { get; internal set; }
+
+        /// <summary><c>once=</c> (S5, G175): 없음, <c>True</c>(반응, 엔티티마다 한 번), <c>"game"</c>(반응 전체에 한 번).</summary>
+        public WhenOnce Once { get; internal set; }
+
+        /// <summary>엔티티마다 평가하면 그 Def 타입 이름, 전역 조건이면 null. ②b 끝에서 매개변수 어노테이션을 풀어 채운다.</summary>
+        public string? Subject { get; internal set; }
+
+        /// <summary>엔티티마다 평가하는 반응의 매개변수 이름.</summary>
+        public string? Parameter => Function.Definition!.Parameters.Count == 1 ? Function.Definition.Parameters[0].Name : null;
+    }
+
+    /// <summary><c>@when(once=...)</c>의 단위 (G175).</summary>
+    public enum WhenOnce
+    {
+        None,
+
+        /// <summary><c>once=True</c>: (반응, 엔티티)마다 한 번. 전역 조건이면 반응에 한 번.</summary>
+        PerEntity,
+
+        /// <summary><c>once="game"</c>: 어느 엔티티든 한 번 발동하면 그 반응은 끝난다.</summary>
+        Game,
+    }
+
     /// <summary>커맨드 매개변수 하나: 이름과 타입 (spec-gaps G114).</summary>
     public sealed class CommandParameter
     {

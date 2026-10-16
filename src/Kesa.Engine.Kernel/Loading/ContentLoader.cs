@@ -78,6 +78,9 @@ namespace Kesa.Engine.Loading
 
         /// <summary>살아남은 모드의 <c>@on</c> 핸들러, 모드 로드 순서 → 정의 순서 (spec S5 동률 규칙, spec-gaps G145).</summary>
         public IReadOnlyList<HandlerDecl> Handlers { get; internal set; } = Array.Empty<HandlerDecl>();
+
+        /// <summary>살아남은 모드의 <c>@when</c> 반응, 모드 로드 순서 → 정의 순서 (spec S5, spec-gaps G169).</summary>
+        public IReadOnlyList<WhenDecl> Whens { get; internal set; } = Array.Empty<WhenDecl>();
     }
 
     /// <summary>한 회차의 ②a·②b가 남긴 것: 살아남은 모드(로드 순서), 완성된 스키마, 등록된 Def.</summary>
@@ -141,6 +144,7 @@ namespace Kesa.Engine.Loading
                 var scopes = new SortedDictionary<string, ModScope>(StringComparer.Ordinal);
                 var commands = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var handlers = new List<HandlerDecl>();
+                var whens = new List<WhenDecl>();
                 foreach (var u in units)
                 {
                     diagnostics.AddRange(u.Bag.ToSortedList());
@@ -155,12 +159,14 @@ namespace Kesa.Engine.Loading
                     // 같은 모드 안의 같은 이름은 EVL004로 막히고 모드 id는 유일하므로 id는 겹치지 않는다
                     foreach (var command in u.Functions.Commands) commands.Add(command.Id, command);
                     handlers.AddRange(u.Functions.Handlers);
+                    whens.AddRange(u.Functions.Whens);
                 }
                 return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
                     run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound, scopes, commands)
                 {
                     SubmitPolicy = run.Policy,
                     Handlers = handlers,
+                    Whens = whens,
                 };
             }
         }
@@ -244,6 +250,8 @@ namespace Kesa.Engine.Loading
                 CommandSignatures.Resolve(u.Functions.Commands, schema, visibility, u.Scope,
                     new CallContext(u.Manifest.Id, u.Bag));
                 HandlerStages.Check(u.Functions.Handlers, schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
+                CommandSignatures.ResolveWhens(u.Functions.Whens, schema, visibility, u.Scope, new CallContext(u.Manifest.Id, u.Bag));
+                HandlerStages.Check(u.Functions.Whens, schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
                 // 로드되지 않은 모드의 가드 안에서 건너뛴 패치는 조용히 사라지지 않게 알린다 (G38)
                 foreach (var skipped in u.Skipped)
                 {

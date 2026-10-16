@@ -57,7 +57,10 @@ namespace Kesa.Engine.Runtime
                 .Add("counters", counters)
                 .Add("entities", entities)
                 .Add("contributions", contributions)
-                .Add("flows", SaveFlows());
+                .Add("flows", SaveFlows())
+                .Add("when", SaveWhens())
+                .Add("when_cooldown", SaveCooldowns())
+                .Add("when_once", SaveOnce());
             return CanonicalJson.Write(root);
         }
 
@@ -169,13 +172,14 @@ namespace Kesa.Engine.Runtime
         /// 모드 목록이 달라진 것은 경고로만 알린다(Def 값 변경은 항상 허용, S8).
         /// </summary>
         public static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, int stepBudget = DefaultStepBudget,
-            bool requireSubmitPolicy = false, int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall)
+            bool requireSubmitPolicy = false, int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
+            int maxSettleRounds = DefaultMaxSettleRounds)
         {
             var diagnostics = new List<Diagnostic>();
             World world;
             try
             {
-                world = new World(loaded, stepBudget, requireSubmitPolicy, maxSignalDepth, maxAdvancePerCall);
+                world = new World(loaded, stepBudget, requireSubmitPolicy, maxSignalDepth, maxAdvancePerCall, maxSettleRounds);
             }
             catch (WorldException e)
             {
@@ -254,6 +258,9 @@ namespace Kesa.Engine.Runtime
                 RestoreContribution(AsObject(node, "a contribution"), problems);
 
             RestoreFlows(AsArray(Field(root, "flows"), "flows"), problems);
+            RestoreWhens(AsArray(Field(root, "when"), "when"));
+            RestoreCooldowns(AsArray(Field(root, "when_cooldown"), "when_cooldown"));
+            RestoreOnce(AsArray(Field(root, "when_once"), "when_once"));
 
             // 색인은 저장하지 않고 다시 만든다 (기록 없이: 커맨드 밖이다)
             foreach (var pair in records)

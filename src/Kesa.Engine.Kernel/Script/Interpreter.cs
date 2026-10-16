@@ -303,6 +303,170 @@ namespace Kesa.Engine.Script
                 });
         }
 
+        public const string WhenName = "when";
+
+        /// <summary>
+        /// <c>@when(조건)</c> (spec S5, spec-gaps G169). 조건은 이름 붙은 함수나 람다이고 본문 함수와 매개변수 수가 같다. 본문은
+        /// 매개변수가 없거나(전역 조건) <c>Ref[Def타입]</c> 하나다(그 타입의 엔티티마다). 타입은 스키마가 정해진 뒤 로더가 푼다.
+        /// </summary>
+        private void DeclareWhen(FunctionDef def, FunctionValue function, Expr decorator)
+        {
+            const string usage = "write @when(lambda u: u.Health.current <= 0) above def f(u: Ref[Unit]): ..., or @when(cond) above def f(): ...";
+            if (!(decorator is CallExpr call) || call.Arguments.Count == 0)
+            {
+                _context.Error(Codes.CmdBadDecorator, "@when needs the condition it watches", decorator.Span, hint: usage);
+                return;
+            }
+            string? stage = null;
+            var stageSpan = SourceSpan.None;
+            bool repeat = false;
+            long? cooldown = null;
+            var once = WhenOnce.None;
+            Argument? onceArg = null;
+            Argument? condition = null;
+            foreach (var arg in call.Arguments)
+            {
+                if (arg.Name == null)
+                {
+                    if (condition != null)
+                    {
+                        _context.Error(Codes.CmdBadDecorator, "@when takes one condition", arg.Span, hint: usage);
+                        return;
+                    }
+                    condition = arg;
+                    continue;
+                }
+                if (arg.Name == "stage")
+                {
+                    if (!(Evaluate(arg.Value) is StrValue s))
+                    {
+                        _context.Error(Codes.CmdBadDecorator, "stage= takes a stage id string, like stage=\"core.economy\"", arg.Span,
+                            hint: "stages are declared with stage(\"mod.name\", after=[...]) in a schema file (spec-gaps G152)");
+                        return;
+                    }
+                    stage = s.Value;
+                    stageSpan = arg.Value.Span;
+                    continue;
+                }
+                if (arg.Name == "repeat")
+                {
+                    if (!(arg.Value is BoolLiteral literal))
+                    {
+                        _context.Error(Codes.CmdBadDecorator, "repeat= must be True or False", arg.Value.Span,
+                            hint: "repeat=True runs the reaction once each tick while its condition holds (spec-gaps G173)");
+                        return;
+                    }
+                    repeat = literal.Value;
+                    continue;
+                }
+                if (arg.Name == "cooldown")
+                {
+                    if (!(arg.Value is IntLiteral ticks) || ticks.Value < 1)
+                    {
+                        _context.Error(Codes.CmdBadDecorator, "cooldown= takes a number of ticks of at least 1, like cooldown=50", arg.Value.Span,
+                            hint: "after it runs, the reaction waits that many ticks before it can run again for the same entity (spec-gaps G174)");
+                        return;
+                    }
+                    cooldown = ticks.Value;
+                    continue;
+                }
+                if (arg.Name == "once")
+                {
+                    if (arg.Value is BoolLiteral b) once = b.Value ? WhenOnce.PerEntity : WhenOnce.None;
+                    else if (arg.Value is StringLiteral s && s.Value == "game") once = WhenOnce.Game;
+                    else
+                    {
+                        _context.Error(Codes.CmdBadDecorator, "once= must be True or \"game\"", arg.Value.Span,
+                            hint: "once=True runs once for each entity; once=\"game\" runs once in the whole game (spec-gaps G175)");
+                        return;
+                    }
+                    onceArg = arg;
+                    continue;
+                }
+                if (arg.Name == "acts_for")
+                {
+                    _context.Error(Codes.CmdBadDecorator, "@when has no acts_for: nobody submits a reaction, so there is no gate to check",
+                        arg.Span, hint: "the entity it is about is its parameter (spec-gaps G149, G169)");
+                    return;
+                }
+                if (arg.Name == OnStaleName)
+                {
+                    OnStaleNotSupported("@when", arg);
+                    return;
+                }
+                _context.Error(Codes.CmdBadDecorator, "@when has no argument '" + arg.Name + "'", arg.Span,
+                    hint: Suggest.Hint(arg.Name, new[] { "stage", "repeat", "cooldown", "once" }) ?? usage);
+                return;
+            }
+            if (once != WhenOnce.None && (repeat || cooldown != null))
+            {
+                _context.Error(Codes.CmdBadDecorator,
+                    "once= cannot go with " + (repeat ? "repeat=True" : "cooldown=") + ": a reaction that runs once never runs again",
+                    onceArg!.Span, hint: "keep only one of them (spec-gaps G175)");
+                return;
+            }
+            if (condition == null)
+            {
+                _context.Error(Codes.CmdBadDecorator, "@when needs the condition it watches", decorator.Span, hint: usage);
+                return;
+            }
+            var value = Evaluate(condition.Value);
+            if (!(value is FunctionValue cond))
+            {
+                _context.Error(Codes.CmdBadDecorator, "@when needs a function or a lambda as its condition, not " + value.KindName,
+                    condition.Span, hint: usage);
+                return;
+            }
+            if (cond.IsEntry)
+            {
+                _context.Error(Codes.CmdBadDecorator, "the condition of @when is '" + cond.Name + "', which is a " + cond.EntryKind,
+                    condition.Span, hint: "a condition only reads; use a plain function (spec-gaps G118)");
+                return;
+            }
+
+            bool ok = true;
+            if (def.Parameters.Count > 1)
+            {
+                _context.Error(Codes.CmdBadDecorator, "a @when reaction takes no parameter or one entity, not " + def.Parameters.Count,
+                    def.Parameters[1].Span, hint: "write def " + def.Name + "(u: Ref[Unit]): ... to run once for each Unit (spec-gaps G169)");
+                ok = false;
+            }
+            foreach (var p in def.Parameters)
+            {
+                if (p.Default != null)
+                {
+                    _context.Error(Codes.CmdBadDecorator, "the parameter of a @when reaction has no default", p.Span,
+                        hint: "write def " + def.Name + "(" + p.Name + ": Ref[Unit]): ... (spec-gaps G169)");
+                    ok = false;
+                }
+                else if (p.Annotation == null)
+                {
+                    _context.Error(Codes.CmdBadDecorator, "the parameter of a @when reaction needs its entity type", p.Span,
+                        hint: "write def " + def.Name + "(" + p.Name + ": Ref[Unit]): ... (spec-gaps G169)");
+                    ok = false;
+                }
+            }
+            if (ok && cond.Parameters.Count != def.Parameters.Count)
+            {
+                _context.Error(Codes.CmdBadDecorator,
+                    "the condition takes " + cond.Parameters.Count + " parameter" + (cond.Parameters.Count == 1 ? "" : "s") +
+                    ", but the reaction '" + def.Name + "' takes " + def.Parameters.Count, condition.Span,
+                    hint: def.Parameters.Count == 0
+                        ? "a reaction with no parameter watches one condition for the whole world: write @when(lambda: ...) (spec-gaps G169)"
+                        : "the condition gets the same entity as the reaction: write @when(lambda " + def.Parameters[0].Name + ": ...) (spec-gaps G169)");
+                ok = false;
+            }
+            if (ok)
+                _context.Functions.Whens.Add(new WhenDecl(_context.Mod, function, cond, decorator.Span)
+                {
+                    Stage = stage,
+                    StageSpan = stageSpan,
+                    Repeat = repeat,
+                    Cooldown = cooldown,
+                    Once = once,
+                });
+        }
+
         /// <summary>
         /// <c>def</c> 위의 데코레이터. <c>@command</c>(<c>free=</c>, <c>acts_for=</c>)와 <c>@submit_policy</c>(<c>override=</c>)를
         /// 받는다 (spec S6, spec-gaps G109·G122~G124·G130). 커맨드 id는 <c>모드id.함수이름</c>이다.
@@ -317,7 +481,7 @@ namespace Kesa.Engine.Script
             }
 
             string? name = def.DecoratorName;
-            if ((name == CommandName || name == SubmitPolicyName || name == OnName) && !IsBuiltin(name))
+            if ((name == CommandName || name == SubmitPolicyName || name == OnName || name == WhenName) && !IsBuiltin(name))
             {
                 _context.Error(Codes.CmdBadDecorator,
                     "this mod defines its own '" + name + "', so the built-in @" + name + " cannot be used here",
@@ -335,9 +499,14 @@ namespace Kesa.Engine.Script
                 DeclareHandler(def, function, decorator);
                 return;
             }
+            if (name == WhenName)
+            {
+                DeclareWhen(def, function, decorator);
+                return;
+            }
             if (name != CommandName)
             {
-                _context.Error(Codes.CmdBadDecorator, "unknown decorator; only @command, @on and @submit_policy are supported",
+                _context.Error(Codes.CmdBadDecorator, "unknown decorator; only @command, @on, @when and @submit_policy are supported",
                     decorator.Span, hint: "write @command or @command(free=True, acts_for=...)");
                 return;
             }

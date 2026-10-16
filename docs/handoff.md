@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1422개 통과(커널 1394, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1468개 통과(커널 1440, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -268,13 +268,27 @@ G140(정규형 JSON을 엔진이 직접 씀)·G141(멈춘 Flow의 런타임 값�
    - 결과의 `OpenedRequest`는 이제 "호출이 끝났을 때 그 Flow가 든 질문"(`HeldRequest`): `advance` 뒤 같은 호출에서 연 질문도 나온다.
    - 테스트 `TimeTests`에 12개(모두 81개 + 앞의 2개).
    - 호출당 상한(G168): 제출·답·응답 하나가 `advance`로 요청한 틱의 합이 `maxAdvancePerCall`(호스트 설정, 기본 10000, `World` 생성자·`Load` 인자)을 넘으면 그 Flow를 버리고 `"advance"` ScriptError 항목을 남긴다. 그때까지 간 틱과 효과는 남는다. 막혀서 덜 갔어도 요청한 만큼 센다. 테스트 4개 추가(모두 85개).
-   - **다음:** 시간 슬라이스 커밋, 그 뒤 반응 ②(`when` + 정착, X2 5단계).
+   - 시간 슬라이스 끝(커밋 `7b0d5c9`).
+
+## 반응 ②: `when`과 정착 (진행 중, 커밋 전, 2026-10-16)
+
+1. **기본 `when`(끝남), G169(주어: 매개변수 없으면 전역, `Ref[Def타입]` 하나면 그 타입의 엔티티마다)·G170(거짓→참 기록은 저장 구역, 기록 없으면 거짓으로 봄)·G171(정착 상한 `maxSettleRounds`, 기본 64, 넘으면 `Dropped`, 버린 것은 기록 안 함)·G172(본문 하나가 끝날 때마다 모든 조건을 다시 봄, 회차 = 세대), 모두 확인:**
+   - 선언: `Interpreter.DeclareWhen` → `WhenDecl`(`Script/CommandDecl.cs`, `Condition`·`Stage`·`Subject`). `FunctionDef.IsWhen`/`FunctionValue.IsWhen`(입구, 로직에서 못 부름, 사전 조건 없음). 조건이 쓰는 함수면 `FunctionEffects`가 CMD 오류. 매개변수 타입은 `CommandSignatures.ResolveWhens`, 단계는 `HandlerStages.Check`(핸들러와 같은 검사). `ContentLoadResult.Whens`.
+   - 런타임 `Runtime/World.When.cs`: `Settle`이 `AfterRun` 끝(제출·답·응답 뒤)과 `AdvanceTicks`의 매 틱 끝에서 돈다. `Look`이 모든 조건을 보고 `Pending`(회차, 원인) 목록을 갱신, 가장 이른 회차 → 단계 순서 → 엔티티 순으로 하나씩 `RunWhen`(핸들러처럼 새 Flow·트랜잭션, 결과 신호 자리 `Reaction.WhenSignal` = `"when"`, 세대 0, 본문이 낸 신호는 1세대). 조건 오류는 정착마다 한 번 `ScriptError`. 본문이 실패해도 발동한 것으로 기록한다(매 정착마다 되풀이 안 함).
+   - `when` 본문 첫 실행에서는 `advance()` 금지(`_settling`).
+   - 저장 최상위 `"when": [{"reaction", "entity"(전역은 null)}]`(골든 갱신). 불러올 때 사라진 반응·엔티티, 전역/엔티티별이 바뀐 반응의 기록은 버린다.
+   - 지금은 정착마다(본문마다) 모든 조건을 다시 평가한다. "읽은 칸이 바뀔 때만"(S5)은 결과가 같은 최적화라 나중에.
+   - 테스트 `Runtime/WhenTests`(29개). 재현했던 것: 차례마다 한 번만 보면 부활/저주가 HP 0으로 조용히 끝났다(G172의 이유).
+2. **`repeat=True`(끝남), G173(확인):** 틱 끝 정착에서만 보고 참이면 틱마다 한 번(`WhenDecl.Repeat`, `Settle(..., tickEnd)`). 기록 대신 그 정착에서 돌았는지(`repeated`)만 본다. 저장에 남지 않는다. 테스트 5개(모두 34개).
+3. **`cooldown=N`(끝남), G174(확인):** 발동 뒤 N틱 동안 그 (반응, 대상)의 조건을 거짓으로 본다(`WhenDecl.Cooldown`, `_whenCooldown`, `Cooling`). 끝나는 정착에서 아직 참이면 발동. 저장 최상위 `"when_cooldown"`(골든 갱신). 테스트 6개(모두 40개).
+4. **`once`(끝남), G175(확인):** `once=True`는 (반응, 엔티티)마다, `once="game"`은 반응 전체에 한 번(`WhenDecl.Once`·`WhenOnce`, `_whenDone`, `Done`). `repeat`·`cooldown`과 함께면 로드 오류. 저장 최상위 `"when_once"`(골든 갱신). 테스트 7개(모두 47개).
+   - **다음:** 반응 ② 커밋. 남은 S5 열린 질문: `prevent_default`, `wait` 중 Flow 취소 세부, "읽은 칸이 바뀔 때만 재평가"(성능), `field`가 `derived` 상한을 넘는 경우(schema-design).
 
 ## 다음 할 일 (사용자와 고를 것)
 
 Flow(`ask`·응답 커맨드)와 저장(C1·C4·C5)까지 끝났고 반응(S5)을 진행 중이다(위 "반응 슬라이스").
 
-**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 전). 다음은 시간 슬라이스 ④ 커밋, 그 뒤 반응 ②(`when` + 정착, X2 5단계).
+**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 전). 다음은 반응 ② 커밋.
 
 그 밖의 후보:
 
@@ -324,7 +338,7 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1422개 통과(커널 1394, CLI 28)를 확인한다.
+1. `git pull` 후 `dotnet test`로 1468개 통과(커널 1440, CLI 28)를 확인한다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G135), `docs/spine-spec.md` S2·S4·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.
 

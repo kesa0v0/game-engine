@@ -31,12 +31,12 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(result.Commands["naval.Move"].Mod, Is.EqualTo("naval"));
         }
 
-        [TestCase("@other\ndef f():\n    return 0\n", "unknown decorator; only @command, @on and @submit_policy are supported")]
+        [TestCase("@other\ndef f():\n    return 0\n", "unknown decorator; only @command, @on, @when and @submit_policy are supported")]
         [TestCase("@command(True)\ndef f():\n    return 0\n", "@command takes no positional arguments")]
         [TestCase("@command(cost=1)\ndef f():\n    return 0\n", "@command has no argument 'cost'")]
         [TestCase("@command(free=1)\ndef f():\n    return 0\n", "free= must be True or False")]
         [TestCase("@command(free=True, acts_for=None)\n@command(free=True, acts_for=None)\ndef f():\n    return 0\n", "a function can have only one decorator")]
-        [TestCase("@command.free\ndef f():\n    return 0\n", "unknown decorator; only @command, @on and @submit_policy are supported")]
+        [TestCase("@command.free\ndef f():\n    return 0\n", "unknown decorator; only @command, @on, @when and @submit_policy are supported")]
         public void BadDecoratorsAreLoadErrors(string defs, string message)
         {
             Mod("core", defs: defs);

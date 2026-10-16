@@ -203,7 +203,10 @@ namespace Kesa.Engine.Tests.Runtime
                 "    }\n" +
                 "  ],\n" +
                 "  \"contributions\": [],\n" +
-                "  \"flows\": []\n" +
+                "  \"flows\": [],\n" +
+                "  \"when\": [],\n" +
+                "  \"when_cooldown\": [],\n" +
+                "  \"when_once\": []\n" +
                 "}\n";
             Assert.That(Encoding.UTF8.GetString(_world.Save()), Is.EqualTo(golden));
         }

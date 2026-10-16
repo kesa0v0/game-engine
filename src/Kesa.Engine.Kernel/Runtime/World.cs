@@ -48,8 +48,12 @@ namespace Kesa.Engine.Runtime
         /// <param name="maxAdvancePerCall">
         /// 제출·답·응답 한 번 안에서 스크립트 <c>advance()</c>로 진행할 수 있는 틱의 합 (spec-gaps G168). 넘기려는 Flow는 오류로 버린다.
         /// </param>
+        /// <param name="maxSettleRounds">
+        /// 정착 한 번의 회차 상한 (spec-gaps G171). 넘으면 남은 <c>when</c> 반응을 돌리지 않고 결과에 알린다.
+        /// </param>
         public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget, bool requireSubmitPolicy = false,
-            int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall)
+            int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
+            int maxSettleRounds = DefaultMaxSettleRounds)
             : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, loaded.SubmitPolicy)
         {
             _mods = loaded.Mods;
@@ -59,7 +63,11 @@ namespace Kesa.Engine.Runtime
             if (maxAdvancePerCall < 1)
                 throw new ArgumentOutOfRangeException(nameof(maxAdvancePerCall), maxAdvancePerCall, "the advance limit must be at least 1");
             _maxAdvancePerCall = maxAdvancePerCall;
+            if (maxSettleRounds < 1)
+                throw new ArgumentOutOfRangeException(nameof(maxSettleRounds), maxSettleRounds, "the settle round limit must be at least 1");
+            _maxSettleRounds = maxSettleRounds;
             SetHandlers(loaded.Handlers);
+            SetWhens(loaded.Whens);
             if (requireSubmitPolicy && loaded.SubmitPolicy == null)
                 throw new WorldException(Codes.RunNoSubmitPolicy,
                     "the host requires a submit policy, but no active mod declares one",

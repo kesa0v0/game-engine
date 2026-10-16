@@ -58,6 +58,32 @@ namespace Kesa.Engine.Loading
         }
 
         /// <summary>
+        /// <c>@when</c> 반응의 매개변수를 푼다 (G169): <c>Ref[Def타입]</c>이어야 하고 그 타입이 <see cref="WhenDecl.Subject"/>가 된다.
+        /// 단계 검사는 핸들러와 같다.
+        /// </summary>
+        public static void ResolveWhens(IReadOnlyList<WhenDecl> whens, SchemaSet schema, ModVisibility visibility,
+            ModScope scope, CallContext context)
+        {
+            foreach (var when in whens)
+            {
+                var parameters = when.Function.Definition!.Parameters;
+                if (parameters.Count != 1) continue;
+                var p = parameters[0];
+                var type = new Reader(schema, visibility, scope, context, when.Mod).Type(p.Annotation!);
+                if (type == null) continue;
+                if (!(type is EntityRefTypeRef entity))
+                {
+                    context.Error(Codes.CmdParameterType,
+                        "the parameter of a @when reaction is the entity it watches, so it must be Ref[...], not " + type.Display,
+                        p.Annotation!.Span, "write " + p.Name + ": Ref[Unit] to watch each Unit, or no parameter for one condition " +
+                                            "over the whole world (spec-gaps G169)");
+                    continue;
+                }
+                when.Subject = entity.Target.Name;
+            }
+        }
+
+        /// <summary>
         /// <c>acts_for</c> 람다는 커맨드 매개변수를 이름으로 골라 받는다 (G130): 매개변수 이름은 커맨드에 있어야 한다.
         /// 람다의 기본값은 파서가 이미 막는다.
         /// </summary>

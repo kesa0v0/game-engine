@@ -91,6 +91,16 @@ namespace Kesa.Engine.Script
                     new[] { policy.Function.WriteWitness!.Value });
             }
 
+            // when 조건은 순수하다: 정착마다 다시 평가하므로 읽기만 한다 (S5, G169)
+            foreach (var when in functions.Whens)
+            {
+                if (!when.Condition.Writes) continue;
+                context.Error(Codes.CmdWriteEffect,
+                    "the condition of @when on '" + when.Function.Name + "' is '" + when.Condition.Name + "', which changes the world; it can only read",
+                    when.Span, "change the world in the reaction's body instead (spec-gaps G117, G169)",
+                    new[] { when.Condition.WriteWitness!.Value });
+            }
+
             CheckPureSlots(schema, context);
         }
 

@@ -577,6 +577,9 @@ namespace Kesa.Engine.Runtime
             if (_reacting != null)
                 throw new ScriptRuntimeException(Codes.RunScript, "advance() cannot be called from a signal handler",
                     "call advance() from a command or after an answer (spec-gaps G167)");
+            if (_settling)
+                throw new ScriptRuntimeException(Codes.RunScript, "advance() cannot be called from a @when reaction",
+                    "call advance() from a command or after an answer (spec-gaps G167, G169)");
             return new AdvancePayload(n.Value);
         }
 

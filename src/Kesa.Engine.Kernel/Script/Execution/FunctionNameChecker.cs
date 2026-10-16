@@ -28,6 +28,9 @@ namespace Kesa.Engine.Script
         /// <summary><c>@on(신호)</c>로 붙인 핸들러, 정의된 순서대로 (G145).</summary>
         public List<HandlerDecl> Handlers { get; } = new List<HandlerDecl>();
 
+        /// <summary><c>@when(조건)</c> 반응, 정의된 순서대로 (G169).</summary>
+        public List<WhenDecl> Whens { get; } = new List<WhenDecl>();
+
         /// <summary>
         /// 함수 본문에서 내장 <c>spawn("Def id", ...)</c>에 리터럴로 적은 Def id (G134). 이름 검사가 모으고 ⑤ 링크가 본다.
         /// </summary>
