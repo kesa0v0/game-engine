@@ -79,10 +79,10 @@ namespace Kesa.Engine.Runtime
         /// <summary>커맨드 id (<c>모드id.함수이름</c>, G109).</summary>
         public string Command { get; }
 
-        /// <summary><c>require</c>마다의 결과, 적힌 순서대로 ("왜?" 도구 3).</summary>
+        /// <summary><c>require</c>·<c>cost</c>마다의 결과, 적힌 순서대로 ("왜?" 도구 3).</summary>
         public IReadOnlyList<RequireOutcome> Requires { get; }
 
-        /// <summary>실패한 <c>require</c>만 (사유 목록). 평가 안 됨은 들어 있지 않다.</summary>
+        /// <summary>실패한 <c>require</c>·<c>cost</c>만 (사유 목록). 평가 안 됨은 들어 있지 않다.</summary>
         public IReadOnlyList<RequireOutcome> Failures { get; }
 
         /// <summary>인자 거절 (G115). 하나라도 있으면 사전 조건은 평가하지 않았으므로 <see cref="Requires"/>가 비어 있다.</summary>
@@ -145,7 +145,7 @@ namespace Kesa.Engine.Runtime
                     var plain = new SortedDictionary<string, Value>(StringComparer.Ordinal);
                     foreach (var pair in r.Args)
                         plain[pair.Key] = ToPlain("argument '" + pair.Key + "' of require()", pair.Value);
-                    requires.Add(new RequireOutcome(r.Status, r.MessageKey, plain, r.Span));
+                    requires.Add(r.WithArgs(plain));
                 }
                 return new PreconditionReport(command, requires);
             }
@@ -166,8 +166,9 @@ namespace Kesa.Engine.Runtime
         /// 돌려주는 맵은 맞춘 값이다: <c>fixed</c> 자리의 <c>int</c>는 올리고 (G95), 빠진 인자는 기본값으로 채운다 (G116).
         /// 커맨드 로그에 남길 전체 인자가 이것이다.
         /// </summary>
+        /// <param name="partial">참이면 빠진 인자(기본값도 없는)를 거절하지 않고 비워 둔다 (후보 나열, G184).</param>
         private SortedDictionary<string, Value> CheckArguments(CommandDecl decl, IReadOnlyDictionary<string, Value> args,
-            List<ArgumentRejection> rejections)
+            List<ArgumentRejection> rejections, bool partial = false)
         {
             var result = new SortedDictionary<string, Value>(StringComparer.Ordinal);
             var known = new HashSet<string>(StringComparer.Ordinal);
@@ -182,6 +183,7 @@ namespace Kesa.Engine.Runtime
                         result[p.Name] = p.Default;
                         continue;
                     }
+                    if (partial) continue;
                     rejections.Add(new ArgumentRejection(p.Name, p.Name, ArgumentProblem.Missing, p.Type.Display,
                         decl.Id + " is missing the argument '" + p.Name + "' (" + p.Type.Display + ")"));
                     continue;

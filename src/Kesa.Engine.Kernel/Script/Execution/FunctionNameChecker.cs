@@ -170,6 +170,31 @@ namespace Kesa.Engine.Script
                 }
             }
 
+            /// <summary><c>pay(칸, 금액)</c>: 위치 인자 둘, 첫 자리는 <c>party.Treasury.gold</c> 같은 속성 (G187). 칸의 종류는 실행 때 본다.</summary>
+            private void CheckPay(CallExpr call)
+            {
+                const string usage = "write ok = pay(party.Treasury.gold, amount)";
+                foreach (var arg in call.Arguments)
+                {
+                    if (arg.Name == null) continue;
+                    _context.Error(Codes.EvlArguments, "pay() takes no keyword arguments", arg.Span, usage);
+                    return;
+                }
+                if (call.Arguments.Count != 2)
+                {
+                    _context.Error(Codes.EvlArguments,
+                        "pay() takes a field and an amount, got " + call.Arguments.Count + " argument" +
+                        (call.Arguments.Count == 1 ? "" : "s"), call.Span, usage);
+                    return;
+                }
+                if (!(call.Arguments[0].Value is AttributeExpr))
+                {
+                    _context.Error(Codes.EvlArguments, "the first argument of pay() must be a field such as party.Treasury.gold",
+                        call.Arguments[0].Value.Span,
+                        "pay() takes the amount out of that field, so it needs the field itself, not a value (spec-gaps G186)");
+                }
+            }
+
             private int _quietPreconditionNames;
 
             private bool IsShadowed(string name, SortedSet<string> locals) => locals.Contains(name) || _globals.Contains(name);
@@ -197,6 +222,9 @@ namespace Kesa.Engine.Script
                         // 엔진 신호의 값은 스크립트가 만들 수 없다 (G156)
                         if (call.Callee is NameExpr signal && Schema.EngineSignals.IsEngine(signal.Name) && !IsShadowed(signal.Name, locals))
                             _context.Error(Codes.CmdWriteEffect, Schema.EngineSignals.Why(signal.Name), call.Span);
+                        // 덮어쓰지 않은 pay의 첫 자리는 칸 자체다 (G186·G187)
+                        if (call.Callee is NameExpr pay && pay.Name == PureBuiltins.PayName && !IsShadowed(pay.Name, locals))
+                            CheckPay(call);
                         Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
                         break;

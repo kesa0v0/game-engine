@@ -54,6 +54,33 @@ namespace Kesa.Engine.Loading
                 }
                 if (ok) command.Parameters = parameters;
                 CheckActsFor(command, context);
+                CheckWhereTypes(command, parameters, context);
+            }
+        }
+
+        /// <summary>
+        /// <c>choose(p, where=...)</c>의 후보는 그 타입의 살아 있는 엔티티 전체라 <c>p</c>는 <c>Ref[X]</c>여야 한다 (G183).
+        /// 모양(첫 자리가 매개변수 이름, 키워드 하나)은 <see cref="FunctionChecker"/>가 보았다.
+        /// </summary>
+        private static void CheckWhereTypes(CommandDecl command, List<CommandParameter> parameters, CallContext context)
+        {
+            var body = command.Function.Definition!.Body;
+            if (body.Count == 0 || !(body[0] is WithStmt with)) return;
+            foreach (var stmt in with.Body)
+            {
+                if (!(stmt is ExprStmt es) || !FunctionChecker.IsPreconditionCall(es.Expr, out var name) ||
+                    name != FunctionChecker.ChooseName)
+                    continue;
+                var call = (CallExpr)es.Expr;
+                if (call.Arguments.Count != 2 || !(call.Arguments[0].Value is NameExpr target) ||
+                    call.Arguments[1].Name != FunctionChecker.WhereName)
+                    continue;
+                var parameter = parameters.Find(p => p.Name == target.Name);
+                if (parameter == null || parameter.Type is EntityRefTypeRef) continue;
+                context.Error(Codes.CmdPreconditions,
+                    "choose(" + target.Name + ", where=...) picks among entities, so '" + target.Name + "' must be Ref[...], not " +
+                    parameter.Type.Display, call.Arguments[1].Span,
+                    "use from_=[...] to give the candidates of other types (spec-gaps G183)");
             }
         }
 

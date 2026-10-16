@@ -78,6 +78,26 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary>
+        /// <c>choose</c> 하나의 후보 식(<c>where=</c>의 함수나 <c>from_=</c>의 목록)만 계산한다 (spec-gaps G184). 그 식이 읽는 블록 대입만
+        /// 블록 순서대로 실행하고 <c>require</c>·<c>cost</c>·다른 <c>choose</c>는 보지 않는다. 아직 정하지 않은 매개변수는 값이 없어도 된다
+        /// (식이 읽지 않는다는 것을 <see cref="ChooseDependencies"/>로 보았다).
+        /// </summary>
+        public Value RunChooseOption(FunctionValue command, IReadOnlyDictionary<string, Value> args, ChooseInfo choose,
+            SourceSpan callSite = default, StepMeter? meter = null)
+        {
+            var session = new Session(this, meter ?? new StepMeter(_budget));
+            try
+            {
+                return session.ChooseOption(command, args, choose, callSite);
+            }
+            catch (ScriptRuntimeException e) when (e.Span.Line <= 0)
+            {
+                e.Span = callSite;
+                throw;
+            }
+        }
+
+        /// <summary>
         /// 커맨드를 실행한다: 사전 조건을 평가하고 실패한 <c>require</c>가 없으면 같은 지역 변수로 본문을 이어서 실행한다
         /// (spec-gaps G132). 본문의 속성 대입은 상태 쓰기다. 결과는 <c>require</c>마다의 결과이고, 실패가 있으면 본문은 돌지 않았다.
         /// </summary>
@@ -286,6 +306,25 @@ namespace Kesa.Engine.Script
 
             /// <summary>문장 수준의 <c>ask</c>가 낸 질문. 있으면 실행 고리가 멈춘다.</summary>
             private Value? _pendingRequest;
+
+            /// <summary>사전 조건 블록의 <c>cost</c>들, 적힌 순서대로. 본문이 시작될 때 이 금액을 뺀다 (G185).</summary>
+            private readonly List<CostEntry> _costs = new List<CostEntry>();
+
+            private sealed class CostEntry
+            {
+                public CostEntry(IRuntimeSlots owner, string name, Value amount, SourceSpan span)
+                {
+                    Owner = owner;
+                    Name = name;
+                    Amount = amount;
+                    Span = span;
+                }
+
+                public IRuntimeSlots Owner { get; }
+                public string Name { get; }
+                public Value Amount { get; }
+                public SourceSpan Span { get; }
+            }
 
             private string? _answerTo;
 
@@ -557,11 +596,40 @@ namespace Kesa.Engine.Script
                     {
                         bodyStarts?.Invoke(); // 사전 조건을 통과해 본문이 시작된다: 새 Flow (난수열을 연다, G182)
                         frame.Writable = true;
+                        PayCosts();
                         frame.Blocks.Add(new Block(body, hasBlock ? 1 : 0));
                         RunUntil(depth);
                         if (depth == 0) Detach();
                     }
                     return results;
+                }
+                finally
+                {
+                    Truncate(depth);
+                }
+            }
+
+            public Value ChooseOption(FunctionValue command, IReadOnlyDictionary<string, Value> args, ChooseInfo choose, SourceSpan site)
+            {
+                int depth = _stack.Count;
+                var frame = Enter(command, null, null, Array.Empty<Value>(), args);
+                frame.CallSite = site;
+                frame.Result = ResultTo.Discard;
+                _stack.Add(frame);
+                try
+                {
+                    var block = ((WithStmt)command.Definition!.Body[0]).Body;
+                    foreach (int i in choose.Statements)
+                    {
+                        Exec(block[i], frame);
+                        RunUntil(depth + 1);
+                    }
+                    return Eval(choose.Call.Arguments[1].Value, frame);
+                }
+                catch (ScriptRuntimeException e)
+                {
+                    Attach(e, choose.Call.Span);
+                    throw;
                 }
                 finally
                 {
@@ -584,7 +652,10 @@ namespace Kesa.Engine.Script
                             RunUntil(depth); // x = f()로 들어간 함수를 끝까지
                             continue;
                         }
-                        var outcome = Require((CallExpr)((ExprStmt)stmt).Expr, frame);
+                        var statement = (CallExpr)((ExprStmt)stmt).Expr;
+                        var outcome = IsCost(statement) ? Cost(statement, frame)
+                            : IsChoose(statement) ? Choose(statement, frame)
+                            : Require(statement, frame);
                         if (outcome.Status == RequireStatus.Failed) failed = true;
                         results.Add(outcome);
                     }
@@ -597,7 +668,11 @@ namespace Kesa.Engine.Script
                             continue;
                         }
                         var call = (CallExpr)((ExprStmt)stmt).Expr;
-                        results.Add(new RequireOutcome(RequireStatus.NotEvaluated, LiteralKey(call), null, call.Span));
+                        results.Add(IsCost(call)
+                            ? RequireOutcome.Cost(RequireStatus.NotEvaluated, null, null, null, call.Span)
+                            : IsChoose(call)
+                                ? RequireOutcome.Choose(RequireStatus.NotEvaluated, ((NameExpr)call.Arguments[0].Value).Name, call.Span)
+                                : new RequireOutcome(RequireStatus.NotEvaluated, LiteralKey(call), null, call.Span));
                     }
                 }
                 return failed;
@@ -629,6 +704,173 @@ namespace Kesa.Engine.Script
                     Attach(e, call.Span);
                     throw;
                 }
+            }
+
+            /// <summary>블록 안의 문장은 덮어쓰지 않은 내장이라는 것을 로드 때 보았다 (G112): 이름만 본다.</summary>
+            private static bool IsCost(CallExpr call) =>
+                call.Callee is NameExpr name && name.Name == FunctionChecker.CostName;
+
+            /// <summary>
+            /// <c>cost(칸, 금액)</c> (G185·G186): 첫 자리는 값이 아니라 칸이다. 마지막 이름 앞까지만 계산해 칸을 찾고, 그 칸의 값이
+            /// 블록에서 같은 칸에 앞서 나온 금액과 이 금액을 더한 것 이상이면 통과다. 빼는 것은 본문이 시작될 때다 (<see cref="PayCosts"/>).
+            /// 모양(위치 인자 둘, 첫 자리는 속성)은 로드 때 보았다.
+            /// </summary>
+            private RequireOutcome Cost(CallExpr call, Frame frame)
+            {
+                try
+                {
+                    Tick();
+                    var slot = (AttributeExpr)call.Arguments[0].Value;
+                    var owner = SlotOwner("cost", slot, frame);
+                    var have = owner.ReadSlot(slot.Name);
+                    var amount = Amount("cost", have, Eval(call.Arguments[1].Value, frame));
+                    var need = amount;
+                    foreach (var earlier in _costs)
+                    {
+                        if (earlier.Name == slot.Name && PureOps.ValuesEqual((Value)earlier.Owner, (Value)owner))
+                            need = PureOps.Arithmetic("+", need, earlier.Amount);
+                    }
+                    _costs.Add(new CostEntry(owner, slot.Name, amount, call.Span));
+                    var status = PureOps.CompareNumbers(have, need) >= 0 ? RequireStatus.Passed : RequireStatus.Failed;
+                    return RequireOutcome.Cost(status, owner.SlotName(slot.Name), have, need, call.Span);
+                }
+                catch (ScriptRuntimeException e)
+                {
+                    Attach(e, call.Span);
+                    throw;
+                }
+            }
+
+            private static bool IsChoose(CallExpr call) =>
+                call.Callee is NameExpr name && name.Name == FunctionChecker.ChooseName;
+
+            /// <summary>
+            /// <c>choose(매개변수, where=함수)</c>·<c>choose(매개변수, from_=목록)</c>의 검사 (G183): 제출된 인자가 후보인가.
+            /// <c>where=</c>의 후보는 그 타입의 살아 있는 엔티티를 함수로 거른 것인데, 인자가 그 타입의 살아 있는 엔티티라는 것은
+            /// 인자 검사(G115)가 보았으므로 인자 하나에만 함수를 부르면 된다. <c>from_=</c>는 목록에 같은 값이 있는가다.
+            /// 후보를 펼치는 것은 호스트 API의 일이다 (G184).
+            /// </summary>
+            private RequireOutcome Choose(CallExpr call, Frame frame)
+            {
+                try
+                {
+                    Tick();
+                    string parameter = ((NameExpr)call.Arguments[0].Value).Name;
+                    var value = Eval(call.Arguments[0].Value, frame);
+                    var option = call.Arguments[1];
+                    var given = Eval(option.Value, frame);
+                    bool candidate;
+                    if (option.Name == FunctionChecker.WhereName)
+                    {
+                        candidate = !(value is NoneValue) &&
+                                    PureOps.Truthy(Invoke(given, new[] { value }, NoKeywords, option.Span));
+                    }
+                    else
+                    {
+                        candidate = given is ListValue || given is IRuntimeCollection
+                            ? PureOps.Contains(given, value)
+                            : throw Fail(Codes.RunType, "from_= of choose() must be a list, not " + given.KindName,
+                                "write choose(" + parameter + ", from_=[...]) (spec-gaps G183)");
+                    }
+                    return RequireOutcome.Choose(candidate ? RequireStatus.Passed : RequireStatus.Failed, parameter, call.Span);
+                }
+                catch (ScriptRuntimeException e)
+                {
+                    Attach(e, call.Span);
+                    throw;
+                }
+            }
+
+            private static readonly IReadOnlyDictionary<string, Value> NoKeywords =
+                new SortedDictionary<string, Value>(StringComparer.Ordinal);
+
+            /// <summary><c>cost</c>·<c>pay</c>의 칸을 가진 값: 칸 식의 마지막 이름 앞까지를 계산한다 (G186).</summary>
+            private IRuntimeSlots SlotOwner(string function, AttributeExpr slot, Frame frame)
+            {
+                var owner = Eval(slot.Target, frame);
+                if (owner is IRuntimeSlots slots) return slots;
+                throw Fail(Codes.RunType, owner is NoneValue
+                        ? function + "() cannot take '" + slot.Name + "' from None"
+                        : function + "() takes a member of a component, not '" + slot.Name + "' of " + owner.KindName,
+                    owner is NoneValue
+                        ? "the component or row is missing; check it with 'is not None' first"
+                        : "write " + function + "(party.Treasury.gold, n) (spec-gaps G186)");
+            }
+
+            /// <summary>
+            /// <c>cost</c>·<c>pay</c>의 금액: <c>int</c>나 <c>fixed</c>이고 음수가 아니다. <c>fixed</c> 칸의 <c>int</c> 금액은 그대로 두면
+            /// 계산에서 올라가고, <c>int</c> 칸에 <c>fixed</c> 금액은 오류다 (인자의 G95와 같다).
+            /// </summary>
+            private Value Amount(string function, Value have, Value amount)
+            {
+                if (!PureOps.IsNumber(amount))
+                {
+                    throw Fail(Codes.RunType, "the amount of " + function + "() must be int or fixed, not " + amount.KindName);
+                }
+                if (have is IntValue && amount is FixedValue)
+                {
+                    throw Fail(Codes.RunType, "the amount of " + function + "() is fixed, but the field is an int",
+                        "a fixed value is not turned into an int; use floor(...), ceil(...) or round(...)");
+                }
+                if (PureOps.CompareNumbers(amount, new IntValue(0)) < 0)
+                {
+                    string shown = amount is IntValue i
+                        ? i.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        : ((FixedValue)amount).Value.ToString();
+                    throw Fail(Codes.RunRange, "the amount of " + function + "() is " + shown + ", which is negative",
+                        "to give something back, add to the field in the body (spec-gaps G185)");
+                }
+                return amount;
+            }
+
+            /// <summary>
+            /// 사전 조건을 모두 통과해 본문이 시작될 때 블록의 <c>cost</c>를 적힌 순서대로 뺀다 (G185). 금액은 블록에서 계산한 그대로다.
+            /// 쓰기는 본문의 대입과 같은 길이라 같은 트랜잭션에 들고, 본문이 실패하면 함께 되돌아간다 (C8).
+            /// </summary>
+            private void PayCosts()
+            {
+                foreach (var cost in _costs)
+                {
+                    try
+                    {
+                        var have = cost.Owner.ReadSlot(cost.Name);
+                        ((IRuntimeAssignable)cost.Owner).SetAttribute(cost.Name, PureOps.Arithmetic("-", have, cost.Amount));
+                    }
+                    catch (ScriptRuntimeException e)
+                    {
+                        Attach(e, cost.Span);
+                        throw;
+                    }
+                }
+                _costs.Clear();
+            }
+
+            /// <summary>
+            /// 본문 중간의 비용 <c>pay(칸, 금액)</c> (G187): 칸의 값이 금액 이상이면 빼고 <c>True</c>, 모자라면 아무것도 바꾸지 않고
+            /// <c>False</c>. 첫 자리는 <c>cost</c>처럼 칸 자체다(G186). 문장 수준의 쓰기라 자리 규칙은 다른 쓰는 내장과 같다 (G117·G135).
+            /// </summary>
+            private void Pay(CallExpr call, Frame frame, string? target)
+            {
+                if (!frame.Writable)
+                {
+                    throw Fail(Codes.RunNotWritable,
+                        "pay() " + PureBuiltins.EffectPhrase(PureBuiltins.PayName) + ", so it cannot be called here",
+                        "call it on its own line (or as 'ok = pay(...)') in a @command body or in a function that changes " +
+                        "the world called on its own line from it (spec-gaps G117, G187)");
+                }
+                // 함수 값으로 받은 pay(f = pay; f(...))는 로드 때 모양을 보지 못했다
+                if (call.Arguments.Count != 2 || call.Arguments[0].Name != null || call.Arguments[1].Name != null ||
+                    !(call.Arguments[0].Value is AttributeExpr slot))
+                {
+                    throw Fail(Codes.RunScript, "pay() takes a field and an amount, such as pay(party.Treasury.gold, n)",
+                        "the first argument is the field itself (spec-gaps G186, G187)");
+                }
+                var owner = SlotOwner("pay", slot, frame);
+                var have = owner.ReadSlot(slot.Name);
+                var amount = Amount("pay", have, Eval(call.Arguments[1].Value, frame));
+                bool enough = PureOps.CompareNumbers(have, amount) >= 0;
+                if (enough) ((IRuntimeAssignable)owner).SetAttribute(slot.Name, PureOps.Arithmetic("-", have, amount));
+                if (target != null) frame.Locals[target] = enough ? BoolValue.True : BoolValue.False;
             }
 
             /// <summary>
@@ -846,6 +1088,11 @@ namespace Kesa.Engine.Script
             /// </summary>
             private void StatementCall(CallExpr call, Frame frame, string? target)
             {
+                if (call.Callee is NameExpr name && LookupName(name.Name, frame) is PureBuiltin pay && pay.Name == PureBuiltins.PayName)
+                {
+                    Pay(call, frame, target);
+                    return;
+                }
                 var (callee, positional, keywords) = CallParts(call, frame);
                 if (callee is FunctionValue fn && fn.Definition != null)
                 {

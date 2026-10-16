@@ -42,6 +42,12 @@ namespace Kesa.Engine.Script
         /// <summary>신호를 내는 내장 (spec S5). 받은 핸들러가 상태를 바꾸므로 자리 규칙은 쓰는 내장과 같다 (spec-gaps G146).</summary>
         public const string EmitName = "emit";
 
+        /// <summary>
+        /// 본문 중간의 비용 <c>ok = pay(칸, 금액)</c> (spec S2, spec-gaps G187). 첫 자리는 <c>cost</c>처럼 칸 자체라(G186) 실행기가
+        /// 호출 모양을 직접 본다. 상태를 바꾸므로 자리 규칙은 쓰는 내장과 같다.
+        /// </summary>
+        public const string PayName = "pay";
+
         /// <summary>난수 이름 공간 (spec-gaps G179). 몸체는 월드가 준다. 이 이름을 쓰는 함수는 난수 함수다 (G178).</summary>
         public const string RandomName = "random";
 
@@ -51,7 +57,7 @@ namespace Kesa.Engine.Script
         private static readonly string[] WritingNameArray =
         {
             SpawnName, DestroyName, AttachName, DetachName, AddRowName, RemoveRowName, ReplaceRowsName, AppendRowName,
-            AskName, WaitName, AdvanceName, EmitName,
+            AskName, WaitName, AdvanceName, EmitName, PayName,
         };
 
         public static IReadOnlyList<string> WritingNames => WritingNameArray;
@@ -62,7 +68,7 @@ namespace Kesa.Engine.Script
         public static string EffectPhrase(string name) =>
             name == AskName ? "waits for an answer" : name == WaitName ? "waits for time to pass" :
             name == AdvanceName ? "makes time pass" :
-            name == EmitName ? "sends a signal" : "changes the world";
+            name == EmitName ? "sends a signal" : name == PayName ? "takes a cost out of a field" : "changes the world";
 
         /// <summary>
         /// 실행 중 함수 본문에서 보이는 내장 이름 전체: <see cref="Create"/>의 이름, <see cref="ContribsName"/>, 쓰는 내장.

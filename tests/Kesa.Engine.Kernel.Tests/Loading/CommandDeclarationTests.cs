@@ -112,15 +112,121 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
         }
 
-        [TestCase("cost")]
-        [TestCase("choose")]
-        public void CostAndChooseAreNotSupportedYet(string name)
+        // ---- choose (G183) ----
+
+        [TestCase("choose(u, 1)", "choose() takes a parameter and either where= or from_=")]
+        [TestCase("choose(u)", "choose() takes a parameter and either where= or from_=")]
+        [TestCase("choose(u, where=lambda x: True, from_=[])", "choose() takes a parameter and either where= or from_=")]
+        [TestCase("choose(u, among=[])", "choose() has no argument 'among'")]
+        [TestCase("choose(where=lambda x: True)", "choose() takes a parameter and either where= or from_=")]
+        [TestCase("choose(u.Treasury, from_=[])", "the first argument of choose() must be a parameter of the command")]
+        [TestCase("choose(v, from_=[])", "'v' is not a parameter of the command")]
+        [TestCase("choose(n, where=lambda x: x > 0)", "choose(n, where=...) picks among entities, so 'n' must be Ref[...], not int")]
+        [TestCase("choose(u, from_=[])\n        choose(u, where=lambda x: True)", "the candidates of 'u' are already chosen above")]
+        [TestCase("choose(n, from_=[u.Treasury.gold])\n        choose(u, where=lambda x: True)",
+            "the candidates of 'n' read 'u', which is chosen below")]
+        [TestCase("g = u.Treasury.gold\n        choose(n, from_=[g])\n        choose(u, where=lambda x: True)",
+            "the candidates of 'n' read 'u', which is chosen below")]
+        [TestCase("here = u.Treasury\n        choose(u, where=lambda x: x.Treasury != here)",
+            "the candidates of 'u' read 'u' itself")]
+        [TestCase("choose(u, where=lambda x: x == u)", "the candidates of 'u' read 'u' itself")]
+        public void TheShapeOfChooseIsCheckedAtLoad(string statement, string message)
         {
-            Mod("core", defs: "@command(free=True, acts_for=None)\ndef f(u: bool):\n    with preconditions:\n        " + name + "(u, 1)\n    return 0\n");
+            Mod("core", defs: "@command(free=True, acts_for=None)\ndef f(u: Ref[Unit], n: int):\n    with preconditions:\n        " +
+                              statement + "\n    return 0\n",
+                schema: "component(\"Treasury\", gold=field(int, default=0))\ndeftype(\"Unit\", components=[\"Treasury\"])\n");
+            Load(out var diags);
+            var d = diags.Single(x => x.Code == Codes.CmdPreconditions);
+            Assert.That(d.Message, Is.EqualTo(message), string.Join("\n", diags));
+        }
+
+        // ---- cost (G185·G186) ----
+
+        [TestCase("cost(3, 1)", "the first argument of cost() must be a field such as party.Treasury.gold")]
+        [TestCase("cost(u, 1)", "the first argument of cost() must be a field such as party.Treasury.gold")]
+        [TestCase("cost(max(u.Treasury.gold, 0), 1)", "the first argument of cost() must be a field such as party.Treasury.gold")]
+        [TestCase("cost(u.Treasury.gold)", "cost() takes a field and an amount, got 1 argument")]
+        [TestCase("cost(u.Treasury.gold, 1, 2)", "cost() takes a field and an amount, got 3 arguments")]
+        [TestCase("cost(u.Treasury.gold, amount=1)", "cost() takes no keyword arguments")]
+        public void TheShapeOfCostIsCheckedAtLoad(string statement, string message)
+        {
+            Mod("core", defs: "@command(free=True, acts_for=None)\ndef f(u: Ref[Unit]):\n    with preconditions:\n        " +
+                              statement + "\n    return 0\n",
+                schema: "component(\"Treasury\", gold=field(int, default=0))\ndeftype(\"Unit\", components=[\"Treasury\"])\n");
+            Load(out var diags);
+            var d = diags.Single(x => x.Code == Codes.CmdPreconditions);
+            Assert.That(d.Message, Is.EqualTo(message), string.Join("\n", diags));
+        }
+
+        [TestCase("choose(u, where=lambda x: True)\n        choose(n, from_=[u.Treasury.gold])")]
+        [TestCase("choose(n, from_=[k])\n        choose(u, where=lambda x: True)")]
+        [TestCase("choose(n, from_=[(lambda u: 1)(3)])\n        choose(u, where=lambda x: True)")]
+        [TestCase("g = 1\n        g = k\n        choose(n, from_=[g])\n        choose(u, where=lambda x: True)")]
+        public void ChooseMayReadEarlierChoicesAndParametersWithoutChoose(string statement)
+        {
+            Mod("core", defs: "@command(free=True, acts_for=None)\ndef f(u: Ref[Unit], n: int, k: int):\n    with preconditions:\n        " +
+                              statement + "\n    return 0\n",
+                schema: "component(\"Treasury\", gold=field(int, default=0))\ndeftype(\"Unit\", components=[\"Treasury\"])\n");
+            LoadClean();
+        }
+
+        // ---- pay (G187) ----
+
+        private const string PaySchema =
+            "component(\"Treasury\", gold=field(int, default=0))\ndeftype(\"Unit\", components=[\"Treasury\"])\n";
+
+        private static string PayCommand(string body) =>
+            "@command(free=True, acts_for=None)\ndef f(u: Ref[Unit]):\n" + body;
+
+        [TestCase("    pay(3, 1)\n", Codes.EvlArguments, "the first argument of pay() must be a field such as party.Treasury.gold")]
+        [TestCase("    ok = pay(u.Treasury.gold)\n", Codes.EvlArguments, "pay() takes a field and an amount, got 1 argument")]
+        [TestCase("    ok = pay(u.Treasury.gold, amount=1)\n", Codes.EvlArguments, "pay() takes no keyword arguments")]
+        public void TheShapeOfPayIsCheckedAtLoad(string body, string code, string message)
+        {
+            Mod("core", defs: PayCommand(body), schema: PaySchema);
             Load(out var diags);
             var d = diags.Single();
-            Assert.That(d.Code, Is.EqualTo(Codes.EvlUnsupported));
-            Assert.That(d.Message, Is.EqualTo("'" + name + "' is not supported yet"));
+            Assert.That(d.Code, Is.EqualTo(code));
+            Assert.That(d.Message, Is.EqualTo(message));
+        }
+
+        [TestCase("    if pay(u.Treasury.gold, 1):\n        pass\n")]
+        [TestCase("    n = 1 if pay(u.Treasury.gold, 1) else 0\n")]
+        [TestCase("    with preconditions:\n        ok = pay(u.Treasury.gold, 1)\n    pass\n")]
+        public void PayInsideAnExpressionOrThePreconditionsIsALoadError(string body)
+        {
+            Mod("core", defs: PayCommand(body), schema: PaySchema);
+            Load(out var diags);
+            Assert.That(diags, Is.Not.Empty);
+            Assert.That(diags.Select(x => x.Message), Has.Some.Contains("pay()"), string.Join("\n", diags));
+        }
+
+        [Test]
+        public void APureFunctionCannotPay()
+        {
+            Mod("core", schema: PaySchema +
+                                "component(\"Look\", v=derived(bool, lambda l: check(l.entity)))\n" +
+                                "def check(u):\n    ok = pay(u.Treasury.gold, 1)\n    return ok\n");
+            Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.CmdWriteEffect));
+            Assert.That(d.Message, Does.StartWith("'check' changes the world"));
+        }
+
+        [Test]
+        public void AModsOwnPayIsAnOrdinaryFunction()
+        {
+            Mod("core", defs: "def pay(a, b):\n    return a > b\n" + PayCommand("    ok = pay(3, 1)\n"), schema: PaySchema);
+            LoadClean();
+        }
+
+        [Test]
+        public void CostTakesAFieldThroughALocalOfTheBlock()
+        {
+            Mod("core", defs: "@command(free=True, acts_for=None)\ndef f(u: Ref[Unit]):\n    with preconditions:\n" +
+                              "        t = u.Treasury\n        cost(t.gold, 1)\n    return 0\n",
+                schema: "component(\"Treasury\", gold=field(int, default=0))\ndeftype(\"Unit\", components=[\"Treasury\"])\n");
+            LoadClean();
         }
 
         // ---- 매개변수 타입 (G114) ----

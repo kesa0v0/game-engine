@@ -19,6 +19,10 @@ namespace Kesa.Engine.Runtime
             void Writer(string name, Func<IReadOnlyList<Value>, IReadOnlyDictionary<string, Value>, Value> body) =>
                 table.Add(name, new PureBuiltin(name, (p, k) => Guard(() => body(p, k))) { Writes = true });
 
+            // pay(칸, 금액)은 실행기가 호출 모양을 보고 처리한다 (G186·G187): 여기 오면 칸 대신 값을 받은 것이다 (pay를 값으로 넘김)
+            Writer(PureBuiltins.PayName, (p, k) => throw new WorldException(Codes.RunScript,
+                "pay() was given a value, not a field",
+                "call it directly as pay(party.Treasury.gold, n), on its own line or as 'ok = pay(...)' (spec-gaps G187)"));
             Writer(PureBuiltins.SpawnName, Spawn);
             Writer(PureBuiltins.DestroyName, (p, k) =>
             {

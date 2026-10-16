@@ -19,9 +19,15 @@ namespace Kesa.Engine.Script
 
         public const string PreconditionsName = "preconditions";
         public const string RequireName = "require";
+        public const string CostName = "cost";
+        public const string ChooseName = "choose";
+        public const string WhereName = "where";
 
-        /// <summary><c>with preconditions:</c> 안에서만 쓰는 이름들 (spec S2). <c>cost</c>·<c>choose</c>는 아직 미지원이다.</summary>
-        public static readonly string[] PreconditionCalls = { RequireName, "cost", "choose" };
+        /// <summary><c>from</c>은 파이썬 예약어라 밑줄을 붙인다 (spec S2).</summary>
+        public const string FromName = "from_";
+
+        /// <summary><c>with preconditions:</c> 안에서만 쓰는 이름들 (spec S2).</summary>
+        public static readonly string[] PreconditionCalls = { RequireName, CostName, ChooseName };
 
         /// <summary>
         /// 함수 본문을 검사한다. 데코레이터가 붙은 함수는 커맨드로 보고, 첫 문장의 <c>with preconditions:</c>를
@@ -33,7 +39,7 @@ namespace Kesa.Engine.Script
             bool isCommand = def.IsCommand;
             for (int i = 0; i < def.Body.Count; i++)
             {
-                if (i == 0 && isCommand && def.Body[0] is WithStmt with) walker.Preconditions(with);
+                if (i == 0 && isCommand && def.Body[0] is WithStmt with) walker.Preconditions(with, def.Parameters);
                 else walker.Statement(def.Body[i]);
             }
         }
@@ -77,26 +83,23 @@ namespace Kesa.Engine.Script
             /// <summary>
             /// 커맨드 첫 문장의 <c>with preconditions:</c> (G111). 안에는 <c>require</c> 호출과 <c>이름 = 식</c>만 온다.
             /// </summary>
-            public void Preconditions(WithStmt with)
+            public void Preconditions(WithStmt with, IReadOnlyList<Parameter>? parameters = null)
             {
                 if (!(with.Context is NameExpr context) || context.Name != PreconditionsName)
                 {
                     _context.Error(Codes.CmdPreconditions, "a command can only open 'with preconditions:'", with.Context.Span);
                     return;
                 }
+                var chosen = new HashSet<string>(System.StringComparer.Ordinal);
                 foreach (var stmt in with.Body)
                 {
                     switch (stmt)
                     {
                         case ExprStmt es when IsPreconditionCall(es.Expr, out var name):
                             var call = (CallExpr)es.Expr;
-                            if (name != RequireName)
-                            {
-                                Report("'" + name + "' is not supported yet", call.Span,
-                                    "this slice supports require(...) only");
-                                break;
-                            }
-                            CheckRequire(call);
+                            if (name == RequireName) CheckRequire(call);
+                            else if (name == CostName) CheckCost(call);
+                            else CheckChoose(call, parameters, chosen);
                             foreach (var arg in call.Arguments) Expr(arg.Value);
                             break;
 
@@ -109,6 +112,38 @@ namespace Kesa.Engine.Script
                                 "'with preconditions:' can only hold require(...) calls and 'name = value' assignments",
                                 stmt.Span, "the block is checked without running the command, so it cannot change anything (spec-gaps G111)");
                             break;
+                    }
+                }
+                if (parameters != null) CheckChooseOrder(with, parameters);
+            }
+
+            /// <summary>
+            /// 블록에 적힌 순서가 고르는 순서다 (G188): <c>choose(P)</c>의 후보 식은 자기 매개변수와 아래쪽 <c>choose</c>가 정하는
+            /// 매개변수를 읽을 수 없다.
+            /// </summary>
+            private void CheckChooseOrder(WithStmt with, IReadOnlyList<Parameter> parameters)
+            {
+                var chooses = ChooseDependencies.Of(with, parameters);
+                for (int i = 0; i < chooses.Count; i++)
+                {
+                    var c = chooses[i];
+                    if (c.Needs.Contains(c.Parameter))
+                    {
+                        _context.Error(Codes.CmdPreconditions,
+                            "the candidates of '" + c.Parameter + "' read '" + c.Parameter + "' itself", c.Call.Arguments[1].Span,
+                            "the candidates are listed before '" + c.Parameter + "' is picked (spec-gaps G188)");
+                        continue;
+                    }
+                    for (int j = i + 1; j < chooses.Count; j++)
+                    {
+                        var later = chooses[j].Parameter;
+                        if (!c.Needs.Contains(later)) continue;
+                        _context.Error(Codes.CmdPreconditions,
+                            "the candidates of '" + c.Parameter + "' read '" + later + "', which is chosen below",
+                            c.Call.Arguments[1].Span,
+                            "move choose(" + later + ", ...) above choose(" + c.Parameter + ", ...): parameters are picked in " +
+                            "the order of the block (spec-gaps G188)");
+                        break;
                     }
                 }
             }
@@ -135,6 +170,88 @@ namespace Kesa.Engine.Script
                 {
                     _context.Error(Codes.CmdPreconditions, "the message of require() must be a text(...) value",
                         key.Span, "write text(\"" + key.Value + "\")");
+                }
+            }
+
+            /// <summary>
+            /// <c>cost(칸, 금액)</c>: 위치 인자 둘, 키워드 인자 없음, 첫 자리는 <c>party.Treasury.gold</c> 같은 속성 (G186).
+            /// 속성 이름과 깊이는 보지 않는다(<c>t.gold</c>도 된다): 그 칸이 <c>int</c>·<c>fixed</c> <c>field</c>인지는 실행 때 본다 (G108).
+            /// </summary>
+            private void CheckCost(CallExpr call)
+            {
+                const string usage = "write cost(party.Treasury.gold, amount)";
+                foreach (var arg in call.Arguments)
+                {
+                    if (arg.Name == null) continue;
+                    _context.Error(Codes.CmdPreconditions, "cost() takes no keyword arguments", arg.Span, usage);
+                    return;
+                }
+                if (call.Arguments.Count != 2)
+                {
+                    _context.Error(Codes.CmdPreconditions,
+                        "cost() takes a field and an amount, got " + call.Arguments.Count + " argument" +
+                        (call.Arguments.Count == 1 ? "" : "s"), call.Span, usage);
+                    return;
+                }
+                if (!(call.Arguments[0].Value is AttributeExpr))
+                {
+                    _context.Error(Codes.CmdPreconditions, "the first argument of cost() must be a field such as party.Treasury.gold",
+                        call.Arguments[0].Value.Span,
+                        "cost() takes the amount out of that field, so it needs the field itself, not a value (spec-gaps G186)");
+                }
+            }
+
+            /// <summary>
+            /// <c>choose(매개변수, where=함수)</c>나 <c>choose(매개변수, from_=목록)</c> (G183): 첫 자리는 커맨드 매개변수의 이름,
+            /// 키워드 인자는 둘 중 하나만, 매개변수마다 한 번. <c>where=</c>의 매개변수가 <c>Ref[...]</c>인지는 타입을 푼 뒤
+            /// <c>CommandSignatures</c>가 본다.
+            /// </summary>
+            private void CheckChoose(CallExpr call, IReadOnlyList<Parameter>? parameters, HashSet<string> chosen)
+            {
+                const string usage = "write choose(unit, where=lambda u: ...) or choose(dest, from_=[...])";
+                int positional = 0, keywords = 0;
+                foreach (var arg in call.Arguments)
+                {
+                    if (arg.Name == null)
+                    {
+                        positional++;
+                        continue;
+                    }
+                    keywords++;
+                    if (arg.Name != WhereName && arg.Name != FromName)
+                    {
+                        _context.Error(Codes.CmdPreconditions, "choose() has no argument '" + arg.Name + "'", arg.Span,
+                            usage + " (spec-gaps G183)");
+                        return;
+                    }
+                }
+                if (positional != 1 || keywords != 1 || call.Arguments[0].Name != null)
+                {
+                    _context.Error(Codes.CmdPreconditions,
+                        "choose() takes a parameter and either where= or from_=", call.Span, usage + " (spec-gaps G183)");
+                    return;
+                }
+                if (!(call.Arguments[0].Value is NameExpr target))
+                {
+                    _context.Error(Codes.CmdPreconditions, "the first argument of choose() must be a parameter of the command",
+                        call.Arguments[0].Value.Span, usage);
+                    return;
+                }
+                if (parameters != null)
+                {
+                    bool found = false;
+                    foreach (var p in parameters) found |= p.Name == target.Name;
+                    if (!found)
+                    {
+                        _context.Error(Codes.CmdPreconditions, "'" + target.Name + "' is not a parameter of the command",
+                            target.Span, "choose() gives the candidates of a parameter (spec-gaps G183)");
+                        return;
+                    }
+                }
+                if (!chosen.Add(target.Name))
+                {
+                    _context.Error(Codes.CmdPreconditions, "the candidates of '" + target.Name + "' are already chosen above",
+                        call.Span, "write one choose() per parameter; put every condition in its where= (spec-gaps G183)");
                 }
             }
 

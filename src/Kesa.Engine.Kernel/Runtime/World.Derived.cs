@@ -293,7 +293,7 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>컴포넌트 하나(키 컴포넌트면 줄 하나). 자기 멤버, 형제 컴포넌트, <c>entity</c>, <c>key</c>를 읽는다 (G103).</summary>
-        private sealed class ComponentView : ComponentViewBase, IRuntimeAttributes, IRuntimeAssignable, IValueEquality
+        private sealed class ComponentView : ComponentViewBase, IRuntimeAttributes, IRuntimeAssignable, IRuntimeSlots, IValueEquality
         {
             /// <summary>같은 엔티티의 같은 컴포넌트(같은 줄)면 같다 (G142).</summary>
             public bool ValueEquals(Value other) =>
@@ -319,6 +319,37 @@ namespace Kesa.Engine.Runtime
             public Value GetAttribute(string name) => Guard(() => _world.ComponentAttribute(this, name));
 
             public void SetAttribute(string name, Value value) => Guard(() => _world.WriteMember(this, name, value));
+
+            public Value ReadSlot(string name) => Guard(() => _world.ReadSlot(this, name));
+
+            public string SlotName(string name) =>
+                _id + "." + Component.Name + (_row == null ? "" : "[" + _row.Value + "]") + "." + name;
+        }
+
+        /// <summary>
+        /// <c>cost</c>·<c>pay</c>가 확인하고 빼는 칸 (spec-gaps G186): <c>int</c>·<c>fixed</c>인 <c>field</c>만. 속성 이름은 로드 때
+        /// 보지 않으므로(G108) 여기서 본다.
+        /// </summary>
+        private Value ReadSlot(ComponentView view, string name)
+        {
+            var component = view.Component;
+            if (!component.TryGetMember(name, out var member))
+            {
+                var names = new List<string>();
+                foreach (var m in component.Members) names.Add(m.Name);
+                throw new WorldException(Codes.RunUnknownName, "'" + component.Name + "' has no member '" + name + "'",
+                    Suggest.Hint(name, names) ?? "cost() and pay() take a member of a component");
+            }
+            var type = member.Spec.Type;
+            bool number = ReferenceEquals(type, PrimitiveTypeRef.Int) || ReferenceEquals(type, PrimitiveTypeRef.Fixed);
+            if (member.Kind != MemberKind.Field || !number)
+            {
+                string what = member.Kind == MemberKind.Field ? "a " + type.Display + " field" : "a " + member.Kind.ToString().ToLowerInvariant();
+                throw new WorldException(Codes.RunType,
+                    "cost() and pay() need an int or fixed field, but '" + component.Name + "." + name + "' is " + what,
+                    "they take the amount out of a stored number (spec-gaps G186)");
+            }
+            return ComponentAttribute(view, name);
         }
 
         /// <summary>

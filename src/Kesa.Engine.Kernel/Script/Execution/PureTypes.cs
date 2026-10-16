@@ -77,6 +77,18 @@ namespace Kesa.Engine.Script
         void SetAttribute(string name, Value value);
     }
 
+    /// <summary>
+    /// <c>cost</c>·<c>pay</c>의 첫 자리가 가리키는 칸을 가진 런타임 값 (컴포넌트, 키 컴포넌트의 줄, spec-gaps G186).
+    /// </summary>
+    public interface IRuntimeSlots
+    {
+        /// <summary>칸의 지금 값. <c>int</c>·<c>fixed</c>인 <c>field</c>가 아니면 <see cref="ScriptRuntimeException"/>을 던진다.</summary>
+        Value ReadSlot(string name);
+
+        /// <summary>보고서에 적을 칸의 이름 (<c>e3.Treasury.gold</c>).</summary>
+        string SlotName(string name);
+    }
+
     /// <summary><c>x[key]</c>를 받는 런타임 값 (키 컴포넌트의 줄 등).</summary>
     public interface IRuntimeIndexable
     {
