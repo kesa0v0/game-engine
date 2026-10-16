@@ -137,7 +137,7 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var raw = runBody
-                    ? Evaluator.RunCommand(decl.Function, scriptArgs, out suspended, decl.Span, _meter)
+                    ? Evaluator.RunCommand(decl.Function, scriptArgs, out suspended, decl.Span, _meter, () => StartStream(command))
                     : Evaluator.RunPreconditions(decl.Function, scriptArgs, decl.Span, _meter);
                 var requires = new List<RequireOutcome>(raw.Count);
                 foreach (var r in raw)

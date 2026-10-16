@@ -51,9 +51,13 @@ namespace Kesa.Engine.Runtime
         /// <param name="maxSettleRounds">
         /// 정착 한 번의 회차 상한 (spec-gaps G171). 넘으면 남은 <c>when</c> 반응을 돌리지 않고 결과에 알린다.
         /// </param>
+        /// <param name="seed">
+        /// 월드 시드 (spec-gaps G180). 같은 시드에 같은 입력이면 같은 난수가 나온다. 새 게임마다 다르게 할지는 호스트가 정한다.
+        /// 저장에 남고 불러오면 그대로 잇는다.
+        /// </param>
         public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget, bool requireSubmitPolicy = false,
             int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
-            int maxSettleRounds = DefaultMaxSettleRounds)
+            int maxSettleRounds = DefaultMaxSettleRounds, long seed = 0)
             : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, loaded.SubmitPolicy)
         {
             _mods = loaded.Mods;
@@ -66,6 +70,7 @@ namespace Kesa.Engine.Runtime
             if (maxSettleRounds < 1)
                 throw new ArgumentOutOfRangeException(nameof(maxSettleRounds), maxSettleRounds, "the settle round limit must be at least 1");
             _maxSettleRounds = maxSettleRounds;
+            _seed = seed;
             SetHandlers(loaded.Handlers);
             SetWhens(loaded.Whens);
             if (requireSubmitPolicy && loaded.SubmitPolicy == null)

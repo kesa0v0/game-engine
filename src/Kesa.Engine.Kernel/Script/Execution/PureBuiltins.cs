@@ -42,6 +42,9 @@ namespace Kesa.Engine.Script
         /// <summary>신호를 내는 내장 (spec S5). 받은 핸들러가 상태를 바꾸므로 자리 규칙은 쓰는 내장과 같다 (spec-gaps G146).</summary>
         public const string EmitName = "emit";
 
+        /// <summary>난수 이름 공간 (spec-gaps G179). 몸체는 월드가 준다. 이 이름을 쓰는 함수는 난수 함수다 (G178).</summary>
+        public const string RandomName = "random";
+
         /// <summary>
         /// 월드를 바꾸거나 멈추거나 신호를 내는 내장. 부르면 쓰기다 (G135·G136·G146). 이름 집합보다 먼저 초기화되어야 한다.
         /// </summary>
@@ -71,7 +74,7 @@ namespace Kesa.Engine.Script
 
         private static SortedSet<string> NameSet()
         {
-            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName };
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, RandomName };
             set.UnionWith(WritingNameArray);
             return set;
         }

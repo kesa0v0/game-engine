@@ -90,12 +90,12 @@ namespace Kesa.Engine.Script
         /// 본문이 문장 수준의 <c>ask</c>에서 멈추면 멈춘 실행을 <paramref name="suspended"/>로 돌려준다 (spec S2 "막힐 때까지 실행").
         /// </summary>
         public List<RequireOutcome> RunCommand(FunctionValue command, IReadOnlyDictionary<string, Value> args,
-            out Suspended? suspended, SourceSpan callSite = default, StepMeter? meter = null)
+            out Suspended? suspended, SourceSpan callSite = default, StepMeter? meter = null, Action? bodyStarts = null)
         {
             var session = new Session(this, meter ?? new StepMeter(_budget));
             try
             {
-                var results = session.Command(command, args, callSite, runBody: true);
+                var results = session.Command(command, args, callSite, runBody: true, bodyStarts);
                 suspended = session.TakeSuspended();
                 return results;
             }
@@ -459,6 +459,13 @@ namespace Kesa.Engine.Script
                                 "call it on its own line (or as 'x = " + b.Name + "(...)') in a @command body or in a " +
                                 "function that changes the world called on its own line from it (spec-gaps G117, G135)");
                         }
+                        // 본문 프레임이 스택에 있어야 한다: derived·조건·입구는 따로 도는 실행이고, 사전 조건은 본문이 열리기 전이다 (G178)
+                        if (b.Random && !_stack.Exists(f => f.Writable))
+                        {
+                            throw Fail(Codes.RunNotWritable, b.Name + "() draws a random number, so it cannot be called here",
+                                "random numbers can only be drawn in a @command, @on or @when body and the functions it calls; " +
+                                "derived values, conditions and preconditions must give the same answer every time (spec-gaps G178)");
+                        }
                         if (b.CallerBody != null)
                             return b.CallerBody(_stack.Count == 0 ? "" : _stack[_stack.Count - 1].Function.Mod, positional, keywords);
                         if (b.KeywordBody != null) return b.KeywordBody(positional, keywords);
@@ -533,7 +540,7 @@ namespace Kesa.Engine.Script
             /// 실행한다 (G132). 본문 실행 중에만 상태 쓰기가 열린다. 본문 안에서 읽는 <c>derived</c>는 따로 도는 순수 실행이다.
             /// </summary>
             public List<RequireOutcome> Command(FunctionValue command, IReadOnlyDictionary<string, Value> args,
-                SourceSpan site, bool runBody)
+                SourceSpan site, bool runBody, Action? bodyStarts = null)
             {
                 int depth = _stack.Count;
                 var frame = Enter(command, null, null, Array.Empty<Value>(), args);
@@ -548,6 +555,7 @@ namespace Kesa.Engine.Script
                     bool failed = hasBlock && EvaluateBlock((WithStmt)body[0], frame, results);
                     if (runBody && !failed)
                     {
+                        bodyStarts?.Invoke(); // 사전 조건을 통과해 본문이 시작된다: 새 Flow (난수열을 연다, G182)
                         frame.Writable = true;
                         frame.Blocks.Add(new Block(body, hasBlock ? 1 : 0));
                         RunUntil(depth);

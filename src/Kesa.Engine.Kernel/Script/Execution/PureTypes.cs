@@ -193,6 +193,12 @@ namespace Kesa.Engine.Script
         public bool Writes { get; set; }
 
         /// <summary>
+        /// 난수를 뽑는 내장인가 (<c>random.randint</c> 등, spec-gaps G178). 식 안에서도 부를 수 있지만 Flow 본문(커맨드·핸들러·반응)과
+        /// 그 본문이 부른 함수에서만이다. <c>derived</c>·조건·사전 조건에서 굴리면 읽기만 해도 값이 바뀐다.
+        /// </summary>
+        public bool Random { get; set; }
+
+        /// <summary>
         /// 실행을 멈추고 답을 기다리는 내장인가 (<c>ask</c>, spec S2·X1). 자리 규칙은 쓰는 내장과 같아서 <see cref="Writes"/>도 참이다
         /// (spec-gaps G136). 몸체가 돌려주는 값은 결과가 아니라 질문의 내용이고, 실행기는 그것을 들고 멈춘다.
         /// </summary>

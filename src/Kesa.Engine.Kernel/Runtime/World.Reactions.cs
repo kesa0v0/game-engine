@@ -231,7 +231,7 @@ namespace Kesa.Engine.Runtime
                     if (outermost) _meter = new StepMeter(_stepBudget);
                     try
                     {
-                        Evaluator.RunCommand(h.Function, args, out var suspended, h.Span, _meter);
+                        Evaluator.RunCommand(h.Function, args, out var suspended, h.Span, _meter, () => StartStream(id));
                         if (suspended == null) return ((long?, Request?))(null, null);
                         long flow = _nextFlow;
                         return (flow, OpenFlow(id, suspended, SubjectsOf(args.Values), handler: true)); // 질문, 또는 wait면 null

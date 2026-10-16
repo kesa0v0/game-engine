@@ -233,6 +233,9 @@ namespace Kesa.Engine.Loading
                     if (f.Kind == FunctionSlotKind.Cond && fn.Writes)
                         return "'" + fn.Name + "' changes the world (at " + fn.WriteWitness + "), but " + f.Display +
                                " only holds functions that read";
+                    if (f.Kind == FunctionSlotKind.Cond && fn.Random)
+                        return "'" + fn.Name + "' draws random numbers (at " + fn.RandomWitness + "), but " + f.Display +
+                               " only holds functions that give the same answer every time";
                     return null;
             }
             return "values of type " + type.Display + " cannot be written in a patch";

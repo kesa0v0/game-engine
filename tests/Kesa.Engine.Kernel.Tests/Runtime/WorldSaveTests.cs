@@ -171,6 +171,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "    }\n" +
                 "  ],\n" +
                 "  \"tick\": 0,\n" +
+                "  \"seed\": 0,\n" +
                 "  \"counters\": {\n" +
                 "    \"entity\": 3,\n" +
                 "    \"contribution\": 1,\n" +
@@ -206,7 +207,8 @@ namespace Kesa.Engine.Tests.Runtime
                 "  \"flows\": [],\n" +
                 "  \"when\": [],\n" +
                 "  \"when_cooldown\": [],\n" +
-                "  \"when_once\": []\n" +
+                "  \"when_once\": [],\n" +
+                "  \"rand\": []\n" +
                 "}\n";
             Assert.That(Encoding.UTF8.GetString(_world.Save()), Is.EqualTo(golden));
         }

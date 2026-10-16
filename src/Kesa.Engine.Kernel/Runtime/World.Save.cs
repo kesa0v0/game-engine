@@ -54,13 +54,15 @@ namespace Kesa.Engine.Runtime
                 .Add("format", new JsonNumber(SaveFormatVersion))
                 .Add("mods", mods)
                 .Add("tick", new JsonNumber(_tick))
+                .Add("seed", new JsonNumber(_seed))
                 .Add("counters", counters)
                 .Add("entities", entities)
                 .Add("contributions", contributions)
                 .Add("flows", SaveFlows())
                 .Add("when", SaveWhens())
                 .Add("when_cooldown", SaveCooldowns())
-                .Add("when_once", SaveOnce());
+                .Add("when_once", SaveOnce())
+                .Add("rand", SaveRandCounts());
             return CanonicalJson.Write(root);
         }
 
@@ -210,6 +212,7 @@ namespace Kesa.Engine.Runtime
 
             _tick = Long(Field(root, "tick"), "tick");
             if (_tick < 0) throw new JsonFormatException("tick should not be negative");
+            _seed = Long(Field(root, "seed"), "seed");
             var counters = AsObject(Field(root, "counters"), "counters");
             _nextId = Positive(Field(counters, "entity"), "counters.entity");
             _nextContribution = Positive(Field(counters, "contribution"), "counters.contribution");
@@ -261,6 +264,7 @@ namespace Kesa.Engine.Runtime
             RestoreWhens(AsArray(Field(root, "when"), "when"));
             RestoreCooldowns(AsArray(Field(root, "when_cooldown"), "when_cooldown"));
             RestoreOnce(AsArray(Field(root, "when_once"), "when_once"));
+            RestoreRandCounts(AsArray(Field(root, "rand"), "rand"));
 
             // 색인은 저장하지 않고 다시 만든다 (기록 없이: 커맨드 밖이다)
             foreach (var pair in records)

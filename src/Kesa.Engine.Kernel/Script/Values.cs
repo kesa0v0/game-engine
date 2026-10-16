@@ -129,6 +129,14 @@ namespace Kesa.Engine.Script
 
         public bool Writes => WriteWitness != null;
 
+        /// <summary>
+        /// 난수 함수면 그렇게 만든 첫 <c>random</c> 사용이나 난수 함수 호출의 위치 (spec-gaps G178). 아니면 null.
+        /// 쓰기와 달리 식 안에서도 부를 수 있지만 순수 자리(<c>derived</c>, 조건, 사전 조건, <c>Cond</c>)에는 둘 수 없다.
+        /// </summary>
+        public SourceSpan? RandomWitness { get; internal set; }
+
+        public bool Random => RandomWitness != null;
+
         /// <summary><c>@command</c> 함수인가 (G109). 로직에서 쓸 수 없다 (G118).</summary>
         public bool IsCommand => Definition != null && Definition.IsCommand;
 

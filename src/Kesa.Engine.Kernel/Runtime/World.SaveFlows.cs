@@ -50,6 +50,7 @@ namespace Kesa.Engine.Runtime
                 flows.Add(saved
                     .Add("subjects", subjects)
                     .Add("about", about)
+                    .Add("rand", SaveStream(flow))
                     .Add("frames", frames)
                     .Add("closures", writer.Closures)
                     .Add("envs", writer.Envs));
@@ -544,7 +545,10 @@ namespace Kesa.Engine.Runtime
                     about = new List<EntityId>();
                     foreach (var s in AsArray(aboutNode, "flow about").Items) about.Add(new EntityId(SavedId(s, "a flow about entity")));
                 }
-                var record = new FlowRecord(id, command, run, request, handler, wakeAt) { Subjects = subjects, About = about };
+                var record = new FlowRecord(id, command, run, request, handler, wakeAt)
+                {
+                    Subjects = subjects, About = about, Rand = LoadStream(Field(obj, "rand"), command),
+                };
                 // 실행이 끝날 때마다 버리므로 대상이 사라진 Flow는 저장에 있을 수 없다 (G164)
                 var stale = StaleReason(record);
                 if (stale != null) throw new JsonFormatException(where + " should have been canceled: " + stale);

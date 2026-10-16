@@ -58,6 +58,7 @@ namespace Kesa.Engine.Runtime
             AddStructureBuiltins(table);
             AddSignalBuiltins(table);
             AddFlowBuiltins(table);
+            AddRandomBuiltins(table);
             return table;
         }
 

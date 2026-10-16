@@ -52,6 +52,40 @@ namespace Kesa.Engine.Script
                 }
             }
 
+            // 난수 함수 판정: random을 쓰거나 난수 함수를 부르는(문장이든 식이든) 함수, 고정점까지 (G178)
+            changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (var body in bodies)
+                {
+                    if (body.Function.Random) continue;
+                    SourceSpan? witness = body.FirstRandom;
+                    foreach (var calls in new[] { body.StatementCalls, body.ExpressionCalls })
+                    foreach (var call in calls)
+                        if (call.Callee.Random && (witness == null || Before(call.Span, witness.Value))) witness = call.Span;
+                    if (witness == null) continue;
+                    body.Function.RandomWitness = witness;
+                    changed = true;
+                }
+            }
+
+            // 사전 조건은 UI가 거듭 확인하므로 같은 답을 내야 한다 (G178)
+            const string randomHint = "draw random numbers in the body instead; derived values, conditions and preconditions must give " +
+                                      "the same answer every time (spec-gaps G178)";
+            foreach (var body in bodies)
+            {
+                foreach (var span in body.PreconditionRandom)
+                    context.Error(Codes.CmdWriteEffect, "random numbers cannot be drawn in 'with preconditions:'", span, randomHint);
+                foreach (var call in body.PreconditionCalls)
+                {
+                    if (!call.Callee.Random) continue;
+                    context.Error(Codes.CmdWriteEffect,
+                        "'" + call.Callee.Name + "' draws random numbers, so it cannot be used in 'with preconditions:'", call.Span,
+                        randomHint, new[] { call.Callee.RandomWitness!.Value });
+                }
+            }
+
             // 커맨드는 제출로만 실행된다: 로직에서 부르거나 값으로 쓰면 사전 조건과 권한을 건너뛴다 (G118)
             foreach (var body in bodies)
             foreach (var use in body.CommandUses)
@@ -84,6 +118,10 @@ namespace Kesa.Engine.Script
             // 입구 검사는 순수하다: 거부가 상태를 건드리지 않는다 (C10, G122)
             foreach (var policy in functions.Policies)
             {
+                if (policy.Function.Random)
+                    context.Error(Codes.CmdWriteEffect,
+                        "the submit policy '" + policy.Function.Name + "' draws random numbers; it must give the same answer every time",
+                        policy.Function.Definition!.Span, randomHint, new[] { policy.Function.RandomWitness!.Value });
                 if (!policy.Function.Writes) continue;
                 context.Error(Codes.CmdWriteEffect,
                     "the submit policy '" + policy.Function.Name + "' changes the world; it can only read",
@@ -94,6 +132,12 @@ namespace Kesa.Engine.Script
             // when 조건은 순수하다: 정착마다 다시 평가하므로 읽기만 한다 (S5, G169)
             foreach (var when in functions.Whens)
             {
+                if (when.Condition.Random)
+                    context.Error(Codes.CmdWriteEffect,
+                        "the condition of @when on '" + when.Function.Name + "' is '" + when.Condition.Name +
+                        "', which draws random numbers; it must give the same answer every time",
+                        when.Span, "draw random numbers in the reaction's body instead (spec-gaps G178)",
+                        new[] { when.Condition.RandomWitness!.Value });
                 if (!when.Condition.Writes) continue;
                 context.Error(Codes.CmdWriteEffect,
                     "the condition of @when on '" + when.Function.Name + "' is '" + when.Condition.Name + "', which changes the world; it can only read",
@@ -118,6 +162,13 @@ namespace Kesa.Engine.Script
                     context.Error(Codes.CmdWriteEffect, what + " uses '" + fn.Name + "', which is a " + fn.EntryKind, span,
                         "a command only runs when it is submitted; use a plain function (spec-gaps G118)",
                         new[] { fn.Definition!.Span });
+                    return;
+                }
+                if (fn.Random)
+                {
+                    context.Error(Codes.CmdWriteEffect,
+                        what + " uses '" + fn.Name + "', which draws random numbers; it must give the same answer every time", span,
+                        "draw random numbers in a @command body instead (spec-gaps G178)", new[] { fn.RandomWitness!.Value });
                     return;
                 }
                 if (!fn.Writes) return;
@@ -172,6 +223,14 @@ namespace Kesa.Engine.Script
             /// <summary>본문에서 커맨드 이름을 쓴 곳 (호출이든 값이든, G118).</summary>
             public List<Call> CommandUses { get; } = new List<Call>();
 
+            /// <summary>본문의 첫 <c>random</c> 사용 (G178).</summary>
+            public SourceSpan? FirstRandom { get; set; }
+
+            /// <summary><c>with preconditions:</c> 안의 <c>random</c> 사용과 함수 호출 (G178).</summary>
+            public List<SourceSpan> PreconditionRandom { get; } = new List<SourceSpan>();
+
+            public List<Call> PreconditionCalls { get; } = new List<Call>();
+
             /// <summary>식 안에서 부른 쓰는 내장 (이름, 위치; G135).</summary>
             public List<KeyValuePair<string, SourceSpan>> BuiltinExpressionCalls { get; } =
                 new List<KeyValuePair<string, SourceSpan>>();
@@ -181,6 +240,9 @@ namespace Kesa.Engine.Script
         {
             private readonly ModScope _scope;
             private readonly Body _body;
+
+            /// <summary><c>with preconditions:</c> 블록 안을 걷는 중인가 (G178: 거기서는 난수를 쓸 수 없다).</summary>
+            private bool _inPreconditions;
 
             public Walker(ModScope scope, Body body)
             {
@@ -256,11 +318,13 @@ namespace Kesa.Engine.Script
                             break;
                         case WithStmt with:
                             // 사전 조건 블록의 문장은 require 호출과 이름 대입뿐이다 (G111): 그 안의 호출은 모두 식 안이다
+                            _inPreconditions = true;
                             foreach (var inner in with.Body)
                             {
                                 if (inner is ExprStmt e) Expr(e.Expr, locals);
                                 else if (inner is AssignStmt a) Expr(a.Value, locals);
                             }
+                            _inPreconditions = false;
                             break;
                         case ReturnStmt ret:
                             if (ret.Value != null) Expr(ret.Value, locals);
@@ -276,7 +340,11 @@ namespace Kesa.Engine.Script
                     case CallExpr call:
                         var callee = Resolve(call.Callee, locals);
                         var builtin = callee == null ? WritingBuiltin(call.Callee, locals) : null;
-                        if (callee != null) _body.ExpressionCalls.Add(new Call(callee, call.Span));
+                        if (callee != null)
+                        {
+                            _body.ExpressionCalls.Add(new Call(callee, call.Span));
+                            if (_inPreconditions) _body.PreconditionCalls.Add(new Call(callee, call.Span));
+                        }
                         else if (builtin != null)
                             _body.BuiltinExpressionCalls.Add(new KeyValuePair<string, SourceSpan>(builtin, call.Span));
                         else if (!(call.Callee is NameExpr)) Expr(call.Callee, locals);
@@ -284,6 +352,12 @@ namespace Kesa.Engine.Script
                         break;
                     case NameExpr name:
                         Resolve(name, locals); // 값으로 쓴 커맨드 이름을 기록한다 (G118)
+                        // 덮어쓰지 않은 random을 쓰면 난수 함수다 (호출이든 값이든, G178)
+                        if (name.Name == PureBuiltins.RandomName && !locals.Contains(name.Name) && !_scope.TryGet(name.Name, out _, out _))
+                        {
+                            if (_body.FirstRandom == null) _body.FirstRandom = name.Span;
+                            if (_inPreconditions) _body.PreconditionRandom.Add(name.Span);
+                        }
                         break;
                     case BinaryExpr bin:
                         Expr(bin.Left, locals);

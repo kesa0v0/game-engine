@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-16. 브랜치 `spec-v0.5-scaffold`, 테스트 1474개 통과(커널 1446, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-17. 브랜치 `spec-v0.5-scaffold`, 테스트 1507개 통과(커널 1479, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -291,13 +291,26 @@ G140(정규형 JSON을 엔진이 직접 씀)·G141(멈춘 Flow의 런타임 값�
    - 여기까지 커밋 `f44f472`.
    - **`field`가 `derived` 상한을 넘는 경우(커밋 전):** 이미 G99(확인, 게임이 고름)로 정해져 있었고 spec·schema-design에 🟡로 남아 있던 것을 고쳤다. G99가 "S5가 생긴 뒤"로 미룬 패턴 B(정착 반응으로 저장값 자르기)가 되는지 테스트 `WhenTests.ASettleReactionClampsAFieldWhenItsDerivedCapGoesDown`로 확인했다: 커맨드 안에서 상한이 내려가면 그 제출의 정착에서 바로 자르고, 호스트가 커맨드 밖에서 내리면 다음 정착 지점까지 넘은 채로 읽힌다. `std.stats`의 편의 함수는 표준 모드 작업이다. spec S5의 열린 질문 줄도 G176·G177과 재평가 비용으로 닫았다.
    - S5의 열린 질문은 이것으로 끝났다. spec S5에 🟡로 남은 줄(단계 없는 핸들러 순서, `when` 정착 지점, `emit` 시점, 트랜잭션 단위)은 구현과 G 번호가 있는데 표시만 남은 것이다(정리 필요).
-   - **다음:** 이 묶음 커밋, 그다음 사용자와 다음 슬라이스를 고른다.
+   - 여기까지 커밋 `d4703fe`.
+
+## 적합성 점검과 난수 (커밋 전, 2026-10-17)
+
+spec 7절 C1~C10을 테스트와 맞춰 봤다: C2·C3·C9(`WorldAskTests`), C4·C5(`WorldSaveTests`·`WorldSaveFlowTests`), C7(`WorldPreconditionTests`), C8(롤백 테스트들)은 확인되어 있었다. 난수가 없어서 C10과 C1의 "난수까지", C6의 시드가 비어 있었다. 검증 시나리오 ①~④는 런타임에서 끝까지 돌린 테스트가 없다(③은 `choose`가 있어야 합법 수를 나열한다).
+
+1. **난수(끝남), G178(부를 수 있는 곳: Flow 본문과 그 본문이 부른 함수, 식 안도 됨, 순수 자리는 로드 오류)·G179(파이썬과 같은 `random` 이름 공간)·G180(호스트가 주는 월드 시드)·G181(H = ChaCha20, RFC 8439)·G182(정의 id마다 실행 횟수, 실패하면 되감음), 모두 확인:**
+   - `Numerics/ChaCha20.cs`(블록 함수). `Runtime/World.Random.cs`: `_seed`(생성자 `seed:`, `World.Seed`), `_randCounts`(정의 id → 실행 횟수), 지금 Flow의 `RandStream`(키, n). 본문이 시작될 때 `PureEvaluator.RunCommand(..., bodyStarts)` 콜백이 `StartStream(id)`로 횟수를 올린다(되돌리기 기록). 커맨드(`EvaluateRequires`)·핸들러·`when` 세 곳. 멈출 때 `FlowRecord.Rand`에 사본을 두고 `Continue`가 사본으로 잇는다(실패하면 멈춘 때의 n으로 남는다).
+   - 스크립트 API: `RandomModule`(`randint`, `randrange`, `choice`, `choices`, `sample`, `random`). 범위는 버리고 다시 뽑기로 쏠림이 없다. 호출 한 번에 n이 1이고 안에서 여러 번 뽑는 것은 블록 안 순서다.
+   - 효과 판정: `FunctionValue.RandomWitness`/`Random`(`FunctionEffects`의 고정점, `random` 이름을 쓰거나 난수 함수를 부르면). 오류 자리: 사전 조건 블록, `when` 조건, 입구 정책, `derived`·`field` 기본값·`Cond` 기본값(`CheckPureSlots`), Def·패치로 넣은 `Cond` 값(`PatchOperationCheck`). 실행 중 안전망: `PureBuiltin.Random`이면 스택에 본문 프레임(`Writable`)이 있어야 한다.
+   - 저장: 최상위 `"seed"`, `"rand"`(정의 id 순 `{"id","count"}`, 사라진 정의는 불러올 때 버림), Flow마다 `"rand": {"count","calls"}`(골든 갱신).
+   - 테스트 `Numerics/ChaCha20Tests`(RFC 8439 2.1.1·2.3.2 값), `Runtime/RandomTests`(골든 값 C6, 같은 시드 같은 값, 다른 커맨드가 밀지 않음, C10 거절·오류 뒤 같은 값, `ask`와 저장을 건너도 같은 난수열 C1, 실패한 답 뒤 같은 값, `when`의 난수열, API 뜻, 잘못된 인자, 로드 오류 자리 6개, 실행 중 안전망). 카운터 되감기와 이어 갈 때의 사본을 빼면 각각 테스트가 실패하는 것을 확인했다.
+   - 로직용 `.pyi`가 아직 없어서 `random`의 스텁도 없다(.pyi 작업 때).
+   - **다음:** 이 묶음 커밋. 그다음 후보: `cost`·`choose`(시나리오 ③), 시나리오 ①②④를 런타임 테스트로, spec S5의 🟡 정리, 표준 모드의 `chance` 같은 편의.
 
 ## 다음 할 일 (사용자와 고를 것)
 
 Flow(`ask`·응답 커맨드)와 저장(C1·C4·C5)까지 끝났고 반응(S5)을 진행 중이다(위 "반응 슬라이스").
 
-**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 `e9a65d6`). S5 열린 질문 G176·G177과 "읽은 칸이 바뀔 때만 재평가"를 했다(커밋 `f44f472`). `field`가 `derived` 상한을 넘는 경우(G99의 패턴 B 확인, 문서 갱신)를 했다(커밋 전). S5 열린 질문은 끝났다. 다음은 사용자와 다음 슬라이스 고르기.
+**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 `e9a65d6`). S5 열린 질문 G176·G177과 "읽은 칸이 바뀔 때만 재평가"를 했다(커밋 `f44f472`). `field`가 `derived` 상한을 넘는 경우(G99의 패턴 B 확인, 문서 갱신)를 했다(커밋 `d4703fe`). S5 열린 질문은 끝났다. 적합성 점검 뒤 난수(G178~G182)를 했다(커밋 전). 다음은 이 묶음 커밋, 그다음 위 "적합성 점검과 난수"의 다음 후보에서 고르기.
 
 그 밖의 후보:
 
@@ -347,7 +360,7 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1474개 통과(커널 1446, CLI 28)를 확인한다.
+1. `git pull` 후 `dotnet test`로 1507개 통과(커널 1479, CLI 28)를 확인한다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G135), `docs/spine-spec.md` S2·S4·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.
 

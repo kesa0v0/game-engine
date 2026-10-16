@@ -192,6 +192,9 @@ namespace Kesa.Engine.Runtime
 
             /// <summary><c>advance(n)</c>에서 멈췄으면 n (G167). 같은 호출 안에서 진행하고 이어 가므로 저장되지 않는다.</summary>
             public long? AdvanceBy { get; set; }
+
+            /// <summary>이 Flow의 난수열 (G182). 이어 갈 때 사본으로 잇는다: 그 구간이 실패하면 멈춘 때의 n으로 남는다.</summary>
+            public RandStream? Rand { get; set; }
         }
 
         /// <summary>멈춘 Flow, 번호 순 (실행 순서가 결정론적이다, X1).</summary>
@@ -230,7 +233,7 @@ namespace Kesa.Engine.Runtime
             if (run.Request is AdvancePayload advance)
             {
                 // 이 호출이 끝나기 전에 시간을 흘리고 이어 간다 (G167). 저장되는 일은 없다
-                _flows.Add(id, new FlowRecord(id, command, run, null, handler) { Subjects = subjects, AdvanceBy = advance.Ticks });
+                _flows.Add(id, new FlowRecord(id, command, run, null, handler) { Rand = _rand?.Copy(), Subjects = subjects, AdvanceBy = advance.Ticks });
                 _advancers.Add(id);
                 Journal(() =>
                 {
@@ -241,7 +244,7 @@ namespace Kesa.Engine.Runtime
             }
             if (run.Request is WaitPayload sleep)
             {
-                _flows.Add(id, new FlowRecord(id, command, run, null, handler, _tick + sleep.Ticks) { Subjects = subjects, About = sleep.About });
+                _flows.Add(id, new FlowRecord(id, command, run, null, handler, _tick + sleep.Ticks) { Rand = _rand?.Copy(), Subjects = subjects, About = sleep.About });
                 Journal(() => _flows.Remove(id));
                 return null;
             }
@@ -257,7 +260,7 @@ namespace Kesa.Engine.Runtime
                 TimeoutChoice = ask.TimeoutChoice,
                 TimeoutResponse = ask.TimeoutResponse,
             };
-            _flows.Add(id, new FlowRecord(id, command, run, request, handler) { Subjects = subjects, About = ask.About });
+            _flows.Add(id, new FlowRecord(id, command, run, request, handler) { Rand = _rand?.Copy(), Subjects = subjects, About = ask.About });
             Journal(() => _flows.Remove(id));
             return request;
         }
@@ -485,6 +488,7 @@ namespace Kesa.Engine.Runtime
         private Request? Continue(FlowRecord flow, Value answer, string after = "after an answer")
         {
             DropFlow(flow);
+            _rand = flow.Rand?.Copy(); // 같은 난수열을 잇는다 (spec S2, G182)
             bool outermost = _meter == null;
             if (outermost) _meter = new StepMeter(_stepBudget);
             try
