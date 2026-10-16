@@ -240,6 +240,20 @@ namespace Kesa.Engine.Script
                         Parameters(e.Parameters);
                         Expr(e.Body);
                         return;
+                    case ComprehensionExpr e:
+                        Tag("comprehension");
+                        Number((int)e.Kind);
+                        Expr(e.Element);
+                        if (e.Value != null) Expr(e.Value);
+                        Number(e.Clauses.Count);
+                        foreach (var clause in e.Clauses)
+                        {
+                            Text(clause.Variable);
+                            Expr(clause.Iterable);
+                            Number(clause.Conditions.Count);
+                            foreach (var condition in clause.Conditions) Expr(condition);
+                        }
+                        return;
                     case UnsupportedExpr e:
                         Tag("unsupported");
                         Text(e.What);

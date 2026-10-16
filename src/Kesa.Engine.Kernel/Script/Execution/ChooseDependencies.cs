@@ -130,6 +130,14 @@ namespace Kesa.Engine.Script
                     foreach (var p in lambda.Parameters) inner.Add(p.Name);
                     Walk(lambda.Body, inner, parameters, locals, reads);
                     return;
+                case ComprehensionExpr comp:
+                    foreach (var (part, names) in comp.Parts())
+                    {
+                        var scope = new SortedSet<string>(bound, StringComparer.Ordinal);
+                        scope.UnionWith(names);
+                        Walk(part, scope, parameters, locals, reads);
+                    }
+                    return;
             }
         }
     }

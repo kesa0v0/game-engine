@@ -6,7 +6,7 @@ using Kesa.Engine.Numerics;
 namespace Kesa.Engine.Script
 {
     /// <summary>
-    /// 순수 함수에서 쓰는 내장 함수 (spec-gaps G97): <c>floor ceil round abs min max clamp len range sum</c>.
+    /// 순수 함수에서 쓰는 내장 함수 (spec-gaps G97·G189): <c>floor ceil round abs min max clamp len range sum any all</c>.
     /// 호스트는 여기에 <c>contribs</c> 같은 것을 더해 <see cref="PureEvaluator"/>에 넘긴다.
     /// </summary>
     public static class PureBuiltins
@@ -102,8 +102,48 @@ namespace Kesa.Engine.Script
             Add("len", Len);
             Add("range", Range);
             Add("sum", Sum);
+            Add(AnyName, a => Truth(AnyName, a, stopOn: true));
+            Add(AllName, a => Truth(AllName, a, stopOn: false));
             table.Add(TextName, new PureBuiltin(TextName, Text));
             return table;
+        }
+
+        /// <summary>
+        /// 제너레이터 식을 받으면 하나씩 당겨 일찍 멈추는 내장 (spec-gaps G189). 실행기가 그 호출을 알아본다.
+        /// </summary>
+        public const string AnyName = "any";
+        public const string AllName = "all";
+
+        /// <summary>
+        /// <c>any(xs)</c>·<c>all(xs)</c> (파이썬과 같다, G189): 참/거짓은 G104. 리스트·<c>range</c>·맵의 키·런타임 묶음을 받는다.
+        /// </summary>
+        private static Value Truth(string name, IReadOnlyList<Value> args, bool stopOn)
+        {
+            Arity(name, args, 1);
+            foreach (var item in Items(name, args[0]))
+                if (PureOps.Truthy(item) == stopOn) return stopOn ? BoolValue.True : BoolValue.False;
+            return stopOn ? BoolValue.False : BoolValue.True;
+        }
+
+        /// <summary><c>for</c>가 도는 것과 같은 항목: 리스트, 맵의 키, <c>range</c>, 런타임 묶음.</summary>
+        private static IEnumerable<Value> Items(string name, Value iterable)
+        {
+            switch (iterable)
+            {
+                case ListValue list:
+                    foreach (var item in list.Items) yield return item;
+                    yield break;
+                case DictValue dict:
+                    foreach (var item in dict.Items) yield return item.Key;
+                    yield break;
+                case RangeValue range:
+                    for (long i = 0; i < range.Count; i++) yield return new IntValue(range.At(i));
+                    yield break;
+                case IRuntimeIterable runtime:
+                    foreach (var item in runtime.Iterate()) yield return item;
+                    yield break;
+            }
+            throw PureOps.TypeError(name + "() needs a list, not " + iterable.KindName);
         }
 
         /// <summary>메시지 값을 만드는 내장 (spec-gaps G113).</summary>

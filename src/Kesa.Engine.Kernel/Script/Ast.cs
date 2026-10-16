@@ -179,6 +179,77 @@ namespace Kesa.Engine.Script
         public Expr WhenFalse { get; }
     }
 
+    public enum ComprehensionKind
+    {
+        /// <summary><c>[x for ...]</c></summary>
+        List,
+
+        /// <summary><c>{k: v for ...}</c></summary>
+        Dict,
+
+        /// <summary><c>f(x for ...)</c>: 호출의 인자로만 온다 (spec-gaps G189).</summary>
+        Generator,
+    }
+
+    /// <summary><c>for 변수 in 반복할것 if 조건 if 조건...</c> 절 하나.</summary>
+    public sealed class ComprehensionClause
+    {
+        public ComprehensionClause(string variable, SourceSpan variableSpan, Expr iterable, IReadOnlyList<Expr> conditions)
+        {
+            Variable = variable;
+            VariableSpan = variableSpan;
+            Iterable = iterable;
+            Conditions = conditions;
+        }
+
+        public string Variable { get; }
+        public SourceSpan VariableSpan { get; }
+        public Expr Iterable { get; }
+        public IReadOnlyList<Expr> Conditions { get; }
+    }
+
+    /// <summary>
+    /// 컴프리헨션과 제너레이터 식 (spec S2, spec-gaps G189). 절은 바깥에서 안쪽 순이다. 반복 변수는 이 식 안에서만 보인다(파이썬 3).
+    /// </summary>
+    public sealed class ComprehensionExpr : Expr
+    {
+        public ComprehensionExpr(ComprehensionKind kind, Expr element, Expr? value, IReadOnlyList<ComprehensionClause> clauses,
+            SourceSpan span) : base(span)
+        {
+            Kind = kind;
+            Element = element;
+            Value = value;
+            Clauses = clauses;
+        }
+
+        public ComprehensionKind Kind { get; }
+
+        /// <summary>리스트·제너레이터면 원소, 딕트면 키.</summary>
+        public Expr Element { get; }
+
+        /// <summary>딕트의 값.</summary>
+        public Expr? Value { get; }
+
+        public IReadOnlyList<ComprehensionClause> Clauses { get; }
+
+        /// <summary>
+        /// 식 안의 모든 하위 식과 그 식에서 보이는 반복 변수 (정적 검사기들이 같은 규칙으로 돌도록). 첫 절의 반복할 것은 파이썬처럼
+        /// 바깥 이름 공간에서 계산하므로 반복 변수가 보이지 않는다.
+        /// </summary>
+        public IEnumerable<(Expr Expr, IReadOnlyList<string> Bound)> Parts()
+        {
+            var bound = new List<string>();
+            foreach (var clause in Clauses)
+            {
+                yield return (clause.Iterable, bound.ToArray());
+                bound.Add(clause.Variable);
+                foreach (var condition in clause.Conditions) yield return (condition, bound.ToArray());
+            }
+            yield return (Element, bound.ToArray());
+            if (Value != null) yield return (Value, bound.ToArray());
+        }
+    }
+
     /// <summary>파싱은 되었지만 이 단계에서 지원하지 않는 식 (진단은 이미 보고됨).</summary>
     public sealed class UnsupportedExpr : Expr
     {

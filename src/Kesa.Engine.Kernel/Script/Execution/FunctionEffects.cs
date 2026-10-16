@@ -393,6 +393,15 @@ namespace Kesa.Engine.Script
                         foreach (var p in lambda.Parameters) inner.Add(p.Name);
                         Expr(lambda.Body, inner);
                         break;
+                    case ComprehensionExpr comp:
+                        // 식 안이라 그 안의 호출은 모두 식 안의 호출이다 (G117·G135)
+                        foreach (var (part, bound) in comp.Parts())
+                        {
+                            var scope = new SortedSet<string>(locals, System.StringComparer.Ordinal);
+                            scope.UnionWith(bound);
+                            Expr(part, scope);
+                        }
+                        break;
                 }
             }
         }

@@ -111,6 +111,9 @@ namespace Kesa.Engine.Script
                     Expr(e.WhenTrue, found);
                     Expr(e.WhenFalse, found);
                     return;
+                case ComprehensionExpr e:
+                    foreach (var (part, _) in e.Parts()) Expr(part, found);
+                    return;
             }
         }
     }

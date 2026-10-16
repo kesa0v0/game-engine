@@ -255,6 +255,11 @@ namespace Kesa.Engine.Script
                 }
             }
 
+            private void Parts(ComprehensionExpr comp)
+            {
+                foreach (var (part, _) in comp.Parts()) Expr(part);
+            }
+
             public void Statement(Stmt stmt)
             {
                 switch (stmt)
@@ -351,7 +356,21 @@ namespace Kesa.Engine.Script
                                 "recursion is not allowed in logic functions");
                         }
                         Expr(call.Callee);
-                        foreach (var arg in call.Arguments) Expr(arg.Value);
+                        foreach (var arg in call.Arguments)
+                        {
+                            // 제너레이터 식은 호출의 인자로만 온다 (G189)
+                            if (arg.Value is ComprehensionExpr gen && gen.Kind == ComprehensionKind.Generator) Parts(gen);
+                            else Expr(arg.Value);
+                        }
+                        break;
+
+                    case ComprehensionExpr comp:
+                        if (comp.Kind == ComprehensionKind.Generator)
+                        {
+                            Report("a generator expression can only be an argument of a call", comp.Span,
+                                "write sum(x for x in xs), or [x for x in xs] for a list (spec-gaps G189)");
+                        }
+                        Parts(comp);
                         break;
 
                     case AttributeExpr attr:

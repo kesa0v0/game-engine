@@ -799,6 +799,10 @@ namespace Kesa.Engine.Script
                     _context.Functions.Functions.Add(lambdaValue);
                     return lambdaValue;
                 case UnsupportedExpr _: throw new ScriptError(); // 파서가 이미 보고함
+                case ComprehensionExpr comp:
+                    // 최상위의 for·조건식과 같다 (G102·G189)
+                    throw _context.Fail(Codes.EvlUnsupported, "comprehensions can only be used inside a function", comp.Span,
+                        "content files list their values directly; compute values in a def or lambda (spec-gaps G189)");
                 case AttributeExpr attr:
                     if (UsesInherit(attr))
                         throw _context.Fail(Codes.EvlUnsupported, "'inherit' can only be used in a Def field value", attr.Span);

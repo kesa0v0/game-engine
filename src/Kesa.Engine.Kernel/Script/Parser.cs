@@ -887,8 +887,15 @@ namespace Kesa.Engine.Script
                     var value = ParseExpression();
                     if (Cur.IsName("for"))
                     {
-                        _diagnostics.Error(Codes.ParUnsupported, "generator expressions are not supported", Cur.Span);
-                        SkipExpressionTail();
+                        // f(x for x in xs): 괄호 없는 제너레이터 식은 유일한 인자일 때만 (파이썬과 같다, G189)
+                        var forSpan = Cur.Span;
+                        var clauses = ParseComprehensionClauses();
+                        value = clauses == null
+                            ? new UnsupportedExpr("comprehension", value.Span)
+                            : new ComprehensionExpr(ComprehensionKind.Generator, value, null, clauses, value.Span);
+                        if (args.Count > 0 || Cur.IsOp(","))
+                            _diagnostics.Error(Codes.ParSyntax, "a generator expression must be parenthesized unless it is the only argument",
+                                forSpan);
                     }
                     if (sawKeyword)
                     {
@@ -977,11 +984,49 @@ namespace Kesa.Engine.Script
             }
             if (Cur.IsName("for"))
             {
-                _diagnostics.Error(Codes.ParUnsupported, "generator expressions are not supported", Cur.Span);
-                SkipExpressionTail();
+                // (x for ...): 호출 인자 자리인지는 FunctionChecker가 본다 (G189)
+                var clauses = ParseComprehensionClauses();
+                Expect(")");
+                return clauses == null
+                    ? new UnsupportedExpr("comprehension", open.Span)
+                    : new ComprehensionExpr(ComprehensionKind.Generator, inner, null, clauses, open.Span);
             }
             Expect(")");
             return inner;
+        }
+
+        /// <summary>
+        /// <c>for 변수 in 식 (if 식)*</c> 절들 (spec-gaps G189). 파이썬처럼 반복할 것과 조건은 조건식·람다가 아닌 식(<c>or</c> 수준)이다.
+        /// 대상 풀기(<c>for k, v in ...</c>)는 받지 않는다: 진단을 내고 식의 나머지를 건너뛰어 null을 돌려준다.
+        /// </summary>
+        private List<ComprehensionClause>? ParseComprehensionClauses()
+        {
+            var clauses = new List<ComprehensionClause>();
+            while (Cur.IsName("for"))
+            {
+                Advance();
+                var target = Cur;
+                if (target.Kind != TokenKind.Name || Keywords.Contains(target.Text))
+                    throw Fail("expected a loop variable after 'for'" + Describe(target), target.Span);
+                Advance();
+                if (Cur.IsOp(","))
+                {
+                    _diagnostics.Error(Codes.ParUnsupported, "unpacking in a comprehension target is not supported", Cur.Span);
+                    while (Accept(",")) SkipExpressionTail();
+                    return null;
+                }
+                if (!Cur.IsName("in")) throw Fail("expected 'in'" + Describe(Cur), Cur.Span);
+                Advance();
+                var iterable = ParseOr();
+                var conditions = new List<Expr>();
+                while (Cur.IsName("if"))
+                {
+                    Advance();
+                    conditions.Add(ParseOr());
+                }
+                clauses.Add(new ComprehensionClause(target.Text, target.Span, iterable, conditions));
+            }
+            return clauses;
         }
 
         private Expr ParseList()
@@ -1001,13 +1046,15 @@ namespace Kesa.Engine.Script
                     items.Add(ParseExpression());
                 }
 
-                if (Cur.IsName("for"))
+                if (Cur.IsName("for") && items.Count == 1)
                 {
-                    _diagnostics.Error(Codes.ParUnsupported, "comprehensions are not supported yet", Cur.Span);
-                    SkipExpressionTail();
+                    var clauses = ParseComprehensionClauses();
                     Expect("]");
-                    return new UnsupportedExpr("comprehension", open.Span);
+                    return clauses == null
+                        ? new UnsupportedExpr("comprehension", open.Span)
+                        : new ComprehensionExpr(ComprehensionKind.List, items[0], null, clauses, open.Span);
                 }
+                if (Cur.IsName("for")) throw Fail("a comprehension takes one element before 'for'", Cur.Span);
 
                 if (!Accept(",")) break;
             }
@@ -1046,10 +1093,10 @@ namespace Kesa.Engine.Script
                     }
                     if (Cur.IsName("for"))
                     {
-                        _diagnostics.Error(Codes.ParUnsupported, "comprehensions are not supported yet", Cur.Span);
+                        _diagnostics.Error(Codes.ParUnsupported, "set comprehensions are not supported", Cur.Span);
                         SkipExpressionTail();
                         Expect("}");
-                        return new UnsupportedExpr("comprehension", open.Span);
+                        return new UnsupportedExpr("set", open.Span);
                     }
                     throw Fail("expected ':' in dict literal" + Describe(Cur), Cur.Span);
                 }
@@ -1057,13 +1104,15 @@ namespace Kesa.Engine.Script
                 var value = ParseExpression();
                 entries.Add(new DictEntry(key, value));
 
-                if (Cur.IsName("for"))
+                if (Cur.IsName("for") && entries.Count == 1)
                 {
-                    _diagnostics.Error(Codes.ParUnsupported, "comprehensions are not supported yet", Cur.Span);
-                    SkipExpressionTail();
+                    var clauses = ParseComprehensionClauses();
                     Expect("}");
-                    return new UnsupportedExpr("comprehension", open.Span);
+                    return clauses == null
+                        ? new UnsupportedExpr("comprehension", open.Span)
+                        : new ComprehensionExpr(ComprehensionKind.Dict, key, value, clauses, open.Span);
                 }
+                if (Cur.IsName("for")) throw Fail("a dict comprehension takes one 'key: value' before 'for'", Cur.Span);
 
                 if (!Accept(",")) break;
             }

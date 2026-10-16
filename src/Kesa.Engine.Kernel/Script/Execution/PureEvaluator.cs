@@ -1277,8 +1277,98 @@ namespace Kesa.Engine.Script
                     case LambdaExpr lambda:
                         // 만든 함수의 지역 변수 자체를 들고 있다가 부를 때 읽는다: 파이썬처럼 늦게 묶인다
                         return new ClosureValue(new FunctionValue(lambda, frame.Function.Mod), frame.Locals, frame.LocalNames);
+
+                    case ComprehensionExpr comp:
+                        return EvalComprehension(comp, frame);
                 }
                 throw Fail(Codes.RunScript, "this expression is not supported in a logic function");
+            }
+
+            /// <summary>
+            /// 컴프리헨션 (G189). 리스트·제너레이터 식은 리스트를 만들고(제너레이터 식을 받는 사용자 함수는 리스트로 받는다), 딕트는 같은 키면
+            /// 파이썬처럼 처음 자리에 나중 값을 둔다.
+            /// </summary>
+            private Value EvalComprehension(ComprehensionExpr comp, Frame frame)
+            {
+                if (comp.Kind == ComprehensionKind.Dict)
+                {
+                    var entries = new List<DictItem>();
+                    var dict = new DictValue(entries);
+                    Comprehend(comp, frame, scope =>
+                    {
+                        var key = Eval(comp.Element, scope);
+                        if (!(key is StrValue) && !(key is IntValue))
+                            throw Fail(Codes.RunScript, "dict keys must be str or int, not " + key.KindName);
+                        var value = Eval(comp.Value!, scope);
+                        int at = entries.FindIndex(e => PureOps.ValuesEqual(e.Key, key));
+                        if (at >= 0) entries[at] = new DictItem(entries[at].Key, value, entries[at].Span);
+                        else entries.Add(new DictItem(key, value, comp.Element.Span));
+                        return true;
+                    });
+                    return dict;
+                }
+                var items = new List<Value>();
+                Comprehend(comp, frame, scope =>
+                {
+                    items.Add(Eval(comp.Element, scope));
+                    return true;
+                });
+                return new ListValue(items);
+            }
+
+            /// <summary>
+            /// 절을 바깥에서 안쪽으로 돌며 조건을 통과한 조합마다 <paramref name="each"/>를 부른다(거짓을 돌려주면 멈춘다). 반복 변수는 이 식만의
+            /// 이름 공간에 있다: 첫 절의 반복할 것은 바깥에서 계산하고, 그 뒤는 모두 그 이름 공간에서 계산한다(파이썬 3). 안에서 만든 람다는 그
+            /// 이름 공간을 들고 간다(파이썬처럼 마지막 값으로 늦게 묶인다). 한 바퀴마다 단계를 센다 (G101).
+            /// </summary>
+            private void Comprehend(ComprehensionExpr comp, Frame frame, Func<Frame, bool> each)
+            {
+                var names = new SortedSet<string>(frame.LocalNames, StringComparer.Ordinal);
+                foreach (var clause in comp.Clauses) names.Add(clause.Variable);
+                var scope = new Frame(frame.Function, new SortedDictionary<string, Value>(frame.Locals, StringComparer.Ordinal), names)
+                {
+                    CallSite = frame.CallSite,
+                };
+                // 아직 값이 없는 바깥 지역 변수가 반복 변수와 이름이 같으면 위 사본에 없다: 반복이 시작되기 전 읽으면 "대입 전" 오류가 맞다
+                Clause(comp, 0, frame, scope, each);
+            }
+
+            private bool Clause(ComprehensionExpr comp, int index, Frame outer, Frame scope, Func<Frame, bool> each)
+            {
+                if (index == comp.Clauses.Count) return each(scope);
+                var clause = comp.Clauses[index];
+                var iterable = Eval(clause.Iterable, index == 0 ? outer : scope);
+                IReadOnlyList<Value>? items = null;
+                RangeValue? range = null;
+                switch (iterable)
+                {
+                    case ListValue list: items = list.Items; break;
+                    case DictValue dict:
+                        var keys = new List<Value>(dict.Items.Count);
+                        foreach (var item in dict.Items) keys.Add(item.Key);
+                        items = keys;
+                        break;
+                    case RangeValue r: range = r; break;
+                    case IRuntimeIterable runtime: items = runtime.Iterate(); break;
+                    default:
+                        throw Fail(Codes.RunScript, "'" + iterable.KindName + "' is not iterable",
+                            "loop over a list, a dict or range(...)");
+                }
+                long count = range?.Count ?? items!.Count;
+                for (long i = 0; i < count; i++)
+                {
+                    Tick();
+                    scope.Locals[clause.Variable] = range != null ? new IntValue(range.At(i)) : items![(int)i];
+                    bool pass = true;
+                    foreach (var condition in clause.Conditions)
+                    {
+                        if (PureOps.Truthy(Eval(condition, scope))) continue;
+                        pass = false;
+                        break;
+                    }
+                    if (pass && !Clause(comp, index + 1, outer, scope, each)) return false;
+                }
+                return true;
             }
 
             private Value LookupName(string name, Frame frame)
@@ -1362,6 +1452,23 @@ namespace Kesa.Engine.Script
                 var callee = Eval(call.Callee, frame);
                 var positional = new List<Value>();
                 var keywords = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+                // any(x for ...)·all(x for ...): 답이 정해지면 멈춘다 (파이썬과 같다, G189). 내장에는 정해진 답을 낼 원소 하나만 넘긴다
+                if (callee is PureBuiltin truth && (truth.Name == PureBuiltins.AnyName || truth.Name == PureBuiltins.AllName) &&
+                    call.Arguments.Count == 1 && call.Arguments[0].Name == null &&
+                    call.Arguments[0].Value is ComprehensionExpr gen && gen.Kind == ComprehensionKind.Generator)
+                {
+                    bool stopOn = truth.Name == PureBuiltins.AnyName;
+                    bool stopped = false;
+                    Comprehend(gen, frame, scope =>
+                    {
+                        if (PureOps.Truthy(Eval(gen.Element, scope)) != stopOn) return true;
+                        stopped = true;
+                        return false;
+                    });
+                    var decided = stopped ? new List<Value> { stopOn ? BoolValue.True : BoolValue.False } : new List<Value>();
+                    positional.Add(new ListValue(decided));
+                    return (callee, positional, keywords);
+                }
                 foreach (var arg in call.Arguments)
                 {
                     var value = Eval(arg.Value, frame);
