@@ -306,39 +306,41 @@ spec 7절 C1~C10을 테스트와 맞춰 봤다: C2·C3·C9(`WorldAskTests`), C4�
    - 로직용 `.pyi`가 아직 없어서 `random`의 스텁도 없다(.pyi 작업 때).
    - **다음:** 커밋했다(`d908c91`). 그다음 후보 중 `cost`·`choose`를 골랐다(아래).
 
-## `cost`·`pay`·`choose` 슬라이스 (끝남, 커밋 전, 2026-10-17)
+## `cost`·`pay`·`choose` 슬라이스 (끝남, 커밋 `52b97e6`, 2026-10-17)
 
 설계는 G183(`choose`는 후보를 정하고 엔진은 검사와 나열 양쪽에 씀)·G184(호스트 API `Candidates`·`LegalMoves`, 최대 개수)·G185(`cost`는 확인하고 본문 시작 때 뺌, 같은 칸은 합산)·G186(`cost`의 첫 자리는 칸 자체인 특수 동작)·G187(`pay(칸, 금액)`은 본문의 쓰기 문장, 돌려주기는 게임 상태로), 모두 확인. 구현은 네 항목으로 나눠 하나씩 한다.
 
-1. **`cost`(끝남, 커밋 전):**
+1. **`cost`(끝남):**
    - 로드: `FunctionChecker.CheckCost`(위치 인자 둘, 키워드 없음, 첫 자리는 `AttributeExpr`; 깊이·이름은 보지 않아 `t = party.Treasury` 뒤 `cost(t.gold, n)`도 된다).
    - 실행: `PureEvaluator`의 `Cost`가 칸 식의 마지막 이름 앞까지만 계산해 `IRuntimeSlots`(월드의 `ComponentView`)를 얻고 `ReadSlot`으로 값을 읽는다(`int`·`fixed` `field`가 아니면 `RUN005`). 금액은 숫자, 음수면 `RUN006`, `int` 칸에 `fixed` 금액이면 `RUN005`. 같은 칸(`ValuesEqual` + 이름)의 앞 금액과 더해 확인한다. 본문이 시작될 때(`bodyStarts` 뒤) `PayCosts`가 블록에서 계산한 금액을 `SetAttribute`로 뺀다(보통 쓰기라 되돌리기·`when` 추적을 탄다). `CheckPreconditions`는 빼지 않는다.
    - 보고서: `RequireOutcome.Kind`(`Require`/`Cost`)와 `Slot`(`#1.Treasury.gold`, 줄이면 `#1.Stock['Wood'].amount`)·`Have`·`Need`(합한 양). 실패한 `cost`는 `Failures`에 든다.
    - 테스트 `Runtime/WorldCostTests`(빼기와 본문 첫 줄이 뺀 값을 봄, 전부 쓰기, 부족은 보고서 행, 사전 검사는 빼지 않음, 다른 이름으로도 같은 칸은 합산, 다른 엔티티는 따로, `fixed` 칸, `fixed` 금액 정확 비교, `require` 실패 뒤에도 보고, 키 컴포넌트 줄, 본문 실패면 되돌림, `@when` 깨움, 실행 오류 6개, 음수), `CommandDeclarationTests`의 모양 검사. 빼기와 합산을 각각 없애면 테스트가 실패하는 것을 확인했다.
-2. **`pay`(끝남, 커밋 전):**
+2. **`pay`(끝남):**
    - `PureBuiltins.PayName`을 쓰는 내장 이름(`WritingNames`)에 넣어 자리 규칙(식 안·사전 조건 블록·순수 함수에서 로드 오류, 부르는 함수는 쓰기 함수)은 기존 판정을 그대로 탄다. 월드 표의 `pay` 몸체는 "값을 받았다" 오류만 낸다(`pay`를 값으로 넘겨 다른 내장이 부른 경우).
    - 실행: `PureEvaluator.StatementCall`이 부를 것이 내장 `pay`면(이름 그대로든 `f = pay`든) 인자를 계산하지 않고 `Pay`로 간다. `cost`와 같은 `SlotOwner`·`Amount`를 쓰고 모자라면 아무것도 쓰지 않는다.
    - 로드: `FunctionNameChecker.CheckPay`가 덮어쓰지 않은 `pay`의 모양을 본다(`EVL003`). 모드가 `def pay`를 두면 보통 함수다(G112).
    - 테스트 `WorldCostTests`의 `pay` 부분(있을 때·딱 맞을 때·모자랄 때, 한 줄 전체, 쓰기 함수 안, 본문 실패면 되돌림, `@when` 깨움, 함수 값으로 부름, 실행 오류, 음수)과 `CommandDeclarationTests`의 `pay` 부분(모양, 식 안·사전 조건 안·순수 함수, 모드의 `pay`). 모자랄 때도 빼게 바꾸면 테스트가 실패하는 것을 확인했다.
-3. **`choose` 검사(끝남, 커밋 전):**
+3. **`choose` 검사(끝남):**
    - 로드: `FunctionChecker.CheckChoose`(첫 자리는 커맨드 매개변수 이름, 키워드는 `where=`·`from_=` 중 하나만, 매개변수마다 한 번), `CommandSignatures.CheckWhereTypes`(`where=`의 매개변수는 `Ref[...]`). 모두 `CMD002`.
    - 실행: `PureEvaluator.Choose`. `where=`는 제출된 인자 하나에 함수를 부른다(그 타입의 살아 있는 엔티티라는 것은 인자 검사가 봤으므로 전체를 펼칠 필요가 없다, `None`이면 후보 아님). `from_=`는 목록(또는 키 컴포넌트 같은 런타임 묶음)에 같은 값이 있는가. 목록이 아니면 `RUN005`.
    - 보고서: `RequireOutcome.Kind == Choose`, `Parameter`. 후보가 아니면 `Failures`에 든다(C7).
    - 테스트 `Runtime/WorldChooseTests`(후보면 본문 실행, 남의 유닛·지금 도시는 거절, 사전 검사도 같은 행, 값 목록, 기본값 인자도 검사, 이름 있는 함수, 목록 아님 오류), `CommandDeclarationTests`의 `choose` 모양 9개. 늘 통과로 바꾸면 테스트가 실패하는 것을 확인했다.
    - 알게 된 것: 스크립트에는 "그 타입의 엔티티 전체"를 읽는 내장이 없고 컴프리헨션도 아직 파서가 받지 않는다(`PAR002`). 그래서 `from_=`의 목록은 지금 상태의 Ref나 함수로 만든다.
-4. **`Candidates`·`LegalMoves`(끝남, 커밋 전), G188(확인, 블록 순서가 고르는 순서, 후보 식이 자기나 아래쪽 `choose`의 매개변수를 읽으면 로드 오류):**
+4. **`Candidates`·`LegalMoves`(끝남), G188(확인, 블록 순서가 고르는 순서, 후보 식이 자기나 아래쪽 `choose`의 매개변수를 읽으면 로드 오류):**
    - `Script/Execution/ChooseDependencies.cs`: `choose`마다 후보 식이 (블록 변수의 마지막 대입을 따라) 읽는 매개변수 `Needs`와 먼저 실행할 블록 대입 `Statements`. 람다 매개변수는 빼고 조건식 양쪽은 다 읽는 것으로 친다. `FunctionChecker.CheckChooseOrder`가 G188 로드 오류를 낸다.
    - `PureEvaluator.RunChooseOption`: 그 대입들과 후보 식만 실행해 `where=` 함수나 `from_=` 목록을 돌려준다(정하지 않은 매개변수는 `None`으로 묶지만 읽히지 않는다).
    - `Runtime/World.Choices.cs`: `Candidates`(→ `CandidateList`: `Values`·`Needs`·`Arguments`, `require`·`cost`는 보지 않음, 기본값은 정한 값으로 침), `LegalMoves`(→ `LegalMoveList`: `Moves`·`Truncated`·`Arguments`, 호스트가 준 값만 고정하고 기본값이 있어도 `choose`면 펼침, `choose` 없고 기본값 없는 매개변수가 빠지면 `RUN007`, 최대+1개까지 찾아 잘림을 판정). `where=` 후보는 `All(타입)`(id 순)을 함수로 거르고 `from_=`는 목록 순, 같은 값은 처음 것만. 후보 하나의 나열에 단계 예산 하나, `LegalMoves`는 조합마다 사전 검사 예산이 따로다. `CheckArguments(..., partial)`.
    - 테스트 `WorldChooseTests`의 나열 부분(id 순 후보, 먼저 정할 매개변수, 블록 변수를 따라감, `require` 안 봄, 같은 값 하나, 인자 거절, `choose` 없는 매개변수, 합법 수, 잘림, 기본값 펼침과 준 값 고정, 그대로 제출 가능, 빠진 매개변수 오류, 나열은 상태를 안 바꿈, 목록 아님 오류)과 `CommandDeclarationTests`의 순서 검사(오류 4, 허용 4). 합법 수에서 사전 검사를 빼거나 블록 변수의 매개변수를 따라가지 않게 하면 테스트가 실패하는 것을 확인했다.
    - spec S6의 열린 질문 "`choose` 후보가 큰 경우"를 닫았다.
-   - **다음:** 이 슬라이스 커밋. 그다음 후보: 시나리오 ③(AI 합법 수)을 런타임 테스트로, 컴프리헨션(파서 `PAR002`), 스크립트에서 엔티티 전체를 읽는 수단(필요한지부터), 시나리오 ①②④.
+   - **다음:** 커밋했다(`52b97e6`). 사용자가 시나리오 ③을 골랐다(아래 5).
+5. **검증 시나리오 ③(끝남, 커밋 전):** `Runtime/ScenarioAiTickTests`. 도시 A-B-C 일렬(`Map.east/west` Ref), `Move` 커맨드(`choose` 둘·`require`·`cost`), 틱 끝 반응 `rest`(움직임 회복)·`regrow`(약탈물이 `random.randint`로 자람, `repeat=True`). AI는 호스트 C#이 `LegalMoves` 중 약탈물이 가장 많은 수를 고른다. 확인한 것: 나열은 남의 유닛·출구 밖을 빼고, AI가 다 움직이면 합법 수가 비었다가 틱 끝에 돌아오고, 금이 없으면 합법 수가 없고(`cost` 실패 행), 시드 7로 여섯 틱의 기록(낸 수·돈 반응·금)이 고정되며 같은 시드면 저장 바이트가 같고, 3틱에서 저장·불러오기 뒤 이어 해도 같다. 시드를 바꾸면 기록이 달라지는 것도 확인했다. 코어 수정은 필요 없었다. spec 7절 ③에 ✅.
+   - **다음 후보:** 컴프리헨션(파서 `PAR002`), 스크립트에서 엔티티 전체를 읽는 수단(필요한지부터), 시나리오 ①②④.
 
 ## 다음 할 일 (사용자와 고를 것)
 
 Flow(`ask`·응답 커맨드)와 저장(C1·C4·C5)까지 끝났고 반응(S5)을 진행 중이다(위 "반응 슬라이스").
 
-**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 `e9a65d6`). S5 열린 질문 G176·G177과 "읽은 칸이 바뀔 때만 재평가"를 했다(커밋 `f44f472`). `field`가 `derived` 상한을 넘는 경우(G99의 패턴 B 확인, 문서 갱신)를 했다(커밋 `d4703fe`). S5 열린 질문은 끝났다. 적합성 점검 뒤 난수(G178~G182)를 했다(커밋 `d908c91`). 지금은 `cost`·`pay`·`choose` 슬라이스(G183~G187) 중이고 `cost`·`pay`·`choose` 검사·`Candidates`·`LegalMoves`(G183~G188)가 끝났다(커밋 전). 다음은 이 슬라이스 커밋.
+**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 `e9a65d6`). S5 열린 질문 G176·G177과 "읽은 칸이 바뀔 때만 재평가"를 했다(커밋 `f44f472`). `field`가 `derived` 상한을 넘는 경우(G99의 패턴 B 확인, 문서 갱신)를 했다(커밋 `d4703fe`). S5 열린 질문은 끝났다. 적합성 점검 뒤 난수(G178~G182)를 했다(커밋 `d908c91`). `cost`·`pay`·`choose` 슬라이스(G183~G188)를 했다(커밋 `52b97e6`). 검증 시나리오 ③을 런타임 테스트로 했다(커밋 전). 다음은 그 절 끝의 "다음 후보"에서 고르기.
 
 그 밖의 후보:
 
