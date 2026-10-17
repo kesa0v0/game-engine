@@ -77,12 +77,89 @@ namespace Kesa.Engine.Runtime
                 }
                 var parts = function.Path.Split('.');
                 for (int i = 0; i < parts.Length - 1; i++) space = space.Group(parts[i]);
-                space.Members.Add(parts[parts.Length - 1], new HostFunctionValue(this, signature));
+                var value = new HostFunctionValue(this, signature);
+                _hostValues[function.Name] = value;
+                space.Members.Add(parts[parts.Length - 1], value);
             }
             // 내장 이름과 같은 소유 모드는 로드가 막았다 (HST001)
             foreach (var pair in roots)
                 if (!table.ContainsKey(pair.Key)) table.Add(pair.Key, pair.Value);
         }
+
+        /// <summary>이 월드의 호스트 함수 값 (이름 → 값). 런타임 내장을 만들 때 함께 만든다.</summary>
+        private readonly SortedDictionary<string, HostFunctionValue> _hostValues =
+            new SortedDictionary<string, HostFunctionValue>(StringComparer.Ordinal);
+
+        /// <summary>저장한 이름의 호스트 함수 값. 지금 등록에 없으면 null (G221).</summary>
+        private HostCallable? HostValue(string name)
+        {
+            _ = Evaluator; // 런타임 내장을 만들며 값을 채운다
+            return _hostValues.TryGetValue(name, out var value) ? value : null;
+        }
+
+        /// <summary>함수 값이 이 월드의 호스트 함수이면 그 이름 (멈춘 Flow 저장용, G221).</summary>
+        private string? SavableHostName(HostCallable value) =>
+            HostValue(value.Name) is { } same && ReferenceEquals(same, value) ? value.Name : null;
+
+        /// <summary>
+        /// 저장 메타의 호스트 함수 목록: 이름, 정규 서명, 효과 등급 (이름 순, G221). 등록이 없으면 싣지 않는다(호스트 함수를 쓰지 않는 게임의
+        /// 저장은 바이트가 그대로다).
+        /// </summary>
+        private JsonArray? SaveHostFunctions()
+        {
+            if (_hostFunctions.Count == 0) return null;
+            var list = new JsonArray();
+            foreach (var signature in _hostFunctions.Values)
+                list.Add(new JsonObject()
+                    .Add("name", new JsonString(signature.Function.Name))
+                    .Add("signature", new JsonString(signature.Canonical))
+                    .Add("effect", new JsonString(EffectName(signature.Function.Effect))));
+            return list;
+        }
+
+        private static string EffectName(HostEffect effect) => effect == HostEffect.Writes ? "writes" : "pure";
+
+        /// <summary>
+        /// 저장 때의 호스트 함수 목록과 지금 등록을 비교해 다르면 경고 하나 (<see cref="Codes.SaveModsChanged"/>): 생김·없어짐·서명이나
+        /// 효과 등급이 바뀜 (G221). C# 구현이 바뀐 것은 엔진이 모른다. 저장된 함수 값이 없어졌으면 그 값을 불러올 때 따로 막는다.
+        /// </summary>
+        private void CompareHostFunctions(JsonNode? saved, List<Diagnostic> diagnostics)
+        {
+            var before = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            if (saved != null)
+            {
+                foreach (var node in AsArray(saved, "host").Items)
+                {
+                    var obj = AsObject(node, "a host function");
+                    string effect = Text(Field(obj, "effect"), "a host function effect");
+                    if (effect != "pure" && effect != "writes")
+                        throw new JsonFormatException("unknown host function effect '" + effect + "'");
+                    before[Text(Field(obj, "name"), "a host function name")] =
+                        effect + " " + Text(Field(obj, "signature"), "a host function signature");
+                }
+            }
+            var now = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            foreach (var signature in _hostFunctions.Values)
+                now[signature.Function.Name] = EffectName(signature.Function.Effect) + " " + signature.Canonical;
+
+            var names = new SortedSet<string>(before.Keys, StringComparer.Ordinal);
+            names.UnionWith(now.Keys);
+            var changes = new List<string>();
+            foreach (var name in names)
+            {
+                bool had = before.TryGetValue(name, out var was);
+                bool has = now.TryGetValue(name, out var @is);
+                if (!had) changes.Add("added " + name);
+                else if (!has) changes.Add("removed " + name);
+                else if (was != @is) changes.Add("changed " + name + " " + Describe(was!) + " -> " + Describe(@is!));
+            }
+            if (changes.Count > 0)
+                diagnostics.Add(new Diagnostic(Codes.SaveModsChanged, Severity.Warning,
+                    "the host functions differ from the save: " + string.Join(", ", changes), null, SourceSpan.None));
+        }
+
+        /// <summary>"pure (a: int) -> int" → "(a: int) -> int", 쓰기면 "writes (a: int) -> None" 그대로.</summary>
+        private static string Describe(string entry) => entry.StartsWith("pure ", StringComparison.Ordinal) ? entry.Substring(5) : entry;
 
         /// <summary><c>core</c>, <c>core.path</c> 같은 이름 공간. 값으로 쓰는 것은 로드가 막는다 (G218).</summary>
         private sealed class HostNamespace : Value, IRuntimeAttributes

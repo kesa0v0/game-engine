@@ -438,6 +438,10 @@ namespace Kesa.Engine.Runtime
                     if (Evaluator.Builtins.TryGetValue(b.Name, out var builtin) && ReferenceEquals(builtin, b))
                         return Tag("builtin", new JsonString(b.Name));
                     break;
+                case HostCallable host:
+                    // 이름 문자열만 남긴다: C# 이름은 저장에 들어가지 않는다 (S7, G221)
+                    if (SavableHostName(host) is { } hostName) return Tag("host", new JsonString(hostName));
+                    break;
                 case ClosureValue closure:
                     return SaveClosure(closure, writer);
                 default:
@@ -983,6 +987,13 @@ namespace Kesa.Engine.Runtime
                             string name = Text(tag.Value, "a builtin name");
                             if (Evaluator.Builtins.TryGetValue(name, out var builtin)) return builtin;
                             problems.Add(where + ": the builtin '" + name + "' no longer exists");
+                            return NoneValue.Instance;
+                        }
+                        case "host":
+                        {
+                            string name = Text(tag.Value, "a host function name");
+                            if (HostValue(name) is { } host) return host;
+                            problems.Add(where + ": the host function '" + name + "' is not registered");
                             return NoneValue.Instance;
                         }
                     }

@@ -77,6 +77,8 @@ namespace Kesa.Engine.Runtime
                 .Add("when_cooldown", SaveCooldowns())
                 .Add("when_once", SaveOnce())
                 .Add("rand", SaveRandCounts());
+            var hosts = SaveHostFunctions();
+            if (hosts != null) root.Add("host", hosts);
             return CanonicalJson.Write(root);
         }
 
@@ -230,6 +232,7 @@ namespace Kesa.Engine.Runtime
                 throw new JsonFormatException("the save format is " + format.ToString(CultureInfo.InvariantCulture) +
                                               ", but this engine reads format " + SaveFormatVersion.ToString(CultureInfo.InvariantCulture));
             CompareMods(AsArray(Field(root, "mods"), "mods"), diagnostics);
+            CompareHostFunctions(root.Get("host"), diagnostics);
 
             _tick = Long(Field(root, "tick"), "tick");
             if (_tick < 0) throw new JsonFormatException("tick should not be negative");
