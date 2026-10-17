@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-17. 브랜치 `spec-v0.5-scaffold`, 테스트 1725개 통과(커널 1697, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-17. 브랜치 `spec-v0.5-scaffold`, 테스트 1726개 통과(커널 1698, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -395,7 +395,7 @@ G189(확인): 리스트·딕트 컴프리헨션과 제너레이터 식을 받는
 
 Flow(`ask`·응답 커맨드)와 저장(C1·C4·C5)까지 끝났고 반응(S5)을 진행 중이다(위 "반응 슬라이스").
 
-**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 `e9a65d6`). S5 열린 질문 G176·G177과 "읽은 칸이 바뀔 때만 재평가"를 했다(커밋 `f44f472`). `field`가 `derived` 상한을 넘는 경우(G99의 패턴 B 확인, 문서 갱신)를 했다(커밋 `d4703fe`). S5 열린 질문은 끝났다. 적합성 점검 뒤 난수(G178~G182)를 했다(커밋 `d908c91`). `cost`·`pay`·`choose` 슬라이스(G183~G188)를 했다(커밋 `52b97e6`). 검증 시나리오 ③을 런타임 테스트로 했다(커밋 `9584650`). 컴프리헨션(G189~G191)을 했다(커밋 `fcf766d`). 전역 순회 `query`(G192·G193)를 했다(커밋 `f4a6902`). 스크립트 순회의 G88(G194)을 고쳤다(커밋 `0e924a6`). 검증 시나리오 ①과 `while`(G195)을 했다(커밋 `68a4398`). 검증 시나리오 ②와 보기 정책·거른 읽기의 첫 조각(G196~G203)을 했다(커밋 `427345c`). 거른 결과 `Show`(G201·G204)와 `LegalMoves`·`Candidates`(G202)를 했다(커밋 `12d1872`). 거른 `Explain`(G205)을 했다(커밋 `780e595`). 검증 시나리오 ④를 코어 수정 없이 런타임 테스트로 했다(`ScenarioRealtimeTests`). 이로써 시나리오 ①~④가 다 됐다. 거른 `Advance` 결과(`Show`, `BlockedBy`는 답할 수 있는 질문만, `Blocked`는 그대로)도 정해 구현했다(G206, 커밋 `d987345`). 로직용 `.pyi`(G207·G208)를 했다(아래 남은 일 2). 다음 결정: 스키마 스텁을 모드마다 만들지.
+**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 `e9a65d6`). S5 열린 질문 G176·G177과 "읽은 칸이 바뀔 때만 재평가"를 했다(커밋 `f44f472`). `field`가 `derived` 상한을 넘는 경우(G99의 패턴 B 확인, 문서 갱신)를 했다(커밋 `d4703fe`). S5 열린 질문은 끝났다. 적합성 점검 뒤 난수(G178~G182)를 했다(커밋 `d908c91`). `cost`·`pay`·`choose` 슬라이스(G183~G188)를 했다(커밋 `52b97e6`). 검증 시나리오 ③을 런타임 테스트로 했다(커밋 `9584650`). 컴프리헨션(G189~G191)을 했다(커밋 `fcf766d`). 전역 순회 `query`(G192·G193)를 했다(커밋 `f4a6902`). 스크립트 순회의 G88(G194)을 고쳤다(커밋 `0e924a6`). 검증 시나리오 ①과 `while`(G195)을 했다(커밋 `68a4398`). 검증 시나리오 ②와 보기 정책·거른 읽기의 첫 조각(G196~G203)을 했다(커밋 `427345c`). 거른 결과 `Show`(G201·G204)와 `LegalMoves`·`Candidates`(G202)를 했다(커밋 `12d1872`). 거른 `Explain`(G205)을 했다(커밋 `780e595`). 검증 시나리오 ④를 코어 수정 없이 런타임 테스트로 했다(`ScenarioRealtimeTests`). 이로써 시나리오 ①~④가 다 됐다. 거른 `Advance` 결과(`Show`, `BlockedBy`는 답할 수 있는 질문만, `Blocked`는 그대로)도 정해 구현했다(G206, 커밋 `d987345`). 로직용 `.pyi`(G207·G208, 커밋 `09da3e8`)와 모드별 스키마 스텁(G209)을 했다(아래 남은 일 2).
 
 그 밖의 후보:
 
@@ -429,7 +429,7 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 ## 남은 일 (사용자와 우선순위를 정할 것)
 
 1. **실행 중 이름 오류의 "혹시 …?" 후보:** `PureEvaluator.LookupName`은 후보에 지역 변수와 내장만 넣고 모드 전역을 빼먹는다(코드로 본 추측, 재현 안 함). G108 뒤로는 로드 시점에 대부분 잡히므로 우선순위는 낮다.
-2. **로직용 `.pyi`** (G207·G208, 대부분 했음): 모드 스텁(`StubGenerator.Write`)에 로직 이름(`PureNames`·`LogicNames`: 데코레이터, `preconditions`·`require`·`cost`·`choose`, 쓰는 내장, `ask`의 `Answer`, `random`, `type Ref[T] = T`, `type DefId[T] = str`)과 엔티티 속성(컴포넌트·Def 타입 클래스, 키 컴포넌트는 `_X_rows`, Def 상수는 `_T_consts`), Def 타입별 `query`·`spawn` 오버로드. 스키마 스텁에 순수 내장. `pyrightconfig.json`은 None 계열을 경고로(G208). **확인 방법:** 시나리오 ①~④와 `WorldViewTests`의 스크립트(6개)를 모드로 내보내 `engine stubs` 뒤 `npx -y pyright@1.1.389`로 오류 0(경고 3, 시나리오 ①의 `optional` Ref)이었고 일부러 넣은 오타 7개는 모두 오류였다. 내보낸 방법: 임시 NUnit 테스트가 각 테스트 클래스의 `Schema`·`Defs` 상수를 리플렉션으로 읽어 파일로 씀(지웠음, 다시 필요하면 같은 방식). `EveryNameScriptsCanUseIsDeclared`가 엔진 이름 목록과 스텁을 대조한다. **남은 것:** 스키마 파일의 `derived` 함수에 `def hmax(h: Health)`처럼 컴포넌트 타입을 적으면 스키마 스텁에 그 이름이 없어 pyright 오류(원래 있던 문제, 재현함). 스키마 스텁을 모드마다 만들지(G82를 바꿈) 정해야 한다.
+2. **로직용 `.pyi`** (G207·G208, 대부분 했음): 모드 스텁(`StubGenerator.Write`)에 로직 이름(`PureNames`·`LogicNames`: 데코레이터, `preconditions`·`require`·`cost`·`choose`, 쓰는 내장, `ask`의 `Answer`, `random`, `type Ref[T] = T`, `type DefId[T] = str`)과 엔티티 속성(컴포넌트·Def 타입 클래스, 키 컴포넌트는 `_X_rows`, Def 상수는 `_T_consts`), Def 타입별 `query`·`spawn` 오버로드. 스키마 스텁에 순수 내장. `pyrightconfig.json`은 None 계열을 경고로(G208). **확인 방법:** 시나리오 ①~④와 `WorldViewTests`의 스크립트(6개)를 모드로 내보내 `engine stubs` 뒤 `npx -y pyright@1.1.389`로 오류 0(경고 3, 시나리오 ①의 `optional` Ref)이었고 일부러 넣은 오타 7개는 모두 오류였다. 내보낸 방법: 임시 NUnit 테스트가 각 테스트 클래스의 `Schema`·`Defs` 상수를 리플렉션으로 읽어 파일로 씀(지웠음, 다시 필요하면 같은 방식). `EveryNameScriptsCanUseIsDeclared`가 엔진 이름 목록과 스텁을 대조한다. 스키마 스텁도 모드마다 그 모드가 보는 클래스를 담는다(G209, `GenerateSchema(모드 id, 결과)`): `def hmax(h: Health)`가 통과하고 `h.base_maxx` 같은 오타는 오류다. **남은 것(작은 것):** 스키마 파일에서 `Health(...)`를 값으로 부르는 잘못은 스텁이 막지 않는다(엔진이 로드 때 잡음).
 3. **스텁의 이름 충돌**: 멤버 이름이 `id`/`self` 같은 예약 이름이면 중복 인자가 생기고, Def 타입·컴포넌트 이름이 `Mod`·`use`·`use_all`·`patch`·`mod_loaded`·`inherit`이면 스텁 안에서 겹친다(G82 알려진 한계). 스키마 단계에서 막는 것이 유력하다.
 4. S9의 나머지 "왜?" 도구 4가지(파생값 추적, 전제 조건 보고서, 반응 추적, 단계 순서 덤프). 각자 `engine` 명령이 될 자리다(G80).
 5. **G32 규칙**(`Ref`=엔티티, `DefId`=Def)을 spec 본문으로 옮기는 일. 예시만 고쳐 둔 상태다.
@@ -445,7 +445,7 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1725개 통과(커널 1697, CLI 28)를 확인한다.
+1. `git pull` 후 `dotnet test`로 1726개 통과(커널 1698, CLI 28)를 확인한다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G135), `docs/spine-spec.md` S2·S4·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.
 

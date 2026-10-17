@@ -122,7 +122,7 @@ namespace Kesa.Engine.Cli
                         string schemaDir = Path.Combine(root, mod.Directory, SchemaDirectory);
                         if (!Directory.Exists(schemaDir)) continue;
                         current = prefix + mod.Directory + "/" + SchemaDirectory + "/" + StubFileName;
-                        WriteText(Path.Combine(schemaDir, StubFileName), StubGenerator.GenerateSchema());
+                        WriteText(Path.Combine(schemaDir, StubFileName), StubGenerator.GenerateSchema(mod.Id, result));
                         stdout.Write("wrote " + current + "\n");
                     }
                     string config = Path.Combine(root, PyrightConfigFileName);

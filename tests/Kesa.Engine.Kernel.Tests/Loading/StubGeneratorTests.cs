@@ -209,6 +209,26 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(stub, Does.Not.Contain("class "));
         }
 
+        /// <summary>
+        /// 모드의 스키마 스텁은 그 모드가 보는 클래스를 더해 <c>derived</c> 함수의 <c>def hmax(h: Health)</c>를 받는다 (G209).
+        /// 스키마 파일에서 <c>fixed</c>·<c>TextKey</c>는 값이므로 클래스 안의 타입 자리에는 풀어 쓴다.
+        /// </summary>
+        [Test]
+        public void AModsSchemaStubAddsTheClassesItSees()
+        {
+            Mod("core", schema: Schema, defs: Defs);
+            var result = LoadClean();
+            var stub = StubGenerator.GenerateSchema("core", result);
+            Assert.That(stub, Does.StartWith(StubGenerator.GenerateSchema()));
+            Assert.That(stub, Does.Contain("\nclass Health:\n    @property\n    def base_max(self) -> int: ...\n"));
+            Assert.That(stub, Does.Contain("    def ratio(self) -> int | float: ...\n"));
+            Assert.That(stub, Does.Contain("    def label(self) -> str: ...\n"));
+            Assert.That(stub, Does.Not.Contain("-> fixed").And.Not.Contain("-> TextKey"));
+            Assert.That(stub, Does.Not.Contain("def query(name: Literal"), "query stays loose in schema files");
+            // ②에서 실패해 선언을 모르는 모드는 모드와 무관한 것만
+            Assert.That(StubGenerator.GenerateSchema("nope", result), Is.EqualTo(StubGenerator.GenerateSchema()));
+        }
+
         [Test]
         public void TheSchemaStubDeclaresEverySchemaBuiltin()
         {
