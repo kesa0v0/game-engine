@@ -457,6 +457,23 @@ namespace Kesa.Engine.Runtime
             return true;
         }
 
+        /// <summary>
+        /// 시간 진행 결과를 이 연결에게 보낼 모양으로 (G206). 진행한 틱과 멈췄는지는 그대로이고, 멈춘 이유의 질문은 이 연결이 답할 수
+        /// 있는 것만 거른 모양으로 남는다(G200). 반응 목록은 빠진다(G201).
+        /// </summary>
+        public AdvanceResult Show(AdvanceResult result)
+        {
+            var mine = new List<Request>();
+            foreach (var q in result.BlockedBy)
+            {
+                var shown = ForMe(q);
+                if (shown != null) mine.Add(shown);
+            }
+            var view = new AdvanceResult(result.Advanced, result.Tick, System.Array.Empty<Reaction>()) { BlockedBy = mine };
+            view.Blocked = result.Blocked;
+            return view;
+        }
+
         private PreconditionReport? Show(PreconditionReport? report)
         {
             if (report == null) return null;

@@ -28,11 +28,22 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>
         /// 시간을 막는 질문이 열려 있어 멈췄으면 그 질문들, 질문 번호 순 (spec X2, spec-gaps G159). 이때 <see cref="Advanced"/>는 바란 틱보다 작다.
-        /// 다 진행했으면 비어 있다.
+        /// 다 진행했으면 비어 있다. 거른 결과(<see cref="WorldView.Show(AdvanceResult)"/>)에서는 그 연결이 답할 수 있는 것만 있다 (G206).
         /// </summary>
-        public IReadOnlyList<Request> BlockedBy { get; internal set; } = Array.Empty<Request>();
+        public IReadOnlyList<Request> BlockedBy
+        {
+            get => _blockedBy;
+            internal set
+            {
+                _blockedBy = value;
+                Blocked = value.Count > 0;
+            }
+        }
 
-        public bool Blocked => BlockedBy.Count > 0;
+        private IReadOnlyList<Request> _blockedBy = Array.Empty<Request>();
+
+        /// <summary>시간을 막는 질문 때문에 멈췄다. 거른 결과에서도 그대로다(멈춘 것은 모두가 안다, G206).</summary>
+        public bool Blocked { get; internal set; }
     }
 
     /// <summary>
