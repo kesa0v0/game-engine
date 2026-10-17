@@ -562,9 +562,28 @@ namespace Kesa.Engine.Runtime
                 };
                 // 실행이 끝날 때마다 버리므로 대상이 사라진 Flow는 저장에 있을 수 없다 (G164)
                 var stale = StaleReason(record);
-                if (stale != null) throw new JsonFormatException(where + " should have been canceled: " + stale);
+                if (stale != null)
+                {
+                    // Def가 없어져 만들지 못한 엔티티 때문이면 버릴 때는 런타임의 대상 소멸처럼 취소하고(G211), 거부할 때는 원인을
+                    // 이미 적었으니 따로 적지 않는다. 그 밖은 저장이 깨진 것이다
+                    if (!Involves(record, problems.Skipped))
+                        throw new JsonFormatException(where + " should have been canceled: " + stale);
+                    problems.DroppedWith(where + " was canceled: " + stale);
+                    continue;
+                }
                 _flows.Add(id, record);
             }
+        }
+
+        /// <summary>Flow의 대상이나 질문의 답할 엔티티 중에 <paramref name="ids"/>가 있는가.</summary>
+        private static bool Involves(FlowRecord flow, HashSet<long> ids)
+        {
+            foreach (var e in flow.About ?? flow.Subjects)
+                if (ids.Contains(e.Value)) return true;
+            if (flow.Request != null)
+                foreach (var e in flow.Request.Who)
+                    if (ids.Contains(e.Value)) return true;
+            return false;
         }
 
         private Request LoadRequest(JsonObject obj, long flow, string command, string where, HashSet<long> requestIds,

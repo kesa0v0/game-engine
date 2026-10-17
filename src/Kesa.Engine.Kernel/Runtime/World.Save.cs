@@ -240,7 +240,8 @@ namespace Kesa.Engine.Runtime
                 var where = new EntityId(id) + " (" + defId + ")";
                 if (!_defs.TryGet(defId, out var def))
                 {
-                    problems.Add(where + ": the Def '" + defId + "' no longer exists");
+                    // 버리면 불러올 때 파괴된 것처럼 다룬다: 남의 Ref 칸은 죽은 id로 남고 키 줄·기여 행·대상 Flow는 함께 버린다 (G211)
+                    problems.Removed(where + ": the Def '" + defId + "' no longer exists");
                     problems.Skipped.Add(id);
                     continue;
                 }
@@ -259,6 +260,8 @@ namespace Kesa.Engine.Runtime
 
             // 2차: 컴포넌트·값·줄
             foreach (var pair in records) RestoreEntity(pair.Key, pair.Value, problems);
+            if (problems.Dropping)
+                foreach (var pair in records) CheckRequiredRefs(pair.Key, problems);
 
             foreach (var node in AsArray(Field(root, "contributions"), "contributions").Items)
                 RestoreContribution(AsObject(node, "a contribution"), problems);
@@ -408,6 +411,43 @@ namespace Kesa.Engine.Runtime
             }
         }
 
+        /// <summary>
+        /// 버린 엔티티를 가리키는 필수 Ref는 거부한다 (S8 "필수 Ref는 로드 오류", G211). 게임이 파괴해 생긴 죽은 Ref(G91)와 달리
+        /// 모드는 이 엔티티가 사라질 줄 몰랐고, 그대로 두면 그 칸을 읽는 순간 오류가 난다. 선택적 Ref는 읽으면 None이다.
+        /// </summary>
+        private void CheckRequiredRefs(EntityRecord entity, LoadProblems problems)
+        {
+            string where = new EntityId(entity.Id) + " (" + entity.Def.Id + ")";
+            foreach (var component in ComponentsOf(entity))
+            {
+                if (!component.IsKeyed)
+                {
+                    CheckRequiredRefs(component, entity.Values, where + " " + component.Name, problems);
+                    continue;
+                }
+                if (!entity.Rows.TryGetValue(component.Name, out var rows)) continue;
+                foreach (var pair in rows.ByDef)
+                    CheckRequiredRefs(component, pair.Value.Values, where + " " + component.Name + "['" + pair.Key + "']", problems);
+                foreach (var pair in rows.ByEntity)
+                    CheckRequiredRefs(component, pair.Value.Values, where + " " + component.Name + "[" + new EntityId(pair.Key) + "]", problems);
+                foreach (var pair in rows.ByInt)
+                    CheckRequiredRefs(component, pair.Value.Values,
+                        where + " " + component.Name + "[" + pair.Key.ToString(CultureInfo.InvariantCulture) + "]", problems);
+            }
+        }
+
+        private static void CheckRequiredRefs(ComponentType component, Dictionary<MemberDecl, Value> values, string where,
+            LoadProblems problems)
+        {
+            foreach (var member in component.Members)
+            {
+                if (member.Kind != MemberKind.Ref || member.Spec.Optional) continue;
+                if (values.TryGetValue(member, out var value) && value is EntityValue ev && problems.Skipped.Contains(ev.Id.Value))
+                    problems.Add(where + "." + member.Name + ": the required ref points at " + ev.Id +
+                                 ", whose Def no longer exists");
+            }
+        }
+
         private ComponentType? ComponentOf(EntityRecord entity, string name, string where, LoadProblems problems)
         {
             if (!_schema.TryGetComponent(name, out var component))
@@ -504,7 +544,12 @@ namespace Kesa.Engine.Runtime
                     return RowKey.Def(id);
                 case KeyKind.Entity:
                     long entity = EntityIdOf(node, "a row key");
-                    if (problems.Skipped.Contains(entity)) return null; // 그 엔티티가 왜 없는지는 이미 적었다
+                    if (problems.Skipped.Contains(entity))
+                    {
+                        // 거부할 때는 그 엔티티가 왜 없는지 이미 적었다. 버릴 때는 함께 버린 줄로 적는다
+                        problems.DroppedWith(where + ": the row keyed by " + new EntityId(entity) + " went with its entity");
+                        return null;
+                    }
                     if (!_entities.TryGetValue(entity, out var keyEntity))
                         throw new JsonFormatException("a row is keyed by #" + entity.ToString(CultureInfo.InvariantCulture) +
                                                       ", which is not in the save");
@@ -529,7 +574,12 @@ namespace Kesa.Engine.Runtime
             long target = Long(Field(obj, "target"), "a contribution target");
             var sourceNode = Field(obj, "source");
             long? source = sourceNode is JsonNull ? (long?)null : Long(sourceNode, "a contribution source");
-            if (problems.Skipped.Contains(target) || (source != null && problems.Skipped.Contains(source.Value))) return;
+            if (problems.Skipped.Contains(target) || (source != null && problems.Skipped.Contains(source.Value)))
+            {
+                problems.DroppedWith("contribution " + id.ToString(CultureInfo.InvariantCulture) + " to " + new EntityId(target) +
+                                     (source == null ? "" : " from " + new EntityId(source.Value)) + " went with its entity");
+                return;
+            }
             // 죽은 엔티티의 행은 함께 지워지므로 저장에 없다
             if (!_entities.TryGetValue(target, out var entity) || (source != null && !_entities.ContainsKey(source.Value)))
                 throw new JsonFormatException("contribution " + id.ToString(CultureInfo.InvariantCulture) +
@@ -695,6 +745,17 @@ namespace Kesa.Engine.Runtime
                 if (!_seen.Add(message)) return;
                 _diagnostics.Add(new Diagnostic(Codes.SaveDropped, Severity.Warning, message + "; its saved value was dropped", null,
                     SourceSpan.None, "the host allowed dropping what the content removed (spec S8)"));
+            }
+
+            /// <summary>Def가 없어진 엔티티를 버리는 중인가 (G211). 거부할 때는 끌려 사라지는 것을 따로 적지 않는다.</summary>
+            public bool Dropping => _dropRemoved && Skipped.Count > 0;
+
+            /// <summary>버린 엔티티에 딸려 함께 버린 것 (G211). 거부할 때는 적지 않는다(로드는 어차피 실패하고 원인은 이미 적었다).</summary>
+            public void DroppedWith(string message)
+            {
+                if (!_dropRemoved || !_seen.Add(message)) return;
+                _diagnostics.Add(new Diagnostic(Codes.SaveDropped, Severity.Warning, message, null, SourceSpan.None,
+                    "the host allowed dropping what the content removed (spec S8)"));
             }
 
             /// <summary>멈춘 Flow의 함수 본문이 저장 뒤에 바뀜 (C5, G144). 위치를 옮겨 보지 않고 거부한다.</summary>

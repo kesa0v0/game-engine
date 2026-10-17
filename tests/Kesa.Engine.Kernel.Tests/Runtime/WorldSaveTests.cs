@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Kesa.Engine.Diagnostics;
@@ -337,6 +338,86 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
             {
                 "SAV002 #2 (Ranger): the Def 'Ranger' no longer exists",
+            }));
+        }
+
+        private const string RefSchema =
+            Schema + "component(\"Rival\", target=ref(\"Unit\", optional=True))\ncomponent(\"Leash\", target=ref(\"Unit\"))\n";
+
+        private const string Brew = "@command(free=True, acts_for=None)\ndef Brew(u: Ref[Unit]):\n    wait(ticks=5)\n";
+
+        /// <summary>
+        /// 호스트가 허락하면 Def가 없어진 엔티티는 불러올 때 파괴된 것처럼 다룬다 (G211): 키 줄·기여 행·대상 Flow는 함께 버리고 경고,
+        /// 남의 선택적 Ref 칸은 죽은 id로 남아 읽으면 None, 반응은 부르지 않는다.
+        /// </summary>
+        [Test]
+        public void DroppingARemovedDefTreatsItsEntitiesAsDestroyedOnLoad()
+        {
+            Mod("banking", schema: RefSchema, defs: Defs + "Unit(\"Ranger\")\n" + Brew, extra: ", version=\"1.0\"");
+            _world = new World(LoadClean());
+            var a = _world.Create("Scout");
+            var ranger = _world.Create("Ranger");
+            _world.Add(a, "Opinion");
+            _world.AddRow(a, "Opinion", ranger);
+            _world.AddContribution(a, M("Power", "total"), "add", new IntValue(1), ranger);
+            _world.AddContribution(ranger, M("Power", "total"), "add", new IntValue(1));
+            _world.Add(a, "Rival", new Init(M("Rival", "target"), new EntityValue(ranger)));
+            _world.Submit("host", "banking.Brew", new Dictionary<string, Value> { ["u"] = new EntityValue(ranger) });
+            _world.Submit("host", "banking.Brew", new Dictionary<string, Value> { ["u"] = new EntityValue(a) });
+            var save = _world.Save();
+
+            Mod("banking", schema: RefSchema, defs: Defs + Brew, extra: ", version=\"1.0\"");
+            var rejected = World.Load(LoadClean(), save);
+            Assert.That(rejected.Diagnostics.Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
+            {
+                "SAV002 #2 (Ranger): the Def 'Ranger' no longer exists",
+            }), "by default nothing changes");
+
+            var result = World.Load(LoadClean(), save, dropRemoved: true);
+            Assert.That(result.Succeeded, Is.True, string.Join("\n", result.Diagnostics));
+            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Severity + " " + d.Message).ToList(), Is.EquivalentTo(new[]
+            {
+                "SAV005 Warning #2 (Ranger): the Def 'Ranger' no longer exists; its saved value was dropped",
+                "SAV005 Warning #1 (Scout) Opinion: the row keyed by #2 went with its entity",
+                "SAV005 Warning contribution 1 to #1 from #2 went with its entity",
+                "SAV005 Warning contribution 2 to #2 went with its entity",
+                "SAV005 Warning flow 1 (banking.Brew) was canceled: its subject #2 was destroyed",
+            }));
+
+            var w = result.World!;
+            Assert.That(w.IsAlive(ranger), Is.False);
+            Assert.That(w.RowEntities(a, "Opinion"), Is.Empty);
+            Assert.That(((IntValue)w.Get(a, w.Member("Power", "total"))).Value, Is.EqualTo(1));
+            Assert.That(w.Get(a, w.Member("Rival", "target")), Is.InstanceOf<NoneValue>(), "an optional ref to it reads None (G91)");
+
+            var dropped = w.Save();
+            var again = World.Load(LoadClean(), dropped);
+            Assert.That(again.Diagnostics, Is.Empty, string.Join("\n", again.Diagnostics));
+            Assert.That(again.World!.Save(), Is.EqualTo(dropped));
+
+            // 남은 Flow는 그대로 이어진다
+            var woke = w.Advance(5).Reactions.Single();
+            Assert.That(woke.Handler + " " + woke.Outcome, Is.EqualTo("banking.Brew Finished"));
+        }
+
+        /// <summary>버린 엔티티를 가리키는 필수 Ref는 허락해도 거부한다 (S8 "필수 Ref는 로드 오류", G211).</summary>
+        [Test]
+        public void ARequiredRefToADroppedEntityIsStillRejected()
+        {
+            Mod("banking", schema: RefSchema, defs: Defs + "Unit(\"Ranger\")\n", extra: ", version=\"1.0\"");
+            _world = new World(LoadClean());
+            var a = _world.Create("Scout");
+            var ranger = _world.Create("Ranger");
+            _world.Add(a, "Leash", new Init(M("Leash", "target"), new EntityValue(ranger)));
+            var save = _world.Save();
+
+            Mod("banking", schema: RefSchema, defs: Defs, extra: ", version=\"1.0\"");
+            var result = World.Load(LoadClean(), save, dropRemoved: true);
+            Assert.That(result.Succeeded, Is.False);
+            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
+            {
+                "SAV005 #2 (Ranger): the Def 'Ranger' no longer exists; its saved value was dropped",
+                "SAV002 #1 (Scout) Leash.target: the required ref points at #2, whose Def no longer exists",
             }));
         }
 
