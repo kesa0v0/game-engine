@@ -22,8 +22,54 @@ namespace Kesa.Engine.Runtime
         private readonly int _stepBudget;
         private PureEvaluator? _evaluator;
 
-        /// <summary>지금 계산 중인 <c>derived</c>들 (바깥부터). 같은 값을 다시 읽으면 순환이다 (G100).</summary>
-        private readonly List<string> _computing = new List<string>();
+        /// <summary>지금 계산 중인 <c>derived</c>·기본값들 (바깥부터). 같은 값을 다시 읽으면 순환이다 (G100).</summary>
+        private readonly List<Computing> _computing = new List<Computing>();
+
+        /// <summary>
+        /// 계산 중인 값 하나. 진단 글(<see cref="Label"/>)은 순환·오류일 때만 만든다: 계산마다 만들면 읽기가 느려진다(규모 벤치).
+        /// </summary>
+        private readonly struct Computing
+        {
+            public Computing(EntityRecord entity, ComponentType component, RowKey? row, MemberDecl member, bool isDefault)
+            {
+                Entity = entity;
+                Component = component;
+                Row = row;
+                Member = member;
+                IsDefault = isDefault;
+            }
+
+            public EntityRecord Entity { get; }
+            public ComponentType Component { get; }
+            public RowKey? Row { get; }
+            public MemberDecl Member { get; }
+
+            /// <summary>생성 때의 함수 기본값 계산이면 참 (같은 칸의 <c>derived</c>와 다른 것).</summary>
+            public bool IsDefault { get; }
+
+            public bool Same(Computing other) =>
+                Entity.Id == other.Entity.Id && ReferenceEquals(Component, other.Component) &&
+                ReferenceEquals(Member, other.Member) && IsDefault == other.IsDefault &&
+                (Row == null ? other.Row == null : other.Row != null && Row.Value.Same(other.Row.Value));
+
+            public string Label => IsDefault
+                ? "default of " + Component.Name + "." + Member.Name + " of " + new EntityId(Entity.Id)
+                : DerivedLabel(Entity, Component, Row, Member);
+        }
+
+        private int IndexOfComputing(Computing value)
+        {
+            for (int i = 0; i < _computing.Count; i++)
+                if (_computing[i].Same(value)) return i;
+            return -1;
+        }
+
+        private List<string> ComputingLabels(int from)
+        {
+            var labels = new List<string>();
+            for (int i = from; i < _computing.Count; i++) labels.Add(_computing[i].Label);
+            return labels;
+        }
 
         /// <summary>지금 진행 중인 최상위 함수 실행의 단계 계량기. 그 안의 중첩 실행이 같은 예산을 나눠 쓴다 (G101).</summary>
         private StepMeter? _meter;
@@ -97,11 +143,13 @@ namespace Kesa.Engine.Runtime
 
         private Value ComputeDerived(EntityRecord entity, ComponentType component, RowKey? row, MemberDecl member)
         {
-            string label = DerivedLabel(entity, component, row, member);
-            int index = _computing.IndexOf(label);
+            var computing = new Computing(entity, component, row, member, isDefault: false);
+            int index = IndexOfComputing(computing);
             if (index >= 0)
             {
-                var chain = new List<string>(_computing.GetRange(index, _computing.Count - index)) { label };
+                string label = computing.Label;
+                var chain = ComputingLabels(index);
+                chain.Add(label);
                 throw new ScriptRuntimeException(Codes.RunCycle,
                     label + " reads itself: " + string.Join(" -> ", chain),
                     "a derived value cannot depend on itself; split the formula in two (schema-design 3.3.1)");
@@ -109,23 +157,23 @@ namespace Kesa.Engine.Runtime
             if (_computing.Count >= MaxDerivedDepth)
             {
                 throw new ScriptRuntimeException(Codes.RunCycle,
-                    "derived values are nested more than " + MaxDerivedDepth + " deep while reading " + label + ": " +
-                    string.Join(" -> ", _computing),
+                    "derived values are nested more than " + MaxDerivedDepth + " deep while reading " + computing.Label + ": " +
+                    string.Join(" -> ", ComputingLabels(0)),
                     "a very long chain of derived reads is treated like a cycle");
             }
 
             var function = member.Spec.Function!;
-            _computing.Add(label);
+            _computing.Add(computing);
             try
             {
                 var self = new ComponentView(this, new EntityId(entity.Id), component, row);
                 var result = RunFunction(function, self);
-                return CheckDerivedResult(component.Name + "." + member.Name, member, result);
+                return CheckDerivedResult(member.Display, member, result);
             }
             catch (ScriptRuntimeException e) when (_computing.Count > 1)
             {
                 // 다른 계산 안에서 읽힌 값이면 흔적에 경계를 남긴다. 바깥 함수의 프레임은 바깥 실행이 덧붙인다
-                e.AddTrace(ReadingPrefix + label);
+                e.AddTrace(ReadingPrefix + computing.Label);
                 throw;
             }
             finally
@@ -207,7 +255,7 @@ namespace Kesa.Engine.Runtime
             foreach (var item in pending)
             {
                 var member = item.Member;
-                string display = item.Component.Name + "." + member.Name;
+                string display = member.Display;
                 Value raw;
                 try
                 {
@@ -243,9 +291,8 @@ namespace Kesa.Engine.Runtime
 
         private Value RunDefault(EntityRecord entity, PendingDefault item)
         {
-            string label = "default of " + item.Component.Name + "." + item.Member.Name + " of " + new EntityId(entity.Id);
             var function = item.Function!;
-            _computing.Add(label);
+            _computing.Add(new Computing(entity, item.Component, item.Row, item.Member, isDefault: true));
             try
             {
                 var self = new ComponentView(this, new EntityId(entity.Id), item.Component, item.Row);
@@ -261,7 +308,7 @@ namespace Kesa.Engine.Runtime
         private Value ReadMember(EntityRecord entity, ComponentType component, RowKey? row, MemberDecl member)
         {
             if (member.Kind == MemberKind.Derived) return ComputeDerived(entity, component, row, member);
-            string display = component.Name + "." + member.Name;
+            string display = member.Display;
             if (row == null) return Read(display, component, member, DefMembers(entity, component), entity.Values);
             if (!FindRow(entity, component, row.Value, out var defRow, out var record))
                 throw NoRow(new EntityId(entity.Id), component, row.Value);

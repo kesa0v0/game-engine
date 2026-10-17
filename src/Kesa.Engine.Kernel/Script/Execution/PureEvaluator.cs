@@ -939,12 +939,16 @@ namespace Kesa.Engine.Script
                 if (captured != null)
                     foreach (var pair in captured) locals[pair.Key] = pair.Value;
 
-                var bound = new HashSet<string>(StringComparer.Ordinal);
-                for (int i = 0; i < positional.Count; i++)
+                for (int i = 0; i < positional.Count; i++) locals[parameters[i].Name] = positional[i];
+                if (keywords.Count == 0)
                 {
-                    locals[parameters[i].Name] = positional[i];
-                    bound.Add(parameters[i].Name);
+                    // 위치 인자만이면(대부분의 호출) 앞에서부터 채워지므로 빠진 것은 그 뒤다: 집합을 만들 필요가 없다
+                    if (positional.Count < parameters.Count)
+                        throw Fail(Codes.RunScript, fn.Name + "() is missing the argument '" + parameters[positional.Count].Name + "'");
+                    return new Frame(fn, locals, LocalNamesFor(fn, capturedLocals));
                 }
+                var bound = new HashSet<string>(StringComparer.Ordinal);
+                for (int i = 0; i < positional.Count; i++) bound.Add(parameters[i].Name);
                 foreach (var pair in keywords)
                 {
                     bool known = false;
@@ -960,19 +964,16 @@ namespace Kesa.Engine.Script
                         throw Fail(Codes.RunScript, fn.Name + "() is missing the argument '" + p.Name + "'");
                 }
 
-                SortedSet<string> localNames;
-                if (fn.Definition != null)
-                {
-                    localNames = _owner.LocalNamesOf(fn.Definition);
-                }
-                else
-                {
-                    // 람다는 대입할 수 없으니 지역 변수는 매개변수와, 만든 함수의 지역 변수다
-                    localNames = FunctionLocals.Parameters(fn.Parameters);
-                    if (capturedLocals != null) localNames.UnionWith(capturedLocals);
-                }
+                return new Frame(fn, locals, LocalNamesFor(fn, capturedLocals));
+            }
 
-                return new Frame(fn, locals, localNames);
+            private SortedSet<string> LocalNamesFor(FunctionValue fn, SortedSet<string>? capturedLocals)
+            {
+                if (fn.Definition != null) return _owner.LocalNamesOf(fn.Definition);
+                // 람다는 대입할 수 없으니 지역 변수는 매개변수와, 만든 함수의 지역 변수다
+                var localNames = FunctionLocals.Parameters(fn.Parameters);
+                if (capturedLocals != null) localNames.UnionWith(capturedLocals);
+                return localNames;
             }
 
             // ---- 문장 ----

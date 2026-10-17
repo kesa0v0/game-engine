@@ -66,7 +66,7 @@ namespace Kesa.Engine.Runtime
         public MemberKind Kind => Member.Kind;
 
         /// <summary><c>Health.current</c> 또는 <c>Unit.cost</c>.</summary>
-        public string Display => (Component?.Name ?? DefType!.Name) + "." + Member.Name;
+        public string Display => Component != null ? Member.Display : DefType!.Name + "." + Member.Name;
 
         public override string ToString() => Display;
     }

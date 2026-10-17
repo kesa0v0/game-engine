@@ -265,7 +265,7 @@ namespace Kesa.Engine.Runtime
                     throw new ScriptRuntimeException(Codes.RunUnknownName,
                         "component '" + component.Name + "' has no value '" + pair.Key + "'", Suggest.Hint(pair.Key, names));
                 }
-                values.Add(new KeyValuePair<MemberDecl, Value>(member, ToPlain(component.Name + "." + member.Name, pair.Value)));
+                values.Add(new KeyValuePair<MemberDecl, Value>(member, ToPlain(member.Display, pair.Value)));
             }
             return new ComponentInitValue(component, values);
         }

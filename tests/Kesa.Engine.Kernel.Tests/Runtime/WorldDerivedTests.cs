@@ -112,7 +112,9 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var scout = NewScout();
             var e = Fails(() => _world.Get(scout, M("Loop", "a")), Codes.RunCycle);
-            Assert.That(e.Message, Does.Contain("Loop.a").And.Contain("Loop.b").And.Contain("->"));
+            // 깊이 상한(MaxDerivedDepth)에 걸린 것이 아니라 바로 순환으로 잡혀 그 고리만 보인다
+            Assert.That(e.Message, Does.Contain("Loop.a of " + scout + " reads itself: Loop.a of " + scout + " -> Loop.b of " +
+                                                scout + " -> Loop.a of " + scout));
         }
 
         // 최상위 읽기 하나에 예산 하나: 안에서 읽은 derived는 남은 단계를 이어서 쓴다 (G101)

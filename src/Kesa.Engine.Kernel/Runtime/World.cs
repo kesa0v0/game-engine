@@ -699,7 +699,7 @@ namespace Kesa.Engine.Runtime
                         continue;
                     }
                     var source = SourceValue(component, from.Name, defMembers, given, where);
-                    target.Add(member, CheckWrite(component.Name + "." + member.Name, member, source));
+                    target.Add(member, CheckWrite(member.Display, member, source));
                     continue;
                 }
                 if (member.Kind == MemberKind.Ref && spec.Optional) continue;

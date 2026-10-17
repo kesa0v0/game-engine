@@ -51,7 +51,12 @@ namespace Kesa.Engine.Bench
         public static int Main(string[] args)
         {
             var sizes = new List<int>();
-            foreach (var a in args) sizes.Add(int.Parse(a, CultureInfo.InvariantCulture));
+            bool profileDerived = false;
+            foreach (var a in args)
+            {
+                if (a == "--profile-derived") profileDerived = true;
+                else sizes.Add(int.Parse(a, CultureInfo.InvariantCulture));
+            }
             if (sizes.Count == 0) sizes.AddRange(new[] { 1000, 10000, 100000 });
 
             string root = Path.Combine(Path.GetTempPath(), "kesa-engine-bench");
@@ -60,6 +65,12 @@ namespace Kesa.Engine.Bench
             Write(root, "core/defs/defs.py", Defs);
             Write(root, "core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse_all(\"defs/\")\n");
             var content = Load(root);
+            if (profileDerived)
+            {
+                ProfileDerived(content);
+                Directory.Delete(root, true);
+                return 0;
+            }
 
             Console.WriteLine("| scene | N | median ms | ns per entity | KB allocated |");
             Console.WriteLine("|---|---:|---:|---:|---:|");
@@ -149,6 +160,32 @@ namespace Kesa.Engine.Bench
                 Measure(reps, () => Submit(world, "core.FeedAll", fail, false)));
             Report(print, "host function command: update all", n,
                 Measure(reps, () => Submit(world, "core.FeedHost", NoArgs, true)));
+        }
+
+        /// <summary>
+        /// 프로파일러용(<c>--profile-derived</c>): 기여 행 2개씩인 유닛 1천 개의 <c>derived</c>를 10초 동안 읽기만 한다.
+        /// <c>dotnet-trace collect -- dotnet bench.dll --profile-derived</c>로 잡는다.
+        /// </summary>
+        private static void ProfileDerived(ContentLoadResult content)
+        {
+            var world = new World(content);
+            var max = world.Member("Health", "max");
+            for (int i = 0; i < 1000; i++)
+            {
+                var id = world.Create("Soldier");
+                world.AddContribution(id, max, "add", new IntValue(1));
+                world.AddContribution(id, max, "add", new IntValue(2));
+            }
+            var units = world.All("Unit");
+            long reads = 0;
+            var sw = Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < 10000)
+            {
+                foreach (var id in units) world.Get(id, max);
+                reads += units.Count;
+            }
+            Console.WriteLine("derived reads: " + reads.ToString("N0", CultureInfo.InvariantCulture) + ", " +
+                              (sw.Elapsed.TotalMilliseconds * 1e6 / reads).ToString("0", CultureInfo.InvariantCulture) + " ns each");
         }
 
         private static void Submit(World world, string command, Dictionary<string, Value> args, bool succeeds)

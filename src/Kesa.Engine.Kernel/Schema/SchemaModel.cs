@@ -198,6 +198,12 @@ namespace Kesa.Engine.Schema
 
         public MemberSpec Spec { get; }
         public MemberKind Kind => Spec.Kind;
+
+        /// <summary>
+        /// 진단에 쓰는 <c>Health.current</c>. 컴포넌트가 만들어질 때 한 번 정한다: 읽고 쓸 때마다 이어 붙이지 않는다.
+        /// 컴포넌트에 들지 않은 멤버(Def 타입의 <c>const</c>)는 이름만이다.
+        /// </summary>
+        internal string Display { get; set; } = "";
     }
 
     // ---- 스키마 파일이 모은 선언 (②a 실행 결과, 아직 이름을 풀지 않음) ----
@@ -398,7 +404,11 @@ namespace Kesa.Engine.Schema
         internal ComponentType(ComponentDecl decl)
         {
             Decl = decl;
-            foreach (var m in decl.Members) _members[m.Name] = m;
+            foreach (var m in decl.Members)
+            {
+                _members[m.Name] = m;
+                m.Display = decl.Name + "." + m.Name;
+            }
         }
 
         public ComponentDecl Decl { get; }
