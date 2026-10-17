@@ -115,17 +115,20 @@ namespace Kesa.Engine.Script
                     call.Value, statementHint);
             }
 
-            // 입구 검사는 순수하다: 거부가 상태를 건드리지 않는다 (C10, G122)
+            // 정책 함수는 순수하다: 입구의 거부(C10, G122)도 거른 읽기(G197)도 상태를 건드리지 않는다
             foreach (var policy in functions.Policies)
             {
                 if (policy.Function.Random)
                     context.Error(Codes.CmdWriteEffect,
-                        "the submit policy '" + policy.Function.Name + "' draws random numbers; it must give the same answer every time",
+                        "the " + policy.Noun + " '" + policy.Function.Name + "' draws random numbers; it must give the same answer every time",
                         policy.Function.Definition!.Span, randomHint, new[] { policy.Function.RandomWitness!.Value });
                 if (!policy.Function.Writes) continue;
                 context.Error(Codes.CmdWriteEffect,
-                    "the submit policy '" + policy.Function.Name + "' changes the world; it can only read",
-                    policy.Function.Definition!.Span, "the gate must not change anything (spec-gaps G122)",
+                    "the " + policy.Noun + " '" + policy.Function.Name + "' changes the world; it can only read",
+                    policy.Function.Definition!.Span,
+                    policy.Kind == PolicyKind.Submit
+                        ? "the gate must not change anything (spec-gaps G122)"
+                        : "reading the world for a viewer must not change anything (spec-gaps G197)",
                     new[] { policy.Function.WriteWitness!.Value });
             }
 

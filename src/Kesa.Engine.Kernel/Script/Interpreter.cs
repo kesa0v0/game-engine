@@ -199,6 +199,7 @@ namespace Kesa.Engine.Script
 
         public const string CommandName = "command";
         public const string SubmitPolicyName = "submit_policy";
+        public const string ViewPolicyName = "view_policy";
         public const string ActsForName = "acts_for";
 
         /// <summary>S5의 <c>on_stale=</c>. 이름만 예약했다: 지금은 기본 취소만 있다 (spec-gaps G166).</summary>
@@ -481,7 +482,8 @@ namespace Kesa.Engine.Script
             }
 
             string? name = def.DecoratorName;
-            if ((name == CommandName || name == SubmitPolicyName || name == OnName || name == WhenName) && !IsBuiltin(name))
+            if ((name == CommandName || name == SubmitPolicyName || name == ViewPolicyName || name == OnName || name == WhenName) &&
+                !IsBuiltin(name))
             {
                 _context.Error(Codes.CmdBadDecorator,
                     "this mod defines its own '" + name + "', so the built-in @" + name + " cannot be used here",
@@ -491,7 +493,12 @@ namespace Kesa.Engine.Script
 
             if (name == SubmitPolicyName)
             {
-                DeclareSubmitPolicy(def, function, decorator);
+                DeclarePolicy(def, function, decorator, PolicyKind.Submit);
+                return;
+            }
+            if (name == ViewPolicyName)
+            {
+                DeclarePolicy(def, function, decorator, PolicyKind.View);
                 return;
             }
             if (name == OnName)
@@ -506,7 +513,7 @@ namespace Kesa.Engine.Script
             }
             if (name != CommandName)
             {
-                _context.Error(Codes.CmdBadDecorator, "unknown decorator; only @command, @on, @when and @submit_policy are supported",
+                _context.Error(Codes.CmdBadDecorator, "unknown decorator; only @command, @on, @when, @submit_policy and @view_policy are supported",
                     decorator.Span, hint: "write @command or @command(free=True, acts_for=...)");
                 return;
             }
@@ -581,11 +588,13 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary>
-        /// <c>@submit_policy</c> / <c>@submit_policy(override=True)</c> (G122·G124). 함수는 기본값 없는 매개변수 둘
-        /// <c>(issuer, target)</c>을 받는다. 개수와 교체는 모든 모드를 모은 뒤 본다.
+        /// <c>@submit_policy</c> / <c>@submit_policy(override=True)</c> (G122·G124): 기본값 없는 매개변수 둘 <c>(issuer, target)</c>.
+        /// <c>@view_policy</c> (G197·G203): 기본값 없는 매개변수 셋 <c>(issuer, entity, component)</c>.
+        /// 개수와 교체는 모든 모드를 모은 뒤 본다.
         /// </summary>
-        private void DeclareSubmitPolicy(FunctionDef def, FunctionValue function, Expr decorator)
+        private void DeclarePolicy(FunctionDef def, FunctionValue function, Expr decorator, PolicyKind kind)
         {
+            string at = "@" + (kind == PolicyKind.Submit ? SubmitPolicyName : ViewPolicyName);
             bool isOverride = false;
             if (decorator is CallExpr call)
             {
@@ -595,9 +604,9 @@ namespace Kesa.Engine.Script
                     {
                         _context.Error(Codes.CmdBadDecorator,
                             arg.Name == null
-                                ? "@submit_policy takes no positional arguments"
-                                : "@submit_policy has no argument '" + arg.Name + "'",
-                            arg.Span, hint: "@submit_policy accepts override=True");
+                                ? at + " takes no positional arguments"
+                                : at + " has no argument '" + arg.Name + "'",
+                            arg.Span, hint: at + " accepts override=True");
                         return;
                     }
                     if (!(arg.Value is BoolLiteral literal))
@@ -609,17 +618,22 @@ namespace Kesa.Engine.Script
                 }
             }
 
-            bool shapeOk = def.Parameters.Count == 2;
+            bool shapeOk = def.Parameters.Count == (kind == PolicyKind.Submit ? 2 : 3);
             foreach (var p in def.Parameters)
                 if (p.Default != null) shapeOk = false;
             if (!shapeOk)
             {
-                _context.Error(Codes.CmdSubmitPolicy,
-                    "a submit policy takes exactly two parameters without defaults: (issuer, target)", def.Span,
-                    hint: "issuer is the connection's tag, target is the entity chosen by acts_for or None (spec-gaps G122)");
+                if (kind == PolicyKind.Submit)
+                    _context.Error(Codes.CmdSubmitPolicy,
+                        "a submit policy takes exactly two parameters without defaults: (issuer, target)", def.Span,
+                        hint: "issuer is the connection's tag, target is the entity chosen by acts_for or None (spec-gaps G122)");
+                else
+                    _context.Error(Codes.CmdViewPolicy,
+                        "a view policy takes exactly three parameters without defaults: (issuer, entity, component)", def.Span,
+                        hint: "component is a component name, or None when asking whether the entity itself is seen (spec-gaps G197)");
                 return;
             }
-            _context.Functions.Policies.Add(new SubmitPolicyDecl(_context.Mod, function, isOverride, decorator.Span));
+            _context.Functions.Policies.Add(new PolicyDecl(_context.Mod, function, isOverride, decorator.Span, kind));
         }
 
         /// <summary>

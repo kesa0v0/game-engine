@@ -22,8 +22,11 @@ namespace Kesa.Engine.Script
         /// <summary><c>@command</c>로 선언한 커맨드, 정의된 순서대로 (spec-gaps G109).</summary>
         public List<CommandDecl> Commands { get; } = new List<CommandDecl>();
 
-        /// <summary><c>@submit_policy</c>로 선언한 정책 함수 (G122). 모드 안에서 둘 이상이면 로드 오류다.</summary>
-        public List<SubmitPolicyDecl> Policies { get; } = new List<SubmitPolicyDecl>();
+        /// <summary>
+        /// <c>@submit_policy</c>(G122)와 <c>@view_policy</c>(G197)로 선언한 정책 함수, 두 종류가 함께 든다(<see cref="PolicyDecl.Kind"/>).
+        /// 모드 안에서 같은 종류가 둘 이상이면 로드 오류다.
+        /// </summary>
+        public List<PolicyDecl> Policies { get; } = new List<PolicyDecl>();
 
         /// <summary><c>@on(신호)</c>로 붙인 핸들러, 정의된 순서대로 (G145).</summary>
         public List<HandlerDecl> Handlers { get; } = new List<HandlerDecl>();

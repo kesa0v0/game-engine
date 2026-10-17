@@ -157,6 +157,9 @@ namespace Kesa.Engine.Script
         /// <summary><c>@submit_policy</c> 함수인가 (G122). 순수 자리다.</summary>
         public bool IsSubmitPolicy => Definition != null && Definition.DecoratorName == Interpreter.SubmitPolicyName;
 
+        /// <summary><c>@view_policy</c> 함수인가 (G197). 순수 자리다.</summary>
+        public bool IsViewPolicy => Definition != null && Definition.DecoratorName == Interpreter.ViewPolicyName;
+
         public override string KindName => "function";
     }
 

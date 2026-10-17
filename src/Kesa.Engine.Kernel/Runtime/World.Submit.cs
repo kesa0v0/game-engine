@@ -91,7 +91,7 @@ namespace Kesa.Engine.Runtime
     /// <summary>커맨드 제출 (spec S6 권한 3층, spec-gaps G122~G124·G131).</summary>
     public sealed partial class World
     {
-        private readonly SubmitPolicyDecl? _submitPolicy;
+        private readonly PolicyDecl? _submitPolicy;
 
         /// <summary>
         /// 커맨드를 제출한다: 자유 커맨드 확인 → 인자 검사(G115) → 입구 <c>may_act(issuer, acts_for(인자))</c>(G122) →

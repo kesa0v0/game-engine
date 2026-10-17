@@ -123,6 +123,10 @@ namespace Kesa.Engine.Diagnostics
         // 제출 입구 (spec S6, spec-gaps G124): 호스트가 정책 필수를 켰는데 정책 함수가 없다
         public const string RunNoSubmitPolicy = "RUN016";
 
+        // 거른 읽기 (spec-gaps G203): 호스트가 보기 정책 필수를 켰는데 보기·입구 정책이 없다 / 보기 정책이 실패해 "안 보임"으로 처리함
+        public const string RunNoViewPolicy = "RUN017";
+        public const string RunViewPolicy = "RUN018";
+
         // 저장과 불러오기 (spec S8, spec-gaps G140): 깨졌거나 형식이 다른 저장 / 지금 내용과 어긋나는 저장 / 모드 목록이 달라짐(경고)
         public const string SaveCorrupt = "SAV001";
         public const string SaveMismatch = "SAV002";
@@ -141,5 +145,8 @@ namespace Kesa.Engine.Diagnostics
 
         // 제출 정책 함수: 모양·개수·교체 (spec S6 입구, spec-gaps G122·G124·G130)
         public const string CmdSubmitPolicy = "CMD005";
+
+        // 보기 정책 함수: 모양·개수·교체 (spec-gaps G197·G203)
+        public const string CmdViewPolicy = "CMD006";
     }
 }

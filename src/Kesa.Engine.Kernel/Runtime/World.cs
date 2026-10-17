@@ -55,11 +55,16 @@ namespace Kesa.Engine.Runtime
         /// 월드 시드 (spec-gaps G180). 같은 시드에 같은 입력이면 같은 난수가 나온다. 새 게임마다 다르게 할지는 호스트가 정한다.
         /// 저장에 남고 불러오면 그대로 잇는다.
         /// </param>
+        /// <param name="requireViewPolicy">
+        /// 서버 권위 멀티 게임처럼 숨김이 꼭 지켜져야 하는 호스트가 켠다. 켰는데 보기 정책이나 입구 정책이 없으면 만들지 않는다
+        /// (spec-gaps G203: "답할 수 있는 질문"을 입구 정책으로 정하기 때문에 둘 다 필요하다).
+        /// </param>
         public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget, bool requireSubmitPolicy = false,
             int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
-            int maxSettleRounds = DefaultMaxSettleRounds, long seed = 0)
+            int maxSettleRounds = DefaultMaxSettleRounds, long seed = 0, bool requireViewPolicy = false)
             : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, loaded.SubmitPolicy)
         {
+            _viewPolicy = loaded.ViewPolicy;
             _mods = loaded.Mods;
             if (maxSignalDepth < 1)
                 throw new ArgumentOutOfRangeException(nameof(maxSignalDepth), maxSignalDepth, "the signal depth limit must be at least 1");
@@ -77,11 +82,20 @@ namespace Kesa.Engine.Runtime
                 throw new WorldException(Codes.RunNoSubmitPolicy,
                     "the host requires a submit policy, but no active mod declares one",
                     "a mod must declare @submit_policy def may_act(issuer, target) (spec-gaps G124)");
+            if (requireViewPolicy && (loaded.ViewPolicy == null || loaded.SubmitPolicy == null))
+                throw new WorldException(Codes.RunNoViewPolicy,
+                    loaded.ViewPolicy == null
+                        ? "the host requires a view policy, but no active mod declares one"
+                        : "the host requires a view policy, which also needs a submit policy, but no active mod declares one",
+                    loaded.ViewPolicy == null
+                        ? "a mod must declare @view_policy def may_see(issuer, entity, component) (spec-gaps G203)"
+                        : "questions are shown to the connections that may answer them, which the submit policy decides; " +
+                          "declare @submit_policy def may_act(issuer, target) (spec-gaps G203)");
         }
 
         public World(DefSet defs, SchemaSet schema, IReadOnlyDictionary<string, ModScope>? scopes = null,
             int stepBudget = DefaultStepBudget, IReadOnlyDictionary<string, CommandDecl>? commands = null,
-            SubmitPolicyDecl? submitPolicy = null)
+            PolicyDecl? submitPolicy = null)
         {
             _defs = defs;
             _schema = schema;

@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-17. 브랜치 `spec-v0.5-scaffold`, 테스트 1688개 통과(커널 1660, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-17. 브랜치 `spec-v0.5-scaffold`, 테스트 1712개 통과(커널 1684, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -366,7 +366,7 @@ G189(확인): 리스트·딕트 컴프리헨션과 제너레이터 식을 받는
 - 테스트 `Runtime/WorldIterationTests`(역방향·`query`·키 줄·엔티티 키 줄에서 건너뜀, `len`·`in`, 사본은 파이썬 리스트, 인덱스 오류 둘, `ask`로 멈춘 반복을 저장·불러온 뒤에도 건너뜀). `WorldQueryTests`의 `query("Board")[0]`을 사본으로 바꿨다. 건너뛰기·저장된 `live` 읽기·살아 있는 것만 세는 `len`을 각각 끊으면 테스트가 실패하는 것을 확인했다.
 - **구현 부채(멀티스레드 메모):** 평가 중 상태(`_whenReads`·`_whenReadsSources`, `Explain`의 `_trace`, 순환 검사 `_computing`, 예산 `_meter`)가 `World` 필드 하나씩이다. 읽기를 병렬화하려면 "평가 하나마다의 문맥"으로 옮겨야 한다.
 
-## 검증 시나리오 ①과 `while` (끝남, 커밋 전, 2026-10-17)
+## 검증 시나리오 ①과 `while` (끝남, 커밋 `68a4398`, 2026-10-17)
 
 사용자가 ①을 "테스트 안의 작은 스택"(A)으로 골랐다. 진짜 `std.stack`(정책을 설치 인자로, std 모드를 저장소 어디에 둘지)은 나중에 따로 한다.
 
@@ -377,11 +377,22 @@ G189(확인): 리스트·딕트 컴프리헨션과 제너레이터 식을 받는
 - 테스트 `Script/WhileTests`(파이썬과 같은 결과, `break`·`continue`·`return`, 예산), `Runtime/WorldWhileTests`(바퀴마다 묻는 반복은 예산에 안 걸림, 혼자 도는 반복은 되감김, 저장·불러오기 C1·C4, 조건이 바뀌면 `SAV004`, 로드 검사 넷). `ParserTests`의 미지원 목록을 바꿨다. 불러오기에서 `While`을 빼면 저장 테스트가 실패하는 것을 확인했다.
 - `std.stack`을 만들 때 볼 것(결정 아님): 스택 순서를 엔티티 id 순서에 기대지 말고 위치를 명시할지, 우선권 고리가 처음 낸 커맨드의 Flow 안에 있어 스택이 열린 동안 다른 `Cast`가 들어오면 고리가 둘이 되는 것.
 
+## 검증 시나리오 ②와 보기 정책·거른 읽기 (첫 조각 끝남, 커밋 전, 2026-10-17)
+
+②는 spec 9절 미결 2(공개/비공개)를 건드려 먼저 설계를 정했다. 다른 엔진 사례(락스텝 StarCraft·패러독스는 전체 상태가 클라이언트에 있어 숨김이 화면뿐, 서버 권위 boardgame.io·Unreal·BGA는 서버가 사람마다 거름)를 설명한 뒤 사용자가 "보는 사람 기준의 읽기 정책"을 골랐다. 결정은 G196~G203(모두 확인), 구현 전 advisor 검토를 받아 G201(문구 인자)·G203(입구 정책도 필수)·G197(Def는 엔티티 층)을 고쳤다.
+
+- G196 방향, G197 `@view_policy def may_see(issuer, entity, component)`(issuer로 받음, `component=None`이면 존재 자체, Def·Def 상수는 엔티티 층), G198 숨긴 엔티티·컴포넌트는 없는 것처럼, 보이는 칸의 Ref가 숨긴 엔티티면 id 없는 `HiddenValue`, 목록에서는 빠짐, 숨긴 id는 죽은 id와 같은 응답. G199 `World.ViewAs(issuer)` → `WorldView`. G200 열린 질문은 `may_act`로 답할 수 있는 것만, 안의 값은 가림(선택지는 자리 유지). G201 결과는 `view.Show(result)`(문구 인자의 숫자는 모드가 쓴 대로, Ref만 가림, 반응 목록·오류 본문·인자 거부 본문은 뺌). G202 `LegalMoves`·`Candidates`는 숨긴 엔티티가 든 수를 빼고 상한은 거른 뒤에. G203 정책 없으면 모두 보임, 최대 하나, `requireViewPolicy`(입구 정책도 필수), 실패하면 안 보임 + 진단.
+- **구현한 것(첫 조각):** `PolicyDecl`(옛 `SubmitPolicyDecl`, `PolicyKind` Submit·View, `Noun`)로 두 정책이 같은 등록·순수성 검사를 씀(`Interpreter.DeclarePolicy`, `ContentLoader.BuildDefs`·`RegisterPolicy`, `FunctionEffects`). `ContentLoadResult.ViewPolicy`, `World(..., requireViewPolicy:)`·`World.Load(..., requireViewPolicy:)`, 코드 `CMD006`·`RUN017`·`RUN018`. `Runtime/World.View.cs`: `HiddenValue`, `World.ViewAs`·`MaySee`(닫는 쪽)·`MayAnswer`, `WorldView`(`Sees`·`IsAlive`·`DefOf`·`Has`·`Get`·줄 읽기·`RowKeys`·`RowInts`·`RowEntities`·`All`·`Query`·`Inverse`·`OpenRequests`·`Diagnostics`).
+- 줄 읽기의 대칭: 못 보는 키 컴포넌트(`keys="listed"`·`"all"` 둘 다)는 붙지 않은 컴포넌트와, 못 보는 엔티티 키는 죽은 키와 같은 오류 코드·문구를 낸다(월드에서 `HasRow`도 죽은 키면 오류이므로 거른 읽기도 그렇다). `HiddenRowsAnswerLikeUnattachedComponentsAndDeadKeys`가 지킨다.
+- **아직 안 한 조각:** `view.Show(result)`(G201), `view.LegalMoves`·`Candidates`(G202), `view.Explain`(숨긴 칸을 읽은 근거를 가림, G199). `Advance` 결과의 `BlockedBy`는 시나리오 ④에서 정한다(G201). Explain을 만들 때 주의: 정책 호출이 `_trace`·`_whenReads`에 기록하거나 바깥 `_meter`를 쓰면 안 된다(보기만 했는데 when 근거·단계 예산이 바뀜).
+- 테스트 `Runtime/WorldViewTests`(남의 손패는 붙지 않은 것처럼·`Query`로도 안 샘, 숨긴 엔티티는 죽은 id와 같은 메시지, 숨긴 Ref는 `HiddenValue`, `Inverse`·엔티티 키 줄에서 빠짐, 답할 수 있는 질문만·선택지 자리 유지·번호로 답함, `HiddenValue`는 인자로 못 냄, 보기는 저장 바이트를 안 바꿈, 정책 없으면 다 보임, 고장 난 정책은 닫힘 + 진단, 로드 검사 6, `requireViewPolicy`). `Runtime/ScenarioSimultaneousTests`(질문 셋이 동시에 열리고 각자 자기 것만 봄, **A가 바위든 보든 공개 전 B·C의 거른 읽기 전체가 같음**, 모두 고르면 공개·점수, 남의 질문에 못 답함, 일부가 고른 채 저장·불러와도 같음). `view.Query`의 컴포넌트 검사, `view.Has`·`Get`의 검사를 끊으면 테스트가 실패하는 것을 확인했다. 질문 여러 개 동시 열기는 구현 전에 임시 테스트로 확인했다.
+- 알려진 한계: id가 차례로 붙어 숨긴 엔티티가 생긴 것을 번호 틈으로 짐작할 수 있다(G198). 정책을 읽을 때마다 부른다(캐시 없음, 벤치에서).
+
 ## 다음 할 일 (사용자와 고를 것)
 
 Flow(`ask`·응답 커맨드)와 저장(C1·C4·C5)까지 끝났고 반응(S5)을 진행 중이다(위 "반응 슬라이스").
 
-**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 `e9a65d6`). S5 열린 질문 G176·G177과 "읽은 칸이 바뀔 때만 재평가"를 했다(커밋 `f44f472`). `field`가 `derived` 상한을 넘는 경우(G99의 패턴 B 확인, 문서 갱신)를 했다(커밋 `d4703fe`). S5 열린 질문은 끝났다. 적합성 점검 뒤 난수(G178~G182)를 했다(커밋 `d908c91`). `cost`·`pay`·`choose` 슬라이스(G183~G188)를 했다(커밋 `52b97e6`). 검증 시나리오 ③을 런타임 테스트로 했다(커밋 `9584650`). 컴프리헨션(G189~G191)을 했다(커밋 `fcf766d`). 전역 순회 `query`(G192·G193)를 했다(커밋 `f4a6902`). 스크립트 순회의 G88(G194)을 고쳤다(커밋 `0e924a6`). 검증 시나리오 ①과 `while`(G195)을 했다(커밋 전, 아래 절). 다음 후보: 검증 시나리오 ②④.
+**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 `e9a65d6`). S5 열린 질문 G176·G177과 "읽은 칸이 바뀔 때만 재평가"를 했다(커밋 `f44f472`). `field`가 `derived` 상한을 넘는 경우(G99의 패턴 B 확인, 문서 갱신)를 했다(커밋 `d4703fe`). S5 열린 질문은 끝났다. 적합성 점검 뒤 난수(G178~G182)를 했다(커밋 `d908c91`). `cost`·`pay`·`choose` 슬라이스(G183~G188)를 했다(커밋 `52b97e6`). 검증 시나리오 ③을 런타임 테스트로 했다(커밋 `9584650`). 컴프리헨션(G189~G191)을 했다(커밋 `fcf766d`). 전역 순회 `query`(G192·G193)를 했다(커밋 `f4a6902`). 스크립트 순회의 G88(G194)을 고쳤다(커밋 `0e924a6`). 검증 시나리오 ①과 `while`(G195)을 했다(커밋 `68a4398`). 검증 시나리오 ②와 보기 정책·거른 읽기의 첫 조각(G196~G203)을 했다(커밋 전, 아래 절). 다음 후보: 거른 읽기의 남은 조각(`Show`·`LegalMoves`·`Candidates`·`Explain`), 검증 시나리오 ④.
 
 그 밖의 후보:
 
@@ -431,7 +442,7 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1688개 통과(커널 1660, CLI 28)를 확인한다.
+1. `git pull` 후 `dotnet test`로 1712개 통과(커널 1684, CLI 28)를 확인한다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G135), `docs/spine-spec.md` S2·S4·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.
 
