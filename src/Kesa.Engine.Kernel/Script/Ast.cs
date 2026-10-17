@@ -32,20 +32,41 @@ namespace Kesa.Engine.Script
 
     public sealed class IntLiteral : Expr
     {
-        public IntLiteral(long value, SourceSpan span) : base(span) => Value = value;
+        public IntLiteral(long value, SourceSpan span) : base(span)
+        {
+            Value = value;
+            Constant = new IntValue(value);
+        }
         public long Value { get; }
+
+        /// <summary>평가 값. 값은 불변이라(G104) 평가할 때마다 새로 만들지 않고 이것을 돌려준다.</summary>
+        internal IntValue Constant { get; }
     }
 
     public sealed class FixedLiteral : Expr
     {
-        public FixedLiteral(Fixed value, SourceSpan span) : base(span) => Value = value;
+        public FixedLiteral(Fixed value, SourceSpan span) : base(span)
+        {
+            Value = value;
+            Constant = new FixedValue(value);
+        }
         public Fixed Value { get; }
+
+        /// <inheritdoc cref="IntLiteral.Constant"/>
+        internal FixedValue Constant { get; }
     }
 
     public sealed class StringLiteral : Expr
     {
-        public StringLiteral(string value, SourceSpan span) : base(span) => Value = value;
+        public StringLiteral(string value, SourceSpan span) : base(span)
+        {
+            Value = value;
+            Constant = new StrValue(value);
+        }
         public string Value { get; }
+
+        /// <inheritdoc cref="IntLiteral.Constant"/>
+        internal StrValue Constant { get; }
     }
 
     public sealed class BoolLiteral : Expr

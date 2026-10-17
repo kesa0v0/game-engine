@@ -144,6 +144,16 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(Int(_world.Get(dig, M("Work", "inner"))), Is.EqualTo(20));
         }
 
+        [Test]
+        public void EveryOutermostReadStartsWithTheWholeBudget()
+        {
+            Mod("banking", schema: WorkSchema, defs: "Job(\"Dig\")\n");
+            // 계량기는 읽기마다 비워서 다시 쓴다: 앞 읽기들의 단계가 쌓이면 몇 번째 읽기에서 넘는다
+            _world = new World(LoadClean(), stepBudget: 300);
+            var dig = _world.Create("Dig");
+            for (int i = 0; i < 30; i++) Assert.That(Int(_world.Get(dig, M("Work", "inner"))), Is.EqualTo(20));
+        }
+
         // 다른 derived를 읽다가 난 오류는 안쪽 함수 → 읽은 값 → 바깥 함수(읽은 위치)로 흔적이 이어진다
         private const string ChainSchema =
             "def boom(w) -> int:\n    return 1 // w.zero\n" +
@@ -166,6 +176,22 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(lines[2], Is.EqualTo("  reading Chain.inner of " + dig));
             Assert.That(lines[3], Does.StartWith("  in gather at ").And.Contain(":5")); // gather가 w.inner를 읽은 줄
             Assert.That(lines, Has.Length.EqualTo(4), e.Message);
+        }
+
+        [Test]
+        public void AFailedReadLeavesNothingForTheNextRead()
+        {
+            Mod("banking", schema: ChainSchema, defs: "Job(\"Dig\")\n");
+            _world = new World(LoadClean());
+            var dig = _world.Create("Dig");
+            // 실행 세션은 다시 쓴다: 실패한 읽기의 프레임이 남으면 다음 읽기가 같은 함수를 "재귀"로 보거나 흔적이 섞인다
+            for (int i = 0; i < 3; i++)
+            {
+                var e = Fails(() => _world.Get(dig, M("Chain", "outer")), Codes.RunArithmetic);
+                Assert.That(e.Message.Split('\n'), Has.Length.EqualTo(4), e.Message);
+            }
+            _world.Set(dig, M("Chain", "zero"), new IntValue(1));
+            Assert.That(Int(_world.Get(dig, M("Chain", "outer"))), Is.EqualTo(1));
         }
 
         [Test]

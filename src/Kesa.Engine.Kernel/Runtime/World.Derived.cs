@@ -74,6 +74,11 @@ namespace Kesa.Engine.Runtime
         /// <summary>지금 진행 중인 최상위 함수 실행의 단계 계량기. 그 안의 중첩 실행이 같은 예산을 나눠 쓴다 (G101).</summary>
         private StepMeter? _meter;
 
+        /// <summary><see cref="RunFunction"/>이 가장 바깥 실행마다 비워서 다시 쓰는 계량기.</summary>
+        private StepMeter? _derivedMeterStore;
+
+        private StepMeter _derivedMeter => _derivedMeterStore ??= new StepMeter(_stepBudget);
+
         private PureEvaluator Evaluator =>
             _evaluator ??= new PureEvaluator(new ScopeGlobals(_scopes), RuntimeBuiltins(), _stepBudget);
 
@@ -85,7 +90,11 @@ namespace Kesa.Engine.Runtime
         {
             var span = function.Definition?.Span ?? function.Lambda!.Span;
             bool outermost = _meter == null;
-            if (outermost) _meter = new StepMeter(_stepBudget);
+            if (outermost)
+            {
+                _derivedMeter.Used = 0; // 읽기마다 새로 만들지 않는다. 가장 바깥 실행은 한 번에 하나다
+                _meter = _derivedMeter;
+            }
             try
             {
                 return Evaluator.Run(function, new[] { self }, span, _meter);

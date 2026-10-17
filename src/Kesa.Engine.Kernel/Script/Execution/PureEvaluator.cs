@@ -36,6 +36,12 @@ namespace Kesa.Engine.Script
         private readonly IReadOnlyDictionary<string, Value> _builtins;
         private readonly int _budget;
 
+        /// <summary>
+        /// <see cref="Run"/>이 다 쓰고 돌려준 세션. <c>derived</c> 읽기마다 세션과 그 목록들을 새로 만들지 않는다(규모 벤치).
+        /// 실행 중에 다시 불린 <see cref="Run"/>(다른 <c>derived</c> 읽기)은 다른 세션을 꺼내므로 겹치지 않는다.
+        /// </summary>
+        private readonly Stack<Session> _spareSessions = new Stack<Session>();
+
         public PureEvaluator(IScriptGlobals globals, IReadOnlyDictionary<string, Value> builtins,
             int stepBudget = DefaultStepBudget)
         {
@@ -50,7 +56,8 @@ namespace Kesa.Engine.Script
         /// </summary>
         public Value Run(Value function, IReadOnlyList<Value> args, SourceSpan callSite = default, StepMeter? meter = null)
         {
-            var session = new Session(this, meter ?? new StepMeter(_budget));
+            var session = _spareSessions.Count > 0 ? _spareSessions.Pop() : new Session(this, null);
+            session.Begin(meter ?? new StepMeter(_budget));
             try
             {
                 return session.Invoke(function, args, EmptyKeywords, callSite);
@@ -59,6 +66,11 @@ namespace Kesa.Engine.Script
             {
                 e.Span = callSite; // 호출 자체의 오류(인자 수 등)는 부른 위치를 가리킨다
                 throw;
+            }
+            finally
+            {
+                session.Clear();
+                _spareSessions.Push(session);
             }
         }
 
@@ -327,12 +339,27 @@ namespace Kesa.Engine.Script
         {
             private readonly PureEvaluator _owner;
             private readonly List<Frame> _stack = new List<Frame>();
-            private readonly StepMeter _meter;
+            private StepMeter _meter;
 
-            public Session(PureEvaluator owner, StepMeter meter)
+            /// <param name="meter">null이면 쓰기 전에 <see cref="Begin"/>으로 준다.</param>
+            public Session(PureEvaluator owner, StepMeter? meter)
             {
                 _owner = owner;
-                _meter = meter;
+                _meter = meter!;
+            }
+
+            /// <summary>다시 쓰는 세션의 새 실행을 시작한다.</summary>
+            public void Begin(StepMeter meter) => _meter = meter;
+
+            /// <summary>실행이 끝난 세션을 비운다(다음 실행이 앞 실행의 흔적을 보지 않게, 붙잡은 값을 놓게).</summary>
+            public void Clear()
+            {
+                _stack.Clear();
+                _costs.Clear();
+                _pendingRequest = null;
+                _answerTo = null;
+                _suspended = null;
+                _meter = null!;
             }
 
             // ---- 멈춤 ----
@@ -956,7 +983,8 @@ namespace Kesa.Engine.Script
                                                 (parameters.Count == 1 ? "" : "s") + ", got " + positional.Count);
                 }
 
-                var locals = new LocalTable();
+                var localNames = LocalNamesFor(fn, capturedLocals);
+                var locals = new LocalTable(localNames.Count); // 지역 변수가 몇 개인지 이미 안다
                 if (captured != null) locals.SetAll(captured);
 
                 for (int i = 0; i < positional.Count; i++) locals[parameters[i].Name] = positional[i];
@@ -965,7 +993,7 @@ namespace Kesa.Engine.Script
                     // 위치 인자만이면(대부분의 호출) 앞에서부터 채워지므로 빠진 것은 그 뒤다: 집합을 만들 필요가 없다
                     if (positional.Count < parameters.Count)
                         throw Fail(Codes.RunScript, fn.Name + "() is missing the argument '" + parameters[positional.Count].Name + "'");
-                    return new Frame(fn, locals, LocalNamesFor(fn, capturedLocals));
+                    return new Frame(fn, locals, localNames);
                 }
                 var bound = new HashSet<string>(StringComparer.Ordinal);
                 for (int i = 0; i < positional.Count; i++) bound.Add(parameters[i].Name);
@@ -984,7 +1012,7 @@ namespace Kesa.Engine.Script
                         throw Fail(Codes.RunScript, fn.Name + "() is missing the argument '" + p.Name + "'");
                 }
 
-                return new Frame(fn, locals, LocalNamesFor(fn, capturedLocals));
+                return new Frame(fn, locals, localNames);
             }
 
             private SortedSet<string> LocalNamesFor(FunctionValue fn, SortedSet<string>? capturedLocals)
@@ -1314,9 +1342,9 @@ namespace Kesa.Engine.Script
             {
                 switch (expr)
                 {
-                    case IntLiteral i: return new IntValue(i.Value);
-                    case FixedLiteral f: return new FixedValue(f.Value);
-                    case StringLiteral s: return new StrValue(s.Value);
+                    case IntLiteral i: return i.Constant;
+                    case FixedLiteral f: return f.Constant;
+                    case StringLiteral s: return s.Constant;
                     case BoolLiteral b: return b.Value ? BoolValue.True : BoolValue.False;
                     case NoneLiteral _: return NoneValue.Instance;
                     case NameExpr name: return LookupName(name, frame);
@@ -1541,7 +1569,7 @@ namespace Kesa.Engine.Script
             private (Value Callee, List<Value> Positional, IReadOnlyDictionary<string, Value> Keywords) CallParts(CallExpr call, Frame frame)
             {
                 var callee = Eval(call.Callee, frame);
-                var positional = new List<Value>();
+                var positional = new List<Value>(call.Arguments.Count);
                 SortedDictionary<string, Value>? keywords = null; // 키워드 인자가 있을 때만 만든다
                 // any(x for ...)·all(x for ...): 답이 정해지면 멈춘다 (파이썬과 같다, G189). 내장에는 정해진 답을 낼 원소 하나만 넘긴다
                 if (callee is PureBuiltin truth && (truth.Name == PureBuiltins.AnyName || truth.Name == PureBuiltins.AllName) &&

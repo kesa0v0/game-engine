@@ -95,9 +95,9 @@ namespace Kesa.Engine.Script
             var table = new SortedDictionary<string, Value>(StringComparer.Ordinal);
             void Add(string name, Func<IReadOnlyList<Value>, Value> body) => table.Add(name, new PureBuiltin(name, body));
 
-            Add("floor", a => Rounding("floor", a, FixedMath.Floor));
-            Add("ceil", a => Rounding("ceil", a, FixedMath.Ceiling));
-            Add("round", a => Rounding("round", a, FixedMath.Round));
+            Add("floor", a => Rounding("floor", a, x => FixedMath.Floor(x)));
+            Add("ceil", a => Rounding("ceil", a, x => FixedMath.Ceiling(x)));
+            Add("round", a => Rounding("round", a, x => FixedMath.Round(x)));
             Add("abs", Abs);
             Add("min", a => Extreme("min", a, -1));
             Add("max", a => Extreme("max", a, 1));
