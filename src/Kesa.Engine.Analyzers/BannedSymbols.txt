@@ -1,10 +1,10 @@
 T:System.Single;부동소수점 금지 (spec P2). int 또는 fixed를 쓴다
 T:System.Double;부동소수점 금지 (spec P2). int 또는 fixed를 쓴다
 T:System.Decimal;fixed를 쓴다 (spec P2)
-T:System.Random;비시드 난수 금지 (spec P2). 커널 RNG를 쓴다
+T:System.Random;비시드 난수 금지 (spec P2). 엔진 난수를 쓴다(스크립트 random, 호스트 함수는 HostAccess.RandInt 등)
 T:System.Guid;무작위 id 금지 (spec X1). 상태 안의 카운터를 쓴다
-T:System.HashCode;프로세스마다 시드가 다르다 (spec C6). 커널 해시를 쓴다
-M:System.String.GetHashCode;프로세스마다 다르다 (spec C6). 커널 해시를 쓴다
+T:System.HashCode;프로세스마다 시드가 다르다 (spec C6). 결정적인 해시를 직접 쓴다
+M:System.String.GetHashCode;프로세스마다 다르다 (spec C6). 결정적인 해시를 직접 쓴다
 M:System.String.GetHashCode(System.StringComparison);프로세스마다 다르다 (spec C6)
 P:System.DateTime.Now;시스템 시계 금지 (spec S7)
 P:System.DateTime.UtcNow;시스템 시계 금지 (spec S7)

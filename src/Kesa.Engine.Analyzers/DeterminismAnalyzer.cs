@@ -8,7 +8,7 @@ using Microsoft.CodeAnalysis.Operations;
 namespace Kesa.Engine.Analyzers
 {
     /// <summary>
-    /// 커널 코드에서 결정론을 깨는 구성을 막는다 (spec P2).
+    /// 결정론을 깨는 구성을 막는다 (spec P2). 커널과, 켜기로 한 호스트 함수 프로젝트(Determinism.props, spec-gaps G220)에 적용된다.
     /// BannedApiAnalyzers가 잡지 못하는 키워드 타입과 foreach 순회를 담당한다.
     /// </summary>
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
@@ -16,8 +16,8 @@ namespace Kesa.Engine.Analyzers
     {
         public static readonly DiagnosticDescriptor FloatingPoint = new DiagnosticDescriptor(
             "KE0001",
-            "Floating-point type in kernel",
-            "'{0}' is not allowed in the kernel (spec P2); use int or fixed",
+            "Floating-point type in deterministic code",
+            "'{0}' is not allowed in deterministic code (spec P2): it can differ between machines; use int or fixed",
             "Determinism",
             DiagnosticSeverity.Error,
             isEnabledByDefault: true);

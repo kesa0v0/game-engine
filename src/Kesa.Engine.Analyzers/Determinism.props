@@ -1,0 +1,22 @@
+<Project>
+  <!--
+    결정론 검사를 켠다 (spec P2, spec-gaps G220). 커널과, 원하면 호스트 함수를 모은 프로젝트가 가져다 쓴다:
+      <Import Project="(이 저장소)/src/Kesa.Engine.Analyzers/Determinism.props" />
+    - BannedSymbols.txt: 부동소수점, 비시드 난수, 시스템 시계, 프로세스마다 다른 해시, 문화권 의존 비교, 순서 없는 순회 (RS0030)
+    - DeterminismAnalyzer: 부동소수점 키워드와 리터럴 (KE0001), Dictionary·HashSet 순회 (KE0002)
+    금지 목록 위반(RS0030)은 경고로 나오므로 오류로 올린다. 프로젝트에 BannedSymbols.txt를 더 두면 함께 적용된다.
+  -->
+  <PropertyGroup>
+    <WarningsAsErrors>$(WarningsAsErrors);RS0030</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" Link="BannedSymbols.txt" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Kesa.Engine.Analyzers.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

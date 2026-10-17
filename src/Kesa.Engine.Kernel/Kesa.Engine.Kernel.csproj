@@ -8,16 +8,8 @@
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
   </PropertyGroup>
 
-  <!-- 결정론을 C# 쪽에도 구조로 강제 (spec P2) -->
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
-    <AdditionalFiles Include="BannedSymbols.txt" />
-    <ProjectReference Include="..\Kesa.Engine.Analyzers\Kesa.Engine.Analyzers.csproj"
-                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-  </ItemGroup>
+  <!-- 결정론을 C# 쪽에도 구조로 강제 (spec P2). 호스트 함수 프로젝트도 같은 파일을 가져다 쓴다 (spec-gaps G220) -->
+  <Import Project="..\Kesa.Engine.Analyzers\Determinism.props" />
 
   <ItemGroup>
     <InternalsVisibleTo Include="Kesa.Engine.Kernel.Tests" />

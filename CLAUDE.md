@@ -13,7 +13,7 @@
 
 ## 빌드와 테스트
 
-저장소 루트에서 `dotnet build`, `dotnet test`. 커널은 `netstandard2.1`, C# 9, 부동소수점·시계·비시드 난수 등은 `BannedSymbols.txt`로 금지(결정론, spec P2).
+저장소 루트에서 `dotnet build`, `dotnet test`. 커널은 `netstandard2.1`, C# 9, 부동소수점·시계·비시드 난수 등은 `src/Kesa.Engine.Analyzers/BannedSymbols.txt`와 `DeterminismAnalyzer`로 금지(결정론, spec P2). 둘 다 `Determinism.props`로 켠다(호스트 함수 프로젝트도 같은 파일, G220).
 
 ## 문서 편집 주의 (겪은 사고)
 
