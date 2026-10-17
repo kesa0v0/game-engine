@@ -27,7 +27,24 @@ namespace Kesa.Engine.Bench
             "    return floor(h.base_max + flat)\n" +
             "component(\"Health\", base_max=const(int, default=10), current=field(int, default=5), max=derived(int, health_max))\n" +
             "component(\"Food\", amount=field(int, default=0))\n" +
-            "deftype(\"Unit\", components=[\"Health\", \"Food\"])\n";
+            // 실행기 몫을 재는 모양들 (--shapes): 같은 일을 C#으로 한 것과 비교한다
+            "def formula(s) -> int:\n" +
+            "    return floor(s.Health.base_max * 3 / 2 + s.Food.amount * 2 - 1)\n" +
+            "def mood(s) -> int:\n" +
+            "    hp = s.Health.current\n" +
+            "    if hp < s.Health.base_max // 2 and s.Food.amount < 3:\n" +
+            "        return 0\n" +
+            "    elif hp < s.Health.base_max:\n" +
+            "        return 1\n" +
+            "    return 2\n" +
+            "def crunch(s) -> int:\n" +
+            "    t = 0\n" +
+            "    for i in range(50):\n" +
+            "        t = t + i * i % 7\n" +
+            "    return t\n" +
+            "def one(s) -> int:\n    return 1\n" +
+            "component(\"Shape\", one=derived(int, one), formula=derived(int, formula), mood=derived(int, mood), crunch=derived(int, crunch))\n" +
+            "deftype(\"Unit\", components=[\"Health\", \"Food\", \"Shape\"])\n";
 
         private const string Defs =
             "Unit(\"Soldier\")\n" +
@@ -51,10 +68,11 @@ namespace Kesa.Engine.Bench
         public static int Main(string[] args)
         {
             var sizes = new List<int>();
-            bool profileDerived = false, profileTick = false;
+            bool profileDerived = false, profileTick = false, shapes = false;
             foreach (var a in args)
             {
-                if (a == "--profile-derived") profileDerived = true;
+                if (a == "--shapes") shapes = true;
+                else if (a == "--profile-derived") profileDerived = true;
                 else if (a == "--profile-tick") profileTick = true;
                 else sizes.Add(int.Parse(a, CultureInfo.InvariantCulture));
             }
@@ -70,6 +88,13 @@ namespace Kesa.Engine.Bench
             {
                 if (profileDerived) ProfileDerived(content);
                 else ProfileTick(content);
+                Directory.Delete(root, true);
+                return 0;
+            }
+
+            if (shapes)
+            {
+                Shapes(content);
                 Directory.Delete(root, true);
                 return 0;
             }
@@ -204,6 +229,76 @@ namespace Kesa.Engine.Bench
             }
             Console.WriteLine("ticks: " + ticks.ToString("N0", CultureInfo.InvariantCulture) + ", " +
                               (sw.Elapsed.TotalMilliseconds / ticks).ToString("0.00", CultureInfo.InvariantCulture) + " ms each");
+        }
+
+        /// <summary>
+        /// 실행기 몫 (<c>--shapes</c>): 모드 스크립트에 흔한 모양마다 스크립트와, 같은 일을 C# API로 한 것을 유닛 1만 개에서 잰다.
+        /// C# 쪽은 거의 월드 접근 비용이라 차이가 실행기(실행 준비 포함) 몫이다.
+        /// </summary>
+        private static void Shapes(ContentLoadResult content)
+        {
+            const int n = 10000;
+            const int reps = 9;
+            var world = new World(content);
+            for (int i = 0; i < n; i++) world.Create("Soldier");
+            var units = world.All("Unit");
+            var baseMax = world.Member("Health", "base_max");
+            var current = world.Member("Health", "current");
+            var amount = world.Member("Food", "amount");
+            var formula = world.Member("Shape", "formula");
+            var mood = world.Member("Shape", "mood");
+            var crunch = world.Member("Shape", "crunch");
+            long Int(EntityId id, MemberHandle m) => ((IntValue)world.Get(id, m)).Value;
+
+            // C# 쪽이 같은 답을 내는지 먼저 본다(fixed 나눗셈은 정수로 흉내: 10 * 3 / 2는 나누어떨어진다)
+            long CsFormula(EntityId id) => Int(id, baseMax) * 3 / 2 + Int(id, amount) * 2 - 1;
+            long CsMood(EntityId id)
+            {
+                long hp = Int(id, current);
+                if (hp < Int(id, baseMax) / 2 && Int(id, amount) < 3) return 0;
+                if (hp < Int(id, baseMax)) return 1;
+                return 2;
+            }
+            long CsCrunch()
+            {
+                long t = 0;
+                for (long i = 0; i < 50; i++) t = t + i * i % 7;
+                return t;
+            }
+            foreach (var id in units)
+            {
+                if (Int(id, formula) != CsFormula(id) || Int(id, mood) != CsMood(id) || Int(id, crunch) != CsCrunch())
+                    throw new InvalidOperationException("a shape gives a different answer in C#");
+            }
+
+            Console.WriteLine("| shape | script ns | C# ns | interpreter share |");
+            Console.WriteLine("|---|---:|---:|---:|");
+            long sink = 0;
+            var one = world.Member("Shape", "one");
+            Compare("call only: return 1", n,
+                Measure(reps, () => { foreach (var id in units) world.Get(id, one); }),
+                Measure(reps, () => { foreach (var id in units) sink += 1; }));
+            Compare("formula: 2 reads + arithmetic", n,
+                Measure(reps, () => { foreach (var id in units) world.Get(id, formula); }),
+                Measure(reps, () => { foreach (var id in units) sink += CsFormula(id); }));
+            Compare("conditions: 3 reads + if/elif", n,
+                Measure(reps, () => { foreach (var id in units) world.Get(id, mood); }),
+                Measure(reps, () => { foreach (var id in units) sink += CsMood(id); }));
+            Compare("compute loop: 50 rounds, no reads", n,
+                Measure(reps, () => { foreach (var id in units) world.Get(id, crunch); }),
+                Measure(reps, () => { foreach (var id in units) sink += CsCrunch(); }));
+            Compare("tick: read + write one field", n,
+                Measure(reps, () => world.Advance(1)),
+                Measure(reps, () => { foreach (var id in units) world.Set(id, amount, new IntValue(Int(id, amount) + 1)); }));
+            if (sink == 42) Console.WriteLine(); // C# 쪽 계산이 지워지지 않게
+        }
+
+        private static void Compare(string shape, int n, Result script, Result csharp)
+        {
+            double s = script.Ms * 1e6 / n, c = csharp.Ms * 1e6 / n;
+            Console.WriteLine("| " + shape + " | " + s.ToString("0", CultureInfo.InvariantCulture) + " | " +
+                              c.ToString("0", CultureInfo.InvariantCulture) + " | " +
+                              ((s - c) / s * 100).ToString("0", CultureInfo.InvariantCulture) + "% |");
         }
 
         private static void Submit(World world, string command, Dictionary<string, Value> args, bool succeeds)
