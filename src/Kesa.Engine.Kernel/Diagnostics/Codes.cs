@@ -138,6 +138,9 @@ namespace Kesa.Engine.Diagnostics
         // 호스트가 허락해(dropRemoved) 지워진 컴포넌트·멤버·Def 키 줄의 저장된 값을 버리고 불러옴 (경고, spec S8, spec-gaps G210)
         public const string SaveDropped = "SAV005";
 
+        // 호스트가 허락해(cancelBrokenFlows) 지금 내용으로 이어 갈 수 없는 멈춘 Flow를 질문과 함께 취소하고 불러옴 (경고, spec S8, spec-gaps G214)
+        public const string SaveFlowCanceled = "SAV006";
+
         // 커맨드 선언 (spec S6, spec-gaps G109)
         public const string CmdBadDecorator = "CMD001";
         public const string CmdPreconditions = "CMD002";

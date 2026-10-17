@@ -267,7 +267,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "    ask(u, \"Go\", choices=[\"ok\"])\n" +
                 "    u.Out.n = d.amount\n");
             var result = World.Load(LoadClean(), save);
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
             {
                 "SAV002 flow 1 (combat.Probe): signal Damaged: 'amount' must be str, not int",
             }));

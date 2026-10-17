@@ -66,6 +66,7 @@ namespace Kesa.Engine.Runtime
         {
             _viewPolicy = loaded.ViewPolicy;
             _mods = loaded.Mods;
+            _contents = loaded.Contents;
             if (maxSignalDepth < 1)
                 throw new ArgumentOutOfRangeException(nameof(maxSignalDepth), maxSignalDepth, "the signal depth limit must be at least 1");
             _maxSignalDepth = maxSignalDepth;

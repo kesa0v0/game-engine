@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Runtime;
 using Kesa.Engine.Script;
@@ -128,7 +129,11 @@ namespace Kesa.Engine.Tests.Runtime
                     var result = World.Load(reloadDefs == null ? Content() : LoadClean(), bytes);
                     Assert.That(result.Succeeded, Is.True, string.Join("\n", result.Diagnostics));
                     world = result.World!;
-                    Assert.That(Encoding.UTF8.GetString(world.Save()), Is.EqualTo(saved), "C4 at step " + step);
+                    // 내용이 바뀌었으면 저장은 새 내용 지문을 적는다 (G212). 상태는 같아야 한다
+                    static string State(string save) =>
+                        System.Text.RegularExpressions.Regex.Replace(save, "\"hash\": \"[0-9a-f]{32}\"", "\"hash\": …");
+                    if (reloadDefs == null) Assert.That(Encoding.UTF8.GetString(world.Save()), Is.EqualTo(saved), "C4 at step " + step);
+                    else Assert.That(State(Encoding.UTF8.GetString(world.Save())), Is.EqualTo(State(saved)), "C4 at step " + step);
                 }
 
                 if (step == 0)
@@ -229,13 +234,15 @@ namespace Kesa.Engine.Tests.Runtime
             // 오류 위치는 새 파일의 줄을 가리킨다 (그 줄이 실제로 실행된 코드다)
             static List<string> Places(List<string> log) =>
                 log.Select(l => System.Text.RegularExpressions.Regex.Replace(l, @"defs\.py:\d+:\d+", "defs.py:…")).ToList();
+            // 저장의 내용 지문은 글자를 그대로 보므로 다르다 (G212). 상태만 비교한다
+            static string State(byte[] save) =>
+                System.Text.RegularExpressions.Regex.Replace(Encoding.UTF8.GetString(save), "\"hash\": \"[0-9a-f]{32}\"", "\"hash\": …");
             var reference = Run(-1);
             for (int k = 0; k <= Answers.Length; k++)
             {
                 var run = Run(k, loose);
                 Assert.That(Places(run.Log), Is.EqualTo(Places(reference.Log)), "saved before step " + k);
-                Assert.That(Encoding.UTF8.GetString(run.Final), Is.EqualTo(Encoding.UTF8.GetString(reference.Final)),
-                    "saved before step " + k);
+                Assert.That(State(run.Final), Is.EqualTo(State(reference.Final)), "saved before step " + k);
             }
         }
 
@@ -245,7 +252,7 @@ namespace Kesa.Engine.Tests.Runtime
             var save = SaveAfter(1); // survey 안에서 멈춤 (Campaign → survey)
             var result = LoadWith(save, Defs.Replace("bump(p, 10)", "bump(p, 11)").Replace("bump(o, 1)", "bump(o, 2)"));
             Assert.That(result.Succeeded, Is.False);
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
             {
                 "SAV004 flow 1 (banking.Campaign): the function 'banking.Campaign' changed since the save",
                 "SAV004 flow 1 (banking.Campaign): the function 'banking.survey' changed since the save",
@@ -258,7 +265,7 @@ namespace Kesa.Engine.Tests.Runtime
             // pair는 이미 끝났지만 Flow가 pair 안의 람다를 들고 있다
             var result = LoadWith(SaveAfter(0), Defs.Replace("    g = lambda: 1\n", "    g = lambda: 2\n"));
             Assert.That(result.Succeeded, Is.False);
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
             {
                 "SAV004 flow 1 (banking.Campaign): the function 'banking.pair' changed since the save",
             }));
@@ -308,12 +315,95 @@ namespace Kesa.Engine.Tests.Runtime
                 .Replace("picked = survey(p, [p, q])", "picked = survey2(p, [p, q])"));
             var result = World.Load(LoadClean(), save);
             Assert.That(result.Succeeded, Is.False);
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
             {
                 "SAV004 flow 1 (banking.Campaign): the function 'banking.Campaign' changed since the save",
                 "SAV002 flow 1 (banking.Campaign): the paused function 'banking.survey' no longer exists",
                 "SAV002 flow 1 (banking.Campaign): the lambda 0 of 'banking.survey' that the flow holds no longer exists",
             }));
+        }
+
+        // ---- 호스트가 허락하면 이어 갈 수 없는 Flow를 취소하고 불러온다 (G214) ----
+
+        private const string Nap =
+            "@command(free=True, acts_for=None)\ndef Nap(p: Ref[Party]):\n    p.Score.log = p.Score.log + \"a\"\n" +
+            "    wait(ticks=3)\n    p.Score.log = p.Score.log + \"z\"\n";
+
+        [Test]
+        public void TheHostCanCancelAFlowItsContentNoLongerSupports()
+        {
+            Mod("banking", schema: Schema, defs: Defs + Nap);
+            var world = new World(LoadClean());
+            var red = world.Create("Red");
+            var blue = world.Create("Blue");
+            world.Submit("host", "banking.Campaign",
+                new Dictionary<string, Value> { ["p"] = new EntityValue(red), ["q"] = new EntityValue(blue) });
+            var request = world.OpenRequests.Single().Id;
+            world.Answer("host", request, red, Answers[0]); // survey 안에서 멈춤, 새 질문
+            request = world.OpenRequests.Single().Id;
+            world.Submit("host", "banking.Nap", new Dictionary<string, Value> { ["p"] = new EntityValue(blue) });
+            var save = world.Save();
+
+            string changed = Defs.Replace("bump(p, 10)", "bump(p, 11)").Replace("bump(o, 1)", "bump(o, 2)") + Nap;
+            Mod("banking", schema: Schema, defs: changed);
+            var rejected = World.Load(LoadClean(), save);
+            Assert.That(rejected.Succeeded, Is.False, "by default nothing changes");
+            Assert.That(rejected.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code).Distinct(), Is.EqualTo(new[] { "SAV004" }));
+
+            var result = World.Load(LoadClean(), save, cancelBrokenFlows: true);
+            Assert.That(result.Succeeded, Is.True, string.Join("\n", result.Diagnostics));
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Severity + " " + d.Message),
+                Is.EqualTo(new[]
+                {
+                    "SAV006 Warning flow 1 (banking.Campaign) was canceled with its request " + request +
+                    ": the function 'banking.Campaign' changed since the save; the function 'banking.survey' changed since the save",
+                }));
+
+            // 질문은 함께 사라지고, 다른 Flow는 이어 가고, 멈추기 전에 한 일은 남는다
+            var w = result.World!;
+            Assert.That(w.OpenRequests, Is.Empty);
+            Assert.That(((StrValue)w.Get(blue, w.Member("Score", "log"))).Value, Is.EqualTo("a"));
+            var woke = w.Advance(3).Reactions.Single();
+            Assert.That(woke.Handler + " " + woke.Outcome, Is.EqualTo("banking.Nap Finished"));
+            Assert.That(((StrValue)w.Get(blue, w.Member("Score", "log"))).Value, Is.EqualTo("az"));
+
+            // 취소한 뒤의 저장은 지금 내용과 맞는다
+            var again = World.Load(LoadClean(), w.Save());
+            Assert.That(again.Diagnostics, Is.Empty, string.Join("\n", again.Diagnostics));
+        }
+
+        [Test]
+        public void CancelingCoversAGoneFunctionButNotProblemsOutsideFlows()
+        {
+            var save = SaveAfter(1); // survey 안에서 멈춤
+            Mod("banking", schema: Schema, defs: Defs.Replace("def survey(p, others):", "def survey2(p, others):")
+                .Replace("picked = survey(p, [p, q])", "picked = survey2(p, [p, q])"));
+            var result = World.Load(LoadClean(), save, cancelBrokenFlows: true);
+            Assert.That(result.Succeeded, Is.True, string.Join("\n", result.Diagnostics));
+            var canceled = result.Diagnostics.Single(d => d.Code == Codes.SaveFlowCanceled).Message;
+            Assert.That(canceled, Does.StartWith("flow 1 (banking.Campaign) was canceled with its request "));
+            Assert.That(canceled, Does.EndWith(": the function 'banking.Campaign' changed since the save; " +
+                "the paused function 'banking.survey' no longer exists; " +
+                "the lambda 0 of 'banking.survey' that the flow holds no longer exists"));
+
+            // Flow 밖의 어긋남(엔티티에 쓴 값의 멤버가 지워짐)은 이 옵션으로 넘어가지 않는다
+            var world = new World(Content());
+            var red = world.Create("Red");
+            var blue = world.Create("Blue");
+            world.Set(red, world.Member("Score", "log"), new StrValue("x"));
+            world.Submit("host", "banking.Campaign",
+                new Dictionary<string, Value> { ["p"] = new EntityValue(red), ["q"] = new EntityValue(blue) });
+            world.Answer("host", world.OpenRequests.Single().Id, red, Answers[0]);
+            save = world.Save();
+            Mod("banking", schema: Schema.Replace(", log=field(str, default=\"\")", ""),
+                defs: Defs.Replace("def survey(p, others):", "def survey2(p, others):")
+                    .Replace("picked = survey(p, [p, q])", "picked = survey2(p, [p, q])"));
+            result = World.Load(LoadClean(), save, cancelBrokenFlows: true);
+            Assert.That(result.Succeeded, Is.False);
+            Assert.That(result.Diagnostics.Where(d => d.Severity == Severity.Error).Select(d => d.Code).Distinct(),
+                Is.EqualTo(new[] { "SAV002" }));
+            Assert.That(result.Diagnostics.Where(d => d.Severity == Severity.Error).Select(d => d.Message),
+                Has.All.Not.StartWith("flow "));
         }
 
         // ---- 응답 커맨드를 기다리는 Flow (G139) ----
@@ -412,7 +502,7 @@ namespace Kesa.Engine.Tests.Runtime
 
             Mod("banking", schema: Schema, defs: RoundDefs.Replace("def Bid(", "def Raise("));
             var result = World.Load(LoadClean(), save);
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
             {
                 "SAV002 flow 1 (banking.Round): the response command banking.Bid no longer exists or is now free",
             }));
@@ -430,7 +520,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: Schema, defs: Defs.Replace("def pair():", "def pair2():").Replace("pg = pair()", "pg = pair2()"));
             var result = World.Load(LoadClean(), save);
             Assert.That(result.Succeeded, Is.False);
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
             {
                 "SAV004 flow 1 (banking.Campaign): the function 'banking.Campaign' changed since the save",
                 "SAV002 flow 1 (banking.Campaign): the lambda 0 of 'banking.pair' that the flow holds no longer exists",

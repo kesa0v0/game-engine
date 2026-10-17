@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Loading;
 using Kesa.Engine.Numerics;
 using Kesa.Engine.Runtime;
 using Kesa.Engine.Script;
@@ -76,6 +77,14 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         private MemberHandle M(string owner, string member) => _world.Member(owner, member);
+
+        /// <summary>UTF-8 바이트의 SHA-256 앞 128비트, 16진수 (G212를 엔진 코드 없이 다시 계산).</summary>
+        private static string Hash(string text)
+        {
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var digest = sha.ComputeHash(Encoding.UTF8.GetBytes(text));
+            return string.Concat(digest.Take(16).Select(b => b.ToString("x2")));
+        }
 
         private World Reload(byte[] save)
         {
@@ -162,13 +171,36 @@ namespace Kesa.Engine.Tests.Runtime
             _world.Add(town, "Die");
             _world.AddRow(town, "Die", 2);
 
-            const string golden =
+            // 내용 지문은 엔진 코드를 쓰지 않고 G212의 규칙대로 따로 계산한다 (파일은 LF, BOM 없음)
+            string manifest = Hash("Mod(id=\"banking\", version=\"1.0\")\nuse_all(\"schema/\")\nuse_all(\"defs/\")\n");
+            string defs = Hash(Defs), schema = Hash(Schema);
+            string mod = Hash("15:kesa-mod-hash/1" + "12:defs/defs.py4:defs32:" + defs + "6:mod.py8:manifest32:" + manifest +
+                              "15:schema/types.py6:schema32:" + schema);
+            string golden =
                 "{\n" +
                 "  \"format\": 1,\n" +
                 "  \"mods\": [\n" +
                 "    {\n" +
                 "      \"id\": \"banking\",\n" +
-                "      \"version\": \"1.0\"\n" +
+                "      \"version\": \"1.0\",\n" +
+                "      \"hash\": \"" + mod + "\",\n" +
+                "      \"files\": [\n" +
+                "        {\n" +
+                "          \"path\": \"defs/defs.py\",\n" +
+                "          \"kind\": \"defs\",\n" +
+                "          \"hash\": \"" + defs + "\"\n" +
+                "        },\n" +
+                "        {\n" +
+                "          \"path\": \"mod.py\",\n" +
+                "          \"kind\": \"manifest\",\n" +
+                "          \"hash\": \"" + manifest + "\"\n" +
+                "        },\n" +
+                "        {\n" +
+                "          \"path\": \"schema/types.py\",\n" +
+                "          \"kind\": \"schema\",\n" +
+                "          \"hash\": \"" + schema + "\"\n" +
+                "        }\n" +
+                "      ]\n" +
                 "    }\n" +
                 "  ],\n" +
                 "  \"tick\": 0,\n" +
@@ -227,7 +259,7 @@ namespace Kesa.Engine.Tests.Runtime
             var result = World.Load(LoadClean(), save);
 
             Assert.That(result.Succeeded, Is.False);
-            var messages = result.Diagnostics.Select(d => d.Code + " " + d.Message).ToList();
+            var messages = result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList();
             Assert.That(messages, Is.EquivalentTo(new[]
             {
                 "SAV002 #2 (Scout): the component 'Wounded' no longer exists",
@@ -250,7 +282,7 @@ namespace Kesa.Engine.Tests.Runtime
             var result = World.Load(LoadClean(), save, dropRemoved: true);
 
             Assert.That(result.Succeeded, Is.True, string.Join("\n", result.Diagnostics));
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Severity + " " + d.Message).ToList(), Is.EquivalentTo(new[]
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Severity + " " + d.Message).ToList(), Is.EquivalentTo(new[]
             {
                 "SAV005 Warning #2 (Scout): the component 'Wounded' no longer exists; its saved value was dropped",
                 "SAV005 Warning #2 (Scout) Name.calm: the member no longer exists; its saved value was dropped",
@@ -287,8 +319,8 @@ namespace Kesa.Engine.Tests.Runtime
 
             var result = World.Load(LoadClean(), save, dropRemoved: true);
             Assert.That(result.Succeeded, Is.True, string.Join("\n", result.Diagnostics));
-            var messages = result.Diagnostics.Select(d => d.Code + " " + d.Message).ToList();
-            Assert.That(messages, Is.EquivalentTo(rejected.Diagnostics.Select(d => "SAV005 " + d.Message + "; its saved value was dropped")));
+            var messages = result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList();
+            Assert.That(messages, Is.EquivalentTo(rejected.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => "SAV005 " + d.Message + "; its saved value was dropped")));
             Assert.That(messages, Has.Some.Contains("#2 (Scout): the entity no longer has 'Home'"));
             Assert.That(messages, Has.Some.Contains("to #2: the entity no longer has 'Power'"));
             Assert.That(messages, Has.Some.Contains("to #4: the entity no longer has 'Power'"));
@@ -312,7 +344,7 @@ namespace Kesa.Engine.Tests.Runtime
             var result = World.Load(LoadClean(), save, dropRemoved: true);
 
             Assert.That(result.Succeeded, Is.False);
-            var codes = result.Diagnostics.Select(d => d.Code + " " + d.Severity).ToList();
+            var codes = result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Severity).ToList();
             Assert.That(codes, Does.Contain("SAV005 Warning"));
             Assert.That(result.Diagnostics.Where(d => d.Severity == Severity.Error).Select(d => d.Message).Single(),
                 Does.StartWith("#2 (Scout) Name.text:"));
@@ -335,7 +367,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: Schema, defs: Defs, extra: ", version=\"1.0\"");
             var result = World.Load(LoadClean(), save);
             Assert.That(result.Succeeded, Is.False);
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
             {
                 "SAV002 #2 (Ranger): the Def 'Ranger' no longer exists",
             }));
@@ -368,14 +400,14 @@ namespace Kesa.Engine.Tests.Runtime
 
             Mod("banking", schema: RefSchema, defs: Defs + Brew, extra: ", version=\"1.0\"");
             var rejected = World.Load(LoadClean(), save);
-            Assert.That(rejected.Diagnostics.Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
+            Assert.That(rejected.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
             {
                 "SAV002 #2 (Ranger): the Def 'Ranger' no longer exists",
             }), "by default nothing changes");
 
             var result = World.Load(LoadClean(), save, dropRemoved: true);
             Assert.That(result.Succeeded, Is.True, string.Join("\n", result.Diagnostics));
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Severity + " " + d.Message).ToList(), Is.EquivalentTo(new[]
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Severity + " " + d.Message).ToList(), Is.EquivalentTo(new[]
             {
                 "SAV005 Warning #2 (Ranger): the Def 'Ranger' no longer exists; its saved value was dropped",
                 "SAV005 Warning #1 (Scout) Opinion: the row keyed by #2 went with its entity",
@@ -414,7 +446,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: RefSchema, defs: Defs, extra: ", version=\"1.0\"");
             var result = World.Load(LoadClean(), save, dropRemoved: true);
             Assert.That(result.Succeeded, Is.False);
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
             {
                 "SAV005 #2 (Ranger): the Def 'Ranger' no longer exists; its saved value was dropped",
                 "SAV002 #1 (Scout) Leash.target: the required ref points at #2, whose Def no longer exists",
@@ -435,7 +467,7 @@ namespace Kesa.Engine.Tests.Runtime
                 defs: Defs, extra: ", version=\"1.0\"");
             var result = World.Load(LoadClean(), save);
             Assert.That(result.Succeeded, Is.False, result.Succeeded ? "loaded; reading gives: " + ReadOrError(result.World!, town) : "");
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
             {
                 "SAV002 #1 (Town) Fresh.m: the member is new and has no default to fill the saved entity with",
                 "SAV002 #2 (Scout) Name.age: the member is new and has no default to fill the saved entity with",
@@ -468,11 +500,66 @@ namespace Kesa.Engine.Tests.Runtime
                 defs: Defs, extra: ", version=\"1.0\"");
             var result = World.Load(LoadClean(), save);
             Assert.That(result.Succeeded, Is.False);
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
             {
                 "SAV002 #1 (Town) Health.current: 8 is above max 6",
                 "SAV002 #1 (Town) Health.regen: 1.5 is below min 2",
             }));
+        }
+
+        // ---- 모드 내용 지문 (G212) ----
+
+        [Test]
+        public void TheContentListsEveryFileTheEngineReadAndNothingElse()
+        {
+            Write("banking/defs/notes.txt", "not read\n");
+            Write("banking/unlisted.py", "x = 1\n");
+            var content = LoadClean().Contents["banking"];
+            Assert.That(content.Files.Select(f => f.Path + " " + ModFile.KindName(f.Kind)), Is.EqualTo(new[]
+            {
+                "defs/defs.py defs", "mod.py manifest", "schema/types.py schema",
+            }));
+            Assert.That(content.Files[0].Hash, Is.EqualTo(Hash(Defs)));
+        }
+
+        [Test]
+        public void LineEndingsAndABomDoNotChangeTheHash()
+        {
+            var save = _world.Save();
+            string before = LoadClean().Contents["banking"].Hash;
+            Write("banking/defs/defs.py", "﻿" + Defs.Replace("\n", "\r\n"));
+            Write("banking/schema/types.py", Schema.Replace("\n", "\r"));
+            var loaded = LoadClean();
+            Assert.That(loaded.Contents["banking"].Hash, Is.EqualTo(before));
+            Assert.That(World.Load(loaded, save).Diagnostics, Is.Empty);
+        }
+
+        [Test]
+        public void AChangedFileIsReportedEvenWhenTheVersionIsTheSame()
+        {
+            var save = _world.Save();
+            Write("banking/defs/defs.py", Defs + "# a comment is content too\n");
+            Write("banking/defs/extra.py", "City(\"Port\")\n");
+            var result = World.Load(LoadClean(), save);
+            Assert.That(result.Succeeded, Is.True);
+            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Severity + " " + d.Message), Is.EqualTo(new[]
+            {
+                "SAV003 Warning the mods differ from the save: 'banking' 1.0, content changed (changed defs/defs.py, added defs/extra.py)",
+            }));
+
+            Mod("banking", schema: Schema, extra: ", version=\"1.1\"");
+            Assert.That(World.Load(LoadClean(), save).Diagnostics.Single().Message, Is.EqualTo(
+                "the mods differ from the save: 'banking' 1.0 -> 1.1, content changed (removed defs/defs.py, changed mod.py)"));
+        }
+
+        [Test]
+        public void ASaveWithoutContentHashesIsCorrupt()
+        {
+            string save = Encoding.UTF8.GetString(_world.Save());
+            string stripped = System.Text.RegularExpressions.Regex.Replace(save, ",\n      \"hash\": \"[0-9a-f]{32}\",\n      \"files\": \\[[^\\]]*\\]", "");
+            Assert.That(stripped, Is.Not.EqualTo(save));
+            var result = World.Load(LoadClean(), Encoding.UTF8.GetBytes(stripped));
+            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message), Is.EqualTo(new[] { "SAV001 the save is missing \"files\"" }));
         }
 
         [Test]

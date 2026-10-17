@@ -477,10 +477,25 @@ namespace Kesa.Engine.Runtime
                     ? Text(handlerNode!, "a flow handler")
                     : Text(Field(obj, "command"), "a flow command");
                 string where = "flow " + id.ToString(CultureInfo.InvariantCulture) + " (" + command + ")";
+                // 이 Flow에서 난 어긋남은 모아 두었다가, 호스트가 허락했으면 Flow를 취소하는 경고 하나로 바꾼다 (G214)
+                problems.EnterFlow();
+                var record = RestoreFlow(obj, id, handler, command, where, requestIds, problems);
+                var requestNode = obj.Get("request");
+                long? request = requestNode is JsonObject r && r.Get("id") is JsonNumber n ? n.Value : (long?)null;
+                bool broken = problems.LeaveFlow(where, request);
+                if (record != null && !broken) _flows.Add(id, record);
+            }
+        }
+
+        /// <summary>Flow 하나를 되살린다. 어긋나면(문제는 <paramref name="problems"/>에 적었다) 또는 함께 버렸으면 null.</summary>
+        private FlowRecord? RestoreFlow(JsonObject obj, long id, bool handler, string command, string where, HashSet<long> requestIds,
+            LoadProblems problems)
+        {
+            {
                 if (handler ? !_handlerById.ContainsKey(command) : !_commands.ContainsKey(command))
                 {
                     problems.Add(where + (handler ? ": the handler no longer exists" : ": the command no longer exists"));
-                    continue;
+                    return null;
                 }
 
                 var wakeNode = obj.Get("wake_at");
@@ -508,7 +523,7 @@ namespace Kesa.Engine.Runtime
                     // 바뀐 함수를 한 번에 모두 보이도록 람다가 든 함수도 마저 본다 (S8 "바뀐 함수 목록")
                     foreach (var c in AsArray(Field(obj, "closures"), "closures").Items)
                         SavedLambda(AsObject(c, "a closure"), where, problems, out _);
-                    continue;
+                    return null;
                 }
 
                 var envNodes = new List<JsonObject>();
@@ -524,7 +539,7 @@ namespace Kesa.Engine.Runtime
                 }
 
                 var closures = RestoreClosures(AsArray(Field(obj, "closures"), "closures"), frames, envs, where, problems);
-                if (closures == null) continue;
+                if (closures == null) return null;
                 problems.Closures = closures;
                 for (int k = 0; k < envNodes.Count; k++)
                     foreach (var pair in AsObject(Field(envNodes[k], "locals"), "env locals").Members)
@@ -533,12 +548,12 @@ namespace Kesa.Engine.Runtime
                 for (int i = 0; i < frames.Count; i++)
                     broken |= RestoreFrame(frames[i], frameNodes[i], where, problems) == null;
                 problems.Closures = null;
-                if (broken) continue;
+                if (broken) return null;
                 if (!Relink(EntrySpan(command, handler), frames, out var answerTo, check: false))
                 {
                     problems.Add(where + ": the function '" + frames[0].Function.Name +
                                  "' or a function it called changed, so the paused position no longer exists");
-                    continue;
+                    return null;
                 }
 
                 Value payload = request == null
@@ -569,9 +584,9 @@ namespace Kesa.Engine.Runtime
                     if (!Involves(record, problems.Skipped))
                         throw new JsonFormatException(where + " should have been canceled: " + stale);
                     problems.DroppedWith(where + " was canceled: " + stale);
-                    continue;
+                    return null;
                 }
-                _flows.Add(id, record);
+                return record;
             }
         }
 

@@ -1,6 +1,6 @@
 # 인계 메모: 로딩 파이프라인, CLI, 런타임 World, S6 커맨드(진행 중)
 
-마지막 갱신: 2026-10-17. 브랜치 `spec-v0.5-scaffold`, 테스트 1732개 통과(커널 1704, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
+마지막 갱신: 2026-10-17. 브랜치 `spec-v0.5-scaffold`, 테스트 1742개 통과(커널 1714, CLI 28). 작업 규칙은 저장소 루트의 `CLAUDE.md`.
 
 ## 한 줄 요약
 
@@ -197,7 +197,10 @@ G140(정규형 JSON을 엔진이 직접 씀)·G141(멈춘 Flow의 런타임 값�
    - 독스트링(본문의 문자열 문장)은 문장이라 커서 번호에 들어가고, 글자를 고쳐도 해시가 바뀐다(사용자에게 보고함).
    - 칼럼 삭제는 G210으로 정했다: 기본은 거부, 호스트가 `World.Load(..., dropRemoved: true)`를 주면 지워진 컴포넌트·멤버·Def 목록에서 빠진 컴포넌트·없어진 Def 키 줄·거기 걸린 기여 행을 버리고 `SAV005` 경고(고아 영역은 만들지 않음). 테스트 `WorldSaveTests`의 버리기 셋(버린 뒤 다시 불러오면 경고 없음, 버린 목록은 거부 목록과 같음, 타입 변경은 그래도 거부).
    - Def 삭제는 G211로 정했다: `dropRemoved`면 Def가 없어진 엔티티를 불러올 때 파괴된 것처럼 다룬다(남의 Ref는 죽은 id, 키 줄·기여 행·대상 Flow는 버리고 `SAV005`, 반응 없음). 그것을 가리키는 필수 Ref는 그래도 `SAV002`(`CheckRequiredRefs`). 거부할 때 대상 Flow가 엉뚱한 `SAV001`을 내던 것도 고쳤다(`Involves`). 테스트 `WorldSaveTests`의 두 개, 필수 Ref 검사를 끊으면 실패하는 것을 확인했다.
-   - 사용자에게 아직 묻지 않은 것: Def가 더 이상 적지 않는 Def 줄 기록(보이지 않게 남음), 새 멤버의 함수 기본값·`default_from`(지금 거부), 모드 내용 해시(S8 세이브 메타, 아직 없음), Flow 취소 후 로드·`migrate`(S8 다음 단계).
+   - 모드 내용 해시는 G212로 정했다: `Loading/ModContent.cs`(`ModContent`·`ModFile`·`ContentHash`), `ContentLoadResult.Contents`(모드 id → 지문). `ParseFiles`가 읽은 파일(`mod.py` 포함)마다 BOM 빼고 LF로 맞춘 바이트의 SHA-256 128비트, 모드 지문은 `kesa-mod-hash/1` + 경로 순 (경로, 종류, 지문)을 길이 붙여 이은 것. 저장 `mods`에 `hash`·`files`(필수, 형식 1 그대로), 다르면 `SAV003`에 `'banking' 1.0, content changed (changed …, added …, removed …)`. 골든 테스트는 지문을 엔진 코드 없이 다시 계산해 맞춘다. 내용을 바꾸고 불러오는 기존 테스트는 진단 목록을 비교할 때 `SAV003`을 뺀다. 내용이 바뀐 뒤 Save→Load→Save는 지문만 다르다(`WorldSaveFlowTests`의 C4 비교는 지문을 가림).
+   - 파일 이름 유니코드 정규화는 G213: `ModDiscovery.Nfc`·`FindOnDisk`(internal, NFC로 같은 이름 → 대소문자만 다른 이름, NFC로 같은 이름이 둘이면 모호), `ContentLoader`의 `ModUnit.DiskPaths`(NFC 경로 → 디스크 실제 경로, 열 때만 씀). 정규화만 다른 두 이름을 만드는 테스트는 그런 이름을 하나로 보는 파일 시스템(macOS APFS)에서 건너뛴다.
+   - Flow 취소 후 로드는 G214: `World.Load(..., cancelBrokenFlows: true)`. `RestoreFlows`가 Flow마다 `problems.EnterFlow()`·`LeaveFlow(where, request)`로 감싸고 몸통은 `RestoreFlow`(문제면 null). `LoadProblems.Report`가 Flow 안의 `SAV002`·`SAV004`를 모았다가 옵션이 켜졌으면 `SAV006` 경고 하나("flow 1 (…) was canceled with its request N: 이유; 이유"), 아니면 그대로 오류. Flow 밖의 어긋남은 이 옵션과 무관. 테스트 `WorldSaveFlowTests`의 두 개, 모으기를 끊으면 실패하는 것을 확인했다.
+   - 사용자에게 아직 묻지 않은 것: Def가 더 이상 적지 않는 Def 줄 기록(보이지 않게 남음), 새 멤버의 함수 기본값·`default_from`(지금 거부), `migrate`(S8 다음 단계), 불러오며 취소한 Flow를 모드가 알아채는 길(지금 없음, G214).
 
 ## 반응 슬라이스 (진행 중, 2026-10-16)
 
@@ -397,12 +400,12 @@ G189(확인): 리스트·딕트 컴프리헨션과 제너레이터 식을 받는
 
 Flow(`ask`·응답 커맨드)와 저장(C1·C4·C5)까지 끝났고 반응(S5)을 진행 중이다(위 "반응 슬라이스").
 
-**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 `e9a65d6`). S5 열린 질문 G176·G177과 "읽은 칸이 바뀔 때만 재평가"를 했다(커밋 `f44f472`). `field`가 `derived` 상한을 넘는 경우(G99의 패턴 B 확인, 문서 갱신)를 했다(커밋 `d4703fe`). S5 열린 질문은 끝났다. 적합성 점검 뒤 난수(G178~G182)를 했다(커밋 `d908c91`). `cost`·`pay`·`choose` 슬라이스(G183~G188)를 했다(커밋 `52b97e6`). 검증 시나리오 ③을 런타임 테스트로 했다(커밋 `9584650`). 컴프리헨션(G189~G191)을 했다(커밋 `fcf766d`). 전역 순회 `query`(G192·G193)를 했다(커밋 `f4a6902`). 스크립트 순회의 G88(G194)을 고쳤다(커밋 `0e924a6`). 검증 시나리오 ①과 `while`(G195)을 했다(커밋 `68a4398`). 검증 시나리오 ②와 보기 정책·거른 읽기의 첫 조각(G196~G203)을 했다(커밋 `427345c`). 거른 결과 `Show`(G201·G204)와 `LegalMoves`·`Candidates`(G202)를 했다(커밋 `12d1872`). 거른 `Explain`(G205)을 했다(커밋 `780e595`). 검증 시나리오 ④를 코어 수정 없이 런타임 테스트로 했다(`ScenarioRealtimeTests`). 이로써 시나리오 ①~④가 다 됐다. 거른 `Advance` 결과(`Show`, `BlockedBy`는 답할 수 있는 질문만, `Blocked`는 그대로)도 정해 구현했다(G206, 커밋 `d987345`). 로직용 `.pyi`(G207·G208, 커밋 `09da3e8`)와 모드별 스키마 스텁(G209, 커밋 `ad362ba`)을 했다(아래 남은 일 2). 적합성 기준 C1~C10을 점검했다(spine-spec 7절, C9의 `Respond` 테스트만 더함, 커밋 `eb04421`). S8 칼럼 삭제는 고아 영역 대신 "기본 거부, 호스트가 허락하면 버리고 경고"로 정해 구현했다(G210, 커밋 `4b5f955`). Def 삭제도 같은 옵션으로 "불러올 때 파괴"로 했다(G211).
+**다음 세션에서 바로 할 것:** 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 `e9a65d6`). S5 열린 질문 G176·G177과 "읽은 칸이 바뀔 때만 재평가"를 했다(커밋 `f44f472`). `field`가 `derived` 상한을 넘는 경우(G99의 패턴 B 확인, 문서 갱신)를 했다(커밋 `d4703fe`). S5 열린 질문은 끝났다. 적합성 점검 뒤 난수(G178~G182)를 했다(커밋 `d908c91`). `cost`·`pay`·`choose` 슬라이스(G183~G188)를 했다(커밋 `52b97e6`). 검증 시나리오 ③을 런타임 테스트로 했다(커밋 `9584650`). 컴프리헨션(G189~G191)을 했다(커밋 `fcf766d`). 전역 순회 `query`(G192·G193)를 했다(커밋 `f4a6902`). 스크립트 순회의 G88(G194)을 고쳤다(커밋 `0e924a6`). 검증 시나리오 ①과 `while`(G195)을 했다(커밋 `68a4398`). 검증 시나리오 ②와 보기 정책·거른 읽기의 첫 조각(G196~G203)을 했다(커밋 `427345c`). 거른 결과 `Show`(G201·G204)와 `LegalMoves`·`Candidates`(G202)를 했다(커밋 `12d1872`). 거른 `Explain`(G205)을 했다(커밋 `780e595`). 검증 시나리오 ④를 코어 수정 없이 런타임 테스트로 했다(`ScenarioRealtimeTests`). 이로써 시나리오 ①~④가 다 됐다. 거른 `Advance` 결과(`Show`, `BlockedBy`는 답할 수 있는 질문만, `Blocked`는 그대로)도 정해 구현했다(G206, 커밋 `d987345`). 로직용 `.pyi`(G207·G208, 커밋 `09da3e8`)와 모드별 스키마 스텁(G209, 커밋 `ad362ba`)을 했다(아래 남은 일 2). 적합성 기준 C1~C10을 점검했다(spine-spec 7절, C9의 `Respond` 테스트만 더함, 커밋 `eb04421`). S8 칼럼 삭제는 고아 영역 대신 "기본 거부, 호스트가 허락하면 버리고 경고"로 정해 구현했다(G210, 커밋 `4b5f955`). Def 삭제도 같은 옵션으로 "불러올 때 파괴"로 했다(G211, 커밋 `21ef858`). 모드 내용 해시(G212, 엔진은 파일별 지문이라는 사실만, 무시할지는 사용처)와 그 전제인 파일 이름 NFC 정규화(G213, 재현한 자소 분리 버그)를 했다. 이어 "Flow 취소 후 로드"(G214, 호스트 옵션 `cancelBrokenFlows`, `SAV006`)를 했다. S8에 남은 것은 `migrate`다.
 
 그 밖의 후보:
 
 - `cost`·`choose`(사전 조건 블록 안, 지금 “미지원”), `wait`.
-- S8의 다음 단계: 모드 내용 해시, Flow 취소 후 로드, `migrate`.
+- S8의 다음 단계: `migrate`.
 - 로직용 `.pyi`(아래 남은 일 2): 쓰기 API 모양이 정해졌으므로 이제 해도 다시 고칠 일이 적다.
 
 ### (참고) 첫 슬라이스를 시작할 때의 합의 (2026-10-15)
@@ -447,7 +450,7 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1732개 통과(커널 1704, CLI 28)를 확인한다.
+1. `git pull` 후 `dotnet test`로 1742개 통과(커널 1714, CLI 28)를 확인한다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(끝의 G109~G135), `docs/spine-spec.md` S2·S4·S6·7절(C7·C8)을 읽는다. 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`, `Frame.Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.
 

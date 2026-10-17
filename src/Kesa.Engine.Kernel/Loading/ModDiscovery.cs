@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using Kesa.Engine.Diagnostics;
 
 namespace Kesa.Engine.Loading
@@ -92,27 +93,41 @@ namespace Kesa.Engine.Loading
             foreach (var use in manifest.Uses)
             {
                 string what = use.Kind == UseKind.File ? "file" : "folder";
-                string? actual = FindOnDisk(dir, use.Path, use.Kind == UseKind.File);
-                if (actual == null)
+                string? actual = FindOnDisk(dir, use.Path, use.Kind == UseKind.File, out var ambiguous);
+                if (ambiguous != null)
+                {
+                    diagnostics.Error(Codes.ModBadManifest,
+                        what + " '" + use.Path + "' matches '" + ambiguous + "' and another name on disk that differ only in " +
+                        "Unicode normalization", use.Span, mod: manifest.Id, hint: "keep one of them");
+                }
+                else if (actual == null)
                 {
                     diagnostics.Error(Codes.ModBadManifest, what + " not found: '" + use.Path + "'", use.Span,
                         mod: manifest.Id);
                 }
-                else if (actual != use.Path)
+                else if (Nfc(actual) != Nfc(use.Path))
                 {
                     diagnostics.Error(Codes.ModBadManifest,
                         what + " '" + use.Path + "' differs in letter case from the one on disk", use.Span,
-                        mod: manifest.Id, hint: "did you mean '" + actual + "'?");
+                        mod: manifest.Id, hint: "did you mean '" + Nfc(actual) + "'?");
                 }
             }
         }
 
         /// <summary>
-        /// 상대 경로(<c>/</c> 구분)를 한 단계씩 디스크의 이름과 맞춰 실제 이름의 경로를 돌려준다. 단계마다 정확히 같은 이름을
-        /// 먼저 찾고, 없으면 대소문자만 다른 이름(서수 순 첫째)을 쓴다. 어느 쪽도 없으면 null.
+        /// 유니코드 NFC 정규화 (spec-gaps G213). 같은 글자를 완성형(NFC)과 자모 분리형(NFD, macOS에서 흔함)으로 쓸 수 있어
+        /// 경로를 비교·기록할 때는 늘 NFC로 맞춘다. 파일을 열 때만 디스크의 실제 이름을 쓴다.
         /// </summary>
-        private static string? FindOnDisk(string dir, string relativePath, bool isFile)
+        internal static string Nfc(string s) => s.Normalize(NormalizationForm.FormC);
+
+        /// <summary>
+        /// 상대 경로(<c>/</c> 구분)를 한 단계씩 디스크의 이름과 맞춰 실제 이름의 경로를 돌려준다. 단계마다 NFC로 같은 이름을
+        /// 먼저 찾고(G213), 없으면 대소문자만 다른 이름(서수 순 첫째)을 쓴다. 어느 쪽도 없으면 null.
+        /// NFC로 같은 이름이 한 폴더에 둘 이상이면 어느 것인지 모호하므로 null이고 <paramref name="ambiguous"/>에 그 이름을 둔다.
+        /// </summary>
+        internal static string? FindOnDisk(string dir, string relativePath, bool isFile, out string? ambiguous)
         {
+            ambiguous = null;
             var segments = relativePath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
             var actual = new List<string>();
             string current = dir;
@@ -125,16 +140,23 @@ namespace Kesa.Engine.Loading
                 foreach (var e in entries) names.Add(Path.GetFileName(e));
                 names.Sort(StringComparer.Ordinal);
 
+                string wanted = Nfc(segments[i]);
                 string? match = null;
                 foreach (var n in names)
                 {
-                    if (string.Equals(n, segments[i], StringComparison.Ordinal)) match = n;
+                    if (!string.Equals(Nfc(n), wanted, StringComparison.Ordinal)) continue;
+                    if (match != null)
+                    {
+                        ambiguous = string.Join("/", actual) + (actual.Count > 0 ? "/" : "") + wanted;
+                        return null;
+                    }
+                    match = n;
                 }
                 if (match == null)
                 {
                     foreach (var n in names)
                     {
-                        if (!string.Equals(n, segments[i], StringComparison.OrdinalIgnoreCase)) continue;
+                        if (!string.Equals(Nfc(n), wanted, StringComparison.OrdinalIgnoreCase)) continue;
                         match = n;
                         break;
                     }

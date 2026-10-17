@@ -21,6 +21,9 @@ namespace Kesa.Engine.Runtime
         /// <summary>이 월드를 만든 모드 목록 (로드 순서). <see cref="DefSet"/>으로 직접 만든 월드는 null.</summary>
         private IReadOnlyList<ModManifest>? _mods;
 
+        /// <summary>그 모드들의 내용 지문 (G212). <see cref="_mods"/>와 함께 null이다.</summary>
+        private IReadOnlyDictionary<string, ModContent>? _contents;
+
         /// <summary>
         /// 월드를 저장한다. 커맨드나 함수가 실행 중이면 저장하지 않는다(상태가 반쯤 바뀐 순간이다).
         /// </summary>
@@ -34,9 +37,20 @@ namespace Kesa.Engine.Runtime
             var mods = new JsonArray();
             if (_mods != null)
                 foreach (var m in _mods)
+                {
+                    var content = _contents![m.Id];
+                    var files = new JsonArray();
+                    foreach (var f in content.Files)
+                        files.Add(new JsonObject()
+                            .Add("path", new JsonString(f.Path))
+                            .Add("kind", new JsonString(ModFile.KindName(f.Kind)))
+                            .Add("hash", new JsonString(f.Hash)));
                     mods.Add(new JsonObject()
                         .Add("id", new JsonString(m.Id))
-                        .Add("version", m.Version == null ? (JsonNode)JsonNull.Instance : new JsonString(m.Version)));
+                        .Add("version", m.Version == null ? (JsonNode)JsonNull.Instance : new JsonString(m.Version))
+                        .Add("hash", new JsonString(content.Hash))
+                        .Add("files", files));
+                }
 
             var counters = new JsonObject()
                 .Add("entity", new JsonNumber(_nextId))
@@ -174,10 +188,14 @@ namespace Kesa.Engine.Runtime
         /// 모드 목록이 달라진 것은 경고로만 알린다(Def 값 변경은 항상 허용, S8).
         /// <paramref name="dropRemoved"/>를 켜면 지워진 것(컴포넌트, 멤버, Def 목록에서 빠진 컴포넌트, 없어진 Def를 키로 한 줄)의
         /// 저장된 값은 버리고 버린 곳마다 경고(<c>SAV005</c>)를 남긴 채 불러온다(G210). 타입이 바뀐 값 같은 나머지 어긋남은 그래도 거부한다.
+        /// <paramref name="cancelBrokenFlows"/>를 켜면 지금 내용으로 이어 갈 수 없는 멈춘 Flow(본문이 바뀐 함수, 없어진 함수·커맨드·
+        /// 핸들러·응답 커맨드, Flow 안의 값의 어긋남)를 그 질문과 함께 취소하고 Flow마다 경고(<c>SAV006</c>)를 남긴다(G214).
+        /// 멈추기 전까지 한 일은 남고 반응은 부르지 않는다.
         /// </summary>
         public static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, int stepBudget = DefaultStepBudget,
             bool requireSubmitPolicy = false, int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
-            int maxSettleRounds = DefaultMaxSettleRounds, bool requireViewPolicy = false, bool dropRemoved = false)
+            int maxSettleRounds = DefaultMaxSettleRounds, bool requireViewPolicy = false, bool dropRemoved = false,
+            bool cancelBrokenFlows = false)
         {
             var diagnostics = new List<Diagnostic>();
             World world;
@@ -194,7 +212,7 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var root = AsObject(CanonicalJson.Read(save), "the save");
-                world.Restore(root, diagnostics, dropRemoved);
+                world.Restore(root, diagnostics, dropRemoved, cancelBrokenFlows);
             }
             catch (JsonFormatException e)
             {
@@ -205,7 +223,7 @@ namespace Kesa.Engine.Runtime
             return new WorldLoadResult(world, diagnostics);
         }
 
-        private void Restore(JsonObject root, List<Diagnostic> diagnostics, bool dropRemoved)
+        private void Restore(JsonObject root, List<Diagnostic> diagnostics, bool dropRemoved, bool cancelBrokenFlows)
         {
             long format = Long(Field(root, "format"), "format");
             if (format != SaveFormatVersion)
@@ -222,7 +240,7 @@ namespace Kesa.Engine.Runtime
             _nextFlow = Positive(Field(counters, "flow"), "counters.flow");
             _nextRequest = Positive(Field(counters, "request"), "counters.request");
 
-            var problems = new LoadProblems(diagnostics, dropRemoved);
+            var problems = new LoadProblems(diagnostics, dropRemoved, cancelBrokenFlows);
             var entities = AsArray(Field(root, "entities"), "entities");
 
             // 1차: 엔티티를 모두 만든다 (값과 줄이 다른 엔티티를 가리킬 수 있다)
@@ -286,14 +304,29 @@ namespace Kesa.Engine.Runtime
             }
         }
 
+        /// <summary>
+        /// 모드 목록과 내용 지문을 비교해 다르면 경고 하나로 알린다 (S8, G212). 버전이 같아도 내용이 다르면 바뀐·생긴·없어진 파일을
+        /// 적는다. 무엇이 달라도 괜찮은지는 판단하지 않는다(로드를 막는 어긋남은 SAV002·SAV004가 따로 본다).
+        /// </summary>
         private void CompareMods(JsonArray saved, List<Diagnostic> diagnostics)
         {
-            var before = new SortedDictionary<string, string?>(StringComparer.Ordinal);
+            var before = new SortedDictionary<string, KeyValuePair<string?, SavedContent>>(StringComparer.Ordinal);
             foreach (var node in saved.Items)
             {
                 var obj = AsObject(node, "a mod");
                 var version = Field(obj, "version");
-                before[Text(Field(obj, "id"), "a mod id")] = version is JsonNull ? null : Text(version, "a mod version");
+                var files = new SortedDictionary<string, string>(StringComparer.Ordinal);
+                foreach (var f in AsArray(Field(obj, "files"), "mod files").Items)
+                {
+                    var file = AsObject(f, "a mod file");
+                    string kind = Text(Field(file, "kind"), "a mod file kind");
+                    if (kind != "manifest" && kind != "schema" && kind != "defs")
+                        throw new JsonFormatException("unknown mod file kind '" + kind + "'");
+                    files[Text(Field(file, "path"), "a mod file path")] = kind + " " + Text(Field(file, "hash"), "a mod file hash");
+                }
+                before[Text(Field(obj, "id"), "a mod id")] = new KeyValuePair<string?, SavedContent>(
+                    version is JsonNull ? null : Text(version, "a mod version"),
+                    new SavedContent(Text(Field(obj, "hash"), "a mod hash"), files));
             }
             var now = new SortedDictionary<string, string?>(StringComparer.Ordinal);
             if (_mods != null) foreach (var m in _mods) now[m.Id] = m.Version;
@@ -301,15 +334,61 @@ namespace Kesa.Engine.Runtime
             var changes = new List<string>();
             foreach (var pair in before)
             {
-                if (!now.TryGetValue(pair.Key, out var version)) changes.Add("removed '" + pair.Key + "'");
-                else if (version != pair.Value)
-                    changes.Add("'" + pair.Key + "' " + (pair.Value ?? "(no version)") + " -> " + (version ?? "(no version)"));
+                if (!now.TryGetValue(pair.Key, out var version))
+                {
+                    changes.Add("removed '" + pair.Key + "'");
+                    continue;
+                }
+                string change = version == pair.Value.Key
+                    ? ""
+                    : " " + (pair.Value.Key ?? "(no version)") + " -> " + (version ?? "(no version)");
+                string? files = _contents != null && _contents.TryGetValue(pair.Key, out var content)
+                    ? FileChanges(pair.Value.Value, content)
+                    : null;
+                if (files != null) change += (change.Length == 0 ? " " + (version ?? "(no version)") : "") + ", content changed (" + files + ")";
+                if (change.Length > 0) changes.Add("'" + pair.Key + "'" + change);
             }
             foreach (var pair in now)
                 if (!before.ContainsKey(pair.Key)) changes.Add("added '" + pair.Key + "'");
             if (changes.Count > 0)
                 diagnostics.Add(new Diagnostic(Codes.SaveModsChanged, Severity.Warning,
                     "the mods differ from the save: " + string.Join(", ", changes), null, SourceSpan.None));
+        }
+
+        private sealed class SavedContent
+        {
+            public SavedContent(string hash, SortedDictionary<string, string> files)
+            {
+                Hash = hash;
+                Files = files;
+            }
+
+            public string Hash { get; }
+
+            /// <summary>경로 → "종류 지문".</summary>
+            public SortedDictionary<string, string> Files { get; }
+        }
+
+        /// <summary>저장의 지문과 지금 지문이 다르면 "changed a, added b, removed c" (경로 서수 순), 같으면 null.</summary>
+        private static string? FileChanges(SavedContent saved, ModContent now)
+        {
+            if (saved.Hash == now.Hash) return null;
+            var current = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            foreach (var f in now.Files) current[f.Path] = ModFile.KindName(f.Kind) + " " + f.Hash;
+            var paths = new SortedSet<string>(current.Keys, StringComparer.Ordinal);
+            paths.UnionWith(saved.Files.Keys);
+            var parts = new List<string>();
+            foreach (var path in paths)
+            {
+                bool had = saved.Files.TryGetValue(path, out var before);
+                bool has = current.TryGetValue(path, out var after);
+                if (!had) parts.Add("added " + path);
+                else if (!has) parts.Add("removed " + path);
+                else if (before != after) parts.Add("changed " + path);
+            }
+            // 목록이 같은데 전체 지문만 다르면 저장의 전체 지문이 목록과 맞지 않는 것이다
+            if (parts.Count == 0) throw new JsonFormatException("the mod hash of '" + now.Id + "' does not match its files");
+            return string.Join(", ", parts);
         }
 
         private void RestoreEntity(EntityRecord entity, JsonObject obj, LoadProblems problems)
@@ -711,11 +790,45 @@ namespace Kesa.Engine.Runtime
             private readonly List<Diagnostic> _diagnostics;
             private readonly HashSet<string> _seen = new HashSet<string>(StringComparer.Ordinal);
             private readonly bool _dropRemoved;
+            private readonly bool _cancelBrokenFlows;
 
-            public LoadProblems(List<Diagnostic> diagnostics, bool dropRemoved)
+            /// <summary>지금 되살리는 Flow에서 난 어긋남 (G214). Flow 밖이면 null이고 그때는 바로 진단이 된다.</summary>
+            private List<Diagnostic>? _flow;
+
+            public LoadProblems(List<Diagnostic> diagnostics, bool dropRemoved, bool cancelBrokenFlows)
             {
                 _diagnostics = diagnostics;
                 _dropRemoved = dropRemoved;
+                _cancelBrokenFlows = cancelBrokenFlows;
+            }
+
+            private void Report(Diagnostic d) => (_flow ?? _diagnostics).Add(d);
+
+            public void EnterFlow() => _flow = new List<Diagnostic>();
+
+            /// <summary>
+            /// Flow 하나를 마친다. 어긋남이 없었으면 false. 있었으면 true이고, 호스트가 <c>cancelBrokenFlows</c>를 켰으면 그 Flow를
+            /// 취소하는 경고 하나(<c>SAV006</c>)로, 아니면 모은 오류 그대로 진단이 된다 (G214).
+            /// </summary>
+            public bool LeaveFlow(string where, long? request)
+            {
+                var found = _flow!;
+                _flow = null;
+                if (found.Count == 0) return false;
+                if (!_cancelBrokenFlows)
+                {
+                    _diagnostics.AddRange(found);
+                    return true;
+                }
+                var reasons = new List<string>();
+                foreach (var d in found)
+                    reasons.Add(d.Message.StartsWith(where + ": ", StringComparison.Ordinal) ? d.Message.Substring(where.Length + 2) : d.Message);
+                _diagnostics.Add(new Diagnostic(Codes.SaveFlowCanceled, Severity.Warning,
+                    where + " was canceled" +
+                    (request == null ? "" : " with its request " + request.Value.ToString(CultureInfo.InvariantCulture)) + ": " +
+                    string.Join("; ", reasons), null, SourceSpan.None,
+                    "the host allowed canceling paused flows the content no longer supports; what they did before pausing stays (spec S8)"));
+                return true;
             }
 
             /// <summary>Def가 없어져 만들지 못한 엔티티. 그것을 가리키는 줄·기여 행은 따로 보고하지 않는다(로드는 어차피 실패한다).</summary>
@@ -727,7 +840,7 @@ namespace Kesa.Engine.Runtime
             public void Add(string message)
             {
                 if (!_seen.Add(message)) return;
-                _diagnostics.Add(new Diagnostic(Codes.SaveMismatch, Severity.Error, message, null, SourceSpan.None,
+                Report(new Diagnostic(Codes.SaveMismatch, Severity.Error, message, null, SourceSpan.None,
                     "the content changed in a way the save cannot follow (spec S8)"));
             }
 
@@ -762,7 +875,7 @@ namespace Kesa.Engine.Runtime
             public void FunctionChanged(string message)
             {
                 if (!_seen.Add(message)) return;
-                _diagnostics.Add(new Diagnostic(Codes.SaveFunctionChanged, Severity.Error, message, null, SourceSpan.None,
+                Report(new Diagnostic(Codes.SaveFunctionChanged, Severity.Error, message, null, SourceSpan.None,
                     "a paused flow resumes only in the exact body it paused in; finish the flow before updating the mod (spec S8)"));
             }
         }

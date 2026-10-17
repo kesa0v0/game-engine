@@ -315,6 +315,75 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(result.Defs.TryGet("A", out _), Is.True);
         }
 
+        // ---- 유니코드 정규화 (G213): macOS에서 온 자모 분리형(NFD) 이름도 완성형(NFC)으로 적은 use로 찾는다 ----
+
+        private const string Nfc = "유닛";
+        private static readonly string Nfd = Nfc.Normalize(System.Text.NormalizationForm.FormD);
+
+        [Test]
+        public void ANfdFileNameIsFoundByAnNfcUseAndReportedAsNfc()
+        {
+            Assert.That(Nfd, Is.Not.EqualTo(Nfc));
+            Write("core/schema/types.py", "deftype(\"Unit\")\n");
+            Write("core/defs/" + Nfd + ".py", "Unit(\"Scout\")\n");
+            Write("core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse(\"defs/" + Nfc + ".py\")\n");
+            var loaded = LoadClean();
+            Assert.That(loaded.Defs.TryGet("Scout", out _), Is.True);
+            // 내용 지문의 경로도 NFC다 (G212)
+            Assert.That(loaded.Contents["core"].Files.Select(f => f.Path), Does.Contain("defs/" + Nfc + ".py"));
+
+            // 오류 위치의 파일 이름도 NFC다
+            Write("core/defs/" + Nfd + ".py", "Unit(\"Scout\"\n");
+            Load(out var diags);
+            Assert.That(diags.Select(d => d.Span.File).Distinct(), Is.EqualTo(new[] { "core/defs/" + Nfc + ".py" }));
+        }
+
+        [Test]
+        public void ANfdFolderIsFoundByUseAllAndAnNfdUseFindsAnNfcName()
+        {
+            Write("core/schema/types.py", "deftype(\"Unit\")\n");
+            Write("core/" + Nfd + "/a.py", "Unit(\"Scout\")\n");
+            Write("core/defs/" + Nfc + ".py", "Unit(\"Ranger\")\n");
+            Write("core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse_all(\"" + Nfc + "/\")\nuse(\"defs/" + Nfd + ".py\")\n");
+            var result = LoadClean();
+            Assert.That(result.Defs.TryGet("Scout", out _), Is.True);
+            Assert.That(result.Defs.TryGet("Ranger", out _), Is.True);
+        }
+
+        [Test]
+        public void TwoNamesThatDifferOnlyInNormalizationAreAnError()
+        {
+            Write("core/schema/types.py", "deftype(\"Unit\")\n");
+            Write("core/defs/" + Nfc + ".py", "Unit(\"Scout\")\n");
+            Write("core/defs/" + Nfd + ".py", "Unit(\"Ranger\")\n");
+            if (System.IO.Directory.GetFiles(System.IO.Path.Combine(_root, "core", "defs")).Length != 2)
+                Assert.Ignore("this file system treats the two names as one (macOS APFS)");
+            Write("core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse(\"defs/" + Nfc + ".py\")\n");
+            Load(out var diags);
+            Assert.That(diags.Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
+            {
+                "MOD002 file 'defs/" + Nfc + ".py' matches 'defs/" + Nfc + ".py' and another name on disk that differ only in " +
+                "Unicode normalization",
+            }));
+
+            Write("core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse_all(\"defs/\")\n");
+            var result = Load(out diags);
+            Assert.That(diags.Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]
+            {
+                "LOD001 'defs/" + Nfc + ".py' is on disk twice, as names that differ only in Unicode normalization",
+            }));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
+        }
+
+        [Test]
+        public void AWrongCaseHintIsWrittenInNfc()
+        {
+            Write("core/defs/" + Nfd + ".py", "x = 1\n");
+            Write("core/mod.py", "Mod(id=\"core\")\nuse(\"DEFS/" + Nfc + ".py\")\n");
+            Load(out var diags);
+            Assert.That(diags.Single().Hint, Is.EqualTo("did you mean 'defs/" + Nfc + ".py'?"), diags.Single().Message);
+        }
+
         [Test]
         public void ListingModPyIsAnError()
         {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Runtime;
 using Kesa.Engine.Script;
@@ -263,7 +264,7 @@ namespace Kesa.Engine.Tests.Runtime
             Go(world);
             var save = world.Save();
             var result = World.Load(Content(Command("    emit(Ping(target=u, tag=\"a\"))\n")), save);
-            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message),
+            Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message),
                 Is.EqualTo(new[] { "SAV002 flow 1 (combat.choose): the handler no longer exists" }));
         }
     }

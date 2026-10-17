@@ -87,6 +87,13 @@ namespace Kesa.Engine.Loading
 
         /// <summary>살아남은 모드의 <c>@when</c> 반응, 모드 로드 순서 → 정의 순서 (spec S5, spec-gaps G169).</summary>
         public IReadOnlyList<WhenDecl> Whens { get; internal set; } = Array.Empty<WhenDecl>();
+
+        /// <summary>
+        /// 살아남은 모드의 내용 지문 (모드 id → 지문, spec S8, spec-gaps G212). 엔진이 읽은 파일별 지문과 전체 지문이다.
+        /// 무엇이 달라도 괜찮은지는 사용처가 이것으로 정한다.
+        /// </summary>
+        public IReadOnlyDictionary<string, ModContent> Contents { get; internal set; } =
+            new SortedDictionary<string, ModContent>(StringComparer.Ordinal);
     }
 
     /// <summary>한 회차의 ②a·②b가 남긴 것: 살아남은 모드(로드 순서), 완성된 스키마, 등록된 Def.</summary>
@@ -151,6 +158,7 @@ namespace Kesa.Engine.Loading
                 var commands = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var handlers = new List<HandlerDecl>();
                 var whens = new List<WhenDecl>();
+                var contents = new SortedDictionary<string, ModContent>(StringComparer.Ordinal);
                 foreach (var u in units)
                 {
                     diagnostics.AddRange(u.Bag.ToSortedList());
@@ -160,6 +168,9 @@ namespace Kesa.Engine.Loading
                         continue;
                     }
                     mods.Add(u.Manifest);
+                    var files = new List<ModFile>(u.Files);
+                    files.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path));
+                    contents.Add(u.Manifest.Id, new ModContent(u.Manifest.Id, files));
                     patches.AddRange(u.Patches);
                     scopes.Add(u.Manifest.Id, u.Scope);
                     // 같은 모드 안의 같은 이름은 EVL004로 막히고 모드 id는 유일하므로 id는 겹치지 않는다
@@ -174,6 +185,7 @@ namespace Kesa.Engine.Loading
                     ViewPolicy = run.ViewPolicy,
                     Handlers = handlers,
                     Whens = whens,
+                    Contents = contents,
                 };
             }
         }
@@ -351,6 +363,12 @@ namespace Kesa.Engine.Loading
             public List<string> SchemaFiles { get; } = new List<string>();
             public List<string> DefFiles { get; } = new List<string>();
 
+            /// <summary>목록의 경로(NFC) → 디스크의 실제 상대 경로. 둘이 다른 것은 유니코드 정규화뿐이다 (G213).</summary>
+            public Dictionary<string, string> DiskPaths { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            /// <summary>읽은 파일의 지문 (G212).</summary>
+            public List<ModFile> Files { get; } = new List<ModFile>();
+
             /// <summary>파싱한 파일 (모드 폴더 기준 상대 경로 → 모듈). 회차가 바뀌어도 그대로다.</summary>
             public Dictionary<string, Module> Modules { get; } = new Dictionary<string, Module>(StringComparer.Ordinal);
 
@@ -424,27 +442,41 @@ namespace Kesa.Engine.Loading
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var use in u.Manifest.Uses)
             {
+                // 경로는 NFC로 다루고 디스크의 실제 이름은 열 때만 쓴다 (G213)
                 var files = new List<string>();
+                var disk = new Dictionary<string, string>(StringComparer.Ordinal);
+                string? found = ModDiscovery.FindOnDisk(modDir, use.Path, use.Kind == UseKind.File, out _);
+                if (found == null) continue; // ①에서 보고됨
                 if (use.Kind == UseKind.File)
                 {
-                    files.Add(use.Path);
+                    string rel = ModDiscovery.Nfc(found);
+                    files.Add(rel);
+                    disk[rel] = found;
                 }
                 else
                 {
-                    string dir = Path.Combine(modDir, use.Path.Replace('/', Path.DirectorySeparatorChar));
-                    if (!Directory.Exists(dir)) continue; // ①에서 보고됨
+                    string dir = Path.Combine(modDir, found.Replace('/', Path.DirectorySeparatorChar));
                     foreach (var f in Directory.GetFiles(dir, "*.py", SearchOption.AllDirectories))
                     {
-                        string rel = Path.GetRelativePath(modDir, f).Replace(Path.DirectorySeparatorChar, '/');
+                        string actual = Path.GetRelativePath(modDir, f).Replace(Path.DirectorySeparatorChar, '/');
+                        if (!actual.EndsWith(".py", StringComparison.Ordinal)) continue; // "*.py"는 ".pyi"도 잡는다
+                        string rel = ModDiscovery.Nfc(actual);
                         if (rel == ModDiscovery.ManifestFileName) continue;
-                        if (!rel.EndsWith(".py", StringComparison.Ordinal)) continue; // "*.py"는 ".pyi"도 잡는다
+                        if (disk.ContainsKey(rel))
+                        {
+                            u.Bag.Error(Codes.LodBadUse, "'" + rel + "' is on disk twice, as names that differ only in Unicode " +
+                                "normalization", use.Span, u.Manifest.Id, hint: "keep one of them");
+                            continue;
+                        }
                         files.Add(rel);
+                        disk[rel] = actual;
                     }
                     files.Sort(StringComparer.Ordinal);
                 }
 
                 foreach (var rel in files)
                 {
+                    if (!u.DiskPaths.ContainsKey(rel)) u.DiskPaths[rel] = disk[rel];
                     if (rel == ModDiscovery.ManifestFileName)
                     {
                         u.Bag.Error(Codes.LodBadUse, "mod.py cannot be listed in use()", use.Span, u.Manifest.Id);
@@ -474,15 +506,31 @@ namespace Kesa.Engine.Loading
         {
             var all = new List<string>(u.SchemaFiles);
             all.AddRange(u.DefFiles);
+            // 내용 지문 (G212): mod.py도 읽은 파일이다(use 순서가 거기 있다)
+            try
+            {
+                var manifest = File.ReadAllBytes(Path.Combine(modsRoot, u.Manifest.Directory, ModDiscovery.ManifestFileName));
+                u.Files.Add(new ModFile(ModDiscovery.ManifestFileName, ModFileKind.Manifest, ContentHash.OfFile(manifest)));
+            }
+            catch (IOException e)
+            {
+                u.Bag.Error(Codes.LodBadUse, "cannot read file: " + e.Message,
+                    new SourceSpan(u.Manifest.Directory + "/" + ModDiscovery.ManifestFileName, 0, 0), u.Manifest.Id);
+            }
             foreach (var relativePath in all)
             {
                 string path = Path.Combine(modsRoot, u.Manifest.Directory,
-                    relativePath.Replace('/', Path.DirectorySeparatorChar));
+                    u.DiskPaths[relativePath].Replace('/', Path.DirectorySeparatorChar));
                 string file = u.Manifest.Directory + "/" + relativePath;
                 string text;
                 try
                 {
-                    text = File.ReadAllText(path, System.Text.Encoding.UTF8);
+                    var bytes = File.ReadAllBytes(path);
+                    u.Files.Add(new ModFile(relativePath, u.SchemaFiles.Contains(relativePath) ? ModFileKind.Schema : ModFileKind.Defs,
+                        ContentHash.OfFile(bytes)));
+                    // File.ReadAllText(path, UTF8)와 같게 읽는다 (BOM으로 인코딩을 알아냄)
+                    using (var reader = new StreamReader(new MemoryStream(bytes), System.Text.Encoding.UTF8, true))
+                        text = reader.ReadToEnd();
                 }
                 catch (IOException e)
                 {
