@@ -109,7 +109,12 @@ namespace Kesa.Engine.Runtime
         /// <paramref name="max"/>개를 넘으면 멈추고 <see cref="LegalMoveList.Truncated"/>를 켠다 (큰 후보, S6). 조합마다 단계 예산이 따로다.
         /// <c>choose</c>가 없고 기본값도 없는 매개변수는 호스트가 줘야 하며 빠지면 <see cref="WorldException"/>이다.
         /// </summary>
-        public LegalMoveList LegalMoves(string command, IReadOnlyDictionary<string, Value> args, int max)
+        public LegalMoveList LegalMoves(string command, IReadOnlyDictionary<string, Value> args, int max) =>
+            LegalMoves(command, args, max, null);
+
+        /// <param name="keep">있으면 사전 검사를 통과한 수 중 이것이 참인 것만 센다 (거른 읽기, G202: 상한은 거른 뒤에).</param>
+        internal LegalMoveList LegalMoves(string command, IReadOnlyDictionary<string, Value> args, int max,
+            Func<IReadOnlyDictionary<string, Value>, bool>? keep)
         {
             if (max < 1) throw new WorldException(Codes.RunRange, "max must be at least 1, not " + max);
             var decl = FindCommand(command);
@@ -137,7 +142,7 @@ namespace Kesa.Engine.Runtime
                     var problems = new List<ArgumentRejection>();
                     var full = CheckArguments(decl, state, problems);
                     // from_=가 매개변수 타입에 맞지 않는 값을 주면 그 조합은 낼 수 없다
-                    if (problems.Count == 0 && EvaluateRequires(decl, full).Passed) moves.Add(full);
+                    if (problems.Count == 0 && EvaluateRequires(decl, full).Passed && (keep == null || keep(full))) moves.Add(full);
                     return;
                 }
                 var choose = chooses[index];

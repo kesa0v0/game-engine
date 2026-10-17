@@ -144,6 +144,186 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(b.Inverse(_a, M("Owner", "party")), Is.EqualTo(new[] { _scout }));
         }
 
+        // ---- 제출·답의 결과 (G201) ----
+
+        private const string ShowDefs =
+            Defs +
+            // 거부 사유의 문구 인자: 숨긴 유닛은 가리고, 모드가 넣은 숫자(남의 손패 수)는 모드가 알려 준 것이라 그대로
+            "@command(free=True, acts_for=lambda party: party)\n" +
+            "def Probe(party: Ref[Party], unit: Ref[Unit]):\n" +
+            "    with preconditions:\n" +
+            "        cost(unit.Owner.party.Hand.cards, 100)\n" +
+            "        cost(party.Hand.cards, 100)\n" +
+            "        require(False, text(\"e.probe\", who=unit, cards=unit.Owner.party.Hand.cards, me=party))\n" +
+            "    pass\n" +
+            // 스크립트 오류의 메시지에는 숨긴 유닛의 id가 든다
+            "@command(free=True, acts_for=lambda party: party)\n" +
+            "def Boom(party: Ref[Party], unit: Ref[Unit]):\n" +
+            "    destroy(unit)\n" +
+            "    unit.Fog.hidden = False\n" +
+            // 남(A)에게 묻는 질문을 연다
+            "@command(free=True, acts_for=lambda party: party)\n" +
+            "def Poke(party: Ref[Party], other: Ref[Party]):\n" +
+            "    r = ask(other, \"q.poke\", choices=[\"ok\"])\n" +
+            "    pass\n";
+
+        private SubmitResult SubmitAs(string issuer, string command, params (string, EntityId)[] args)
+        {
+            var values = new Dictionary<string, Value>();
+            foreach (var (name, id) in args) values[name] = new EntityValue(id);
+            return _w.Submit(issuer, "banking." + command, values);
+        }
+
+        [Test]
+        public void ARejectionShowsHiddenEntitiesAsHiddenButWhatTheModWroteAsIs()
+        {
+            NewWorld(ShowDefs);
+            var full = SubmitAs("B", "Probe", ("party", _b), ("unit", _scout));
+            Assert.That(full.Outcome, Is.EqualTo(SubmitOutcome.PreconditionsFailed));
+            var shown = _w.ViewAs("B").Show(full);
+            Assert.That(shown.Outcome, Is.EqualTo(SubmitOutcome.PreconditionsFailed));
+            Assert.That(shown.Arguments!["unit"], Is.SameAs(HiddenValue.Instance), "B named the scout but must not learn its id back");
+            Assert.That(((EntityValue)shown.Arguments["party"]).Id, Is.EqualTo(_b));
+            Assert.That(((EntityValue)shown.Target!).Id, Is.EqualTo(_b));
+
+            var requires = shown.Preconditions!.Requires;
+            // A의 손패 칸(B에게 숨김): 칸과 가진 양은 없고, 필요한 양은 모드가 쓴 식
+            Assert.That(requires[0].Slot, Is.Null);
+            Assert.That(requires[0].Have, Is.SameAs(HiddenValue.Instance));
+            Assert.That(((IntValue)requires[0].Need!).Value, Is.EqualTo(100));
+            Assert.That(full.Preconditions!.Requires[0].Slot, Does.StartWith(_a + ".Hand"), "the server still sees everything");
+            // 자기 손패 칸은 그대로
+            Assert.That(requires[1].Slot, Is.EqualTo(_b + ".Hand.cards"));
+            Assert.That(((IntValue)requires[1].Have!).Value, Is.EqualTo(5));
+
+            var text = requires[2];
+            Assert.That(text.MessageKey, Is.EqualTo("e.probe"));
+            Assert.That(text.Args["who"], Is.SameAs(HiddenValue.Instance));
+            Assert.That(((IntValue)text.Args["cards"]).Value, Is.EqualTo(3), "a number the mod put in the text is the mod's choice");
+            Assert.That(((EntityValue)text.Args["me"]).Id, Is.EqualTo(_b));
+            Assert.That(shown.Preconditions.Failures.Select(f => f.Span), Is.EqualTo(full.Preconditions.Failures.Select(f => f.Span)));
+
+            // A는 다 본다
+            var a = _w.ViewAs("A").Show(full);
+            Assert.That(((EntityValue)a.Arguments!["unit"]).Id, Is.EqualTo(_scout));
+            Assert.That(a.Preconditions!.Requires[0].Slot, Is.EqualTo(full.Preconditions.Requires[0].Slot));
+        }
+
+        [Test]
+        public void AScriptErrorKeepsOnlyItsCodeAndArgumentRejectionsOnlyTheirKind()
+        {
+            NewWorld(ShowDefs);
+            var boom = SubmitAs("B", "Boom", ("party", _b), ("unit", _scout));
+            Assert.That(boom.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(boom.Error!.Message, Does.Contain(_scout.ToString()), "the server log names the scout");
+            var shown = _w.ViewAs("B").Show(boom);
+            Assert.That(shown.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(shown.Error!.Code, Is.EqualTo(boom.Error.Code));
+            Assert.That(shown.Error.Message, Is.EqualTo("script error"));
+            Assert.That(shown.Error.Hint, Is.Null);
+
+            var bad = _w.Submit("B", "banking.Boom", new Dictionary<string, Value>
+            {
+                ["party"] = new EntityValue(_b), ["unit"] = new EntityValue(_a),
+            });
+            Assert.That(bad.Outcome, Is.EqualTo(SubmitOutcome.ArgumentsRejected));
+            var r = _w.ViewAs("B").Show(bad).ArgumentRejections.Single();
+            Assert.That((r.Parameter, r.Path, r.Problem, r.Expected, r.Message),
+                Is.EqualTo(("unit", "unit", bad.ArgumentRejections[0].Problem, bad.ArgumentRejections[0].Expected, "")));
+        }
+
+        [Test]
+        public void AnOpenedQuestionIsShownOnlyToWhoMayAnswerAndReactionsAreLeftOut()
+        {
+            NewWorld(ShowDefs);
+            var mine = SubmitAs("B", "Target", ("party", _b), ("unit", _scout));
+            var q = _w.ViewAs("B").Show(mine).OpenedRequest!;
+            Assert.That(q.Id, Is.EqualTo(mine.OpenedRequest!.Id));
+            Assert.That(((TextValue)q.Title).Args["who"], Is.SameAs(HiddenValue.Instance));
+            Assert.That(q.Choices[0], Is.SameAs(HiddenValue.Instance));
+
+            var poke = SubmitAs("B", "Poke", ("party", _b), ("other", _a));
+            Assert.That(poke.OpenedRequest, Is.Not.Null);
+            Assert.That(_w.ViewAs("B").Show(poke).OpenedRequest, Is.Null, "the question is A's to answer");
+            Assert.That(_w.ViewAs("A").Show(poke).OpenedRequest!.Id, Is.EqualTo(poke.OpenedRequest!.Id));
+
+            // 답의 거절 이유 본문(엔티티 id가 든다)은 빠지고 결과 종류만 남는다
+            var wrong = _w.Answer("B", q.Id, _a, 1);
+            Assert.That(wrong.Message, Is.Not.Null);
+            var shown = _w.ViewAs("B").Show(wrong);
+            Assert.That((shown.Request, shown.Outcome, shown.Message), Is.EqualTo((wrong.Request, wrong.Outcome, (string?)null)));
+            var ok = _w.ViewAs("B").Show(_w.Answer("B", q.Id, _b, 1));
+            Assert.That(ok.Succeeded, Is.True);
+            Assert.That(ok.Reactions, Is.Empty);
+        }
+
+        // ---- 합법 수와 후보 (G202) ----
+
+        private const string MoveDefs =
+            Defs +
+            "@command(free=True, acts_for=lambda party: party)\n" +
+            "def Attack(party: Ref[Party], unit: Ref[Unit]):\n" +
+            "    with preconditions:\n" +
+            "        choose(unit, where=lambda u: u.Owner.party != party)\n" +
+            "    pass\n" +
+            "@command(free=True, acts_for=lambda party: party)\n" +
+            "def Group(party: Ref[Party], units: list[Ref[Unit]]):\n" +
+            "    with preconditions:\n" +
+            "        choose(units, from_=[[u] for u in query(\"Unit\")])\n" +
+            "    pass\n";
+
+        /// <summary>id 순으로 scout(숨김) · u1 · h(숨김) · u2. 모두 A의 유닛이다.</summary>
+        private (EntityId u1, EntityId h, EntityId u2) MoveWorld()
+        {
+            NewWorld(MoveDefs);
+            EntityId Unit(bool hidden)
+            {
+                var u = _w.Create("Scout", new Init(M("Owner", "party"), new EntityValue(_a)));
+                _w.Set(u, M("Fog", "hidden"), hidden ? BoolValue.True : BoolValue.False);
+                return u;
+            }
+            return (Unit(false), Unit(true), Unit(false));
+        }
+
+        private static IEnumerable<EntityId> Units(LegalMoveList list, string parameter) =>
+            list.Moves.Select(m => ((EntityValue)m[parameter]).Id);
+
+        [Test]
+        public void LegalMovesLeaveOutHiddenTargetsAndTheLimitCountsOnlyWhatIsSeen()
+        {
+            var (u1, h, u2) = MoveWorld();
+            var args = new Dictionary<string, Value> { ["party"] = new EntityValue(_b) };
+            var world = _w.LegalMoves("banking.Attack", args, 10);
+            Assert.That(Units(world, "unit"), Is.EqualTo(new[] { _scout, u1, h, u2 }));
+
+            var b = _w.ViewAs("B");
+            Assert.That(Units(b.LegalMoves("banking.Attack", args, 10), "unit"), Is.EqualTo(new[] { u1, u2 }));
+            // 상한 2: 월드는 숨긴 scout가 한 자리를 차지해 잘리지만, B에게는 보이는 둘이 다이고 잘리지 않았다
+            Assert.That(_w.LegalMoves("banking.Attack", args, 2).Truncated, Is.True);
+            var two = b.LegalMoves("banking.Attack", args, 2);
+            Assert.That((Units(two, "unit"), two.Truncated), Is.EqualTo((new[] { u1, u2 }, false)));
+            var one = b.LegalMoves("banking.Attack", args, 1);
+            Assert.That((Units(one, "unit"), one.Truncated), Is.EqualTo((new[] { u1 }, true)));
+
+            // A에게는 자기 유닛이라 모두 보인다(A는 자기 유닛을 공격할 수 없으니 B 쪽 인자로 물어도 같다)
+            Assert.That(Units(_w.ViewAs("A").LegalMoves("banking.Attack", args, 10), "unit"), Is.EqualTo(new[] { _scout, u1, h, u2 }));
+            Assert.That(b.Diagnostics, Is.Empty);
+        }
+
+        [Test]
+        public void CandidatesLeaveOutHiddenEntitiesEvenInsideLists()
+        {
+            var (u1, h, u2) = MoveWorld();
+            var args = new Dictionary<string, Value> { ["party"] = new EntityValue(_b) };
+            var b = _w.ViewAs("B");
+            Assert.That(b.Candidates("banking.Attack", args, "unit").Values.Select(v => ((EntityValue)v).Id), Is.EqualTo(new[] { u1, u2 }));
+
+            var groups = b.Candidates("banking.Group", args, "units").Values;
+            Assert.That(groups.Select(g => ((EntityValue)((ListValue)g).Items.Single()).Id), Is.EqualTo(new[] { u1, u2 }));
+            Assert.That(b.LegalMoves("banking.Group", args, 10).Moves.Select(m => ((EntityValue)((ListValue)m["units"]).Items.Single()).Id),
+                Is.EqualTo(new[] { u1, u2 }));
+        }
+
         /// <summary>못 보는 키 컴포넌트의 줄과 못 보는 엔티티 키는 붙지 않은 컴포넌트·죽은 키와 똑같이 응답한다 (G198).</summary>
         [Test]
         public void HiddenRowsAnswerLikeUnattachedComponentsAndDeadKeys()

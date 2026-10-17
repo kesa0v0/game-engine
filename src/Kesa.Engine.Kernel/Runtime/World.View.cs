@@ -266,6 +266,15 @@ namespace Kesa.Engine.Runtime
             }
         }
 
+        /// <summary>이 연결이 답할 수 있으면 거른 질문, 아니면 null (G200).</summary>
+        private Request? ForMe(Request? q)
+        {
+            if (q == null) return null;
+            foreach (var who in q.Who)
+                if (_world.IsAlive(who) && _world.MayAnswer(Issuer, who, _diagnostics)) return Filtered(q);
+            return null;
+        }
+
         private Request Filtered(Request q)
         {
             var who = new List<EntityId>();
@@ -281,6 +290,147 @@ namespace Kesa.Engine.Runtime
                 TimeoutResponse = q.TimeoutResponse,
             };
         }
+
+        // ---- 제출·답의 결과 ----
+
+        /// <summary>
+        /// 제출 결과를 이 연결에게 보낼 모양으로 (G201). 거부 사유의 문구 인자·대상·인자 안의 못 보는 엔티티는 <see cref="HiddenValue"/>이고
+        /// 그 밖의 값은 모드가 쓴 대로다. 반응 목록은 빠지고, 스크립트 오류는 코드만, 인자 거부는 문제 종류와 매개변수 이름만 남는다.
+        /// 연 질문은 이 연결이 답할 수 있을 때만 있다(G200).
+        /// </summary>
+        public SubmitResult Show(SubmitResult result)
+        {
+            return new SubmitResult(result.Command, result.Issuer, result.Outcome)
+            {
+                Arguments = MaskArguments(result.Arguments),
+                ArgumentRejections = Bare(result.ArgumentRejections),
+                Target = result.Target == null ? null : Mask(result.Target),
+                Preconditions = Show(result.Preconditions),
+                Error = Bare(result.Error),
+                OpenedRequest = ForMe(result.OpenedRequest),
+                SleepsUntil = result.SleepsUntil,
+            };
+        }
+
+        /// <summary>답·응답 결과를 이 연결에게 보낼 모양으로 (G201). 거절 이유 본문(<see cref="AnswerResult.Message"/>)도 빠진다.</summary>
+        public AnswerResult Show(AnswerResult result)
+        {
+            return new AnswerResult(result.Request, result.Issuer, result.Outcome)
+            {
+                Arguments = MaskArguments(result.Arguments),
+                ArgumentRejections = Bare(result.ArgumentRejections),
+                Preconditions = Show(result.Preconditions),
+                Error = Bare(result.Error),
+                OpenedRequest = ForMe(result.OpenedRequest),
+                SleepsUntil = result.SleepsUntil,
+            };
+        }
+
+        // ---- 합법 수와 후보 (G202) ----
+
+        /// <summary>
+        /// 월드의 <see cref="World.Candidates"/>에서 이 연결이 못 보는 엔티티가 든 후보(리스트·딕트 안까지)를 뺀 것. 실제 상태로 평가하므로
+        /// 합법 여부로 드러나는 것은 모드의 설계다. 인자 거절은 <see cref="Show(SubmitResult)"/>처럼 본문이 빠진다.
+        /// </summary>
+        public CandidateList Candidates(string command, IReadOnlyDictionary<string, Value> args, string parameter)
+        {
+            var all = _world.Candidates(command, args, parameter);
+            var values = new List<Value>(all.Values.Count);
+            foreach (var v in all.Values)
+                if (AllSeen(v)) values.Add(v);
+            return new CandidateList(all.Command, all.Parameter, values, all.Needs, Bare(all.Arguments));
+        }
+
+        /// <summary>
+        /// 월드의 <see cref="World.LegalMoves"/>에서 이 연결이 못 보는 엔티티가 든 수를 뺀 것. <paramref name="max"/>와
+        /// <see cref="LegalMoveList.Truncated"/>는 보이는 수만 센다(아니면 "상한보다 적은데 잘림"으로 숨긴 수가 샌다).
+        /// </summary>
+        public LegalMoveList LegalMoves(string command, IReadOnlyDictionary<string, Value> args, int max)
+        {
+            var moves = _world.LegalMoves(command, args, max, move =>
+            {
+                foreach (var v in move.Values)
+                    if (!AllSeen(v)) return false;
+                return true;
+            });
+            return new LegalMoveList(moves.Command, moves.Moves, moves.Truncated, Bare(moves.Arguments));
+        }
+
+        /// <summary>값 안의 살아 있는 엔티티가 모두 보이는가.</summary>
+        private bool AllSeen(Value value)
+        {
+            switch (value)
+            {
+                case EntityValue _:
+                    return !IsUnseenEntity(value);
+                case ListValue list:
+                    foreach (var item in list.Items)
+                        if (!AllSeen(item)) return false;
+                    return true;
+                case DictValue dict:
+                    foreach (var item in dict.Items)
+                        if (!AllSeen(item.Key) || !AllSeen(item.Value)) return false;
+                    return true;
+            }
+            return true;
+        }
+
+        private PreconditionReport? Show(PreconditionReport? report)
+        {
+            if (report == null) return null;
+            var requires = new List<RequireOutcome>(report.Requires.Count);
+            foreach (var r in report.Requires) requires.Add(Show(r));
+            return new PreconditionReport(report.Command, Bare(report.Arguments), requires);
+        }
+
+        private RequireOutcome Show(RequireOutcome r)
+        {
+            switch (r.Kind)
+            {
+                case PreconditionKind.Choose:
+                    return r;
+                case PreconditionKind.Cost:
+                    // 칸(#3.Treasury.gold)의 엔티티나 컴포넌트를 못 보면 칸과 가진 양은 없는 것이다 (G198). 필요한 양은 모드가 쓴 식이다
+                    if (r.Slot != null && !SeesSlot(r.Slot))
+                        return RequireOutcome.Cost(r.Status, null, r.Have == null ? null : HiddenValue.Instance, r.Need, r.Span);
+                    return r;
+            }
+            var args = new SortedDictionary<string, Value>(System.StringComparer.Ordinal);
+            foreach (var pair in r.Args) args[pair.Key] = Mask(pair.Value);
+            return new RequireOutcome(r.Status, r.MessageKey, args, r.Span);
+        }
+
+        /// <summary><c>SlotName</c>의 모양 <c>#id.Component[key].field</c>에서 엔티티와 컴포넌트를 읽어 본다.</summary>
+        private bool SeesSlot(string slot)
+        {
+            int dot = slot.IndexOf('.');
+            if (dot < 2 || slot[0] != '#' || !long.TryParse(slot.Substring(1, dot - 1), System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var id))
+                return false;
+            int end = slot.IndexOfAny(new[] { '.', '[' }, dot + 1);
+            var component = end < 0 ? slot.Substring(dot + 1) : slot.Substring(dot + 1, end - dot - 1);
+            var entity = new EntityId(id);
+            return !_world.IsAlive(entity) || Sees(entity, component);
+        }
+
+        private IReadOnlyDictionary<string, Value>? MaskArguments(IReadOnlyDictionary<string, Value>? args)
+        {
+            if (args == null) return null;
+            var masked = new SortedDictionary<string, Value>(System.StringComparer.Ordinal);
+            foreach (var pair in args) masked[pair.Key] = Mask(pair.Value);
+            return masked;
+        }
+
+        private static IReadOnlyList<ArgumentRejection> Bare(IReadOnlyList<ArgumentRejection> rejections)
+        {
+            if (rejections.Count == 0) return rejections;
+            var bare = new List<ArgumentRejection>(rejections.Count);
+            foreach (var r in rejections) bare.Add(new ArgumentRejection(r.Parameter, r.Parameter, r.Problem, r.Expected, ""));
+            return bare;
+        }
+
+        private static WorldException? Bare(WorldException? error) =>
+            error == null ? null : new WorldException(error.Code, "script error");
 
         // ---- 값 거르기 ----
 
