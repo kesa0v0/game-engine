@@ -22,8 +22,14 @@ namespace Kesa.Engine.Script
     /// 오류는 <see cref="ScriptRuntimeException"/>이고 오류가 난 식의 위치와 호출 흔적이 붙는다.
     /// 호스트가 읽기 도중 다시 <see cref="Run"/>을 불러도 된다: 호출 체인은 새로 시작하고, 단계는 넘겨준
     /// <see cref="StepMeter"/>가 있으면 이어서 센다.
+    /// <para>
+    /// 구조 (G226): ① 풀기 — 함수마다 지역 변수 칸 배치(<see cref="FrameLayout"/>), 연산자 번호(<see cref="Operators"/>). ② 값 연산
+    /// (<see cref="PureOps"/>). ④ 프레임의 지역 변수는 칸 배열(<see cref="LocalTable"/>). ⑥ 멈춘 실행은 블록 자료(문장 경로)이고 저장 형식은 그대로다.
+    /// ⑦ 실행 — 식과 문장을 칸 배치에서 풀어 만든 실행 노드(<c>PureEvaluator.Nodes.cs</c>, <c>PureEvaluator.Statements.cs</c>)가 계산한다.
+    /// 나중에 바이트코드로 바꾸면 ⑦만 새로 쓴다.
+    /// </para>
     /// </summary>
-    public sealed class PureEvaluator
+    public sealed partial class PureEvaluator
     {
         /// <summary>한 번의 실행에 주는 기본 단계 수. 정할 근거 자료가 아직 없어 넉넉하게 둔다 (G101).</summary>
         public const int DefaultStepBudget = 100_000;
@@ -179,50 +185,50 @@ namespace Kesa.Engine.Script
             public string Origin => Frames[0].Function.Name;
         }
 
-        /// <summary>이름 자리의 캐시 (<see cref="NameExpr.Cache"/>): 어느 실행기·모드에서 어느 지역 이름 집합일 때 찾은 전역·내장 값인가.</summary>
+        /// <summary>
+        /// 이름 자리의 풀이 (<see cref="NameExpr.Cache"/>): 어느 칸 배치에서 지역 칸 몇 번인가, 아니면(<see cref="Slot"/> -1) 어느 실행기·모드에서
+        /// 찾은 전역·내장 값인가.
+        /// </summary>
         private sealed class NameSite
         {
-            public NameSite(PureEvaluator owner, string mod, SortedSet<string> localNames, Value value)
+            public NameSite(FrameLayout layout, int slot, PureEvaluator? owner, string? mod, Value? value)
             {
+                Layout = layout;
+                Slot = slot;
                 Owner = owner;
                 Mod = mod;
-                LocalNames = localNames;
                 Value = value;
             }
 
-            public PureEvaluator Owner { get; }
-            public string Mod { get; }
-            public SortedSet<string> LocalNames { get; }
-            public Value Value { get; }
+            public FrameLayout Layout { get; }
+            public int Slot { get; }
+            public PureEvaluator? Owner { get; }
+            public string? Mod { get; }
+            public Value? Value { get; }
         }
-
-        /// <summary><c>def</c>마다 지역 변수 이름 (한 번 계산해 둔다).</summary>
-        private readonly Dictionary<FunctionDef, SortedSet<string>> _localNames = new Dictionary<FunctionDef, SortedSet<string>>();
 
         /// <summary>이 실행기의 내장 함수 표 (저장이 내장 함수 값을 이름으로 적고 다시 찾는다).</summary>
         internal IReadOnlyDictionary<string, Value> Builtins => _builtins;
 
-        /// <summary>불러온 멈춘 실행의 프레임 (저장, spec S8). 지역 변수 이름 전체는 함수 정의에서 다시 계산한다.</summary>
-        internal Frame NewFrame(FunctionValue function, LocalTable locals) =>
-            new Frame(function, locals, LocalNamesOf(function.Definition!));
+        /// <summary>불러온 멈춘 실행의 빈 프레임 (저장, spec S8). 칸 배치는 함수 정의에서 다시 계산한다.</summary>
+        internal Frame NewFrame(FunctionValue function) =>
+            new Frame(function, new LocalTable(LayoutOf(function.Definition!)));
 
-        private SortedSet<string> LocalNamesOf(FunctionDef def)
-        {
-            if (!_localNames.TryGetValue(def, out var names))
-            {
-                names = FunctionLocals.Of(def);
-                _localNames.Add(def, names);
-            }
-            return names;
-        }
+        /// <summary>
+        /// <c>def</c>의 지역 변수 칸 배치. AST에만 기대므로 함수 정의에 한 번 둔다: 같은 콘텐츠를 쓰는 여러 월드가 같은 배치와 실행 노드를 나눠 쓴다.
+        /// </summary>
+        private static FrameLayout LayoutOf(FunctionDef def) =>
+            (FrameLayout)(def.Layout ??= new FrameLayout(FunctionLocals.Of(def)));
 
+        /// <summary>붙잡은 이름 공간 없이 불린 람다의 칸 배치 (매개변수만).</summary>
+        private static FrameLayout BareLambdaLayout(LambdaExpr lambda) =>
+            (FrameLayout)(lambda.Layout ??= new FrameLayout(FunctionLocals.Parameters(lambda.Parameters)));
         internal sealed class Frame
         {
-            public Frame(FunctionValue function, LocalTable locals, SortedSet<string> localNames)
+            public Frame(FunctionValue function, LocalTable locals)
             {
                 Function = function;
                 Locals = locals;
-                LocalNames = localNames;
             }
 
             /// <summary>
@@ -230,7 +236,7 @@ namespace Kesa.Engine.Script
             /// </summary>
             public Frame Copy()
             {
-                var copy = new Frame(Function, Locals.Clone(), LocalNames)
+                var copy = new Frame(Function, Locals.Clone())
                 {
                     CallSite = CallSite,
                     Writable = Writable,
@@ -241,13 +247,33 @@ namespace Kesa.Engine.Script
                 return copy;
             }
 
-            public FunctionValue Function { get; }
-            public LocalTable Locals { get; }
+            public FunctionValue Function { get; private set; }
+            public LocalTable Locals { get; private set; }
+
+            /// <summary>다시 쓰는 프레임을 새 호출로 채운다.</summary>
+            public void Reuse(FunctionValue function, LocalTable locals)
+            {
+                Function = function;
+                Locals = locals;
+            }
+
+            /// <summary>끝난 프레임이 붙잡은 것을 놓는다 (다시 쓰기 전).</summary>
+            public void Release()
+            {
+                Function = null!;
+                Locals = null!;
+                CallSite = default;
+                Writable = false;
+                Result = ResultTo.Host;
+                ResultName = null;
+                Returned = NoneValue.Instance;
+                Blocks.Clear();
+            }
 
             /// <summary>
-            /// 이 함수의 지역 변수 이름 전체 (파이썬 규칙, G104). 여기 든 이름은 값이 아직 없어도 전역·내장으로 넘어가지 않는다.
+            /// 이 함수의 지역 변수 칸 배치 (파이썬 규칙, G104). 여기 든 이름은 값이 아직 없어도 전역·내장으로 넘어가지 않는다.
             /// </summary>
-            public SortedSet<string> LocalNames { get; }
+            public FrameLayout Layout => Locals.Layout;
 
             public SourceSpan CallSite { get; set; }
 
@@ -296,8 +322,37 @@ namespace Kesa.Engine.Script
                 Next = next;
             }
 
-            public IReadOnlyList<Stmt> Body { get; }
+            /// <summary>AST 문장 목록 (저장이 문장 경로를 적고 다시 찾는다).</summary>
+            public IReadOnlyList<Stmt> Body { get; private set; }
+
+            /// <summary>
+            /// <see cref="Body"/>를 이 프레임의 칸 배치에서 풀어 둔 실행 노드 (G226). 실행 고리가 채운다: 불러온 저장의 블록은 처음 실행할 때 찾는다.
+            /// </summary>
+            internal StmtNode[]? Code { get; set; }
+
             public int Next { get; set; }
+
+            /// <summary>다시 쓰는 블록을 새 몸체로 채운다 (나머지는 <see cref="Release"/>가 비웠다).</summary>
+            internal void Reuse(IReadOnlyList<Stmt> body, StmtNode[] code)
+            {
+                Body = body;
+                Code = code;
+            }
+
+            /// <summary>스택에서 내린 블록이 붙잡은 것을 놓는다 (다시 쓰기 전).</summary>
+            internal void Release()
+            {
+                Body = null!;
+                Code = null;
+                Next = 0;
+                Loop = null;
+                While = null;
+                Items = null;
+                Range = null;
+                Live = null;
+                Count = 0;
+                Index = -1;
+            }
 
             /// <summary>이 블록이 <c>for</c>의 몸체면 그 문장.</summary>
             public ForStmt? Loop { get; set; }
@@ -325,6 +380,7 @@ namespace Kesa.Engine.Script
 
             public Block Copy() => new Block(Body, Next)
             {
+                Code = Code,
                 Loop = Loop,
                 While = While,
                 Items = Items,
@@ -335,7 +391,7 @@ namespace Kesa.Engine.Script
             };
         }
 
-        private sealed class Session
+        internal sealed class Session
         {
             private readonly PureEvaluator _owner;
             private readonly List<Frame> _stack = new List<Frame>();
@@ -425,14 +481,14 @@ namespace Kesa.Engine.Script
                 var copies = new List<Frame>(frames.Count);
                 foreach (var frame in frames) copies.Add(frame.Copy());
                 var closures = new Dictionary<ClosureValue, ClosureValue>();
-                var envs = new Dictionary<IReadOnlyDictionary<string, Value>, LocalTable>();
+                var envs = new Dictionary<LocalTable, LocalTable>();
 
-                IReadOnlyDictionary<string, Value> Env(IReadOnlyDictionary<string, Value> captured)
+                LocalTable Env(LocalTable captured)
                 {
                     for (int i = 0; i < frames.Count; i++)
                         if (ReferenceEquals(captured, frames[i].Locals)) return copies[i].Locals;
                     if (envs.TryGetValue(captured, out var copied)) return copied;
-                    copied = new LocalTable();
+                    copied = new LocalTable(captured.Layout);
                     envs.Add(captured, copied); // 채우기 전에 등록한다: 사전이 자기를 잡은 람다를 들 수 있다
                     var names = new SortedSet<string>(StringComparer.Ordinal);
                     foreach (var pair in captured) names.Add(pair.Key);
@@ -449,7 +505,7 @@ namespace Kesa.Engine.Script
                             // 사전을 옮기는 동안 같은 람다를 다시 만날 수 있으니 먼저 만들 자리를 잡을 수 없다: 사전부터 옮긴다
                             var env = Env(closure.Captured);
                             if (closures.TryGetValue(closure, out copy)) return copy;
-                            copy = new ClosureValue(closure.Function, env, closure.CapturedLocals);
+                            copy = new ClosureValue(closure.Function, env);
                             closures.Add(closure, copy);
                             return copy;
                         case ListValue list:
@@ -502,7 +558,7 @@ namespace Kesa.Engine.Script
 
             private static bool HasSpan(ScriptRuntimeException e) => e.Span.Line > 0;
 
-            private ScriptRuntimeException Fail(string code, string message, string? hint = null) =>
+            public ScriptRuntimeException Fail(string code, string message, string? hint = null) =>
                 new ScriptRuntimeException(code, message, hint);
 
             /// <summary>
@@ -510,7 +566,7 @@ namespace Kesa.Engine.Script
             /// 이미 있으면 오류는 안쪽 실행(이 식이 읽은 다른 <c>derived</c>)에서 났으므로, 이 식의 위치는 가장 안쪽
             /// 프레임에 "at …"으로 붙여 어디서 읽었는지 남긴다.
             /// </summary>
-            private void Attach(ScriptRuntimeException e, SourceSpan span)
+            public void Attach(ScriptRuntimeException e, SourceSpan span)
             {
                 if (ReferenceEquals(e.TracedBy, this)) return;
                 e.TracedBy = this;
@@ -526,15 +582,30 @@ namespace Kesa.Engine.Script
                 }
             }
 
-            private void Tick()
+            public PureEvaluator Owner => _owner;
+
+            /// <summary>오류에 노드의 위치를 붙여 돌려준다 (감싸지 않는 노드가 스스로 낸 오류).</summary>
+            public ScriptRuntimeException Placed(ScriptRuntimeException e, ExprNode node)
             {
-                if (++_meter.Used > _meter.Budget)
-                {
-                    throw Fail(Codes.RunBudget, "the function used more than " + _meter.Budget + " evaluation steps",
-                        "a loop may be too large or endless; the budget is shared by everything one read computes, " +
-                        "including the derived values it reads");
-                }
+                Attach(e, node.Span);
+                return e;
             }
+
+            /// <summary>감싸지 않는 노드의 한 단계: 넘치면 그 노드의 위치를 붙인다.</summary>
+            public void Tick(ExprNode node)
+            {
+                if (++_meter.Used > _meter.Budget) throw Placed(BudgetExceeded(), node);
+            }
+
+            public void Tick()
+            {
+                if (++_meter.Used > _meter.Budget) throw BudgetExceeded();
+            }
+
+            private ScriptRuntimeException BudgetExceeded() =>
+                Fail(Codes.RunBudget, "the function used more than " + _meter.Budget + " evaluation steps",
+                    "a loop may be too large or endless; the budget is shared by everything one read computes, " +
+                    "including the derived values it reads");
 
             // ---- 호출 ----
 
@@ -547,9 +618,9 @@ namespace Kesa.Engine.Script
                 switch (function)
                 {
                     case FunctionValue f:
-                        return CallFunction(f, null, null, positional, keywords, site, writable);
+                        return CallFunction(f, null, positional, keywords, site, writable);
                     case ClosureValue c:
-                        return CallFunction(c.Function, c.Captured, c.CapturedLocals, positional, keywords, site, writable);
+                        return CallFunction(c.Function, c.Captured, positional, keywords, site, writable);
                     case PureBuiltin b:
                         if (b.Writes && !writable)
                         {
@@ -587,21 +658,31 @@ namespace Kesa.Engine.Script
                 ReferenceEquals(a.Definition, b.Definition) && ReferenceEquals(a.Lambda, b.Lambda);
 
             /// <summary>C# 쪽에서 끝까지 실행하는 호출 (호스트 실행, 식 안의 호출). 돌려준 값을 받는다.</summary>
-            private Value CallFunction(FunctionValue fn, IReadOnlyDictionary<string, Value>? captured,
-                SortedSet<string>? capturedLocals, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
+            private Value CallFunction(FunctionValue fn, LocalTable? captured,
+                IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
                 bool writable)
             {
                 int depth = _stack.Count;
-                var newFrame = Push(fn, captured, capturedLocals, positional, keywords, site, writable);
+                var newFrame = Push(fn, captured, positional, keywords, site, writable);
                 newFrame.Result = ResultTo.Host;
                 try
                 {
-                    if (fn.Lambda != null) return Eval(fn.Lambda.Body, newFrame);
-                    RunUntil(depth);
-                    // 식 안의 호출은 쓰기 모드가 아니라 ask가 먼저 거부된다: 여기 오면 엔진 결함이다 (G136)
-                    if (_pendingRequest != null)
-                        throw new InvalidOperationException("a call inside an expression stopped at ask()");
-                    return newFrame.Returned;
+                    Value result;
+                    if (fn.Lambda != null)
+                    {
+                        result = Eval(fn.Lambda.Body, newFrame);
+                        _stack.RemoveAt(_stack.Count - 1);
+                    }
+                    else
+                    {
+                        RunUntil(depth);
+                        // 식 안의 호출은 쓰기 모드가 아니라 ask가 먼저 거부된다: 여기 오면 엔진 결함이다 (G136)
+                        if (_pendingRequest != null)
+                            throw new InvalidOperationException("a call inside an expression stopped at ask()");
+                        result = newFrame.Returned;
+                    }
+                    Recycle(newFrame); // 끝까지 실행했다 (오류로 빠져나간 프레임은 다시 쓰지 않는다)
+                    return result;
                 }
                 finally
                 {
@@ -610,8 +691,8 @@ namespace Kesa.Engine.Script
             }
 
             /// <summary>재귀를 검사하고 인자를 묶은 프레임을 스택에 넣는다. <c>def</c>면 몸체 블록에서 시작한다.</summary>
-            private Frame Push(FunctionValue fn, IReadOnlyDictionary<string, Value>? captured,
-                SortedSet<string>? capturedLocals, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
+            private Frame Push(FunctionValue fn, LocalTable? captured,
+                IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
                 bool writable)
             {
                 // 커맨드는 제출로만 실행된다 (G118). 이름으로 잡히지 않은 길(함수 값)의 마지막 방어선
@@ -620,10 +701,10 @@ namespace Kesa.Engine.Script
                     throw Fail(Codes.RunScript, "'" + fn.Name + "' is a " + fn.EntryKind + ", so logic cannot call it",
                         "a command only runs when it is submitted; move the shared part into a plain function (spec-gaps G118)");
                 }
-                var newFrame = Enter(fn, captured, capturedLocals, positional, keywords);
+                var newFrame = Enter(fn, captured, positional, keywords);
                 newFrame.CallSite = site;
                 newFrame.Writable = writable && fn.Writes;
-                if (fn.Definition != null) newFrame.Blocks.Add(new Block(fn.Definition.Body));
+                if (fn.Definition != null) newFrame.Blocks.Add(BodyBlock(fn.Definition, newFrame.Layout));
                 _stack.Add(newFrame);
                 return newFrame;
             }
@@ -651,7 +732,7 @@ namespace Kesa.Engine.Script
                 SourceSpan site, bool runBody, Action? bodyStarts = null)
             {
                 int depth = _stack.Count;
-                var frame = Enter(command, null, null, Array.Empty<Value>(), args);
+                var frame = Enter(command, null, Array.Empty<Value>(), args);
                 frame.CallSite = site;
                 frame.Result = ResultTo.Discard;
                 _stack.Add(frame);
@@ -666,7 +747,7 @@ namespace Kesa.Engine.Script
                         bodyStarts?.Invoke(); // 사전 조건을 통과해 본문이 시작된다: 새 Flow (난수열을 연다, G182)
                         frame.Writable = true;
                         PayCosts();
-                        frame.Blocks.Add(new Block(body, hasBlock ? 1 : 0));
+                        frame.Blocks.Add(BodyBlock(command.Definition!, frame.Layout, hasBlock ? 1 : 0));
                         RunUntil(depth);
                         if (depth == 0) Detach();
                     }
@@ -681,7 +762,7 @@ namespace Kesa.Engine.Script
             public Value ChooseOption(FunctionValue command, IReadOnlyDictionary<string, Value> args, ChooseInfo choose, SourceSpan site)
             {
                 int depth = _stack.Count;
-                var frame = Enter(command, null, null, Array.Empty<Value>(), args);
+                var frame = Enter(command, null, Array.Empty<Value>(), args);
                 frame.CallSite = site;
                 frame.Result = ResultTo.Discard;
                 _stack.Add(frame);
@@ -797,7 +878,7 @@ namespace Kesa.Engine.Script
                     foreach (var earlier in _costs)
                     {
                         if (earlier.Name == slot.Name && PureOps.ValuesEqual((Value)earlier.Owner, (Value)owner))
-                            need = PureOps.Arithmetic("+", need, earlier.Amount);
+                            need = PureOps.Arithmetic(BinaryOp.Add, need, earlier.Amount);
                     }
                     _costs.Add(new CostEntry(owner, slot.Name, amount, call.Span));
                     var status = PureOps.CompareNumbers(have, need) >= 0 ? RequireStatus.Passed : RequireStatus.Failed;
@@ -850,7 +931,7 @@ namespace Kesa.Engine.Script
                 }
             }
 
-            private static readonly IReadOnlyDictionary<string, Value> NoKeywords =
+            public static readonly IReadOnlyDictionary<string, Value> NoKeywords =
                 new SortedDictionary<string, Value>(StringComparer.Ordinal);
 
             /// <summary><c>cost</c>·<c>pay</c>의 칸을 가진 값: 칸 식의 마지막 이름 앞까지를 계산한다 (G186).</summary>
@@ -903,7 +984,7 @@ namespace Kesa.Engine.Script
                     try
                     {
                         var have = cost.Owner.ReadSlot(cost.Name);
-                        ((IRuntimeAssignable)cost.Owner).SetAttribute(cost.Name, PureOps.Arithmetic("-", have, cost.Amount));
+                        ((IRuntimeAssignable)cost.Owner).SetAttribute(cost.Name, PureOps.Arithmetic(BinaryOp.Subtract, have, cost.Amount));
                     }
                     catch (ScriptRuntimeException e)
                     {
@@ -938,7 +1019,7 @@ namespace Kesa.Engine.Script
                 var have = owner.ReadSlot(slot.Name);
                 var amount = Amount("pay", have, Eval(call.Arguments[1].Value, frame));
                 bool enough = PureOps.CompareNumbers(have, amount) >= 0;
-                if (enough) ((IRuntimeAssignable)owner).SetAttribute(slot.Name, PureOps.Arithmetic("-", have, amount));
+                if (enough) ((IRuntimeAssignable)owner).SetAttribute(slot.Name, PureOps.Arithmetic(BinaryOp.Subtract, have, amount));
                 if (target != null) frame.Locals[target] = enough ? BoolValue.True : BoolValue.False;
             }
 
@@ -950,7 +1031,7 @@ namespace Kesa.Engine.Script
                 if (call.Arguments.Count < 2 || !(call.Arguments[1].Value is CallExpr text) ||
                     !(text.Callee is NameExpr name) || name.Name != PureBuiltins.TextName ||
                     _owner._globals.Lookup(_stack[_stack.Count - 1].Function.Mod, PureBuiltins.TextName) != null ||
-                    _stack[_stack.Count - 1].LocalNames.Contains(PureBuiltins.TextName))
+                    _stack[_stack.Count - 1].Layout.Contains(PureBuiltins.TextName))
                     return null;
                 return text.Arguments.Count > 0 && text.Arguments[0].Name == null && text.Arguments[0].Value is StringLiteral s
                     ? s.Value
@@ -958,12 +1039,12 @@ namespace Kesa.Engine.Script
             }
 
             /// <summary>재귀를 검사하고 인자를 매개변수에 묶은 새 프레임을 만든다 (스택에는 아직 넣지 않는다).</summary>
-            private Frame Enter(FunctionValue fn, IReadOnlyDictionary<string, Value>? captured,
-                SortedSet<string>? capturedLocals, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+            private Frame Enter(FunctionValue fn, LocalTable? captured,
+                IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
             {
-                foreach (var frame in _stack)
+                for (int k = 0; k < _stack.Count; k++)
                 {
-                    if (!SameFunction(frame.Function, fn)) continue;
+                    if (!SameFunction(_stack[k].Function, fn)) continue;
                     var chain = new List<string>();
                     bool inChain = false;
                     foreach (var f in _stack)
@@ -983,28 +1064,28 @@ namespace Kesa.Engine.Script
                                                 (parameters.Count == 1 ? "" : "s") + ", got " + positional.Count);
                 }
 
-                var localNames = LocalNamesFor(fn, capturedLocals);
-                var locals = new LocalTable(localNames.Count); // 지역 변수가 몇 개인지 이미 안다
-                if (captured != null) locals.SetAll(captured);
-
-                for (int i = 0; i < positional.Count; i++) locals[parameters[i].Name] = positional[i];
+                var locals = NewLocals(fn, captured);
+                // 인자는 매개변수의 칸에 곧장 넣는다 (칸 번호는 배치마다 한 번 정한다)
+                var slots = locals.Layout.SlotsOf(parameters);
+                for (int i = 0; i < positional.Count; i++) locals.Set(slots[i], positional[i]);
                 if (keywords.Count == 0)
                 {
                     // 위치 인자만이면(대부분의 호출) 앞에서부터 채워지므로 빠진 것은 그 뒤다: 집합을 만들 필요가 없다
                     if (positional.Count < parameters.Count)
                         throw Fail(Codes.RunScript, fn.Name + "() is missing the argument '" + parameters[positional.Count].Name + "'");
-                    return new Frame(fn, locals, localNames);
+                    return NewFrame(fn, locals);
                 }
                 var bound = new HashSet<string>(StringComparer.Ordinal);
                 for (int i = 0; i < positional.Count; i++) bound.Add(parameters[i].Name);
                 foreach (var pair in keywords)
                 {
-                    bool known = false;
-                    foreach (var p in parameters) known |= p.Name == pair.Key;
-                    if (!known) throw Fail(Codes.RunScript, fn.Name + "() has no parameter '" + pair.Key + "'");
+                    int at = -1;
+                    for (int i = 0; i < parameters.Count && at < 0; i++)
+                        if (parameters[i].Name == pair.Key) at = i;
+                    if (at < 0) throw Fail(Codes.RunScript, fn.Name + "() has no parameter '" + pair.Key + "'");
                     if (!bound.Add(pair.Key))
                         throw Fail(Codes.RunScript, fn.Name + "() got several values for '" + pair.Key + "'");
-                    locals[pair.Key] = pair.Value;
+                    locals.Set(slots[at], pair.Value);
                 }
                 foreach (var p in parameters)
                 {
@@ -1012,23 +1093,56 @@ namespace Kesa.Engine.Script
                         throw Fail(Codes.RunScript, fn.Name + "() is missing the argument '" + p.Name + "'");
                 }
 
-                return new Frame(fn, locals, localNames);
+                return NewFrame(fn, locals);
             }
 
-            private SortedSet<string> LocalNamesFor(FunctionValue fn, SortedSet<string>? capturedLocals)
+            /// <summary>
+            /// 끝난 프레임을 모아 두었다가 다시 쓴다 (부르기마다 프레임과 블록 목록을 새로 만들지 않는다). 끝난 프레임은 아무도 붙잡지 않는다:
+            /// 람다는 프레임이 아니라 지역 변수 표를 잡고, 멈춘 실행은 끝나지 않은 프레임만 든다.
+            /// </summary>
+            private readonly Stack<Frame> _spareFrames = new Stack<Frame>();
+
+            private Frame NewFrame(FunctionValue fn, LocalTable locals)
             {
-                if (fn.Definition != null) return _owner.LocalNamesOf(fn.Definition);
-                // 람다는 대입할 수 없으니 지역 변수는 매개변수와, 만든 함수의 지역 변수다
-                var localNames = FunctionLocals.Parameters(fn.Parameters);
-                if (capturedLocals != null) localNames.UnionWith(capturedLocals);
-                return localNames;
+                if (_spareFrames.Count == 0) return new Frame(fn, locals);
+                var frame = _spareFrames.Pop();
+                frame.Reuse(fn, locals);
+                return frame;
+            }
+
+            /// <summary>끝나서 스택에서 내린 프레임을 다시 쓰도록 돌려준다.</summary>
+            private void Recycle(Frame frame)
+            {
+                frame.Release();
+                _spareFrames.Push(frame);
+            }
+
+            /// <summary>
+            /// 새 프레임의 빈 지역 변수 표. 람다는 대입할 수 없으니 지역 변수는 매개변수와 만든 이름 공간의 지역 변수다: 만든 이름 공간의 표를
+            /// 지금 값 그대로 옮긴다(늦게 묶임, G104).
+            /// </summary>
+            private LocalTable NewLocals(FunctionValue fn, LocalTable? captured)
+            {
+                if (fn.Definition != null) return new LocalTable(LayoutOf(fn.Definition));
+                var lambda = fn.Lambda!;
+                if (captured == null) return new LocalTable(BareLambdaLayout(lambda));
+                if (!captured.Layout.TryChild(lambda, out var layout))
+                    layout = captured.Layout.Child(lambda, ParameterNames(lambda.Parameters));
+                return captured.ChildTable(layout);
+            }
+
+            private static List<string> ParameterNames(IReadOnlyList<Parameter> parameters)
+            {
+                var names = new List<string>(parameters.Count);
+                foreach (var p in parameters) names.Add(p.Name);
+                return names;
             }
 
             // ---- 문장 ----
 
             /// <summary>
             /// 스택이 <paramref name="depth"/>로 줄어들 때까지 맨 위 프레임의 문장을 하나씩 실행한다 (S2 "막힐 때까지 실행").
-            /// 문장 수준의 <c>def</c> 호출은 프레임을 쌓고 이 고리가 이어서 돈다. 식은 재귀로 평가한다.
+            /// 문장 수준의 <c>def</c> 호출은 프레임을 쌓고 이 고리가 이어서 돈다. 식은 실행 노드가 재귀로 평가한다 (G226).
             /// </summary>
             private void RunUntil(int depth)
             {
@@ -1043,12 +1157,14 @@ namespace Kesa.Engine.Script
                     return;
                 }
                 var block = frame.Blocks[frame.Blocks.Count - 1];
-                if (block.Next < block.Body.Count)
+                // 불러온 저장의 블록은 AST 몸체만 든다: 처음 실행할 때 이 프레임의 배치로 푼 것을 찾는다
+                var code = block.Code ??= StmtBuilder.Body(block.Body, frame.Layout);
+                if (block.Next < code.Length)
                 {
-                    Exec(block.Body[block.Next++], frame);
+                    Exec(code[block.Next++], frame);
                     return;
                 }
-                if (!block.IsLoop || !NextIteration(block, frame)) frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
+                if (!block.IsLoop || !NextIteration(block, frame)) PopBlock(frame);
             }
 
             /// <summary>반복의 다음 항목으로 넘어간다. 항목이 더 없으면(<c>while</c>은 조건이 거짓이면) false.</summary>
@@ -1087,103 +1203,92 @@ namespace Kesa.Engine.Script
                     throw;
                 }
                 block.Index++;
-                frame.Locals[block.Loop!.Target.Name] = block.ItemAt(block.Index);
+                frame.Locals.Set(SlotOf(block.Loop!.Target, frame), block.ItemAt(block.Index));
                 block.Next = 0;
                 return true;
             }
 
             /// <summary>맨 위 프레임을 끝내고 돌려준 값을 정해진 곳에 둔다.</summary>
-            private void Finish(Value value)
+            public void Finish(Value value)
             {
                 var frame = _stack[_stack.Count - 1];
                 _stack.RemoveAt(_stack.Count - 1);
-                frame.Blocks.Clear();
+                while (frame.Blocks.Count > 0) PopBlock(frame);
                 switch (frame.Result)
                 {
                     case ResultTo.Host:
-                        frame.Returned = value;
-                        break;
+                        frame.Returned = value; // 부른 C# 쪽이 읽고 나서 돌려준다
+                        return;
                     case ResultTo.Local:
                         _stack[_stack.Count - 1].Locals[frame.ResultName!] = value;
                         break;
                 }
+                Recycle(frame);
             }
 
-            private void Exec(Stmt stmt, Frame frame)
+            /// <summary>문장 하나를 실행한다: 1단계를 쓰고, 오류에는 이 문장의 위치를 붙인다(안쪽 식이 이미 붙였으면 그대로).</summary>
+            private void Exec(StmtNode node, Frame frame)
             {
                 try
                 {
                     Tick();
-                    ExecCore(stmt, frame);
+                    node.Run(this, frame);
                 }
                 catch (ScriptRuntimeException e)
                 {
-                    Attach(e, stmt.Span);
+                    Attach(e, node.Site.Span);
                     throw;
                 }
             }
 
-            private void ExecCore(Stmt stmt, Frame frame)
+            /// <summary>블록 밖의 문장 하나 (사전 조건 블록, <c>choose</c> 후보).</summary>
+            private void Exec(Stmt stmt, Frame frame) => Exec(StmtBuilder.For(stmt, frame.Layout), frame);
+
+            // ---- 블록 ----
+
+            /// <summary>스택에서 내린 블록을 모아 두었다가 다시 쓴다 (내린 블록은 아무도 붙잡지 않는다: 멈춘 실행은 쌓여 있는 블록만 든다).</summary>
+            private readonly Stack<Block> _spareBlocks = new Stack<Block>();
+
+            public Block NewBlock(IReadOnlyList<Stmt> body, StmtNode[] code)
             {
-                switch (stmt)
-                {
-                    case ExprStmt es:
-                        if (es.Expr is CallExpr statementCall) StatementCall(statementCall, frame, null);
-                        else Eval(es.Expr, frame);
-                        return;
-
-                    case AssignStmt assign:
-                        ExecAssign(assign, frame);
-                        return;
-
-                    case IfStmt ifs:
-                        foreach (var branch in ifs.Branches)
-                        {
-                            if (PureOps.Truthy(Eval(branch.Condition, frame)))
-                            {
-                                frame.Blocks.Add(new Block(branch.Body));
-                                return;
-                            }
-                        }
-                        if (ifs.OrElse != null) frame.Blocks.Add(new Block(ifs.OrElse));
-                        return;
-
-                    case ForStmt loop:
-                        StartFor(loop, frame);
-                        return;
-
-                    case WhileStmt loop:
-                        // 끝에 선 빈 몸체를 쌓는다: 첫 조건 검사도 실행 고리가 NextIteration에서 한다
-                        frame.Blocks.Add(new Block(loop.Body) { While = loop, Next = loop.Body.Count });
-                        return;
-
-                    case ReturnStmt ret:
-                        Finish(ret.Value == null ? NoneValue.Instance : Eval(ret.Value, frame));
-                        return;
-
-                    case PassStmt _:
-                        return;
-
-                    case BreakStmt _:
-                        // 가장 안쪽 반복의 몸체까지 걷어 낸다 (반복 밖의 break는 파서가 막는다)
-                        while (!frame.Blocks[frame.Blocks.Count - 1].IsLoop) frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
-                        frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
-                        return;
-
-                    case ContinueStmt _:
-                        while (!frame.Blocks[frame.Blocks.Count - 1].IsLoop) frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
-                        var body = frame.Blocks[frame.Blocks.Count - 1];
-                        body.Next = body.Body.Count;
-                        return;
-                }
-                throw Fail(Codes.RunScript, "this statement is not supported in a logic function");
+                if (_spareBlocks.Count == 0) return new Block(body) { Code = code };
+                var block = _spareBlocks.Pop();
+                block.Reuse(body, code);
+                return block;
             }
 
+            public void RecycleBlock(Block block)
+            {
+                block.Release();
+                _spareBlocks.Push(block);
+            }
+
+            /// <summary>프레임의 맨 안쪽 블록을 내린다.</summary>
+            public void PopBlock(Frame frame)
+            {
+                var block = frame.Blocks[frame.Blocks.Count - 1];
+                frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
+                RecycleBlock(block);
+            }
+
+            /// <summary>함수 본문의 블록 (배치마다 한 번 풀어 둔다).</summary>
+            private Block BodyBlock(FunctionDef def, FrameLayout layout, int next = 0)
+            {
+                var code = (StmtNode[]?)layout.FunctionCode;
+                if (code == null)
+                {
+                    code = StmtBuilder.Body(def.Body, layout);
+                    layout.FunctionCode = code;
+                }
+                var block = NewBlock(def.Body, code);
+                block.Next = next;
+                return block;
+            }
             /// <summary>
             /// 문장 수준의 호출: 한 줄 전체(<paramref name="target"/> 없음)이거나 이름 대입의 오른쪽 전체 (G117·G135).
             /// <c>def</c>는 프레임을 쌓고 돌아가 실행 고리가 이어서 실행한다. 람다·내장은 그 자리에서 값을 낸다.
             /// </summary>
-            private void StatementCall(CallExpr call, Frame frame, string? target)
+            public void StatementCall(CallExpr call, Frame frame, string? target)
             {
                 if (call.Callee is NameExpr name && LookupName(name, frame) is PureBuiltin pay && pay.Name == PureBuiltins.PayName)
                 {
@@ -1193,7 +1298,7 @@ namespace Kesa.Engine.Script
                 var (callee, positional, keywords) = CallParts(call, frame);
                 if (callee is FunctionValue fn && fn.Definition != null)
                 {
-                    var called = Push(fn, null, null, positional, keywords, call.Span, frame.Writable);
+                    var called = Push(fn, null, positional, keywords, call.Span, frame.Writable);
                     called.Result = target == null ? ResultTo.Discard : ResultTo.Local;
                     called.ResultName = target;
                     return;
@@ -1209,7 +1314,7 @@ namespace Kesa.Engine.Script
                 if (target != null) frame.Locals[target] = value;
             }
 
-            private void ExecAssign(AssignStmt assign, Frame frame)
+            public void ExecAssign(AssignStmt assign, Frame frame)
             {
                 if (assign.Target is AttributeExpr attr)
                 {
@@ -1235,23 +1340,24 @@ namespace Kesa.Engine.Script
                 {
                     // 이름 대입의 오른쪽 전체인 호출은 문장이다: 쓰기 함수의 결과를 받을 수 있다 (G135)
                     if (assign.Value is CallExpr call) StatementCallTraced(call, frame, target.Name);
-                    else frame.Locals[target.Name] = Eval(assign.Value, frame);
+                    else frame.Locals.Set(SlotOf(target, frame), Eval(assign.Value, frame));
                     return;
                 }
 
-                if (!frame.Locals.TryGetValue(target.Name, out var current))
+                int slot = SlotOf(target, frame);
+                var current = frame.Locals.At(slot);
+                if (current == null)
                 {
                     throw Fail(Codes.RunScript, "local variable '" + target.Name + "' is used before it is assigned");
                 }
                 // 파이썬의 리스트 +=는 그 자리에서 고쳐 별칭에도 보인다. 순수 함수의 값은 불변이므로 막는다 (G104)
-                if (assign.Op == "+=" && current is ListValue)
+                if (assign.Compound == BinaryOp.Add && current is ListValue)
                 {
                     throw Fail(Codes.RunScript, "'+=' cannot be used on a list in a logic function",
                         "write " + target.Name + " = " + target.Name + " + [...]: values in logic functions never change in place");
                 }
                 var right = Eval(assign.Value, frame);
-                string op = assign.Op.Substring(0, assign.Op.Length - 1);
-                frame.Locals[target.Name] = Binary(op, current, right);
+                frame.Locals.Set(slot, Binary(assign.Compound, current, right, assign));
             }
 
             /// <summary>
@@ -1282,222 +1388,58 @@ namespace Kesa.Engine.Script
                         ? site.GetAttribute(attr)
                         : ((IRuntimeAttributes)owner).GetAttribute(attr.Name);
                     var right = Eval(assign.Value, frame);
-                    value = Binary(assign.Op.Substring(0, assign.Op.Length - 1), current, right);
+                    value = Binary(assign.Compound, current, right, assign);
                 }
                 if (target is ISiteAssignable siteTarget) siteTarget.SetAttribute(attr, value);
                 else target.SetAttribute(attr.Name, value);
             }
-
-            /// <summary>
-            /// 반복할 항목을 정해 반복 블록을 쌓는다. 항목은 시작할 때 굳는다(목록은 펼치고 range는 그대로 둔다).
-            /// 첫 항목으로 넘어가는 것은 실행 고리가 한다.
-            /// </summary>
-            private void StartFor(ForStmt loop, Frame frame)
-            {
-                var iterable = Eval(loop.Iterable, frame);
-                var block = new Block(loop.Body) { Loop = loop };
-                switch (iterable)
-                {
-                    case ListValue list:
-                        block.Items = list.Items;
-                        break;
-                    case DictValue dict:
-                        var keys = new List<Value>(dict.Items.Count);
-                        foreach (var item in dict.Items) keys.Add(item.Key);
-                        block.Items = keys;
-                        break;
-                    case RangeValue range:
-                        block.Range = range;
-                        break;
-                    case IRuntimeIterable runtime:
-                        block.Items = runtime.Iterate();
-                        block.Live = runtime as IRuntimeLiveCollection;
-                        break;
-                    default:
-                        throw Fail(Codes.RunScript, "'" + iterable.KindName + "' is not iterable",
-                            "loop over a list, a dict or range(...)");
-                }
-                block.Count = block.Range?.Count ?? block.Items!.Count;
-                block.Next = block.Body.Count;
-                frame.Blocks.Add(block);
-            }
-
             // ---- 식 ----
 
-            private Value Eval(Expr expr, Frame frame)
-            {
-                try
-                {
-                    Tick();
-                    return EvalCore(expr, frame);
-                }
-                catch (ScriptRuntimeException e)
-                {
-                    Attach(e, expr.Span);
-                    throw;
-                }
-            }
-
-            private Value EvalCore(Expr expr, Frame frame)
-            {
-                switch (expr)
-                {
-                    case IntLiteral i: return i.Constant;
-                    case FixedLiteral f: return f.Constant;
-                    case StringLiteral s: return s.Constant;
-                    case BoolLiteral b: return b.Value ? BoolValue.True : BoolValue.False;
-                    case NoneLiteral _: return NoneValue.Instance;
-                    case NameExpr name: return LookupName(name, frame);
-
-                    case ListExpr list:
-                        var items = new List<Value>(list.Items.Count);
-                        foreach (var item in list.Items) items.Add(Eval(item, frame));
-                        return new ListValue(items);
-
-                    case DictExpr dict: return EvalDict(dict, frame);
-
-                    case AttributeExpr attr:
-                        var owner = Eval(attr.Target, frame);
-                        if (owner is ISiteAttributes site) return site.GetAttribute(attr);
-                        if (owner is IRuntimeAttributes source) return source.GetAttribute(attr.Name);
-                        throw Fail(Codes.RunScript, "'" + owner.KindName + "' has no attribute '" + attr.Name + "'");
-
-                    case IndexExpr index:
-                        if (index.Indices.Count != 1) throw Fail(Codes.RunScript, "an index takes one value");
-                        return Index(Eval(index.Target, frame), Eval(index.Index, frame));
-
-                    case CallExpr call: return EvalCall(call, frame);
-
-                    case UnaryExpr unary: return EvalUnary(unary, frame);
-                    case BinaryExpr bin: return EvalBinary(bin, frame);
-
-                    case ConditionalExpr cond:
-                        return PureOps.Truthy(Eval(cond.Condition, frame))
-                            ? Eval(cond.WhenTrue, frame)
-                            : Eval(cond.WhenFalse, frame);
-
-                    case LambdaExpr lambda:
-                        // 만든 함수의 지역 변수 자체를 들고 있다가 부를 때 읽는다: 파이썬처럼 늦게 묶인다
-                        return new ClosureValue(new FunctionValue(lambda, frame.Function.Mod), frame.Locals, frame.LocalNames);
-
-                    case ComprehensionExpr comp:
-                        return EvalComprehension(comp, frame);
-                }
-                throw Fail(Codes.RunScript, "this expression is not supported in a logic function");
-            }
+            /// <summary>식 하나를 이 프레임의 칸 배치로 만든 실행 노드로 평가한다 (G226 ⑦).</summary>
+            private Value Eval(Expr expr, Frame frame) => NodeBuilder.For(expr, frame.Layout).Eval(this, frame);
 
             /// <summary>
-            /// 컴프리헨션 (G189). 리스트·제너레이터 식은 리스트를 만들고(제너레이터 식을 받는 사용자 함수는 리스트로 받는다), 딕트는 같은 키면
-            /// 파이썬처럼 처음 자리에 나중 값을 둔다.
+            /// 이름 자리의 풀이 (G226 ①). 이 프레임의 칸 배치에 든 이름이면 칸 번호이고, 아니면 전역·내장이다. 칸 번호는 배치에만 기대므로
+            /// 배치가 처음과 같은 객체면 그대로 쓴다(<c>def</c>는 함수마다 배치 하나). 전역·내장은 실행 중에 바뀌지 않으므로 같은 실행기(내장 표)·
+            /// 같은 모드(전역)면 처음 찾은 값 그대로다.
             /// </summary>
-            private Value EvalComprehension(ComprehensionExpr comp, Frame frame)
+            private NameSite Resolve(NameExpr site, Frame frame)
             {
-                if (comp.Kind == ComprehensionKind.Dict)
-                {
-                    var entries = new List<DictItem>();
-                    var dict = new DictValue(entries);
-                    Comprehend(comp, frame, scope =>
-                    {
-                        var key = Eval(comp.Element, scope);
-                        if (!(key is StrValue) && !(key is IntValue))
-                            throw Fail(Codes.RunScript, "dict keys must be str or int, not " + key.KindName);
-                        var value = Eval(comp.Value!, scope);
-                        int at = entries.FindIndex(e => PureOps.ValuesEqual(e.Key, key));
-                        if (at >= 0) entries[at] = new DictItem(entries[at].Key, value, entries[at].Span);
-                        else entries.Add(new DictItem(key, value, comp.Element.Span));
-                        return true;
-                    });
-                    return dict;
-                }
-                var items = new List<Value>();
-                Comprehend(comp, frame, scope =>
-                {
-                    items.Add(Eval(comp.Element, scope));
-                    return true;
-                });
-                return new ListValue(items);
+                var layout = frame.Layout;
+                if (site.Cache is NameSite cached && ReferenceEquals(cached.Layout, layout) &&
+                    (cached.Slot >= 0 || ReferenceEquals(cached.Owner, _owner) && string.Equals(cached.Mod, frame.Function.Mod)))
+                    return cached;
+                int slot = layout.SlotOf(site.Name);
+                var resolved = slot >= 0
+                    ? new NameSite(layout, slot, null, null, null)
+                    : new NameSite(layout, -1, _owner, frame.Function.Mod, LookupFree(site.Name, frame));
+                site.Cache = resolved;
+                return resolved;
             }
 
-            /// <summary>
-            /// 절을 바깥에서 안쪽으로 돌며 조건을 통과한 조합마다 <paramref name="each"/>를 부른다(거짓을 돌려주면 멈춘다). 반복 변수는 이 식만의
-            /// 이름 공간에 있다: 첫 절의 반복할 것은 바깥에서 계산하고, 그 뒤는 모두 그 이름 공간에서 계산한다(파이썬 3). 안에서 만든 람다는 그
-            /// 이름 공간을 들고 간다(파이썬처럼 마지막 값으로 늦게 묶인다). 한 바퀴마다 단계를 센다 (G101).
-            /// </summary>
-            private void Comprehend(ComprehensionExpr comp, Frame frame, Func<Frame, bool> each)
+            /// <summary>대입할 지역 변수의 칸 (대입하는 이름은 언제나 그 배치에 있다, G104).</summary>
+            private int SlotOf(NameExpr site, Frame frame)
             {
-                var names = new SortedSet<string>(frame.LocalNames, StringComparer.Ordinal);
-                foreach (var clause in comp.Clauses) names.Add(clause.Variable);
-                var scope = new Frame(frame.Function, frame.Locals.Clone(), names)
-                {
-                    CallSite = frame.CallSite,
-                };
-                // 아직 값이 없는 바깥 지역 변수가 반복 변수와 이름이 같으면 위 사본에 없다: 반복이 시작되기 전 읽으면 "대입 전" 오류가 맞다
-                Clause(comp, 0, frame, scope, each);
+                if (site.Cache is NameSite cached && ReferenceEquals(cached.Layout, frame.Layout) && cached.Slot >= 0) return cached.Slot;
+                return Resolve(site, frame).Slot;
             }
 
-            private bool Clause(ComprehensionExpr comp, int index, Frame outer, Frame scope, Func<Frame, bool> each)
-            {
-                if (index == comp.Clauses.Count) return each(scope);
-                var clause = comp.Clauses[index];
-                var iterable = Eval(clause.Iterable, index == 0 ? outer : scope);
-                IReadOnlyList<Value>? items = null;
-                RangeValue? range = null;
-                switch (iterable)
-                {
-                    case ListValue list: items = list.Items; break;
-                    case DictValue dict:
-                        var keys = new List<Value>(dict.Items.Count);
-                        foreach (var item in dict.Items) keys.Add(item.Key);
-                        items = keys;
-                        break;
-                    case RangeValue r: range = r; break;
-                    case IRuntimeIterable runtime: items = runtime.Iterate(); break;
-                    default:
-                        throw Fail(Codes.RunScript, "'" + iterable.KindName + "' is not iterable",
-                            "loop over a list, a dict or range(...)");
-                }
-                long count = range?.Count ?? items!.Count;
-                for (long i = 0; i < count; i++)
-                {
-                    Tick();
-                    scope.Locals[clause.Variable] = range != null ? new IntValue(range.At(i)) : items![(int)i];
-                    bool pass = true;
-                    foreach (var condition in clause.Conditions)
-                    {
-                        if (PureOps.Truthy(Eval(condition, scope))) continue;
-                        pass = false;
-                        break;
-                    }
-                    if (pass && !Clause(comp, index + 1, outer, scope, each)) return false;
-                }
-                return true;
-            }
-
-            /// <summary>
-            /// 자리의 캐시를 쓰는 이름 찾기. 지역 변수가 먼저다. 전역·내장은 실행 중에 바뀌지 않으므로 같은 실행기(내장 표)·같은 모드(전역)이고
-            /// 그 이름이 이 프레임의 지역 변수 이름이 아니면 처음 찾은 값 그대로다. 지역 이름 집합이 처음과 같은 객체면(<c>def</c>는 함수마다 하나)
-            /// 그 확인도 건너뛴다.
-            /// </summary>
             private Value LookupName(NameExpr site, Frame frame)
             {
-                if (frame.Locals.TryGetValue(site.Name, out var local)) return local;
-                if (site.Cache is NameSite cached && ReferenceEquals(cached.Owner, _owner) &&
-                    string.Equals(cached.Mod, frame.Function.Mod) &&
-                    (ReferenceEquals(cached.LocalNames, frame.LocalNames) || !frame.LocalNames.Contains(site.Name)))
-                    return cached.Value;
-                var value = LookupName(site.Name, frame);
-                site.Cache = new NameSite(_owner, frame.Function.Mod, frame.LocalNames, value);
-                return value;
+                var resolved = Resolve(site, frame);
+                if (resolved.Slot < 0) return resolved.Value!;
+                return frame.Locals.At(resolved.Slot) ?? throw Unassigned(site.Name);
             }
 
-            private Value LookupName(string name, Frame frame)
+            // 함수 안 어딘가에서 대입하는 이름은 값이 없어도 지역 변수다: 같은 이름의 전역·내장으로 넘어가지 않는다 (G104)
+            public ScriptRuntimeException Unassigned(string name) =>
+                Fail(Codes.RunScript, "local variable '" + name + "' is used before it is assigned",
+                    "it is assigned somewhere in this function, so it is local everywhere in it; " +
+                    "assign it on every path first, or use a different name");
+
+            /// <summary>지역 변수가 아닌 이름: 모드의 전역, 그다음 내장.</summary>
+            public Value LookupFree(string name, Frame frame)
             {
-                if (frame.Locals.TryGetValue(name, out var local)) return local;
-                // 함수 안 어딘가에서 대입하는 이름은 값이 없어도 지역 변수다: 같은 이름의 전역·내장으로 넘어가지 않는다 (G104)
-                if (frame.LocalNames.Contains(name))
-                    throw Fail(Codes.RunScript, "local variable '" + name + "' is used before it is assigned",
-                        "it is assigned somewhere in this function, so it is local everywhere in it; " +
-                        "assign it on every path first, or use a different name");
                 var global = _owner._globals.Lookup(frame.Function.Mod, name);
                 if (global != null) return global;
                 if (_owner._builtins.TryGetValue(name, out var builtin)) return builtin;
@@ -1507,22 +1449,7 @@ namespace Kesa.Engine.Script
                 throw Fail(Codes.RunScript, "name '" + name + "' is not defined", Suggest.Hint(name, candidates));
             }
 
-            private Value EvalDict(DictExpr dict, Frame frame)
-            {
-                var items = new List<DictItem>(dict.Entries.Count);
-                var result = new DictValue(items);
-                foreach (var entry in dict.Entries)
-                {
-                    var key = Eval(entry.Key, frame);
-                    if (!(key is StrValue) && !(key is IntValue))
-                        throw Fail(Codes.RunScript, "dict keys must be str or int, not " + key.KindName);
-                    if (PureOps.FindKey(result, key) != null) throw Fail(Codes.RunScript, "duplicate dict key");
-                    items.Add(new DictItem(key, Eval(entry.Value, frame), entry.Key.Span));
-                }
-                return result;
-            }
-
-            private Value Index(Value target, Value key)
+            public Value Index(Value target, Value key)
             {
                 switch (target)
                 {
@@ -1545,7 +1472,7 @@ namespace Kesa.Engine.Script
             }
 
             /// <summary><c>x = f(...)</c>의 호출을 <see cref="Eval"/>처럼 단계를 세고 오류 위치를 붙여 실행한다.</summary>
-            private void StatementCallTraced(CallExpr call, Frame frame, string target)
+            public void StatementCallTraced(CallExpr call, Frame frame, string target)
             {
                 try
                 {
@@ -1559,98 +1486,21 @@ namespace Kesa.Engine.Script
                 }
             }
 
-            /// <summary>식 안의 호출: 끝까지 실행해 값을 낸다. 쓰기 함수는 여기서 쓰기 모드가 되지 않는다 (G117·G135).</summary>
-            private Value EvalCall(CallExpr call, Frame frame)
+            /// <summary>문장 수준 호출의 부를 것과 인자 (식 안의 호출과 같은 실행 노드로 계산한다).</summary>
+            private (Value Callee, IReadOnlyList<Value> Positional, IReadOnlyDictionary<string, Value> Keywords) CallParts(CallExpr call, Frame frame)
             {
-                var (callee, positional, keywords) = CallParts(call, frame);
-                return Invoke(callee, positional, keywords, call.Span);
+                var node = (CallNode)NodeBuilder.For(call, frame.Layout);
+                var callee = node.Parts(this, frame, out var positional, out var keywords);
+                return (callee, positional, keywords);
             }
 
-            private (Value Callee, List<Value> Positional, IReadOnlyDictionary<string, Value> Keywords) CallParts(CallExpr call, Frame frame)
-            {
-                var callee = Eval(call.Callee, frame);
-                var positional = new List<Value>(call.Arguments.Count);
-                SortedDictionary<string, Value>? keywords = null; // 키워드 인자가 있을 때만 만든다
-                // any(x for ...)·all(x for ...): 답이 정해지면 멈춘다 (파이썬과 같다, G189). 내장에는 정해진 답을 낼 원소 하나만 넘긴다
-                if (callee is PureBuiltin truth && (truth.Name == PureBuiltins.AnyName || truth.Name == PureBuiltins.AllName) &&
-                    call.Arguments.Count == 1 && call.Arguments[0].Name == null &&
-                    call.Arguments[0].Value is ComprehensionExpr gen && gen.Kind == ComprehensionKind.Generator)
-                {
-                    bool stopOn = truth.Name == PureBuiltins.AnyName;
-                    bool stopped = false;
-                    Comprehend(gen, frame, scope =>
-                    {
-                        if (PureOps.Truthy(Eval(gen.Element, scope)) != stopOn) return true;
-                        stopped = true;
-                        return false;
-                    });
-                    var decided = stopped ? new List<Value> { stopOn ? BoolValue.True : BoolValue.False } : new List<Value>();
-                    positional.Add(new ListValue(decided));
-                    return (callee, positional, NoKeywords);
-                }
-                foreach (var arg in call.Arguments)
-                {
-                    var value = Eval(arg.Value, frame);
-                    if (arg.Name == null) positional.Add(value);
-                    else (keywords ??= new SortedDictionary<string, Value>(StringComparer.Ordinal))[arg.Name] = value;
-                }
-                return (callee, positional, keywords ?? NoKeywords);
-            }
+            /// <param name="site">연산자를 쓴 식이나 복합 대입: 지원하지 않는 연산자의 오류 문구에 원래 글자를 쓴다.</param>
+            public Value Binary(BinaryOp op, Value left, Value right, Node site) =>
+                PureOps.Binary(op, left, right) ??
+                throw Fail(Codes.RunScript, "operator '" + Symbol(site) + "' is not supported in a logic function", "see spec-gaps G96");
 
-            private Value EvalUnary(UnaryExpr unary, Frame frame)
-            {
-                var operand = Eval(unary.Operand, frame);
-                switch (unary.Op)
-                {
-                    case "-": return PureOps.Negate(operand);
-                    case "+": return PureOps.Plus(operand);
-                    case "not": return PureOps.Truthy(operand) ? BoolValue.False : BoolValue.True;
-                }
-                throw Fail(Codes.RunScript, "operator '" + unary.Op + "' is not supported in a logic function");
-            }
-
-            private Value EvalBinary(BinaryExpr bin, Frame frame)
-            {
-                // and / or는 파이썬처럼 결정한 쪽의 피연산자 값을 그대로 돌려주고, 오른쪽은 필요할 때만 평가한다 (G104).
-                if (bin.Op == "and")
-                {
-                    var left = Eval(bin.Left, frame);
-                    return PureOps.Truthy(left) ? Eval(bin.Right, frame) : left;
-                }
-                if (bin.Op == "or")
-                {
-                    var left = Eval(bin.Left, frame);
-                    return PureOps.Truthy(left) ? left : Eval(bin.Right, frame);
-                }
-                return Binary(bin.Op, Eval(bin.Left, frame), Eval(bin.Right, frame));
-            }
-
-            private Value Binary(string op, Value left, Value right)
-            {
-                switch (op)
-                {
-                    case "==": return PureOps.ValuesEqual(left, right) ? BoolValue.True : BoolValue.False;
-                    case "!=": return PureOps.ValuesEqual(left, right) ? BoolValue.False : BoolValue.True;
-                    case "<":
-                    case "<=":
-                    case ">":
-                    case ">=":
-                        return PureOps.Ordering(op, left, right);
-                    case "in": return PureOps.Contains(right, left) ? BoolValue.True : BoolValue.False;
-                    case "not in": return PureOps.Contains(right, left) ? BoolValue.False : BoolValue.True;
-                    case "is": return right is NoneValue && left is NoneValue ? BoolValue.True : BoolValue.False;
-                    case "is not": return right is NoneValue && left is NoneValue ? BoolValue.False : BoolValue.True;
-                    case "+":
-                    case "-":
-                    case "*":
-                    case "/":
-                    case "//":
-                    case "%":
-                        return PureOps.Arithmetic(op, left, right);
-                }
-                throw Fail(Codes.RunScript, "operator '" + op + "' is not supported in a logic function",
-                    "see spec-gaps G96");
-            }
+            private static string Symbol(Node site) =>
+                site is AssignStmt assign ? assign.Op.Substring(0, assign.Op.Length - 1) : ((BinaryExpr)site).Op;
         }
     }
 }

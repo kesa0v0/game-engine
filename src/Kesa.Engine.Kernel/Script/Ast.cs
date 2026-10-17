@@ -16,6 +16,11 @@ namespace Kesa.Engine.Script
     public abstract class Expr : Node
     {
         protected Expr(SourceSpan span) : base(span) { }
+
+        /// <summary>
+        /// 이 식을 칸 배치 하나에서 풀어 만든 실행 노드 (G226). 실행기만 채우고 읽으며, 쓸 때마다 배치가 처음과 같은 객체인지 확인한다.
+        /// </summary>
+        internal object? Compiled { get; set; }
     }
 
     public sealed class NameExpr : Expr
@@ -176,11 +181,15 @@ namespace Kesa.Engine.Script
         {
             Op = op;
             Operand = operand;
+            Operator = Operators.Unary(op);
         }
 
         /// <summary>"-", "+", "~", "not"</summary>
         public string Op { get; }
         public Expr Operand { get; }
+
+        /// <summary><see cref="Op"/>의 번호 (G226 ①).</summary>
+        internal UnaryOp Operator { get; }
     }
 
     public sealed class BinaryExpr : Expr
@@ -190,12 +199,16 @@ namespace Kesa.Engine.Script
             Op = op;
             Left = left;
             Right = right;
+            Operator = Operators.Binary(op);
         }
 
         /// <summary>산술·비트·비교·논리 연산자. "not in", "is not"은 공백 하나로 잇는다.</summary>
         public string Op { get; }
         public Expr Left { get; }
         public Expr Right { get; }
+
+        /// <summary><see cref="Op"/>의 번호 (G226 ①).</summary>
+        internal BinaryOp Operator { get; }
     }
 
     /// <summary><c>참일때 if 조건 else 거짓일때</c>.</summary>
@@ -296,6 +309,11 @@ namespace Kesa.Engine.Script
     public abstract class Stmt : Node
     {
         protected Stmt(SourceSpan span) : base(span) { }
+
+        /// <summary>
+        /// 이 문장을 칸 배치 하나에서 풀어 만든 실행 노드 (G226). 실행기만 채우고 읽으며, 쓸 때마다 배치가 처음과 같은 객체인지 확인한다.
+        /// </summary>
+        internal object? Compiled { get; set; }
     }
 
     public sealed class ExprStmt : Stmt
@@ -311,6 +329,7 @@ namespace Kesa.Engine.Script
             Target = target;
             Op = op;
             Value = value;
+            Compound = Operators.Compound(op);
         }
 
         public Expr Target { get; }
@@ -318,6 +337,9 @@ namespace Kesa.Engine.Script
         /// <summary>"=" 또는 복합 대입 연산자 ("+=" 등).</summary>
         public string Op { get; }
         public Expr Value { get; }
+
+        /// <summary>복합 대입의 연산자 번호 (<c>+=</c>면 더하기). <c>=</c>면 <see cref="BinaryOp.Unsupported"/>다 (G226 ①).</summary>
+        internal BinaryOp Compound { get; }
     }
 
     public sealed class Parameter
@@ -352,6 +374,9 @@ namespace Kesa.Engine.Script
 
         public IReadOnlyList<Parameter> Parameters { get; }
         public Expr Body { get; }
+
+        /// <summary>이 함수의 지역 변수 칸 배치 (실행기가 처음 부를 때 채운다, G226).</summary>
+        internal object? Layout { get; set; }
     }
 
     /// <summary>
@@ -404,6 +429,9 @@ namespace Kesa.Engine.Script
         public IReadOnlyList<Parameter> Parameters { get; }
         public Expr? Returns { get; }
         public IReadOnlyList<Stmt> Body { get; }
+
+        /// <summary>이 함수의 지역 변수 칸 배치 (실행기가 처음 부를 때 채운다, G226).</summary>
+        internal object? Layout { get; set; }
     }
 
     /// <summary>

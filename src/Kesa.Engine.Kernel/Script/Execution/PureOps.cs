@@ -60,9 +60,42 @@ namespace Kesa.Engine.Script
 
         // ---- 산술 ----
 
-        public static Value Arithmetic(string op, Value left, Value right)
+        /// <summary>
+        /// 값 둘의 이항 연산 (<c>and</c>·<c>or</c>는 오른쪽을 늦게 평가하므로 실행기가 한다). 지원하지 않는 연산자면 null이고, 문구는 원래 글자를
+        /// 아는 부른 쪽이 만든다.
+        /// </summary>
+        public static Value? Binary(BinaryOp op, Value left, Value right)
         {
-            if (op == "+")
+            switch (op)
+            {
+                case BinaryOp.Equal: return ValuesEqual(left, right) ? BoolValue.True : BoolValue.False;
+                case BinaryOp.NotEqual: return ValuesEqual(left, right) ? BoolValue.False : BoolValue.True;
+                case BinaryOp.Less:
+                case BinaryOp.LessEqual:
+                case BinaryOp.Greater:
+                case BinaryOp.GreaterEqual:
+                    return Ordering(op, left, right);
+                case BinaryOp.In: return Contains(right, left) ? BoolValue.True : BoolValue.False;
+                case BinaryOp.NotIn: return Contains(right, left) ? BoolValue.False : BoolValue.True;
+                case BinaryOp.Is: return right is NoneValue && left is NoneValue ? BoolValue.True : BoolValue.False;
+                case BinaryOp.IsNot: return right is NoneValue && left is NoneValue ? BoolValue.False : BoolValue.True;
+                case BinaryOp.Add:
+                case BinaryOp.Subtract:
+                case BinaryOp.Multiply:
+                case BinaryOp.Divide:
+                case BinaryOp.FloorDivide:
+                case BinaryOp.Modulo:
+                    return Arithmetic(op, left, right);
+            }
+            return null;
+        }
+
+        public static Value Arithmetic(BinaryOp op, Value left, Value right)
+        {
+            // 가장 흔한 정수끼리는 형 검사 한 번으로 끝낸다
+            if (left is IntValue a && right is IntValue b && op != BinaryOp.Divide) return IntArithmetic(op, a.Value, b.Value);
+
+            if (op == BinaryOp.Add)
             {
                 if (left is StrValue ls && right is StrValue rs) return new StrValue(ls.Value + rs.Value);
                 if (left is ListValue ll && right is ListValue rl)
@@ -76,13 +109,11 @@ namespace Kesa.Engine.Script
 
             if (!IsNumber(left) || !IsNumber(right))
             {
-                throw TypeError("unsupported operand types for '" + op + "': " + left.KindName + " and " + right.KindName,
-                    ListHint(left) ?? ListHint(right));
+                throw TypeError("unsupported operand types for '" + Operators.Symbol(op) + "': " + left.KindName + " and " +
+                                right.KindName, ListHint(left) ?? ListHint(right));
             }
 
-            if (op == "/") return Divide(left, right);
-
-            if (left is IntValue a && right is IntValue b) return IntArithmetic(op, a.Value, b.Value);
+            if (op == BinaryOp.Divide) return Divide(left, right);
             return FixedArithmetic(op, ToFixed(left), ToFixed(right));
         }
 
@@ -95,49 +126,49 @@ namespace Kesa.Engine.Script
             return new FixedValue(result);
         }
 
-        private static Value IntArithmetic(string op, long a, long b)
+        private static Value IntArithmetic(BinaryOp op, long a, long b)
         {
             long result;
             bool ok;
             switch (op)
             {
-                case "+": ok = FixedMath.TryAdd(a, b, out result); break;
-                case "-": ok = FixedMath.TrySubtract(a, b, out result); break;
-                case "*": ok = FixedMath.TryMultiply(a, b, out result); break;
-                case "//":
+                case BinaryOp.Add: ok = FixedMath.TryAdd(a, b, out result); break;
+                case BinaryOp.Subtract: ok = FixedMath.TrySubtract(a, b, out result); break;
+                case BinaryOp.Multiply: ok = FixedMath.TryMultiply(a, b, out result); break;
+                case BinaryOp.FloorDivide:
                     if (b == 0) throw ArithmeticError("division by zero");
                     ok = FixedMath.TryFloorDivide(a, b, out result);
                     break;
-                case "%":
+                case BinaryOp.Modulo:
                     if (b == 0) throw ArithmeticError("modulo by zero");
                     ok = FixedMath.TryFloorModulo(a, b, out result);
                     break;
-                default: throw TypeError("operator '" + op + "' is not supported");
+                default: throw TypeError("operator '" + Operators.Symbol(op) + "' is not supported");
             }
-            if (!ok) throw ArithmeticError("integer overflow in '" + op + "'");
+            if (!ok) throw ArithmeticError("integer overflow in '" + Operators.Symbol(op) + "'");
             return new IntValue(result);
         }
 
-        private static Value FixedArithmetic(string op, Fixed a, Fixed b)
+        private static Value FixedArithmetic(BinaryOp op, Fixed a, Fixed b)
         {
             Fixed result;
             bool ok;
             switch (op)
             {
-                case "+": ok = FixedMath.TryAdd(a, b, out result); break;
-                case "-": ok = FixedMath.TrySubtract(a, b, out result); break;
-                case "*": ok = FixedMath.TryMultiply(a, b, out result); break;
-                case "//":
+                case BinaryOp.Add: ok = FixedMath.TryAdd(a, b, out result); break;
+                case BinaryOp.Subtract: ok = FixedMath.TrySubtract(a, b, out result); break;
+                case BinaryOp.Multiply: ok = FixedMath.TryMultiply(a, b, out result); break;
+                case BinaryOp.FloorDivide:
                     if (b.Raw == 0) throw ArithmeticError("division by zero");
                     ok = FixedMath.TryFloorDivide(a, b, out result);
                     break;
-                case "%":
+                case BinaryOp.Modulo:
                     if (b.Raw == 0) throw ArithmeticError("modulo by zero");
                     ok = FixedMath.TryFloorModulo(a, b, out result);
                     break;
-                default: throw TypeError("operator '" + op + "' is not supported");
+                default: throw TypeError("operator '" + Operators.Symbol(op) + "' is not supported");
             }
-            if (!ok) throw ArithmeticError("fixed overflow in '" + op + "'");
+            if (!ok) throw ArithmeticError("fixed overflow in '" + Operators.Symbol(op) + "'");
             return new FixedValue(result);
         }
 
@@ -173,19 +204,19 @@ namespace Kesa.Engine.Script
             throw TypeError("cannot compare " + left.KindName + " and " + right.KindName);
         }
 
-        public static BoolValue Ordering(string op, Value left, Value right)
+        public static BoolValue Ordering(BinaryOp op, Value left, Value right)
         {
             int c;
             if (IsNumber(left) && IsNumber(right)) c = CompareNumbers(left, right);
             else if (left is StrValue ls && right is StrValue rs) c = string.CompareOrdinal(ls.Value, rs.Value);
-            else throw TypeError("'" + op + "' is not supported between " + left.KindName + " and " + right.KindName);
+            else throw TypeError("'" + Operators.Symbol(op) + "' is not supported between " + left.KindName + " and " + right.KindName);
 
             bool result;
             switch (op)
             {
-                case "<": result = c < 0; break;
-                case "<=": result = c <= 0; break;
-                case ">": result = c > 0; break;
+                case BinaryOp.Less: result = c < 0; break;
+                case BinaryOp.LessEqual: result = c <= 0; break;
+                case BinaryOp.Greater: result = c > 0; break;
                 default: result = c >= 0; break;
             }
             return result ? BoolValue.True : BoolValue.False;

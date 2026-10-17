@@ -91,8 +91,6 @@ namespace Kesa.Engine.Runtime
             for (int i = 0; i < writer.Frames.Count && env is JsonNull; i++)
             {
                 if (!ReferenceEquals(closure.Captured, writer.Frames[i].Locals)) continue;
-                if (!ReferenceEquals(closure.CapturedLocals, writer.Frames[i].LocalNames))
-                    throw new InvalidOperationException("engine: a lambda's local names are not its frame's");
                 env = Tag("frame", new JsonNumber(i));
             }
             if (env is JsonNull) env = Tag("env", new JsonNumber(SaveEnv(closure, writer)));
@@ -111,7 +109,7 @@ namespace Kesa.Engine.Runtime
             writer.Envs.Add(entry);
 
             var names = new JsonArray();
-            foreach (var name in closure.CapturedLocals) names.Add(new JsonString(name));
+            foreach (var name in captured.Layout.Names()) names.Add(new JsonString(name));
             entry.Add("names", names);
             var sorted = new SortedSet<string>(StringComparer.Ordinal);
             foreach (var pair in captured) sorted.Add(pair.Key);
@@ -520,7 +518,7 @@ namespace Kesa.Engine.Runtime
                 foreach (var f in frameNodes)
                 {
                     var fn = PausedFunction(f, where, problems);
-                    if (fn != null) frames.Add(Evaluator.NewFrame(fn, new LocalTable()));
+                    if (fn != null) frames.Add(Evaluator.NewFrame(fn));
                 }
                 if (frames.Count != frameNodes.Count)
                 {
@@ -531,15 +529,14 @@ namespace Kesa.Engine.Runtime
                 }
 
                 var envNodes = new List<JsonObject>();
-                var envs = new List<KeyValuePair<SortedDictionary<string, Value>, SortedSet<string>>>();
+                var envs = new List<LocalTable>();
                 foreach (var e in AsArray(Field(obj, "envs"), "envs").Items)
                 {
                     var env = AsObject(e, "an env");
                     var envNames = new SortedSet<string>(StringComparer.Ordinal);
                     foreach (var n in AsArray(Field(env, "names"), "env names").Items) envNames.Add(Text(n, "a local name"));
                     envNodes.Add(env);
-                    envs.Add(new KeyValuePair<SortedDictionary<string, Value>, SortedSet<string>>(
-                        new SortedDictionary<string, Value>(StringComparer.Ordinal), envNames));
+                    envs.Add(new LocalTable(new FrameLayout(envNames)));
                 }
 
                 var closures = RestoreClosures(AsArray(Field(obj, "closures"), "closures"), frames, envs, where, problems);
@@ -547,7 +544,10 @@ namespace Kesa.Engine.Runtime
                 problems.Closures = closures;
                 for (int k = 0; k < envNodes.Count; k++)
                     foreach (var pair in AsObject(Field(envNodes[k], "locals"), "env locals").Members)
-                        envs[k].Key[pair.Key] = LoadScriptValue(pair.Value, where, problems);
+                    {
+                        if (!envs[k].TrySet(pair.Key, LoadScriptValue(pair.Value, where, problems)))
+                            throw new JsonFormatException(where + ": an env holds '" + pair.Key + "', which is not among its names");
+                    }
                 bool broken = false;
                 for (int i = 0; i < frames.Count; i++)
                     broken |= RestoreFrame(frames[i], frameNodes[i], where, problems) == null;
@@ -669,7 +669,7 @@ namespace Kesa.Engine.Runtime
         /// 람다를 찾을 수 없으면 문제로 적고 null.
         /// </summary>
         private List<ClosureValue>? RestoreClosures(JsonArray saved, List<PureEvaluator.Frame> frames,
-            List<KeyValuePair<SortedDictionary<string, Value>, SortedSet<string>>> envs, string where, LoadProblems problems)
+            List<LocalTable> envs, string where, LoadProblems problems)
         {
             var closures = new List<ClosureValue>();
             bool broken = false;
@@ -680,26 +680,23 @@ namespace Kesa.Engine.Runtime
                 var env = AsObject(Field(entry, "env"), "a lambda env");
                 if (env.Members.Count != 1) throw new JsonFormatException("a lambda env should be {\"frame\": i} or {\"env\": i}");
                 long index = Long(env.Members[0].Value, "a lambda env");
-                IReadOnlyDictionary<string, Value> captured;
-                SortedSet<string> names;
+                LocalTable captured;
                 switch (env.Members[0].Key)
                 {
                     case "frame":
                         if (index < 0 || index >= frames.Count) throw new JsonFormatException("a lambda env frame is out of range");
                         captured = frames[(int)index].Locals;
-                        names = frames[(int)index].LocalNames;
                         break;
                     case "env":
                         if (index < 0 || index >= envs.Count) throw new JsonFormatException("a lambda env is out of range");
-                        captured = envs[(int)index].Key;
-                        names = envs[(int)index].Value;
+                        captured = envs[(int)index];
                         break;
                     default:
                         throw new JsonFormatException("a lambda env should be {\"frame\": i} or {\"env\": i}");
                 }
 
                 if (lambda == null) broken = true;
-                else closures.Add(new ClosureValue(new FunctionValue(lambda, mod), captured, names));
+                else closures.Add(new ClosureValue(new FunctionValue(lambda, mod), captured));
             }
             return broken ? null : closures;
         }
@@ -756,7 +753,10 @@ namespace Kesa.Engine.Runtime
             string mod = fn.Mod;
             string name = fn.Name;
             foreach (var pair in AsObject(Field(obj, "locals"), "locals").Members)
-                frame.Locals[pair.Key] = LoadScriptValue(pair.Value, where, problems);
+            {
+                if (!frame.Locals.TrySet(pair.Key, LoadScriptValue(pair.Value, where, problems)))
+                    throw new JsonFormatException(where + ": the paused function '" + mod + "." + name + "' has no local '" + pair.Key + "'");
+            }
 
             string changed = where + ": the function '" + mod + "." + name +
                              "' changed, so the paused position no longer exists";

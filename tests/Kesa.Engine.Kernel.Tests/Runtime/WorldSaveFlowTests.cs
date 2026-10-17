@@ -260,6 +260,17 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
+        public void ASavedLocalThatTheFunctionDoesNotHaveIsACorruptSave()
+        {
+            // 함수 해시가 같으면 지역 변수 이름은 함수의 칸 배치 안에 있다(G226). 밖의 이름은 고친 저장이다
+            string save = Encoding.UTF8.GetString(SaveAfter(1));
+            Assert.That(save, Does.Contain("\"bonus\": "));
+            var result = LoadWith(Encoding.UTF8.GetBytes(save.Replace("\"bonus\": ", "\"bonusx\": ")), Defs);
+            Assert.That(result.Succeeded, Is.False);
+            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Message), Has.Some.Contains("SAV").And.Contains("has no local 'bonusx'"));
+        }
+
+        [Test]
         public void AChangedFunctionThatHoldsASavedLambdaIsRejected()
         {
             // pair는 이미 끝났지만 Flow가 pair 안의 람다를 들고 있다

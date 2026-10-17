@@ -15,7 +15,7 @@ namespace Kesa.Engine.Tests.Script
         [Test]
         public void ItIteratesInOrdinalNameOrder()
         {
-            var t = new LocalTable(1);
+            var t = new LocalTable();
             foreach (var name in new[] { "zeta", "Alpha", "beta", "a", "b2", "b10" }) t[name] = I(name.Length);
             Assert.That(Names(t), Is.EqualTo(new[] { "Alpha", "a", "b10", "b2", "beta", "zeta" }));
             Assert.That(t.Keys, Is.EqualTo(new[] { "Alpha", "a", "b10", "b2", "beta", "zeta" }));
@@ -58,6 +58,40 @@ namespace Kesa.Engine.Tests.Script
             t["count"] = I(1);
             string built = new string(new[] { 'c', 'o', 'u', 'n', 't' });
             Assert.That(t.TryGetValue(built, out var v) && ((IntValue)v).Value == 1, Is.True);
+        }
+
+        [Test]
+        public void AFixedLayoutNumbersItsNamesInOrdinalOrderAndRefusesOthers()
+        {
+            var layout = new FrameLayout(new[] { "zeta", "a", "Beta" });
+            Assert.That(layout.SlotOf("Beta"), Is.EqualTo(0));
+            Assert.That(layout.SlotOf("a"), Is.EqualTo(1));
+            Assert.That(layout.SlotOf("zeta"), Is.EqualTo(2));
+            var t = new LocalTable(layout);
+            t.Set(2, I(1));
+            t.Set(0, I(2));
+            Assert.That(Names(t), Is.EqualTo(new[] { "Beta", "zeta" }));
+            Assert.That(t.At(1), Is.Null);
+            Assert.That(t.TrySet("other", I(3)), Is.False);
+            Assert.That(t.Count, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void AChildTableCarriesTheParentValuesIntoItsOwnSlots()
+        {
+            var parent = new FrameLayout(new[] { "m", "x" });
+            var site = new object();
+            var child = parent.Child(site, new[] { "b", "x" }); // x는 바깥 이름과 같은 칸
+            Assert.That(parent.Child(site, new[] { "ignored" }), Is.SameAs(child));
+            var t = new LocalTable(parent);
+            t["x"] = I(7);
+            var c = t.ChildTable(child);
+            Assert.That(Names(c), Is.EqualTo(new[] { "x" }));
+            Assert.That(((IntValue)c["x"]).Value, Is.EqualTo(7));
+            c["b"] = I(1);
+            c["x"] = I(8);
+            Assert.That(((IntValue)t["x"]).Value, Is.EqualTo(7));
+            Assert.That(child.Names(), Is.EqualTo(new[] { "b", "m", "x" }));
         }
     }
 }

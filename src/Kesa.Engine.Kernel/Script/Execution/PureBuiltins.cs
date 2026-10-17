@@ -301,7 +301,7 @@ namespace Kesa.Engine.Script
                     "write sum([a, b]) to add separate values");
             var items = Operands("sum", new[] { args[0] });
             Value total = args.Count == 2 ? NumberArg("sum", args[1]) : new IntValue(0);
-            foreach (var item in items) total = PureOps.Arithmetic("+", total, NumberArg("sum", item));
+            foreach (var item in items) total = PureOps.Arithmetic(BinaryOp.Add, total, NumberArg("sum", item));
             return total;
         }
     }
