@@ -520,7 +520,7 @@ namespace Kesa.Engine.Runtime
                 foreach (var f in frameNodes)
                 {
                     var fn = PausedFunction(f, where, problems);
-                    if (fn != null) frames.Add(Evaluator.NewFrame(fn, new SortedDictionary<string, Value>(StringComparer.Ordinal)));
+                    if (fn != null) frames.Add(Evaluator.NewFrame(fn, new LocalTable()));
                 }
                 if (frames.Count != frameNodes.Count)
                 {

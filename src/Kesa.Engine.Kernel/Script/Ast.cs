@@ -22,6 +22,12 @@ namespace Kesa.Engine.Script
     {
         public NameExpr(string name, SourceSpan span) : base(span) => Name = name;
         public string Name { get; }
+
+        /// <summary>
+        /// 이 자리에서 이름이 전역·내장으로 풀린 결과 (인라인 캐시). <see cref="AttributeExpr.Cache"/>처럼 실행만 채우고 읽으며, 쓸 때마다
+        /// 같은 실행기·같은 모드이고 그 이름이 지역 변수가 아닌지 확인한다.
+        /// </summary>
+        internal object? Cache { get; set; }
     }
 
     public sealed class IntLiteral : Expr

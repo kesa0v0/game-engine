@@ -54,7 +54,10 @@ namespace Kesa.Engine.Script
         public int Used { get; internal set; }
     }
 
-    /// <summary>함수 본문이 이름을 찾는 모드 최상위 이름 공간 (같은 모드의 함수·상수).</summary>
+    /// <summary>
+    /// 함수 본문이 이름을 찾는 모드 최상위 이름 공간 (같은 모드의 함수·상수). 한 실행기가 사는 동안 같은 (모드, 이름)은 같은 값이어야 한다:
+    /// 실행기가 이름 자리마다 찾은 값을 기억한다(<see cref="NameExpr.Cache"/>). 로드가 끝난 모드 최상위는 바뀌지 않으므로 월드에서는 늘 맞다.
+    /// </summary>
     public interface IScriptGlobals
     {
         Value? Lookup(string mod, string name);

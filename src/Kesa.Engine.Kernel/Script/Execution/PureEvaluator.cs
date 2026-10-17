@@ -28,6 +28,10 @@ namespace Kesa.Engine.Script
         /// <summary>한 번의 실행에 주는 기본 단계 수. 정할 근거 자료가 아직 없어 넉넉하게 둔다 (G101).</summary>
         public const int DefaultStepBudget = 100_000;
 
+        /// <summary>키워드 인자 없음. 읽기만 하므로 하나를 나눠 쓴다(호출마다 빈 사전을 만들지 않는다).</summary>
+        private static readonly IReadOnlyDictionary<string, Value> EmptyKeywords =
+            new SortedDictionary<string, Value>(StringComparer.Ordinal);
+
         private readonly IScriptGlobals _globals;
         private readonly IReadOnlyDictionary<string, Value> _builtins;
         private readonly int _budget;
@@ -49,7 +53,7 @@ namespace Kesa.Engine.Script
             var session = new Session(this, meter ?? new StepMeter(_budget));
             try
             {
-                return session.Invoke(function, args, new SortedDictionary<string, Value>(StringComparer.Ordinal), callSite);
+                return session.Invoke(function, args, EmptyKeywords, callSite);
             }
             catch (ScriptRuntimeException e) when (e.Span.Line <= 0)
             {
@@ -163,6 +167,23 @@ namespace Kesa.Engine.Script
             public string Origin => Frames[0].Function.Name;
         }
 
+        /// <summary>이름 자리의 캐시 (<see cref="NameExpr.Cache"/>): 어느 실행기·모드에서 어느 지역 이름 집합일 때 찾은 전역·내장 값인가.</summary>
+        private sealed class NameSite
+        {
+            public NameSite(PureEvaluator owner, string mod, SortedSet<string> localNames, Value value)
+            {
+                Owner = owner;
+                Mod = mod;
+                LocalNames = localNames;
+                Value = value;
+            }
+
+            public PureEvaluator Owner { get; }
+            public string Mod { get; }
+            public SortedSet<string> LocalNames { get; }
+            public Value Value { get; }
+        }
+
         /// <summary><c>def</c>마다 지역 변수 이름 (한 번 계산해 둔다).</summary>
         private readonly Dictionary<FunctionDef, SortedSet<string>> _localNames = new Dictionary<FunctionDef, SortedSet<string>>();
 
@@ -170,7 +191,7 @@ namespace Kesa.Engine.Script
         internal IReadOnlyDictionary<string, Value> Builtins => _builtins;
 
         /// <summary>불러온 멈춘 실행의 프레임 (저장, spec S8). 지역 변수 이름 전체는 함수 정의에서 다시 계산한다.</summary>
-        internal Frame NewFrame(FunctionValue function, SortedDictionary<string, Value> locals) =>
+        internal Frame NewFrame(FunctionValue function, LocalTable locals) =>
             new Frame(function, locals, LocalNamesOf(function.Definition!));
 
         private SortedSet<string> LocalNamesOf(FunctionDef def)
@@ -185,7 +206,7 @@ namespace Kesa.Engine.Script
 
         internal sealed class Frame
         {
-            public Frame(FunctionValue function, SortedDictionary<string, Value> locals, SortedSet<string> localNames)
+            public Frame(FunctionValue function, LocalTable locals, SortedSet<string> localNames)
             {
                 Function = function;
                 Locals = locals;
@@ -197,7 +218,7 @@ namespace Kesa.Engine.Script
             /// </summary>
             public Frame Copy()
             {
-                var copy = new Frame(Function, new SortedDictionary<string, Value>(Locals, StringComparer.Ordinal), LocalNames)
+                var copy = new Frame(Function, Locals.Clone(), LocalNames)
                 {
                     CallSite = CallSite,
                     Writable = Writable,
@@ -209,7 +230,7 @@ namespace Kesa.Engine.Script
             }
 
             public FunctionValue Function { get; }
-            public SortedDictionary<string, Value> Locals { get; }
+            public LocalTable Locals { get; }
 
             /// <summary>
             /// 이 함수의 지역 변수 이름 전체 (파이썬 규칙, G104). 여기 든 이름은 값이 아직 없어도 전역·내장으로 넘어가지 않는다.
@@ -377,14 +398,14 @@ namespace Kesa.Engine.Script
                 var copies = new List<Frame>(frames.Count);
                 foreach (var frame in frames) copies.Add(frame.Copy());
                 var closures = new Dictionary<ClosureValue, ClosureValue>();
-                var envs = new Dictionary<IReadOnlyDictionary<string, Value>, SortedDictionary<string, Value>>();
+                var envs = new Dictionary<IReadOnlyDictionary<string, Value>, LocalTable>();
 
                 IReadOnlyDictionary<string, Value> Env(IReadOnlyDictionary<string, Value> captured)
                 {
                     for (int i = 0; i < frames.Count; i++)
                         if (ReferenceEquals(captured, frames[i].Locals)) return copies[i].Locals;
                     if (envs.TryGetValue(captured, out var copied)) return copied;
-                    copied = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+                    copied = new LocalTable();
                     envs.Add(captured, copied); // 채우기 전에 등록한다: 사전이 자기를 잡은 람다를 들 수 있다
                     var names = new SortedSet<string>(StringComparer.Ordinal);
                     foreach (var pair in captured) names.Add(pair.Key);
@@ -935,9 +956,8 @@ namespace Kesa.Engine.Script
                                                 (parameters.Count == 1 ? "" : "s") + ", got " + positional.Count);
                 }
 
-                var locals = new SortedDictionary<string, Value>(StringComparer.Ordinal);
-                if (captured != null)
-                    foreach (var pair in captured) locals[pair.Key] = pair.Value;
+                var locals = new LocalTable();
+                if (captured != null) locals.SetAll(captured);
 
                 for (int i = 0; i < positional.Count; i++) locals[parameters[i].Name] = positional[i];
                 if (keywords.Count == 0)
@@ -1137,7 +1157,7 @@ namespace Kesa.Engine.Script
             /// </summary>
             private void StatementCall(CallExpr call, Frame frame, string? target)
             {
-                if (call.Callee is NameExpr name && LookupName(name.Name, frame) is PureBuiltin pay && pay.Name == PureBuiltins.PayName)
+                if (call.Callee is NameExpr name && LookupName(name, frame) is PureBuiltin pay && pay.Name == PureBuiltins.PayName)
                 {
                     Pay(call, frame, target);
                     return;
@@ -1299,7 +1319,7 @@ namespace Kesa.Engine.Script
                     case StringLiteral s: return new StrValue(s.Value);
                     case BoolLiteral b: return b.Value ? BoolValue.True : BoolValue.False;
                     case NoneLiteral _: return NoneValue.Instance;
-                    case NameExpr name: return LookupName(name.Name, frame);
+                    case NameExpr name: return LookupName(name, frame);
 
                     case ListExpr list:
                         var items = new List<Value>(list.Items.Count);
@@ -1379,7 +1399,7 @@ namespace Kesa.Engine.Script
             {
                 var names = new SortedSet<string>(frame.LocalNames, StringComparer.Ordinal);
                 foreach (var clause in comp.Clauses) names.Add(clause.Variable);
-                var scope = new Frame(frame.Function, new SortedDictionary<string, Value>(frame.Locals, StringComparer.Ordinal), names)
+                var scope = new Frame(frame.Function, frame.Locals.Clone(), names)
                 {
                     CallSite = frame.CallSite,
                 };
@@ -1423,6 +1443,23 @@ namespace Kesa.Engine.Script
                     if (pass && !Clause(comp, index + 1, outer, scope, each)) return false;
                 }
                 return true;
+            }
+
+            /// <summary>
+            /// 자리의 캐시를 쓰는 이름 찾기. 지역 변수가 먼저다. 전역·내장은 실행 중에 바뀌지 않으므로 같은 실행기(내장 표)·같은 모드(전역)이고
+            /// 그 이름이 이 프레임의 지역 변수 이름이 아니면 처음 찾은 값 그대로다. 지역 이름 집합이 처음과 같은 객체면(<c>def</c>는 함수마다 하나)
+            /// 그 확인도 건너뛴다.
+            /// </summary>
+            private Value LookupName(NameExpr site, Frame frame)
+            {
+                if (frame.Locals.TryGetValue(site.Name, out var local)) return local;
+                if (site.Cache is NameSite cached && ReferenceEquals(cached.Owner, _owner) &&
+                    string.Equals(cached.Mod, frame.Function.Mod) &&
+                    (ReferenceEquals(cached.LocalNames, frame.LocalNames) || !frame.LocalNames.Contains(site.Name)))
+                    return cached.Value;
+                var value = LookupName(site.Name, frame);
+                site.Cache = new NameSite(_owner, frame.Function.Mod, frame.LocalNames, value);
+                return value;
             }
 
             private Value LookupName(string name, Frame frame)
@@ -1501,11 +1538,11 @@ namespace Kesa.Engine.Script
                 return Invoke(callee, positional, keywords, call.Span);
             }
 
-            private (Value Callee, List<Value> Positional, SortedDictionary<string, Value> Keywords) CallParts(CallExpr call, Frame frame)
+            private (Value Callee, List<Value> Positional, IReadOnlyDictionary<string, Value> Keywords) CallParts(CallExpr call, Frame frame)
             {
                 var callee = Eval(call.Callee, frame);
                 var positional = new List<Value>();
-                var keywords = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+                SortedDictionary<string, Value>? keywords = null; // 키워드 인자가 있을 때만 만든다
                 // any(x for ...)·all(x for ...): 답이 정해지면 멈춘다 (파이썬과 같다, G189). 내장에는 정해진 답을 낼 원소 하나만 넘긴다
                 if (callee is PureBuiltin truth && (truth.Name == PureBuiltins.AnyName || truth.Name == PureBuiltins.AllName) &&
                     call.Arguments.Count == 1 && call.Arguments[0].Name == null &&
@@ -1521,15 +1558,15 @@ namespace Kesa.Engine.Script
                     });
                     var decided = stopped ? new List<Value> { stopOn ? BoolValue.True : BoolValue.False } : new List<Value>();
                     positional.Add(new ListValue(decided));
-                    return (callee, positional, keywords);
+                    return (callee, positional, NoKeywords);
                 }
                 foreach (var arg in call.Arguments)
                 {
                     var value = Eval(arg.Value, frame);
                     if (arg.Name == null) positional.Add(value);
-                    else keywords[arg.Name] = value;
+                    else (keywords ??= new SortedDictionary<string, Value>(StringComparer.Ordinal))[arg.Name] = value;
                 }
-                return (callee, positional, keywords);
+                return (callee, positional, keywords ?? NoKeywords);
             }
 
             private Value EvalUnary(UnaryExpr unary, Frame frame)
