@@ -20,6 +20,50 @@ namespace Kesa.Engine.Runtime
         private IReadOnlyDictionary<string, HostSignature> _hostFunctions =
             new SortedDictionary<string, HostSignature>(StringComparer.Ordinal);
 
+        /// <summary>호스트 함수의 C# 코드가 실행 중인 깊이. 창구를 거치는 동안은 0이다 (G217).</summary>
+        private int _hostDepth;
+
+        /// <summary>
+        /// 호스트 함수 안에서 월드의 공개 쓰기·<c>Submit</c>·<c>Answer</c>·<c>Respond</c>·<c>Advance</c>를 직접 부르면 막는다 (G217).
+        /// 그 순간 스택에 C# 코드가 있는 길은 호스트 함수뿐이다.
+        /// </summary>
+        private void NoHostWrites(string what)
+        {
+            if (_hostDepth > 0)
+                throw new InvalidOperationException("World." + what + " cannot be called from inside a host function; " +
+                                                    "use the HostAccess it was given (spec-gaps G217)");
+        }
+
+        /// <summary>창구가 월드를 부르는 동안: 엔진이 하는 일이라 막기를 푼다.</summary>
+        internal T AsEngine<T>(Func<T> body)
+        {
+            int saved = _hostDepth;
+            _hostDepth = 0;
+            try
+            {
+                return body();
+            }
+            finally
+            {
+                _hostDepth = saved;
+            }
+        }
+
+        /// <summary>창구의 난수: 스크립트 <c>random.이름</c>과 같은 몸체·같은 흐름 (G217).</summary>
+        internal Value HostRandom(string name, params Value[] args)
+        {
+            var none = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+            switch (name)
+            {
+                case "randint": return RandInt(args, none);
+                case "randrange": return RandRange(args, none);
+                case "choice": return Choice(args, none);
+                case "sample": return Sample(args, none);
+                case "random": return RandomFixed(args, none);
+            }
+            throw new ArgumentException("no random function " + name, nameof(name));
+        }
+
         private void AddHostBuiltins(SortedDictionary<string, Value> table)
         {
             var roots = new SortedDictionary<string, HostNamespace>(StringComparer.Ordinal);
@@ -142,15 +186,26 @@ namespace Kesa.Engine.Runtime
             // C# 값으로 (G222)
             var implementation = function.Implementation;
             var types = implementation.GetType().GetMethod("Invoke")!.GetParameters();
-            int skip = function.Effect == HostEffect.Writes ? 1 : 0;
+            int skip = function.TakesAccess ? 1 : 0;
             var args = new object?[types.Length];
-            if (skip == 1) args[0] = new HostAccess();
+            HostReader? access = null;
+            if (skip == 1)
+            {
+                access = function.Effect == HostEffect.Writes ? new HostAccess(this, name) : new HostReader(this, name);
+                args[0] = access;
+            }
             for (int i = 0; i < fitted.Length; i++) args[i + skip] = ToClr(fitted[i], types[i + skip].ParameterType);
 
             object? result;
+            _hostDepth++;
             try
             {
                 result = implementation.DynamicInvoke(args);
+            }
+            catch (TargetInvocationException e) when (e.InnerException is WorldException world)
+            {
+                // 창구가 낸 월드 오류(죽은 엔티티 등)는 스크립트의 같은 읽기·쓰기와 같은 오류다
+                throw new ScriptRuntimeException(world.Code, "in host function " + name + ": " + world.Message, world.Hint, world);
             }
             catch (TargetInvocationException e) when (e.InnerException != null)
             {
@@ -158,6 +213,11 @@ namespace Kesa.Engine.Runtime
                 throw new ScriptRuntimeException(Codes.RunHostFailed,
                     "host function " + name + " failed: " + inner.GetType().Name + ": " + inner.Message,
                     "this is a bug in the game's C# code, not in the mod (spec-gaps G219)", inner);
+            }
+            finally
+            {
+                _hostDepth--;
+                access?.Close();
             }
 
             if (signature.Returns == null) return NoneValue.Instance;

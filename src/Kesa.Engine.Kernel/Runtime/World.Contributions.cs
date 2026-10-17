@@ -64,6 +64,7 @@ namespace Kesa.Engine.Runtime
 
         private long AddContribution(EntityId target, MemberHandle member, RowKey? key, string op, Value value, EntityId? source)
         {
+            NoHostWrites("AddContribution");
             var entity = Record(target);
             if (member.Component == null || member.Kind != MemberKind.Derived)
                 throw new WorldException(Codes.RunNotWritable,
@@ -104,6 +105,7 @@ namespace Kesa.Engine.Runtime
         /// <summary>행 하나를 뗀다. 이미 없으면 오류다.</summary>
         public void RemoveContribution(long id)
         {
+            NoHostWrites("RemoveContribution");
             if (!_contributions.TryGetValue(id, out var row))
                 throw new WorldException(Codes.RunNoRow, "there is no contribution " + id,
                     "it may already have been removed, or its source or target entity died");

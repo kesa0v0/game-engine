@@ -342,6 +342,7 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public AnswerResult Answer(string issuer, long request, EntityId by, long choice)
         {
+            NoHostWrites("Answer");
             var flow = FindFlow(request);
             if (flow == null) return Unknown(issuer, request);
 
@@ -378,6 +379,7 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public AnswerResult Respond(string issuer, long request, string command, IReadOnlyDictionary<string, Value> args)
         {
+            NoHostWrites("Respond");
             if (!_commands.TryGetValue(command, out var decl))
             {
                 throw new WorldException(Codes.RunUnknownName, "there is no command '" + command + "'",

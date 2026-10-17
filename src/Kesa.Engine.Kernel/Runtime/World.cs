@@ -141,6 +141,7 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public EntityId Create(string defId, params Init[] inits)
         {
+            NoHostWrites("Create");
             if (!_defs.TryGet(defId, out var def))
             {
                 var ids = new List<string>();
@@ -224,6 +225,7 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public void Destroy(EntityId id)
         {
+            NoHostWrites("Destroy");
             var entity = Record(id);
             foreach (var component in ComponentsOf(entity)) UnindexRefs(entity, component);
             DropContributionsOf(id.Value);
@@ -284,6 +286,7 @@ namespace Kesa.Engine.Runtime
         /// <summary><c>field</c>·Ref에 쓴다. 타입과 범위가 맞아야 하고(G92), 쓴 값은 Def 값과 같아도 엔티티 값이 된다.</summary>
         public void Set(EntityId id, MemberHandle member, Value value)
         {
+            NoHostWrites("Set");
             var entity = Record(id);
             if (member.Component == null)
                 throw new WorldException(Codes.RunNotWritable, "'" + member.Display + "' is a const of the Def type and cannot be written");
@@ -302,6 +305,7 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public void Add(EntityId id, string componentName, params Init[] inits)
         {
+            NoHostWrites("Add");
             var entity = Record(id);
             var component = ComponentNamed(componentName);
             if (Has(entity, component))
@@ -340,6 +344,7 @@ namespace Kesa.Engine.Runtime
         /// <summary>런타임에 붙인 컴포넌트를 뗀다. Def가 가진 컴포넌트는 뗄 수 없다 (spec S4).</summary>
         public void Remove(EntityId id, string componentName)
         {
+            NoHostWrites("Remove");
             var entity = Record(id);
             var component = ComponentNamed(componentName);
             if (entity.Def.Components.Contains(componentName))
@@ -509,6 +514,7 @@ namespace Kesa.Engine.Runtime
 
         private void SetRow(EntityId id, MemberHandle member, RowKey key, Value value)
         {
+            NoHostWrites("SetRow");
             var entity = Record(id);
             var component = KeyedMember(member);
             if (!FindRow(entity, component, key, out _, out var record)) throw NoRow(id, component, key);
@@ -533,6 +539,7 @@ namespace Kesa.Engine.Runtime
 
         private void AddRow(EntityId id, string componentName, RowKey key, Init[] inits)
         {
+            NoHostWrites("AddRow");
             var entity = Record(id);
             var component = Keyed(ComponentNamed(componentName), key.Kind);
             if (component.KeyKind == KeyKind.Def && component.Keys == KeysMode.All)
@@ -577,6 +584,7 @@ namespace Kesa.Engine.Runtime
 
         private void RemoveRow(EntityId id, string componentName, RowKey key)
         {
+            NoHostWrites("RemoveRow");
             var entity = Record(id);
             var component = Keyed(ComponentNamed(componentName), key.Kind);
             if (component.KeyKind == KeyKind.Def && component.Keys == KeysMode.All)

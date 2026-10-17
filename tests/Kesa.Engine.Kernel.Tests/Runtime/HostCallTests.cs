@@ -63,13 +63,45 @@ namespace Kesa.Engine.Tests.Runtime
             "    n = core.debug.ghost()\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Ghosts(at: Ref[Tile]):\n" +
-            "    n = core.debug.ghosts()\n";
+            "    n = core.debug.ghosts()\n" +
+            // ---- 창구 (G217) ----
+            "@when(lambda t: core.terrain.cost_of(t) >= 5)\n" +
+            "def pricey(t: Ref[Tile]):\n" +
+            "    pass\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def SetCost(at: Ref[Tile], n: int):\n" +
+            "    at.Terrain.cost = n\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def Raise(at: Ref[Tile]):\n" +
+            "    core.terrain.raise_cost(at, 40)\n" +
+            "    at.Terrain.cost = at.Terrain.cost + 2\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def RaiseThenFail(at: Ref[Tile]):\n" +
+            "    core.terrain.raise_cost(at, 40)\n" +
+            "    at.Terrain.cost = \"oops\"\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def Build(at: Ref[Tile]):\n" +
+            "    core.terrain.build()\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def Roll(at: Ref[Tile]):\n" +
+            "    core.terrain.roll(at)\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def Sneak(at: Ref[Tile]):\n" +
+            "    core.debug.sneak(at)\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def SneakSubmit(at: Ref[Tile]):\n" +
+            "    core.debug.sneak_submit()\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def ReadDead(at: Ref[Tile]):\n" +
+            "    n = core.debug.read_dead()\n";
 
         private World _world = null!;
         private EntityId _a, _b, _dead;
         private MemberHandle _cost = null!;
         private readonly List<string> _calls = new List<string>();
         private HostAccess? _access;
+        private HostReader? _reader;
+        private EntityId _built;
 
         [SetUp]
         public void NewWorld()
@@ -94,6 +126,28 @@ namespace Kesa.Engine.Tests.Runtime
             core.Pure("def debug.null() -> list[int]", "", () => (List<long>)null!);
             core.Pure("def debug.ghost() -> Ref[Tile]", "", () => _dead);
             core.Pure("def debug.ghosts() -> list[Ref[Tile]]", "", () => new[] { _a, _dead });
+
+            core.Pure("def terrain.cost_of(t: Ref[Tile]) -> int", "", (HostReader r, EntityId t) =>
+            {
+                _reader = r;
+                return ((IntValue)r.Get(t, r.Member("Terrain", "cost"))).Value;
+            });
+            core.Writes("def terrain.raise_cost(at: Ref[Tile], by: int) -> None", "", (HostAccess a, EntityId at, long by) =>
+            {
+                var cost = a.Member("Terrain", "cost");
+                a.Set(at, cost, new IntValue(((IntValue)a.Get(at, cost)).Value + by));
+            });
+            core.Writes("def terrain.build() -> None", "", (HostAccess a) => { _built = a.Create("Grass"); });
+            core.Writes("def terrain.roll(at: Ref[Tile]) -> None", "", (HostAccess a, EntityId at) =>
+                a.Set(at, a.Member("Terrain", "cost"), new IntValue(a.RandInt(100, 105))));
+            core.Writes("def debug.sneak(at: Ref[Tile]) -> None", "", (HostAccess a, EntityId at) =>
+                _world.Set(at, _world.Member("Terrain", "cost"), new IntValue(99)));
+            core.Writes("def debug.sneak_submit() -> None", "", (HostAccess a) =>
+            {
+                _world.Submit("host", "core.SetCost", new Dictionary<string, Value>());
+            });
+            core.Pure("def debug.read_dead() -> int", "", (HostReader r) =>
+                ((IntValue)r.Get(_dead, r.Member("Terrain", "cost"))).Value);
 
             Mod("core", schema: Schema, defs: Defs);
             var bag = new DiagnosticBag();
@@ -229,6 +283,108 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(r.Error.Message, Does.Contain(
                 "host function core.debug.ghosts returned a value that does not fit its signature list[Ref[\"Tile\"]]: " +
                 "'return[1]' is " + _dead + ", which no longer exists"));
+        }
+
+        // ---- 창구 (G216·G217) ----
+
+        [Test]
+        public void WhatAPureHostFunctionReadsIsTrackedLikeAScriptRead()
+        {
+            // when 조건은 읽은 칸이 바뀔 때만 다시 본다: 창구의 읽기가 기록되지 않으면 반응이 영영 없다
+            var low = Submit("SetCost", Arg("at", _a), ("n", new IntValue(3)));
+            Assert.That(low.Reactions.Where(r => r.Handler.Contains("pricey")), Is.Empty);
+            var high = Submit("SetCost", Arg("at", _a), ("n", new IntValue(9)));
+            Assert.That(high.Reactions.Count(r => r.Handler.Contains("pricey")), Is.EqualTo(1),
+                string.Join("\n", high.Reactions.Select(r => r.Handler)));
+        }
+
+        [Test]
+        public void AWritingHostFunctionWritesThroughItsAccessor()
+        {
+            var r = Submit("Raise", Arg("at", _a));
+            Assert.That(r.Succeeded, Is.True, r.Error?.ToString());
+            // 1 + 40, 그 뒤 스크립트가 쓴 것을 본다: + 2
+            Assert.That(Cost(_a), Is.EqualTo(43));
+        }
+
+        [Test]
+        public void AccessorWritesRollBackWithTheCommand()
+        {
+            var r = Submit("RaiseThenFail", Arg("at", _a));
+            Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(Cost(_a), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TheAccessorCreatesEntities()
+        {
+            int before = _world.All("Tile").Count;
+            Assert.That(Submit("Build", Arg("at", _a)).Succeeded, Is.True);
+            Assert.That(_world.IsAlive(_built), Is.True);
+            Assert.That(_world.All("Tile").Count, Is.EqualTo(before + 1));
+        }
+
+        [Test]
+        public void TheAccessorDrawsFromTheWorldRandomStream()
+        {
+            Assert.That(Submit("Roll", Arg("at", _a)).Succeeded, Is.True);
+            Assert.That(Cost(_a), Is.InRange(100, 105));
+        }
+
+        [Test]
+        public void TheAccessorCannotBeKeptAfterTheCall()
+        {
+            // when 조건이 cost_of를 부르며 창구를 건넨다. 테스트의 구현은 그것을 붙잡아 둔다
+            Submit("SetCost", Arg("at", _a), ("n", new IntValue(4)));
+            Assert.That(_reader, Is.Not.Null);
+            var e = Assert.Throws<InvalidOperationException>(() => _reader!.IsAlive(_a))!;
+            Assert.That(e.Message, Is.EqualTo("the accessor of host function core.terrain.cost_of was used after the call ended; " +
+                                              "do not keep it (spec-gaps G217)"));
+        }
+
+        [Test]
+        public void AHostFunctionCannotWriteTheWorldDirectly()
+        {
+            var r = Submit("Sneak", Arg("at", _a));
+            Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(r.Error!.Code, Is.EqualTo(Codes.RunHostFailed));
+            Assert.That(r.Error.Message, Does.Contain("host function core.debug.sneak failed: InvalidOperationException: " +
+                                                      "World.Set cannot be called from inside a host function; use the HostAccess it was given"));
+            Assert.That(Cost(_a), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AHostFunctionCannotSubmit()
+        {
+            var r = Submit("SneakSubmit", Arg("at", _a));
+            Assert.That(r.Error!.Code, Is.EqualTo(Codes.RunHostFailed));
+            Assert.That(r.Error.Message, Does.Contain("World.Submit cannot be called from inside a host function"));
+        }
+
+        [Test]
+        public void TheWorldIsWritableAgainAfterAHostFunctionFails()
+        {
+            Submit("Sneak", Arg("at", _a));
+            _world.Set(_a, _cost, new IntValue(6));
+            Assert.That(Cost(_a), Is.EqualTo(6));
+        }
+
+        [Test]
+        public void AWorldErrorFromTheAccessorKeepsItsCode()
+        {
+            var r = Submit("ReadDead", Arg("at", _a));
+            Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(r.Error!.Code, Is.EqualTo(Codes.RunDeadEntity));
+            Assert.That(r.Error.Message, Does.Contain("in host function core.debug.read_dead: "));
+        }
+
+        [Test]
+        public void APureFunctionCannotTakeAWritingAccessor()
+        {
+            var e = Assert.Throws<ArgumentException>(() => new HostFunctions().For("core")
+                .Pure("def f() -> int", "", (HostAccess a) => 1L))!;
+            Assert.That(e.Message, Does.StartWith("host function core.f: a pure function reads the world through a HostReader, " +
+                                                  "not a HostAccess"));
         }
     }
 }

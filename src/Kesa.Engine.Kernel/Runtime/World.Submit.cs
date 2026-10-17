@@ -100,6 +100,7 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public SubmitResult Submit(string issuer, string command, IReadOnlyDictionary<string, Value> args)
         {
+            NoHostWrites("Submit");
             if (!_commands.TryGetValue(command, out var decl))
             {
                 throw new WorldException(Codes.RunUnknownName, "there is no command '" + command + "'",

@@ -64,6 +64,7 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public AdvanceResult Advance(int ticks = 1)
         {
+            NoHostWrites("Advance");
             if (ticks < 1) throw new ArgumentOutOfRangeException(nameof(ticks), ticks, "advance needs at least one tick");
             if (_undo != null || _meter != null || _advancing)
                 throw new InvalidOperationException("time cannot advance while a command or a function is running");

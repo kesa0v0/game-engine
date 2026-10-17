@@ -19,17 +19,6 @@ namespace Kesa.Engine.Host
     }
 
     /// <summary>
-    /// 엔티티를 쓰는 호스트 함수가 첫 인자로 받는 접근기 (spec S7). 엔티티 접근은 이것으로만 한다.
-    /// 읽기·쓰기 기능은 아직 없다 (S7 구현 3단계).
-    /// </summary>
-    public sealed class HostAccess
-    {
-        internal HostAccess()
-        {
-        }
-    }
-
-    /// <summary>
     /// 호스트(게임 개발자)가 C# 함수를 스크립트에 내놓는 등록부 (spec S7). 모드를 불러오기 전에 채워
     /// <see cref="ContentLoader.Load"/>에 넘긴다. 이름은 <c>소유모드id.점.경로</c>다 (spec-gaps G218):
     /// <c>host.For("core").Pure("def path.find(...) -> ...", "설명", (EntityId start, ...) => ...)</c>.
@@ -111,8 +100,9 @@ namespace Kesa.Engine.Host
                                             ": " + shorter + " would be both a function and a group of functions",
                     nameof(signature));
             }
-            HostShape.Check(name, header, effect, implementation);
-            _functions.Add(header.Name, new HostFunction(Mod, header.Name, effect, signature, doc, header, implementation));
+            bool takesAccess = HostShape.Check(name, header, effect, implementation);
+            _functions.Add(header.Name, new HostFunction(Mod, header.Name, effect, signature, doc, header, implementation)
+                { TakesAccess = takesAccess });
             return this;
         }
     }
@@ -152,6 +142,9 @@ namespace Kesa.Engine.Host
 
         internal Delegate Implementation { get; }
 
+        /// <summary>첫 매개변수로 창구(<see cref="HostReader"/>·<see cref="HostAccess"/>)를 받는가.</summary>
+        internal bool TakesAccess { get; set; }
+
         /// <summary>서명의 진단 위치에 붙는 파일 이름.</summary>
         internal static string File(string mod, string? path) => "<host " + mod + (path == null ? "" : "." + path) + ">";
     }
@@ -164,16 +157,22 @@ namespace Kesa.Engine.Host
         private const string TypesHint =
             "use int, fixed, bool, str, Ref[X], DefId[X], list[T], dict[K, V] or T | None (spec-gaps G222)";
 
-        public static void Check(string name, FunctionDef header, HostEffect effect, Delegate implementation)
+        /// <returns>첫 매개변수가 창구인가</returns>
+        public static bool Check(string name, FunctionDef header, HostEffect effect, Delegate implementation)
         {
             var names = implementation.Method.GetParameters();
             var types = implementation.GetType().GetMethod("Invoke")!.GetParameters();
-            int skip = effect == HostEffect.Writes ? 1 : 0;
+            // Writes는 오버로드가 HostAccess를 첫 자리에 둔다. 순수 함수는 월드를 읽을 때만 HostReader를 첫 자리에 둔다 (G216·G217)
+            var first = types.Length > 0 ? types[0].ParameterType : null;
+            if (effect == HostEffect.Pure && first == typeof(HostAccess))
+                throw Fail(name, "a pure function reads the world through a HostReader, not a HostAccess; register it with " +
+                                 "Writes if it writes entities");
+            int skip = effect == HostEffect.Writes || first == typeof(HostReader) ? 1 : 0;
             int count = types.Length - skip;
 
             if (count != header.Parameters.Count)
                 throw Fail(name, "the signature takes " + Count(header.Parameters.Count) + ", but the C# function takes " +
-                                 Count(count) + (skip == 1 ? " after the HostAccess" : ""));
+                                 Count(count) + (skip == 1 ? " after the " + Show(first!) : ""));
 
             for (int i = 0; i < count; i++)
             {
@@ -200,7 +199,7 @@ namespace Kesa.Engine.Host
                                      "Writes if it writes entities");
                 if (returnType != typeof(void))
                     throw Fail(name, "the signature returns None, but the C# function returns " + Show(returnType));
-                return;
+                return skip == 1;
             }
             var expectedReturn = Expected(name, returns, argument: false);
             if (returnType == typeof(void))
@@ -208,6 +207,7 @@ namespace Kesa.Engine.Host
             if (!Fits(returns, returnType, argument: false))
                 throw Fail(name, "the signature returns " + Show(returns) + ", so the C# function returns " + expectedReturn +
                                  ", not " + Show(returnType));
+            return skip == 1;
         }
 
         private static ArgumentException Fail(string name, string message) =>
