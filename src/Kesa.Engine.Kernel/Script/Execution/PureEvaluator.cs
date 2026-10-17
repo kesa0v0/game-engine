@@ -273,6 +273,10 @@ namespace Kesa.Engine.Script
             public IReadOnlyList<Value>? Items { get; set; }
 
             public RangeValue? Range { get; set; }
+
+            /// <summary>엔진이 준 묶음을 돌면 그 묶음: 한 바퀴마다 사라진 항목을 건너뛴다 (G88·G194).</summary>
+            public IRuntimeLiveCollection? Live { get; set; }
+
             public long Count { get; set; }
 
             /// <summary>지금 실행 중인 항목의 위치 (아직 시작 전이면 -1).</summary>
@@ -285,6 +289,7 @@ namespace Kesa.Engine.Script
                 Loop = Loop,
                 Items = Items,
                 Range = Range,
+                Live = Live,
                 Count = Count,
                 Index = Index,
             };
@@ -984,6 +989,9 @@ namespace Kesa.Engine.Script
             /// <summary>반복의 다음 항목으로 넘어간다. 항목이 더 없으면 false.</summary>
             private bool NextIteration(Block block, Frame frame)
             {
+                // 엔진이 준 묶음이면 그사이 죽은 엔티티와 뗀 줄은 건너뛴다 (G88·G194)
+                while (block.Live != null && block.Index + 1 < block.Count && block.Live.IsGone(block.ItemAt(block.Index + 1)))
+                    block.Index++;
                 if (block.Index + 1 >= block.Count) return false;
                 try
                 {
@@ -1211,6 +1219,7 @@ namespace Kesa.Engine.Script
                         break;
                     case IRuntimeIterable runtime:
                         block.Items = runtime.Iterate();
+                        block.Live = runtime as IRuntimeLiveCollection;
                         break;
                     default:
                         throw Fail(Codes.RunScript, "'" + iterable.KindName + "' is not iterable",

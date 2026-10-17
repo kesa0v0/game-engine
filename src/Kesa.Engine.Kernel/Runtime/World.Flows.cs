@@ -662,7 +662,7 @@ namespace Kesa.Engine.Runtime
                     case "choices":
                         if (!(pair.Value is ListValue items) || items.Items.Count == 0)
                             throw new ScriptRuntimeException(Codes.RunType, "choices= of ask() must be a non-empty list",
-                                "write " + usage);
+                                PureOps.ListHint(pair.Value) ?? "write " + usage);
                         for (int i = 0; i < items.Items.Count; i++)
                             choices.Add(Savable("choice " + i.ToString(CultureInfo.InvariantCulture) + " of ask()", items.Items[i]));
                         hasChoices = true;

@@ -272,7 +272,7 @@ namespace Kesa.Engine.Runtime
                 case ListValue list: return list.Items.Count;
                 case RangeValue range: return range.Count;
             }
-            throw PureOps.TypeError(name + "() needs a list or a range, not " + seq.KindName);
+            throw PureOps.TypeError(name + "() needs a list or a range, not " + seq.KindName, PureOps.ListHint(seq));
         }
 
         private static Value SequenceAt(Value seq, long index) =>

@@ -15,6 +15,12 @@ namespace Kesa.Engine.Script
         public static ScriptRuntimeException TypeError(string message, string? hint = null) =>
             new ScriptRuntimeException(Codes.RunScript, message, hint);
 
+        /// <summary>리스트 자리에 엔진이 준 묶음(엔티티 묶음·키 줄)을 받았으면 사본을 만들라는 안내 (G194).</summary>
+        public static string? ListHint(Value value) =>
+            value is IRuntimeLiveCollection
+                ? value.KindName + " is not a list (its members can go away while you hold it); make a list first: [x for x in ...] (spec-gaps G194)"
+                : null;
+
         public static ScriptRuntimeException ArithmeticError(string message) =>
             new ScriptRuntimeException(Codes.RunArithmetic, message);
 
@@ -70,7 +76,8 @@ namespace Kesa.Engine.Script
 
             if (!IsNumber(left) || !IsNumber(right))
             {
-                throw TypeError("unsupported operand types for '" + op + "': " + left.KindName + " and " + right.KindName);
+                throw TypeError("unsupported operand types for '" + op + "': " + left.KindName + " and " + right.KindName,
+                    ListHint(left) ?? ListHint(right));
             }
 
             if (op == "/") return Divide(left, right);

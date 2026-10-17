@@ -28,7 +28,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private const string Commands =
             "Settlement(\"Town\")\nUnit(\"Scout\")\nBoard(\"Main\")\nNeed(\"Food\")\n" +
-            "def board():\n    return query(\"Board\")[0]\n" +
+            "def board():\n    return [b for b in query(\"Board\")][0]\n" +
             "@command(free=True, acts_for=None)\ndef Found(mood: int):\n    s = spawn(\"Town\")\n    s.Mood.value = mood\n" +
             "@command(free=True, acts_for=None)\ndef Raze(s: Ref[Settlement]):\n    destroy(s)\n" +
             "@command(free=True, acts_for=None)\ndef Hurt(e: Ref[Unit]):\n    attach(e, Wounded(turns=2))\n" +

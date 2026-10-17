@@ -86,7 +86,7 @@ namespace Kesa.Engine.Runtime
             return names;
         }
 
-        /// <summary>스크립트의 <c>query("Unit", "Wounded")</c>: 엔티티 Ref의 리스트.</summary>
+        /// <summary>스크립트의 <c>query("Unit", "Wounded")</c>: 엔티티 묶음 (G194).</summary>
         private Value QueryBuiltin(IReadOnlyList<Value> positional)
         {
             var names = new string[positional.Count];
@@ -99,14 +99,85 @@ namespace Kesa.Engine.Runtime
                 names[i] = s.Value;
             }
             var ids = Guard(() => Query(names));
-            var items = new List<Value>(ids.Count);
-            foreach (var id in ids) items.Add(new EntityView(this, id));
-            var list = new ListValue(items);
-            _trace?.Add(ExplainNode.Query(names, list));
+            if (_trace != null)
+            {
+                var items = new List<Value>(ids.Count);
+                foreach (var id in ids) items.Add(new EntityView(this, id));
+                _trace.Add(ExplainNode.Query(names, new ListValue(items)));
+            }
             // when 조건이 이 목록을 읽었다: 그 출처의 엔티티가 생기거나 죽거나 컴포넌트가 붙거나 떨어지면 다시 본다 (G193)
             if (_whenReadsSources != null)
                 foreach (var name in names) _whenReadsSources.Add(name);
-            return list;
+            return new EntityGroup(this, ids, PureBuiltins.QueryName + "(...)");
+        }
+
+        /// <summary>
+        /// 엔진이 준 엔티티 묶음: <c>query(...)</c>의 결과와 역방향 컬렉션(<c>city.units</c>) (G194, 파이썬 <c>weakref.WeakSet</c>처럼).
+        /// 받을 때의 목록(id 순)을 들고 있고 엔티티를 살려 두지 않는다. <c>for</c>는 시작 시점의 목록을 돌며 그사이 죽은 것은 건너뛰고(G88),
+        /// <c>len</c>·<c>in</c>·참/거짓은 지금 살아 있는 것만 본다. 인덱스와 리스트 연산은 받지 않는다: 리스트가 필요하면
+        /// 컴프리헨션으로 그 순간의 사본을 만든다(<c>[u for u in c.units]</c>).
+        /// </summary>
+        private sealed class EntityGroup : Value, IRuntimeLiveCollection, IRuntimeIndexable, IValueEquality
+        {
+            /// <summary>살아 있는 원소가 같으면 같다 (<c>WeakSet</c>끼리의 비교처럼). 리스트와는 다르다.</summary>
+            public bool ValueEquals(Value other)
+            {
+                if (!(other is EntityGroup g)) return false;
+                var mine = Iterate();
+                var theirs = g.Iterate();
+                if (mine.Count != theirs.Count) return false;
+                for (int i = 0; i < mine.Count; i++)
+                    if (((IEntityReference)mine[i]).EntityId != ((IEntityReference)theirs[i]).EntityId) return false;
+                return true;
+            }
+
+            private readonly World _world;
+
+            public EntityGroup(World world, IReadOnlyList<EntityId> ids, string label)
+            {
+                _world = world;
+                Ids = ids;
+                Label = label;
+            }
+
+            /// <summary>받을 때의 목록. 저장은 이것을 적는다.</summary>
+            public IReadOnlyList<EntityId> Ids { get; }
+
+            /// <summary>메시지에 쓰는 이름 (<c>units</c>, <c>query(...)</c>).</summary>
+            public string Label { get; }
+
+            public override string KindName => "entity group";
+
+            public IReadOnlyList<Value> Iterate()
+            {
+                var items = new List<Value>(Ids.Count);
+                foreach (var id in Ids)
+                    if (_world.IsAlive(id)) items.Add(new EntityView(_world, id));
+                return items;
+            }
+
+            public int Size()
+            {
+                int n = 0;
+                foreach (var id in Ids)
+                    if (_world.IsAlive(id)) n++;
+                return n;
+            }
+
+            public bool ContainsKey(Value key)
+            {
+                if (!(key is IEntityReference r) || !_world.IsAlive(r.EntityId)) return false;
+                foreach (var id in Ids)
+                    if (id == r.EntityId) return true;
+                return false;
+            }
+
+            public bool IsGone(Value item) => item is IEntityReference r && !_world.IsAlive(r.EntityId);
+
+            public Value GetItem(Value key) =>
+                throw new ScriptRuntimeException(Codes.RunType,
+                    "an entity group (" + Label + ") cannot be indexed; its members can die while you hold it",
+                    "loop over it, or make a list first: xs = [u for u in ...] (spec-gaps G194)");
         }
 
         /// <summary>엔티티가 생기거나 죽었다: 그 타입과 가진 컴포넌트를 출처로 읽은 조건을 다시 본다.</summary>

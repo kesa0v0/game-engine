@@ -210,7 +210,8 @@ namespace Kesa.Engine.Script
                         for (long i = 0; i < range.Count; i++) items.Add(new IntValue(range.At(i)));
                         return items;
                     default:
-                        throw PureOps.TypeError(name + "() with one argument needs a list, not " + args[0].KindName);
+                        throw PureOps.TypeError(name + "() with one argument needs a list, not " + args[0].KindName,
+                            PureOps.ListHint(args[0]));
                 }
             }
             if (args.Count == 0) throw PureOps.TypeError(name + "() needs at least one argument");

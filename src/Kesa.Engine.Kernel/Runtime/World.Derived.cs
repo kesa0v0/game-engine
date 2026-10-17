@@ -379,7 +379,7 @@ namespace Kesa.Engine.Runtime
         /// 파이썬 <c>dict</c>처럼 <c>len</c>은 줄 수, <c>k in h.Skill</c>은 그 키의 줄이 있는가, 비면 거짓이다 (G104).
         /// 컴포넌트가 붙어 있는지는 <c>h.Skill is not None</c>으로 따로 묻는다.
         /// </remarks>
-        private sealed class RowsView : ComponentViewBase, IRuntimeAttributes, IRuntimeIndexable, IRuntimeCollection, IValueEquality
+        private sealed class RowsView : ComponentViewBase, IRuntimeAttributes, IRuntimeIndexable, IRuntimeLiveCollection, IValueEquality
         {
             /// <summary>같은 엔티티의 같은 키 컴포넌트면 같다 (G142).</summary>
             public bool ValueEquals(Value other) => other is RowsView v && v._id == _id && v._component == _component;
@@ -411,6 +411,11 @@ namespace Kesa.Engine.Runtime
             /// <summary>그 키의 줄이 있는가. 없는 Def id는 <c>h.Skill[k]</c>처럼 "혹시 …?" 오류다 (오타가 조용히 False가 되지 않게).</summary>
             public bool ContainsKey(Value key) => Guard(() => _world.HasRowKey(_id, _component, KeyOf(key)));
 
+            /// <summary>반복 도중 그 줄이 떨어졌거나 엔티티가 죽었다 (G88·G194).</summary>
+            public bool IsGone(Value key) =>
+                !_world.IsAlive(_id) || (key is IEntityReference r && !_world.IsAlive(r.EntityId)) ||
+                !Guard(() => _world.HasRowKey(_id, _component, KeyOf(key)));
+
             private RowKey KeyOf(Value key)
             {
                 switch (key)
@@ -440,9 +445,7 @@ namespace Kesa.Engine.Runtime
                     continue;
                 }
                 var handle = new MemberHandle(inverse.Source, null, inverse.Member);
-                var items = new List<Value>();
-                foreach (var source in Inverse(id, handle)) items.Add(new EntityView(this, source));
-                return new ListValue(items);
+                return new EntityGroup(this, Inverse(id, handle), inverse.Name);
             }
             throw new ScriptRuntimeException(Codes.RunScript,
                 id + " (" + entity.Def.Id + ") has no component or collection '" + name + "'", Suggest.Hint(name, candidates));

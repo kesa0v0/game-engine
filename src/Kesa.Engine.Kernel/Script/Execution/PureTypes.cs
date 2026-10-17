@@ -113,6 +113,15 @@ namespace Kesa.Engine.Script
     }
 
     /// <summary>
+    /// 반복 도중 사라진 항목을 아는 묶음 (spec-gaps G88·G194): 엔진이 준 엔티티 묶음과 키 줄 묶음. <c>for</c>는 시작 시점의 목록을 돌며
+    /// 한 바퀴마다 이것으로 물어 죽은 엔티티와 뗀 줄을 건너뛴다. 스크립트가 만든 리스트는 파이썬 그대로다.
+    /// </summary>
+    public interface IRuntimeLiveCollection : IRuntimeCollection
+    {
+        bool IsGone(Value item);
+    }
+
+    /// <summary>
     /// 다른 값을 담은 런타임 값 (컴포넌트 값 <c>Wounded(turns=...)</c>). 이어서 실행할 프레임 사본을 만들 때 안에 든 람다도
     /// 사본의 것으로 바꿔야 해서(G143) 담은 값을 바꾼 새 값을 만든다.
     /// </summary>

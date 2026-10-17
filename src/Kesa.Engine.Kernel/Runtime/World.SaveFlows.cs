@@ -235,6 +235,8 @@ namespace Kesa.Engine.Runtime
                                 foreach (var item in block.Items!) items.Add(SaveScriptValue(item, writer));
                                 obj.Add("items", items);
                             }
+                            // 엔진이 준 묶음을 돌던 중이면 그 묶음도: 이어서 돌 때도 사라진 항목을 건너뛴다 (G194)
+                            if (block.Live != null) obj.Add("live", SaveScriptValue((Value)block.Live, writer));
                             break;
                         default:
                             throw new InvalidOperationException("engine: a paused block was not opened by an if or a for");
@@ -378,6 +380,10 @@ namespace Kesa.Engine.Runtime
                         .Add("entity", new JsonNumber(c.Id.Value))
                         .Add("name", new JsonString(c.Component.Name))
                         .Add("row", c.Row == null ? (JsonNode)JsonNull.Instance : SaveKey(c.Row.Value)));
+                case EntityGroup g:
+                    var ids = new JsonArray();
+                    foreach (var id in g.Ids) ids.Add(new JsonNumber(id.Value));
+                    return Tag("entity_group", new JsonObject().Add("ids", ids).Add("label", new JsonString(g.Label)));
                 case RowsView r:
                     return Tag("rows", new JsonObject()
                         .Add("entity", new JsonNumber(r.Id.Value))
@@ -743,6 +749,8 @@ namespace Kesa.Engine.Runtime
                                     items.Add(LoadScriptValue(item, where, problems));
                                 block.Items = items;
                             }
+                            var live = b.Get("live");
+                            if (live != null) block.Live = LoadScriptValue(live, where, problems) as IRuntimeLiveCollection;
                             block.Count = block.Range?.Count ?? block.Items!.Count;
                             if (block.Index < -1 || block.Index >= block.Count)
                                 throw new JsonFormatException("a loop index is out of range");
@@ -830,6 +838,14 @@ namespace Kesa.Engine.Runtime
                                 return NoneValue.Instance;
                             }
                             return new RowsView(this, id, component);
+                        }
+                        case "entity_group":
+                        {
+                            var v = AsObject(tag.Value, "an entity group");
+                            var ids = new List<EntityId>();
+                            foreach (var n in AsArray(Field(v, "ids"), "entity group ids").Items)
+                                ids.Add(new EntityId(SavedId(n, "an entity group member")));
+                            return new EntityGroup(this, ids, Text(Field(v, "label"), "an entity group label"));
                         }
                         case "def_view":
                         {
