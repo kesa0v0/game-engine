@@ -15,7 +15,49 @@ namespace Kesa.Engine.Runtime
     public sealed partial class World
     {
         /// <summary>커맨드 실행 중의 되돌리기 기록. 커맨드 밖(호스트 API)에서는 null이라 기록하지 않는다.</summary>
-        private List<Action>? _undo;
+        private List<UndoEntry>? _undo;
+
+        /// <summary>
+        /// 되돌리기 기록의 그릇. 커맨드마다 새로 만들어 키우지 않고 비워서 다시 쓴다(규모 벤치: 한 틱에 칸 1만 개를 쓰면 목록을 키우는
+        /// 복사가 눈에 띄었다). 가장 큰 커맨드만큼의 용량이 남는다.
+        /// </summary>
+        private readonly List<UndoEntry> _undoBuffer = new List<UndoEntry>();
+
+        /// <summary>
+        /// 되돌리기 하나. 가장 흔한 "칸 하나에 쓰기"는 (값 사전, 멤버, 옛 값)으로 적어 람다를 만들지 않고, 그 밖의 연산은 동작을 그대로 든다.
+        /// </summary>
+        private readonly struct UndoEntry
+        {
+            private readonly Dictionary<MemberDecl, Value>? _values;
+            private readonly MemberDecl? _member;
+            private readonly Value? _old;
+            private readonly Action? _action;
+
+            private UndoEntry(Dictionary<MemberDecl, Value>? values, MemberDecl? member, Value? old, Action? action)
+            {
+                _values = values;
+                _member = member;
+                _old = old;
+                _action = action;
+            }
+
+            public static UndoEntry Of(Action action) => new UndoEntry(null, null, null, action);
+
+            /// <summary>칸에 원래 값이 있었으면 그 값으로, 없었으면(<paramref name="old"/>가 null) 지운다.</summary>
+            public static UndoEntry Slot(Dictionary<MemberDecl, Value> values, MemberDecl member, Value? old) =>
+                new UndoEntry(values, member, old, null);
+
+            public void Run()
+            {
+                if (_action != null)
+                {
+                    _action();
+                    return;
+                }
+                if (_old == null) _values!.Remove(_member!);
+                else _values![_member!] = _old;
+            }
+        }
 
         /// <summary>
         /// <paramref name="run"/>을 되돌릴 수 있게 실행한다. 어떤 예외로 끝나든(스크립트 오류, 엔진 오류) 그동안의 변경을 거꾸로
@@ -24,7 +66,8 @@ namespace Kesa.Engine.Runtime
         private T Atomically<T>(Func<T> run)
         {
             if (_undo != null) throw new InvalidOperationException("a command is already running");
-            var undo = new List<Action>();
+            var undo = _undoBuffer;
+            undo.Clear();
             _undo = undo;
             try
             {
@@ -33,16 +76,17 @@ namespace Kesa.Engine.Runtime
             catch
             {
                 _undo = null; // 되감는 동작은 기록하지 않는다
-                for (int i = undo.Count - 1; i >= 0; i--) undo[i]();
+                for (int i = undo.Count - 1; i >= 0; i--) undo[i].Run();
                 throw;
             }
             finally
             {
                 _undo = null;
+                undo.Clear(); // 붙잡은 값을 놓는다
             }
         }
 
-        private void Journal(Action undo) => _undo?.Add(undo);
+        private void Journal(Action undo) => _undo?.Add(UndoEntry.Of(undo));
 
         /// <summary>
         /// <paramref name="owner"/> 엔티티의 값 칸 하나에 쓴다. 커맨드 실행 중이면 원래 값(또는 "값 없음")을 기록한다. 그 엔티티를 읽은
@@ -51,11 +95,7 @@ namespace Kesa.Engine.Runtime
         private void Assign(long owner, Dictionary<MemberDecl, Value> values, MemberDecl member, Value value)
         {
             Touch(owner);
-            if (_undo != null)
-            {
-                if (values.TryGetValue(member, out var old)) Journal(() => values[member] = old);
-                else Journal(() => values.Remove(member));
-            }
+            if (_undo != null) _undo.Add(UndoEntry.Slot(values, member, values.TryGetValue(member, out var old) ? old : null));
             values[member] = value;
         }
     }
