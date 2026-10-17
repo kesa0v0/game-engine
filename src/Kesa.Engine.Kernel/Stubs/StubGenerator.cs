@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Kesa.Engine.Host;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Schema;
 
@@ -39,10 +40,12 @@ namespace Kesa.Engine.Stubs
         private static Writer? WriterFor(string modId, ContentLoadResult result)
         {
             var final = Find(modId, result.Mods);
-            if (final != null) return new Writer(final, result.Mods, result.Schema, result.Defs, fromFirstRound: false);
+            if (final != null)
+                return new Writer(final, result.Mods, result.Schema, result.Defs, fromFirstRound: false, result.HostFunctions);
             var first = Find(modId, result.FirstRound.Mods);
             if (first != null)
-                return new Writer(first, result.FirstRound.Mods, result.FirstRound.Schema, result.FirstRound.Defs, fromFirstRound: true);
+                return new Writer(first, result.FirstRound.Mods, result.FirstRound.Schema, result.FirstRound.Defs, fromFirstRound: true,
+                    result.HostFunctions);
             return null;
         }
 
@@ -195,16 +198,18 @@ namespace Kesa.Engine.Stubs
             private readonly DefRegistry _defs;
             private readonly bool _fromFirstRound;
             private readonly ModVisibility _visibility;
+            private readonly IReadOnlyDictionary<string, HostSignature> _hosts;
             private readonly StringBuilder _out = new StringBuilder();
 
             public Writer(ModManifest mod, IReadOnlyList<ModManifest> mods, SchemaSet schema, DefRegistry defs,
-                bool fromFirstRound)
+                bool fromFirstRound, IReadOnlyDictionary<string, HostSignature> hosts)
             {
                 _mod = mod;
                 _schema = schema;
                 _defs = defs;
                 _fromFirstRound = fromFirstRound;
                 _visibility = new ModVisibility(mods);
+                _hosts = hosts;
             }
 
             private bool Sees(string owner) => _visibility.CanSee(_mod.Id, owner);
@@ -223,7 +228,79 @@ namespace Kesa.Engine.Stubs
                     if (Sees(c.Mod)) WriteComponent(c);
                 foreach (var t in _schema.Types)
                     if (Sees(t.Mod)) WriteDefType(t);
+                WriteHostFunctions();
                 return _out.ToString();
+            }
+
+            // ---- 호스트 함수 (spec S7, spec-gaps G221) ----
+
+            /// <summary>
+            /// 이 모드가 부를 수 있는 호스트 함수(소유 모드가 자기이거나 의존한 모드, G218)를 이름 경로를 따라 중첩한 클래스로:
+            /// <c>core.path.find</c>면 <c>class core:</c> 안의 <c>class path:</c> 안의 정적 메서드 <c>find</c>.
+            /// </summary>
+            private void WriteHostFunctions()
+            {
+                var visible = new List<HostSignature>();
+                foreach (var signature in _hosts.Values)
+                    if (Sees(signature.Function.Mod)) visible.Add(signature);
+                // 이름 순이라 같은 이름 공간의 함수는 붙어 있다
+                WriteHostGroup(visible, 0, visible.Count, 0, "");
+            }
+
+            /// <param name="depth">이미 클래스로 연 이름 조각의 수</param>
+            private void WriteHostGroup(List<HostSignature> signatures, int from, int to, int depth, string indent)
+            {
+                int i = from;
+                while (i < to)
+                {
+                    var parts = signatures[i].Function.Name.Split('.');
+                    if (depth == parts.Length - 1)
+                    {
+                        WriteHostFunction(signatures[i], parts[depth], indent);
+                        i++;
+                        continue;
+                    }
+                    // 같은 조각으로 시작하는 것들을 한 클래스로 묶는다 (한 경로가 함수이면서 이름 공간일 수는 없다, G218)
+                    string part = parts[depth];
+                    int end = i + 1;
+                    while (end < to && Part(signatures[end], depth) == part) end++;
+                    Line(indent + "class " + part + ":");
+                    WriteHostGroup(signatures, i, end, depth + 1, indent + "    ");
+                    if (depth == 0) Line();
+                    i = end;
+                }
+            }
+
+            private static string? Part(HostSignature signature, int depth)
+            {
+                var parts = signature.Function.Name.Split('.');
+                return depth < parts.Length ? parts[depth] : null;
+            }
+
+            private void WriteHostFunction(HostSignature signature, string name, string indent)
+            {
+                var parameters = new List<string>();
+                foreach (var p in signature.Parameters)
+                    parameters.Add(p.Name + ": " + TypeText(p.Type) + (p.Default == null ? "" : " = ..."));
+                string returns = signature.Returns == null ? "None" : TypeText(signature.Returns);
+                Line(indent + "@staticmethod");
+                string head = indent + "def " + name + "(" + string.Join(", ", parameters) + ") -> " + returns + ":";
+                if (signature.Function.Doc.Length == 0)
+                {
+                    Line(head + " ...");
+                    return;
+                }
+                Line(head);
+                Line(indent + "    \"\"\"" + DocText(signature.Function.Doc) + "\"\"\"");
+                Line(indent + "    ...");
+            }
+
+            /// <summary>독스트링 안에서 안전하게: 역슬래시와 따옴표 셋을 풀어 쓴다.</summary>
+            private static string DocText(string doc)
+            {
+                string text = doc.Replace("\\", "\\\\").Replace("\"\"\"", "\\\"\\\"\\\"");
+                // 끝의 따옴표가 닫는 따옴표와 붙지 않게
+                return text.EndsWith("\"", StringComparison.Ordinal) ? text.Substring(0, text.Length - 1) + "\\\"" : text;
             }
 
             public string Write()
@@ -424,6 +501,8 @@ namespace Kesa.Engine.Stubs
                     case EntityRefTypeRef entity:
                         // 엔티티는 그 Def 타입의 클래스로 읽는다 (G207)
                         return _schema.TryGetType(entity.Target.Name, out var target) && Sees(target.Mod) ? target.Name : "Any";
+                    case OptionalTypeRef optional:
+                        return TypeText(optional.Inner) + " | None";
                     case FunctionTypeRef f:
                         return f.Kind == FunctionSlotKind.Cond ? "Callable[..., bool]" : "Callable[..., None]";
                 }

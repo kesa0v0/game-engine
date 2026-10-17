@@ -261,7 +261,7 @@ namespace Kesa.Engine.Runtime
             }
 
             // C# 값으로 (G222)
-            var implementation = function.Implementation;
+            var implementation = function.Implementation!;
             var types = implementation.GetType().GetMethod("Invoke")!.GetParameters();
             int skip = function.TakesAccess ? 1 : 0;
             var args = new object?[types.Length];

@@ -290,6 +290,99 @@ namespace Kesa.Engine.Cli.Tests
             Assert.That(_out.ToString(), Is.EqualTo("errors: 0, warnings: 0, info: 0; mods loaded: 1, disabled: 0\n"));
         }
 
+        // --host (G221)
+
+        private const string UsesHost = "Resource(\"Wood\")\ndef count(r):\n    return core.stock.count(r)\n";
+
+        /// <summary>호스트가 내보낸 선언 파일을 모드 폴더에 쓰고 경로를 준다.</summary>
+        private string HostFile(string type = "DefId[Resource]")
+        {
+            var host = new Kesa.Engine.Host.HostFunctions();
+            if (type.StartsWith("Ref"))
+                host.For("core").Pure("def stock.count(resource: " + type + ") -> int", "창고의 개수.",
+                    (Kesa.Engine.Runtime.EntityId resource) => 3L);
+            else
+                host.For("core").Pure("def stock.count(resource: " + type + ") -> int", "창고의 개수.",
+                    (string resource) => 3L);
+            Write("host.json", host.ExportDeclarations());
+            return Path.Combine(_root, "host.json");
+        }
+
+        [Test]
+        public void CheckKnowsTheHostFunctionsOnlyWithTheHostFile()
+        {
+            Mod(UsesHost);
+            string file = HostFile();
+            Assert.That(Run(_root), Is.EqualTo(1));
+            Assert.That(_out.ToString(), Does.Contain("core"));
+            _out = new StringWriter();
+            Assert.That(Run(_root, "--host", file), Is.EqualTo(0), _out + _err.ToString());
+            Assert.That(_out.ToString(), Is.EqualTo("errors: 0, warnings: 0, info: 0; mods loaded: 1, disabled: 0\n"));
+        }
+
+        [Test]
+        public void StubsWithTheHostFileDeclareTheFunctions()
+        {
+            Mod(UsesHost);
+            Assert.That(Stubs("--host", HostFile(), _root), Is.EqualTo(0), _err.ToString());
+            string expected =
+                "class core:\n" +
+                "    class stock:\n" +
+                "        @staticmethod\n" +
+                "        def count(resource: Literal[\"Wood\"]) -> int:\n" +
+                "            \"\"\"창고의 개수.\"\"\"\n" +
+                "            ...\n";
+            Assert.That(Read("core/__builtins__.pyi"), Does.Contain(expected));
+            Assert.That(Read("core/schema/__builtins__.pyi"), Does.Contain(expected));
+        }
+
+        [Test]
+        public void DumpTakesTheHostFileToo()
+        {
+            Mod(UsesHost);
+            Assert.That(Dump(_root, "--host", HostFile()), Is.EqualTo(0), _err.ToString());
+        }
+
+        [TestCase("{", "host.json': the host declarations file is not valid JSON (line 1)")]
+        [TestCase("{}", "host.json': this is not a host declarations file")]
+        public void ABrokenHostFileIsAUsageError(string text, string expected)
+        {
+            Mod("Resource(\"Wood\")\n");
+            Write("host.json", text);
+            Assert.That(Run(_root, "--host", Path.Combine(_root, "host.json")), Is.EqualTo(2));
+            Assert.That(_out.ToString(), Is.Empty);
+            Assert.That(_err.ToString(), Does.StartWith("engine check: '").And.Contain(expected));
+        }
+
+        [Test]
+        public void AMissingHostFileIsAUsageError()
+        {
+            Mod("Resource(\"Wood\")\n");
+            Assert.That(Run(_root, "--host", Path.Combine(_root, "nope.json")), Is.EqualTo(2));
+            Assert.That(_err.ToString(), Does.StartWith("engine check: cannot read host declarations file '"));
+        }
+
+        [Test]
+        public void HostNeedsExactlyOneFile()
+        {
+            Mod("Resource(\"Wood\")\n");
+            string file = HostFile();
+            Assert.That(Run(_root, "--host"), Is.EqualTo(2));
+            Assert.That(_err.ToString(), Does.StartWith("engine check: --host needs a file"));
+            _err = new StringWriter();
+            Assert.That(Run(_root, "--host", file, "--host", file), Is.EqualTo(2));
+            Assert.That(_err.ToString(), Does.StartWith("engine check: more than one --host file given"));
+        }
+
+        [Test]
+        public void AHostSignatureErrorIsNotPlacedUnderTheModsFolder()
+        {
+            // <host ...>는 모드 폴더의 파일이 아니다
+            Mod(UsesHost);
+            Assert.That(Run(_root, "--host", HostFile("Ref[Resource]")), Is.EqualTo(1));
+            Assert.That(_out.ToString(), Does.StartWith("<host core.stock.count>:1:30: error HST001: "));
+        }
+
         [TestCase("mods", "mods/")]
         [TestCase("mods/", "mods/")]
         [TestCase("mods\\", "mods/")]

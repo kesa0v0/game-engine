@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Host;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Reporting;
 using Kesa.Engine.Stubs;
@@ -10,7 +11,7 @@ using Kesa.Engine.Stubs;
 namespace Kesa.Engine.Cli
 {
     /// <summary>
-    /// CLI 명령 (spec S9). 종료 코드는 spec-gaps G78, <c>check</c> 출력 형식은 G79, <c>dump</c>는 G80, <c>stubs</c>는 G81.
+    /// CLI 명령 (spec S9). 종료 코드는 spec-gaps G78, <c>check</c> 출력 형식은 G79, <c>dump</c>는 G80, <c>stubs</c>는 G81, <c>--host</c>는 G221.
     /// </summary>
     public static class Commands
     {
@@ -23,9 +24,9 @@ namespace Kesa.Engine.Cli
         public const string WarningsAsErrors = "--warnings-as-errors";
 
         public const string Usage =
-            "usage: engine check <mods-dir> [--json] [--warnings-as-errors]\n" +
-            "       engine dump <mods-dir>\n" +
-            "       engine stubs <mods-dir>";
+            "usage: engine check <mods-dir> [--host <file>] [--json] [--warnings-as-errors]\n" +
+            "       engine dump <mods-dir> [--host <file>]\n" +
+            "       engine stubs <mods-dir> [--host <file>]";
 
         /// <param name="args">명령 이름까지 포함한 전체 인자</param>
         public static int Run(string[] args, TextWriter stdout, TextWriter stderr)
@@ -40,10 +41,10 @@ namespace Kesa.Engine.Cli
         /// <summary><c>engine check &lt;mods-dir&gt; [--json]</c>: 진단을 텍스트나 JSON으로 stdout에 낸다 (G79).</summary>
         private static int Check(string[] args, TextWriter stdout, TextWriter stderr)
         {
-            int parsed = Parse("check", args, new[] { "--json", WarningsAsErrors }, stderr, out var root, out var options);
+            int parsed = Parse("check", args, new[] { "--json", WarningsAsErrors }, stderr, out var root, out var options, out var host);
             if (parsed != ExitOk) return parsed;
             bool json = options.Contains("--json");
-            return LoadAndReport("check", root, stderr, (diagnostics, result, _) =>
+            return LoadAndReport("check", root, host, stderr, (diagnostics, result, _) =>
             {
                 stdout.Write(json ? CheckReport.ToJson(diagnostics, result) : CheckReport.ToText(diagnostics, result, PathPrefix(root)));
                 return ExitOk;
@@ -53,9 +54,9 @@ namespace Kesa.Engine.Cli
         /// <summary><c>engine dump &lt;mods-dir&gt;</c>: 덤프 JSON은 stdout, 진단 텍스트는 stderr (G80).</summary>
         private static int Dump(string[] args, TextWriter stdout, TextWriter stderr)
         {
-            int parsed = Parse("dump", args, Array.Empty<string>(), stderr, out var root, out _);
+            int parsed = Parse("dump", args, Array.Empty<string>(), stderr, out var root, out _, out var host);
             if (parsed != ExitOk) return parsed;
-            return LoadAndReport("dump", root, stderr, (diagnostics, result, _) =>
+            return LoadAndReport("dump", root, host, stderr, (diagnostics, result, _) =>
             {
                 stdout.Write(DefDump.ToJson(result));
                 stderr.Write(CheckReport.ToText(diagnostics, result, PathPrefix(root)));
@@ -89,10 +90,10 @@ namespace Kesa.Engine.Cli
         /// </summary>
         private static int Stubs(string[] args, TextWriter stdout, TextWriter stderr)
         {
-            int parsed = Parse("stubs", args, Array.Empty<string>(), stderr, out var root, out _);
+            int parsed = Parse("stubs", args, Array.Empty<string>(), stderr, out var root, out _, out var host);
             if (parsed != ExitOk) return parsed;
             string prefix = PathPrefix(root);
-            return LoadAndReport("stubs", root, stderr, (diagnostics, result, discovered) =>
+            return LoadAndReport("stubs", root, host, stderr, (diagnostics, result, discovered) =>
             {
                 stderr.Write(CheckReport.ToText(diagnostics, result, prefix));
                 string current = "";
@@ -144,16 +145,31 @@ namespace Kesa.Engine.Cli
 
         private static void WriteText(string path, string text) => File.WriteAllText(path, text, new UTF8Encoding(false));
 
-        /// <summary>모드 폴더 하나와 허용된 옵션만 받는다. 아니면 사용법 오류 (G78의 2).</summary>
+        /// <summary>호스트 함수 선언 파일을 받는 옵션 (spec-gaps G221). 모든 명령이 받는다.</summary>
+        public const string HostOption = "--host";
+
+        /// <summary>
+        /// 모드 폴더 하나와 허용된 옵션만 받는다. 아니면 사용법 오류 (G78의 2). <c>--host &lt;file&gt;</c>는 선언 파일을 읽어
+        /// <paramref name="host"/>로 준다 (G221). 파일을 못 읽거나 틀렸으면 환경 문제(2)다.
+        /// </summary>
         private static int Parse(string command, string[] args, string[] allowed, TextWriter stderr,
-            out string root, out HashSet<string> options)
+            out string root, out HashSet<string> options, out HostFunctions? host)
         {
             root = "";
             options = new HashSet<string>(StringComparer.Ordinal);
+            host = null;
             string? folder = null;
-            foreach (var a in args)
+            string? hostFile = null;
+            for (int i = 0; i < args.Length; i++)
             {
-                if (Array.IndexOf(allowed, a) >= 0) options.Add(a);
+                string a = args[i];
+                if (a == HostOption)
+                {
+                    if (hostFile != null) return UsageError(command, stderr, "more than one " + HostOption + " file given");
+                    if (i + 1 >= args.Length) return UsageError(command, stderr, HostOption + " needs a file");
+                    hostFile = args[++i];
+                }
+                else if (Array.IndexOf(allowed, a) >= 0) options.Add(a);
                 else if (a.StartsWith("-", StringComparison.Ordinal))
                     return UsageError(command, stderr, "unknown option '" + a + "'");
                 else if (folder != null)
@@ -167,6 +183,28 @@ namespace Kesa.Engine.Cli
                 return ExitUsage;
             }
             root = folder;
+            if (hostFile == null) return ExitOk;
+
+            string text;
+            try
+            {
+                text = File.ReadAllText(hostFile, new UTF8Encoding(false));
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is ArgumentException ||
+                                      e is NotSupportedException)
+            {
+                stderr.WriteLine("engine " + command + ": cannot read host declarations file '" + hostFile + "': " + e.Message);
+                return ExitUsage;
+            }
+            try
+            {
+                host = HostFunctions.ImportDeclarations(text);
+            }
+            catch (FormatException e)
+            {
+                stderr.WriteLine("engine " + command + ": '" + hostFile + "': " + e.Message);
+                return ExitUsage;
+            }
             return ExitOk;
         }
 
@@ -175,7 +213,7 @@ namespace Kesa.Engine.Cli
         /// 아니면 오류 진단이 있을 때 1. 엔진 예외는 3 (G78). <paramref name="warningsAsErrors"/>면 경고를 오류로 올린 진단을
         /// 넘기고 그것으로 종료 코드를 정한다 (G84).
         /// </summary>
-        private static int LoadAndReport(string command, string root, TextWriter stderr,
+        private static int LoadAndReport(string command, string root, HostFunctions? host, TextWriter stderr,
             Func<IReadOnlyList<Diagnostic>, ContentLoadResult, IReadOnlyList<ModManifest>, int> report,
             bool warningsAsErrors = false)
         {
@@ -184,7 +222,7 @@ namespace Kesa.Engine.Cli
                 var bag = new DiagnosticBag();
                 var discovery = ModDiscovery.Discover(root, bag);
                 var order = ModSorter.Sort(discovery, bag);
-                var result = ContentLoader.Load(root, order, bag);
+                var result = ContentLoader.Load(root, order, bag, host);
                 var diagnostics = bag.ToSortedList();
                 if (warningsAsErrors) diagnostics = PromoteWarnings(diagnostics);
                 int reported = report(diagnostics, result, discovery.Mods);

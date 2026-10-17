@@ -56,6 +56,102 @@ namespace Kesa.Engine.Host
             }
         }
 
+        /// <summary>선언 파일의 <c>format</c> 값.</summary>
+        public const string DeclarationFormat = "kesa-engine-host-functions";
+
+        /// <summary>선언 파일의 <c>version</c> 값. 모양을 바꾸면 올린다.</summary>
+        public const long DeclarationVersion = 1;
+
+        /// <summary>
+        /// 등록 목록을 선언만 담은 JSON으로 (spec-gaps G221): 함수마다 전체 이름, 등록한 <c>def</c> 한 줄, 효과 등급, 독스트링. 게임과 함께
+        /// 배포하면 <c>engine check --host</c>·<c>engine stubs --host</c>가 게임 없이 그 함수를 안다. 원본은 C# 등록이고 이 파일은 그 결과다.
+        /// 같은 등록이면 같은 글이다.
+        /// </summary>
+        public string ExportDeclarations()
+        {
+            var functions = new JsonArray();
+            foreach (var f in All)
+                functions.Add(new JsonObject()
+                    .Add("name", new JsonString(f.Name))
+                    .Add("signature", new JsonString(f.Signature))
+                    .Add("effect", new JsonString(f.Effect == HostEffect.Writes ? "writes" : "pure"))
+                    .Add("doc", new JsonString(f.Doc)));
+            var root = new JsonObject()
+                .Add("format", new JsonString(DeclarationFormat))
+                .Add("version", new JsonNumber(DeclarationVersion))
+                .Add("functions", functions);
+            return new UTF8Encoding(false).GetString(CanonicalJson.Write(root));
+        }
+
+        /// <summary>
+        /// <see cref="ExportDeclarations"/>의 글을 읽어 구현 없는 등록부를 만든다 (G221). 서명은 C# 등록과 같은 검사를 받는다(람다 대조만 빼고).
+        /// 이것으로 로드는 할 수 있지만 월드는 만들 수 없다(<see cref="HostFunction.IsDeclarationOnly"/>). 모르는 키는 건너뛴다:
+        /// 나중 판이 항목을 더해도 읽힌다. 틀린 글이면 <see cref="FormatException"/>.
+        /// </summary>
+        public static HostFunctions ImportDeclarations(string text)
+        {
+            if (text == null) throw new ArgumentNullException(nameof(text));
+            JsonNode root;
+            try
+            {
+                root = CanonicalJson.Read(new UTF8Encoding(false).GetBytes(text));
+            }
+            catch (JsonFormatException e)
+            {
+                // 저장 파일용 문구를 이 파일의 것으로
+                const string save = "the save ";
+                throw new FormatException("the host declarations file " +
+                                          (e.Message.StartsWith(save, StringComparison.Ordinal) ? e.Message.Substring(save.Length) : e.Message));
+            }
+            if (!(root is JsonObject top) || !(top.Get("format") is JsonString format) || format.Value != DeclarationFormat)
+                throw new FormatException("this is not a host declarations file: it needs \"format\": \"" + DeclarationFormat +
+                                          "\" (write it with HostFunctions.ExportDeclarations)");
+            if (!(top.Get("version") is JsonNumber version) || version.Value != DeclarationVersion)
+                throw new FormatException("the host declarations file has a version this engine does not read: expected " +
+                                          DeclarationVersion + "; export it again with this engine");
+            if (!(top.Get("functions") is JsonArray functions))
+                throw new FormatException("the host declarations file has no \"functions\" list");
+
+            var host = new HostFunctions();
+            for (int i = 0; i < functions.Items.Count; i++)
+            {
+                string where = "functions[" + i + "]";
+                if (!(functions.Items[i] is JsonObject item))
+                    throw new FormatException("the host declarations file: " + where + " is not an object");
+                string name = Text(item, "name", where);
+                string signature = Text(item, "signature", where);
+                string effectText = Text(item, "effect", where);
+                string doc = Text(item, "doc", where);
+                HostEffect effect = effectText == "pure" ? HostEffect.Pure
+                    : effectText == "writes" ? HostEffect.Writes
+                    : throw new FormatException("the host declarations file: " + where + " has effect '" + effectText +
+                                                "'; use \"pure\" or \"writes\"");
+                int dot = name.IndexOf('.');
+                if (dot <= 0)
+                    throw new FormatException("the host declarations file: " + where + " has name '" + name +
+                                              "', which is not mod.path");
+                string mod = name.Substring(0, dot);
+                try
+                {
+                    host.For(mod).Declare(signature, doc, effect);
+                }
+                catch (ArgumentException e)
+                {
+                    throw new FormatException("the host declarations file: " + where + ": " + e.Message);
+                }
+                // 이름과 서명의 경로가 어긋나면 손으로 고친 파일이다
+                if (!host.For(mod).Has(name.Substring(dot + 1)))
+                    throw new FormatException("the host declarations file: " + where + " is named '" + name +
+                                              "', but its signature declares another path: " + signature);
+            }
+            return host;
+        }
+
+        private static string Text(JsonObject item, string key, string where) =>
+            item.Get(key) is JsonString s
+                ? s.Value
+                : throw new FormatException("the host declarations file: " + where + " needs a string \"" + key + "\"");
+
         /// <summary><paramref name="mod"/>가 소유한 함수, 경로 순.</summary>
         internal IReadOnlyList<HostFunction> Of(string mod) =>
             _mods.TryGetValue(mod, out var functions) ? functions.Functions : (IReadOnlyList<HostFunction>)Array.Empty<HostFunction>();
@@ -73,11 +169,22 @@ namespace Kesa.Engine.Host
 
         internal IReadOnlyList<HostFunction> Functions => _functions.Values.ToList();
 
+        internal bool Has(string path) => _functions.ContainsKey(path);
+
         private HostModFunctions Add(string signature, string doc, HostEffect effect, Delegate implementation)
+        {
+            if (implementation == null) throw new ArgumentNullException(nameof(implementation));
+            return Register(signature, doc, effect, implementation);
+        }
+
+        /// <summary>구현 없이 선언만 (<see cref="HostFunctions.ImportDeclarations"/>). 검사와 스텁에만 쓴다 (G221).</summary>
+        internal HostModFunctions Declare(string signature, string doc, HostEffect effect) =>
+            Register(signature, doc, effect, null);
+
+        private HostModFunctions Register(string signature, string doc, HostEffect effect, Delegate? implementation)
         {
             if (signature == null) throw new ArgumentNullException(nameof(signature));
             if (doc == null) throw new ArgumentNullException(nameof(doc));
-            if (implementation == null) throw new ArgumentNullException(nameof(implementation));
 
             var bag = new DiagnosticBag();
             var header = Parser.ParseHostHeader(signature, HostFunction.File(Mod, null), bag);
@@ -100,7 +207,9 @@ namespace Kesa.Engine.Host
                                             ": " + shorter + " would be both a function and a group of functions",
                     nameof(signature));
             }
-            bool takesAccess = HostShape.Check(name, header, effect, implementation);
+            bool takesAccess = implementation == null
+                ? HostShape.CheckDeclaration(name, header, effect)
+                : HostShape.Check(name, header, effect, implementation);
             _functions.Add(header.Name, new HostFunction(Mod, header.Name, effect, signature, doc, header, implementation)
                 { TakesAccess = takesAccess });
             return this;
@@ -111,7 +220,7 @@ namespace Kesa.Engine.Host
     public sealed class HostFunction
     {
         internal HostFunction(string mod, string path, HostEffect effect, string signature, string doc, FunctionDef header,
-            Delegate implementation)
+            Delegate? implementation)
         {
             Mod = mod;
             Path = path;
@@ -140,7 +249,11 @@ namespace Kesa.Engine.Host
 
         internal FunctionDef Header { get; }
 
-        internal Delegate Implementation { get; }
+        /// <summary>등록한 C# 함수. 선언 파일에서 읽은 것이면 null이다 (G221).</summary>
+        internal Delegate? Implementation { get; }
+
+        /// <summary>구현 없이 선언 파일에서 읽은 것인가. 이런 함수로는 월드를 만들 수 없다 (G221).</summary>
+        public bool IsDeclarationOnly => Implementation == null;
 
         /// <summary>첫 매개변수로 창구(<see cref="HostReader"/>·<see cref="HostAccess"/>)를 받는가.</summary>
         internal bool TakesAccess { get; set; }
@@ -208,6 +321,32 @@ namespace Kesa.Engine.Host
                 throw Fail(name, "the signature returns " + Show(returns) + ", so the C# function returns " + expectedReturn +
                                  ", not " + Show(returnType));
             return skip == 1;
+        }
+
+        /// <summary>
+        /// 선언만 있는 함수 (G221): 람다가 없으니 서명의 모양만 본다. 타입마다 C# 타입이 있어야 하고, 순수 함수는 값을 돌려줘야 한다.
+        /// </summary>
+        /// <returns>창구를 받는가: 선언에는 구현이 없어 늘 거짓</returns>
+        public static bool CheckDeclaration(string name, FunctionDef header, HostEffect effect)
+        {
+            foreach (var p in header.Parameters)
+            {
+                if (p.Annotation == null)
+                    throw Fail(name, "parameter '" + p.Name + "' needs a type: write " + p.Name + ": int, " + p.Name +
+                                     ": Ref[Unit], ...");
+                Expected(name, p.Annotation, argument: true);
+            }
+            if (header.Returns is NoneLiteral)
+            {
+                if (effect == HostEffect.Pure)
+                    throw Fail(name, "a pure function that returns None does nothing: return a value, or register it with " +
+                                     "Writes if it writes entities");
+            }
+            else
+            {
+                Expected(name, header.Returns!, argument: false);
+            }
+            return false;
         }
 
         private static ArgumentException Fail(string name, string message) =>

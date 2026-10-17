@@ -68,6 +68,11 @@ namespace Kesa.Engine.Runtime
             _mods = loaded.Mods;
             _contents = loaded.Contents;
             _hostFunctions = loaded.HostFunctions;
+            foreach (var signature in _hostFunctions.Values)
+                if (signature.Function.IsDeclarationOnly)
+                    throw new ArgumentException("host function " + signature.Function.Name + " has no implementation: it was " +
+                                                "read from a declarations file, which is for engine check and stubs only; " +
+                                                "register the C# function to run a world (spec-gaps G221)", nameof(loaded));
             if (maxSignalDepth < 1)
                 throw new ArgumentOutOfRangeException(nameof(maxSignalDepth), maxSignalDepth, "the signal depth limit must be at least 1");
             _maxSignalDepth = maxSignalDepth;

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -90,10 +91,14 @@ namespace Kesa.Engine.Reporting
             return sb.ToString();
         }
 
-        /// <summary>파일이 없으면 빈 문자열, 줄이 없으면 파일만.</summary>
+        /// <summary>
+        /// 파일이 없으면 빈 문자열, 줄이 없으면 파일만. <c>&lt;host core.path.find&gt;</c>처럼 꺾쇠로 싼 것은 모드 폴더의 파일이 아니라
+        /// 호스트가 등록한 서명이라 폴더 경로를 붙이지 않는다 (spec-gaps G218).
+        /// </summary>
         private static string Location(SourceSpan span, string pathPrefix)
         {
             if (span.File.Length == 0) return "";
+            if (span.File.StartsWith("<", StringComparison.Ordinal)) pathPrefix = "";
             if (span.Line <= 0) return pathPrefix + span.File;
             return pathPrefix + span.File + ":" + Number(span.Line) + ":" + Number(span.Col);
         }
