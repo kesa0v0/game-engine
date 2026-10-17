@@ -55,6 +55,55 @@ namespace Kesa.Engine.Script
             return parser.ParseModule();
         }
 
+        /// <summary>
+        /// 호스트 함수의 서명 한 줄 <c>def path.find(start: Ref[Tile], max_steps: int = 50) -> list[Ref[Tile]]</c>을 읽는다
+        /// (spec S7, spec-gaps G215). 이름은 점으로 이은 경로이고 매개변수 기본값과 반환 타입을 쓸 수 있으며(반환 타입은 필수),
+        /// 본문(<c>:</c> 뒤)은 없다. 읽지 못하면 진단을 남기고 null.
+        /// </summary>
+        internal static FunctionDef? ParseHostHeader(string text, string file, DiagnosticBag diagnostics)
+        {
+            var tokens = Lexer.Tokenize(text, file, diagnostics);
+            if (diagnostics.HasErrors) return null;
+            var header = new Parser(tokens, file, diagnostics).HostHeader();
+            // 매개변수 목록의 일부 오류는 진단만 남기고 계속 읽는다
+            return diagnostics.HasErrors ? null : header;
+        }
+
+        private FunctionDef? HostHeader()
+        {
+            try
+            {
+                if (!Cur.IsName("def"))
+                    throw Fail("a host function signature starts with 'def'" + Describe(Cur), Cur.Span);
+                var keyword = Advance();
+                var path = new List<string>();
+                while (true)
+                {
+                    var name = Cur;
+                    if (name.Kind != TokenKind.Name || Keywords.Contains(name.Text))
+                        throw Fail("expected a name" + Describe(name), name.Span);
+                    path.Add(name.Text);
+                    Advance();
+                    if (!Accept(".")) break;
+                }
+                Expect("(");
+                var parameters = ParseParameters(")", allowAnnotations: true, allowDefaults: true);
+                Expect(")");
+                if (!Cur.IsOp("->"))
+                    throw Fail("a host function signature needs a return type" + Describe(Cur), Cur.Span);
+                Advance();
+                var returns = ParseExpression();
+                while (Cur.Kind == TokenKind.Newline) Advance();
+                if (Cur.Kind != TokenKind.EndOfFile)
+                    throw Fail("a host function signature is one 'def' line without a body" + Describe(Cur), Cur.Span);
+                return new FunctionDef(string.Join(".", path), parameters, returns, new List<Stmt>(), keyword.Span);
+            }
+            catch (ParseError)
+            {
+                return null;
+            }
+        }
+
         private Token Cur => _tokens[_pos];
         private Token PeekToken(int offset) => _tokens[Math.Min(_pos + offset, _tokens.Count - 1)];
 

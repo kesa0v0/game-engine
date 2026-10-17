@@ -133,12 +133,12 @@ namespace Kesa.Engine.Loading
         }
 
         /// <summary>기본값: 리터럴만 읽고 매개변수 타입에 맞춘다 (G116). <c>DefId</c>의 존재는 ⑤ 링크가 본다.</summary>
-        private static class Defaults
+        internal static class Defaults
         {
             private const string LiteralHint =
                 "a default must be a number, a string, True/False, None, or a list/dict of those (spec-gaps G116)";
 
-            public static Value? Literal(Expr expr, CallContext context)
+            public static Value? Literal(Expr expr, CallContext context, string code = Codes.CmdParameterType)
             {
                 switch (expr)
                 {
@@ -148,7 +148,7 @@ namespace Kesa.Engine.Loading
                     case BoolLiteral b: return b.Value ? BoolValue.True : BoolValue.False;
                     case NoneLiteral _: return NoneValue.Instance;
                     case UnaryExpr u when (u.Op == "-" || u.Op == "+") && (u.Operand is IntLiteral || u.Operand is FixedLiteral):
-                        if (u.Op == "+") return Literal(u.Operand, context);
+                        if (u.Op == "+") return Literal(u.Operand, context, code);
                         return u.Operand is IntLiteral n
                             ? new IntValue(-n.Value)
                             : (Value)new FixedValue(Fixed.FromRaw(-((FixedLiteral)u.Operand).Value.Raw));
@@ -157,7 +157,7 @@ namespace Kesa.Engine.Loading
                         var items = new List<Value>(list.Items.Count);
                         foreach (var item in list.Items)
                         {
-                            var v = Literal(item, context);
+                            var v = Literal(item, context, code);
                             if (v == null) return null;
                             items.Add(v);
                         }
@@ -168,15 +168,15 @@ namespace Kesa.Engine.Loading
                         var entries = new List<DictItem>(dict.Entries.Count);
                         foreach (var entry in dict.Entries)
                         {
-                            var key = Literal(entry.Key, context);
+                            var key = Literal(entry.Key, context, code);
                             if (key == null) return null;
-                            var value = Literal(entry.Value, context);
+                            var value = Literal(entry.Value, context, code);
                             if (value == null) return null;
                             foreach (var other in entries)
                             {
                                 if (SameKey(other.Key, key))
                                 {
-                                    context.Error(Codes.CmdParameterType, "the key " + Show(key) + " is written twice",
+                                    context.Error(code, "the key " + Show(key) + " is written twice",
                                         entry.Key.Span, related: new[] { other.Span });
                                     return null;
                                 }
@@ -186,7 +186,7 @@ namespace Kesa.Engine.Loading
                         return new DictValue(entries);
                     }
                 }
-                context.Error(Codes.CmdParameterType, "a default parameter value must be a literal", expr.Span, LiteralHint);
+                context.Error(code, "a default parameter value must be a literal", expr.Span, LiteralHint);
                 return null;
             }
 
@@ -201,13 +201,13 @@ namespace Kesa.Engine.Loading
 
             /// <summary>리터럴 값을 타입에 맞춘다. 맞지 않으면 오류를 내고 null.</summary>
             public static Value? Fit(string parameter, TypeRef type, Value value, SourceSpan span, CallContext context,
-                TypeRef? declared = null)
+                TypeRef? declared = null, string code = Codes.CmdParameterType)
             {
                 string shown = (declared ?? type).Display;
 
                 Value? Fail(string message, string? hint = null)
                 {
-                    context.Error(Codes.CmdParameterType, "the default of '" + parameter + "' " + message, span, hint);
+                    context.Error(code, "the default of '" + parameter + "' " + message, span, hint);
                     return null;
                 }
 
@@ -217,7 +217,7 @@ namespace Kesa.Engine.Loading
                 switch (type)
                 {
                     case OptionalTypeRef optional:
-                        return value is NoneValue ? value : Fit(parameter, optional.Inner, value, span, context, type);
+                        return value is NoneValue ? value : Fit(parameter, optional.Inner, value, span, context, type, code);
 
                     case PrimitiveTypeRef primitive:
                         if (ReferenceEquals(primitive, PrimitiveTypeRef.Fixed))
@@ -259,7 +259,7 @@ namespace Kesa.Engine.Loading
                             var fitted = new List<Value>(items.Items.Count);
                             foreach (var item in items.Items)
                             {
-                                var v = Fit(parameter, list.Element, item, span, context);
+                                var v = Fit(parameter, list.Element, item, span, context, null, code);
                                 if (v == null) return null;
                                 fitted.Add(v);
                             }
@@ -273,9 +273,9 @@ namespace Kesa.Engine.Loading
                             var fitted = new List<DictItem>(map.Items.Count);
                             foreach (var item in map.Items)
                             {
-                                var k = Fit(parameter, dict.Key, item.Key, item.Span, context);
+                                var k = Fit(parameter, dict.Key, item.Key, item.Span, context, null, code);
                                 if (k == null) return null;
-                                var v = Fit(parameter, dict.Value, item.Value, item.Span, context);
+                                var v = Fit(parameter, dict.Value, item.Value, item.Span, context, null, code);
                                 if (v == null) return null;
                                 fitted.Add(new DictItem(k, v, item.Span));
                             }
@@ -287,26 +287,29 @@ namespace Kesa.Engine.Loading
             }
         }
 
-        private sealed class Reader
+        internal sealed class Reader
         {
             private readonly SchemaSet _schema;
             private readonly ModVisibility _visibility;
-            private readonly ModScope _scope;
+            private readonly ModScope? _scope;
+            private readonly string _code;
             private readonly CallContext _context;
             private readonly string _mod;
 
-            public Reader(SchemaSet schema, ModVisibility visibility, ModScope scope, CallContext context, string mod)
+            public Reader(SchemaSet schema, ModVisibility visibility, ModScope? scope, CallContext context, string mod,
+                string code = Codes.CmdParameterType)
             {
                 _schema = schema;
                 _visibility = visibility;
                 _scope = scope;
+                _code = code;
                 _context = context;
                 _mod = mod;
             }
 
             private TypeRef? Fail(string message, SourceSpan span, string? hint = null)
             {
-                _context.Error(Codes.CmdParameterType, message, span, hint);
+                _context.Error(_code, message, span, hint);
                 return null;
             }
 
@@ -314,7 +317,7 @@ namespace Kesa.Engine.Loading
             private bool Shadowed(NameExpr name, out TypeRef? failure)
             {
                 failure = null;
-                if (!_scope.TryGet(name.Name, out _, out _)) return false;
+                if (_scope == null || !_scope.TryGet(name.Name, out _, out _)) return false;
                 failure = Fail("'" + name.Name + "' is this mod's own name, so it cannot be used as a type here", name.Span,
                     "rename it (spec-gaps G112)");
                 return true;
@@ -407,7 +410,7 @@ namespace Kesa.Engine.Loading
                 switch (expr)
                 {
                     case NameExpr n:
-                        if (_scope.TryGet(n.Name, out _, out _))
+                        if (_scope != null && _scope.TryGet(n.Name, out _, out _))
                         {
                             Fail("'" + n.Name + "' is this mod's own name, so it cannot name a Def type here", n.Span,
                                 "rename it, or write " + generic + "[\"" + n.Name + "\"] (spec-gaps G112)");

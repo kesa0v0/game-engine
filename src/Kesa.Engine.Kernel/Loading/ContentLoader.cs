@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Schema;
+using Kesa.Engine.Host;
 using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Loading
@@ -94,6 +95,13 @@ namespace Kesa.Engine.Loading
         /// </summary>
         public IReadOnlyDictionary<string, ModContent> Contents { get; internal set; } =
             new SortedDictionary<string, ModContent>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// 소유 모드가 살아남았고 서명이 풀린 호스트 함수 (전체 이름 → 서명, spec S7, spec-gaps G215·G218).
+        /// 소유 모드가 없는 등록은 여기 없다.
+        /// </summary>
+        public IReadOnlyDictionary<string, HostSignature> HostFunctions { get; internal set; } =
+            new SortedDictionary<string, HostSignature>(StringComparer.Ordinal);
     }
 
     /// <summary>한 회차의 ②a·②b가 남긴 것: 살아남은 모드(로드 순서), 완성된 스키마, 등록된 Def.</summary>
@@ -122,7 +130,8 @@ namespace Kesa.Engine.Loading
         /// <summary>이 폴더 아래 파일은 스키마 파일이다 (spec-gaps G16).</summary>
         public const string SchemaFolder = "schema/";
 
-        public static ContentLoadResult Load(string modsRoot, LoadOrder order, DiagnosticBag diagnostics)
+        public static ContentLoadResult Load(string modsRoot, LoadOrder order, DiagnosticBag diagnostics,
+            HostFunctions? host = null)
         {
             var units = new List<ModUnit>();
             foreach (var m in order.Mods) units.Add(new ModUnit(m));
@@ -146,7 +155,7 @@ namespace Kesa.Engine.Loading
             {
                 foreach (var u in units) u.ResetRun();
                 var runDiagnostics = new DiagnosticBag();
-                var run = RunDefinitionStages(units, order, runDiagnostics);
+                var run = RunDefinitionStages(units, order, runDiagnostics, host);
                 // ③ 이후에 빠질 모드도 아직 들어 있을 때 남긴다 (G83)
                 firstRound ??= new DefinitionSnapshot(SurvivingManifests(units), run.Schema, run.Defs);
                 if (ExcludeFailedAtPatchStage(units, run, order, runDiagnostics)) continue;
@@ -159,6 +168,7 @@ namespace Kesa.Engine.Loading
                 var handlers = new List<HandlerDecl>();
                 var whens = new List<WhenDecl>();
                 var contents = new SortedDictionary<string, ModContent>(StringComparer.Ordinal);
+                var hostFunctions = new SortedDictionary<string, HostSignature>(StringComparer.Ordinal);
                 foreach (var u in units)
                 {
                     diagnostics.AddRange(u.Bag.ToSortedList());
@@ -171,6 +181,7 @@ namespace Kesa.Engine.Loading
                     var files = new List<ModFile>(u.Files);
                     files.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path));
                     contents.Add(u.Manifest.Id, new ModContent(u.Manifest.Id, files));
+                    foreach (var signature in u.Hosts) hostFunctions.Add(signature.Function.Name, signature);
                     patches.AddRange(u.Patches);
                     scopes.Add(u.Manifest.Id, u.Scope);
                     // 같은 모드 안의 같은 이름은 EVL004로 막히고 모드 id는 유일하므로 id는 겹치지 않는다
@@ -186,6 +197,7 @@ namespace Kesa.Engine.Loading
                     Handlers = handlers,
                     Whens = whens,
                     Contents = contents,
+                    HostFunctions = hostFunctions,
                 };
             }
         }
@@ -232,7 +244,8 @@ namespace Kesa.Engine.Loading
         /// ②a(스키마 파일 실행과 타입 완성)와 ②b(Def 파일 실행과 Def 등록). 이전 회차에서 비활성화된 모드는 처음부터 실패로 본다.
         /// 이 안의 실패는 G28의 고정점으로 푼다. <paramref name="runDiagnostics"/>는 이번 회차에만 속한 진단(MOD009)이다.
         /// </summary>
-        private static DefinitionRun RunDefinitionStages(List<ModUnit> units, LoadOrder order, DiagnosticBag runDiagnostics)
+        private static DefinitionRun RunDefinitionStages(List<ModUnit> units, LoadOrder order, DiagnosticBag runDiagnostics,
+            HostFunctions? host)
         {
             var active = new List<ModManifest>();
             foreach (var u in units)
@@ -274,6 +287,8 @@ namespace Kesa.Engine.Loading
                 HandlerStages.Check(u.Functions.Handlers, schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
                 CommandSignatures.ResolveWhens(u.Functions.Whens, schema, visibility, u.Scope, new CallContext(u.Manifest.Id, u.Bag));
                 HandlerStages.Check(u.Functions.Whens, schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
+                if (host != null)
+                    u.Hosts = HostSignatures.Resolve(host.Of(u.Manifest.Id), schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
                 // 로드되지 않은 모드의 가드 안에서 건너뛴 패치는 조용히 사라지지 않게 알린다 (G38)
                 foreach (var skipped in u.Skipped)
                 {
@@ -385,6 +400,9 @@ namespace Kesa.Engine.Loading
             /// <summary>②b에서 기록한 <c>patch.*</c> 호출 (G35).</summary>
             public List<PatchCall> Patches { get; private set; } = new List<PatchCall>();
 
+            /// <summary>이 모드가 소유한 호스트 함수의 풀린 서명 (spec-gaps G215).</summary>
+            public List<HostSignature> Hosts { get; set; } = new List<HostSignature>();
+
             /// <summary>거짓인 <c>mod_loaded</c> 가드 안에서 건너뛴 패치 호출 (G38·G46), 모드 id 순.</summary>
             public SortedDictionary<string, SkippedGuard> Skipped { get; private set; } =
                 new SortedDictionary<string, SkippedGuard>(StringComparer.Ordinal);
@@ -413,6 +431,7 @@ namespace Kesa.Engine.Loading
                 Defs = new List<DefRecord>();
                 Patches = new List<PatchCall>();
                 Skipped = new SortedDictionary<string, SkippedGuard>(StringComparer.Ordinal);
+                Hosts = new List<HostSignature>();
                 Bag = new DiagnosticBag();
                 Bag.AddRange(Excluded ? _frozen! : _baseDiagnostics);
                 Failed = Excluded || _baseFailed;

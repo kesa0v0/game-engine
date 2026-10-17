@@ -4,7 +4,7 @@ namespace Kesa.Engine.Diagnostics
     /// 진단 코드. 잠정 체계: 영역 접두사 + 세 자리 번호 (spec-gaps G6).
     /// LEX = 렉서, PAR = 파서, MOD = 모드 매니페스트·정렬, LOD = 콘텐츠 파일 목록, EVL = 로드 시점 평가,
     /// SCH = 스키마 단계(②a), DEF = Def 등록(②b), PAT = 패치(③), INH = 상속 펼치기(④), LNK = 링크(⑤), VAL = 검증(⑥),
-    /// RUN = 런타임 월드, CMD = 커맨드 선언과 함수 효과(쓰기).
+    /// RUN = 런타임 월드, CMD = 커맨드 선언과 함수 효과(쓰기), SAV = 저장과 불러오기, HST = 호스트 함수.
     /// </summary>
     public static class Codes
     {
@@ -140,6 +140,9 @@ namespace Kesa.Engine.Diagnostics
 
         // 호스트가 허락해(cancelBrokenFlows) 지금 내용으로 이어 갈 수 없는 멈춘 Flow를 질문과 함께 취소하고 불러옴 (경고, spec S8, spec-gaps G214)
         public const string SaveFlowCanceled = "SAV006";
+
+        // 호스트 함수의 서명을 지금 스키마로 풀지 못함: 없는 Def 타입, 소유 모드에 안 보이는 타입, 맞지 않는 기본값 (spec S7, spec-gaps G215)
+        public const string HostSignature = "HST001";
 
         // 커맨드 선언 (spec S6, spec-gaps G109)
         public const string CmdBadDecorator = "CMD001";
