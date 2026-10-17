@@ -60,6 +60,7 @@ namespace Kesa.Engine.Runtime
             AddSignalBuiltins(table);
             AddFlowBuiltins(table);
             AddRandomBuiltins(table);
+            AddHostBuiltins(table);
             return table;
         }
 
@@ -88,7 +89,7 @@ namespace Kesa.Engine.Runtime
             if (e.Span.Line > 0) text.Append(" (at ").Append(e.Span).Append(')');
             foreach (var step in e.Trace)
                 text.Append(step.StartsWith(ReadingPrefix, StringComparison.Ordinal) ? "\n  " : "\n  in ").Append(step);
-            return new WorldException(e.Code, text.ToString(), e.Hint);
+            return new WorldException(e.Code, text.ToString(), e.Hint, e.InnerException);
         }
 
         private static string DerivedLabel(EntityRecord entity, ComponentType component, RowKey? row, MemberDecl member) =>

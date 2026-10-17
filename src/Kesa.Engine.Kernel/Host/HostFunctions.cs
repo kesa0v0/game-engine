@@ -100,6 +100,17 @@ namespace Kesa.Engine.Host
             header = Parser.ParseHostHeader(signature, HostFunction.File(Mod, header.Name), new DiagnosticBag())!;
             if (_functions.ContainsKey(header.Name))
                 throw new ArgumentException("host function " + name + " is registered twice", nameof(signature));
+            // 한 이름이 함수이면서 이름 공간일 수는 없다 (core.path와 core.path.find)
+            foreach (var other in _functions.Keys)
+            {
+                if (!other.StartsWith(header.Name + ".", StringComparison.Ordinal) &&
+                    !header.Name.StartsWith(other + ".", StringComparison.Ordinal))
+                    continue;
+                string shorter = Mod + "." + (other.Length < header.Name.Length ? other : header.Name);
+                throw new ArgumentException("host function " + name + " cannot be registered next to " + Mod + "." + other +
+                                            ": " + shorter + " would be both a function and a group of functions",
+                    nameof(signature));
+            }
             HostShape.Check(name, header, effect, implementation);
             _functions.Add(header.Name, new HostFunction(Mod, header.Name, effect, signature, doc, header, implementation));
             return this;

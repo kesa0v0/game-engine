@@ -16,13 +16,14 @@ namespace Kesa.Engine.Script
     /// </summary>
     public static class FunctionEffects
     {
-        public static void Check(ModFunctions functions, ModScope scope, SchemaSet schema, CallContext context)
+        public static void Check(ModFunctions functions, ModScope scope, SchemaSet schema, CallContext context,
+            HostNames? hosts = null)
         {
             var bodies = new List<Body>();
             foreach (var function in functions.Functions)
             {
                 var body = new Body(function);
-                var walker = new Walker(scope, body);
+                var walker = new Walker(scope, body, hosts ?? HostNames.None);
                 if (function.Definition != null)
                     walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
                 else
@@ -243,14 +244,16 @@ namespace Kesa.Engine.Script
         {
             private readonly ModScope _scope;
             private readonly Body _body;
+            private readonly HostNames _hosts;
 
             /// <summary><c>with preconditions:</c> 블록 안을 걷는 중인가 (G178: 거기서는 난수를 쓸 수 없다).</summary>
             private bool _inPreconditions;
 
-            public Walker(ModScope scope, Body body)
+            public Walker(ModScope scope, Body body, HostNames hosts)
             {
                 _scope = scope;
                 _body = body;
+                _hosts = hosts;
             }
 
             /// <summary>지역 변수가 아니고 모드가 <c>def</c> 함수로 묶은 이름이면 그 함수 (G112의 덮어쓰기와 같은 규칙).</summary>
@@ -268,6 +271,13 @@ namespace Kesa.Engine.Script
             /// <summary>덮어쓰지 않은 쓰는 내장의 이름이면 그 이름 (G112의 덮어쓰기와 같은 규칙).</summary>
             private string? WritingBuiltin(Expr callee, SortedSet<string> locals)
             {
+                // 엔티티를 쓰는 호스트 함수도 같은 자리 규칙이다 (G216)
+                if (callee is AttributeExpr && HostNames.TryChain(callee, out var root, out var attributes) &&
+                    !locals.Contains(root.Name) && !_scope.TryGet(root.Name, out _, out _) && _hosts.IsRoot(root.Name))
+                {
+                    var r = _hosts.Resolve(root.Name, attributes);
+                    return r.Function != null && r.Used == attributes.Count && _hosts.IsWriting(r.Function) ? r.Function : null;
+                }
                 if (!(callee is NameExpr name) || locals.Contains(name.Name) || _scope.TryGet(name.Name, out _, out _))
                     return null;
                 return PureBuiltins.IsWritingName(name.Name) ? name.Name : null;

@@ -12,7 +12,8 @@ namespace Kesa.Engine.Script
     {
         private readonly List<string> _trace = new List<string>();
 
-        public ScriptRuntimeException(string code, string message, string? hint = null) : base(message)
+        public ScriptRuntimeException(string code, string message, string? hint = null, Exception? inner = null)
+            : base(message, inner)
         {
             Code = code;
             Hint = hint;

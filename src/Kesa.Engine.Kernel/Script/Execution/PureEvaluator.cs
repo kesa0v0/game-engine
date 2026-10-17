@@ -522,6 +522,15 @@ namespace Kesa.Engine.Script
                         if (b.KeywordBody != null) return b.KeywordBody(positional, keywords);
                         if (keywords.Count > 0) throw Fail(Codes.RunScript, b.Name + "() does not take keyword arguments");
                         return b.Body(positional);
+                    case HostCallable h:
+                        // 로드 검사가 이름으로 부른 곳은 막았다. 함수 값으로 부르는 길의 방어선 (G216)
+                        if (h.Writes && !writable)
+                        {
+                            throw Fail(Codes.RunNotWritable, h.Name + "() changes the world, so it cannot be called here",
+                                "call it on its own line (or as 'x = " + h.Name + "(...)') in a @command body or in a " +
+                                "function that changes the world called on its own line from it (spec-gaps G216)");
+                        }
+                        return h.Call(positional, keywords);
                 }
                 throw Fail(Codes.RunScript, "'" + function.KindName + "' is not callable");
             }

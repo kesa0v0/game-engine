@@ -318,5 +318,137 @@ namespace Kesa.Engine.Tests.Loading
             var result = LoadClean();
             Assert.That(result.HostFunctions, Is.Empty);
         }
+
+        [Test]
+        public void APathCannotBeBothAFunctionAndAGroup()
+        {
+            var core = new HostFunctions().For("core");
+            core.Pure("def path(a: int) -> int", "", (long a) => a);
+            Assert.That(Fails(() => core.Pure("def path.find(a: int) -> int", "", (long a) => a)),
+                Does.StartWith("host function core.path.find cannot be registered next to core.path: core.path would be both " +
+                               "a function and a group of functions"));
+            var other = new HostFunctions().For("core");
+            other.Pure("def path.find(a: int) -> int", "", (long a) => a);
+            Assert.That(Fails(() => other.Pure("def path(a: int) -> int", "", (long a) => a)),
+                Does.StartWith("host function core.path cannot be registered next to core.path.find"));
+        }
+
+        [Test]
+        public void ABuiltInNameCannotOwnHostFunctions()
+        {
+            Mod("len", schema: "x = 1\n");
+            var host = new HostFunctions();
+            host.For("len").Pure("def a() -> int", "", () => 1L);
+            var result = Load(host, out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.HostSignature));
+            Assert.That(d.Message, Is.EqualTo("mod id 'len' is a built-in name, so scripts cannot reach its host functions"));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "len" }));
+        }
+
+        // ---- 스크립트에서 쓰는 이름 (G218) ----
+
+        private HostFunctions PathHost()
+        {
+            var host = new HostFunctions();
+            var core = host.For("core");
+            core.Pure("def path.find(start: Ref[Tile], goal: Ref[Tile], max_steps: int = 50) -> list[Ref[Tile]]", "",
+                (EntityId start, EntityId goal, long maxSteps) => Find(start, goal, maxSteps));
+            core.Writes("def economy.tax(at: Ref[Tile]) -> int", "", (HostAccess a, EntityId at) => 1L);
+            return host;
+        }
+
+        /// <summary>core에 의존하는 naval 모드의 Def 파일이 <paramref name="defs"/>이다.</summary>
+        private IReadOnlyList<Diagnostic> LoadNaval(string defs, bool depends = true)
+        {
+            Mod("core", schema: Tiles);
+            Mod("naval", defs: defs, extra: depends ? ", dependencies=[\"core\"]" : "");
+            Load(PathHost(), out var diags);
+            return diags;
+        }
+
+        [Test]
+        public void AModThatDependsOnTheOwnerCallsItsFunctions()
+        {
+            var diags = LoadNaval("def go(a, b):\n    return core.path.find(a, b, max_steps=3)\n" +
+                                  "def keep():\n    f = core.path.find\n    return f\n");
+            Assert.That(diags, Is.Empty, string.Join("\n", diags));
+        }
+
+        [Test]
+        public void TheOwnerCallsItsOwnFunctions()
+        {
+            Mod("core", schema: Tiles, defs: "def go(a, b):\n    return core.path.find(a, b)\n");
+            Load(PathHost(), out var diags);
+            Assert.That(diags, Is.Empty, string.Join("\n", diags));
+        }
+
+        [Test]
+        public void AModThatDoesNotDependOnTheOwnerCannotUseThem()
+        {
+            var d = LoadNaval("def go(a, b):\n    return core.path.find(a, b)\n", depends: false).Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.SchNotVisible));
+            Assert.That(d.Message, Is.EqualTo("the host functions of mod 'core' can only be used by mods that depend on it"));
+            Assert.That(d.Hint, Is.EqualTo("add \"core\" to dependencies in mod.py (spec-gaps G218)"));
+        }
+
+        [TestCase("core.path.fnd(a, b)", Codes.EvlUnknownName, "core.path has no host function 'fnd'", "did you mean 'find'?")]
+        [TestCase("core.pth.find(a, b)", Codes.EvlUnknownName, "core has no host function 'pth'", "did you mean 'path'?")]
+        [TestCase("cor.path.find(a, b)", Codes.EvlUnknownName, "name 'cor' is not defined", "did you mean 'core'?")]
+        [TestCase("core.path", Codes.HostName, "core.path is a group of host functions, not a value",
+            "call one of them, such as core.path.find(...) (spec-gaps G218)")]
+        [TestCase("core", Codes.HostName, "core is a group of host functions, not a value",
+            "call one of them, such as core.economy.tax(...) (spec-gaps G218)")]
+        [TestCase("core.path.find.name", Codes.HostName, "core.path.find is a host function, so it has no attribute 'name'", null)]
+        public void HostNamesAreCheckedWhenTheModLoads(string expr, string code, string message, string? hint)
+        {
+            var d = LoadNaval("def go(a, b):\n    return " + expr + "\n").Single();
+            Assert.That(d.Code, Is.EqualTo(code));
+            Assert.That(d.Message, Is.EqualTo(message));
+            Assert.That(d.Hint, Is.EqualTo(hint));
+        }
+
+        [Test]
+        public void ALocalNamedLikeTheOwnerIsJustALocal()
+        {
+            var diags = LoadNaval("def go(core):\n    return core.anything\n");
+            Assert.That(diags, Is.Empty, string.Join("\n", diags));
+        }
+
+        [Test]
+        public void ATopLevelNameThatHidesTheOwnerIsALoadError()
+        {
+            var diags = LoadNaval("core = 1\ndef go(a, b):\n    return core.path.find(a, b)\n");
+            var d = diags.First();
+            Assert.That(d.Code, Is.EqualTo(Codes.HostName));
+            Assert.That(d.Message, Is.EqualTo("the top-level name 'core' hides the host functions of mod 'core'"));
+            Assert.That(d.Span.Line, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AWritingHostFunctionInsideAnExpressionIsALoadError()
+        {
+            var d = LoadNaval("@command(free=True, acts_for=None)\ndef Tax(t: Ref[Tile]):\n    n = core.economy.tax(t) + 1\n")
+                .Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.CmdWriteEffect));
+            Assert.That(d.Message, Is.EqualTo("core.economy.tax() changes the world, so it can only be called as a statement"));
+        }
+
+        [Test]
+        public void AFunctionThatCallsAWritingHostFunctionWrites()
+        {
+            var d = LoadNaval("def levy(t):\n    core.economy.tax(t)\n    return 1\n" +
+                              "@command(free=True, acts_for=None)\ndef Tax(t: Ref[Tile]):\n    n = levy(t) + 1\n").Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.CmdWriteEffect));
+            Assert.That(d.Message, Is.EqualTo("'levy' changes the world, so it can only be called as a statement"));
+        }
+
+        [Test]
+        public void AWritingHostFunctionAsAStatementLoads()
+        {
+            var diags = LoadNaval("@command(free=True, acts_for=None)\ndef Tax(t: Ref[Tile]):\n    core.economy.tax(t)\n" +
+                                  "    n = core.economy.tax(t)\n");
+            Assert.That(diags, Is.Empty, string.Join("\n", diags));
+        }
     }
 }

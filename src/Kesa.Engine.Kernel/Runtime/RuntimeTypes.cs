@@ -90,7 +90,7 @@ namespace Kesa.Engine.Runtime
     /// </summary>
     public sealed class WorldException : Exception
     {
-        public WorldException(string code, string message, string? hint = null) : base(message)
+        public WorldException(string code, string message, string? hint = null, Exception? inner = null) : base(message, inner)
         {
             Code = code;
             Hint = hint;

@@ -59,7 +59,7 @@ namespace Kesa.Engine.Script
         /// <param name="notVisible">다른 모드의 것이라 보이지 않는 이름이면 그 안내 (SCH003)</param>
         public static void Check(ModFunctions functions, ModScope scope, Func<string, bool> isLoadTimeName,
             CallContext context, Func<string, bool>? isSchemaRuntimeName = null, Func<string, string?>? notVisible = null,
-            IEnumerable<string>? schemaRuntimeNames = null)
+            IEnumerable<string>? schemaRuntimeNames = null, HostNames? hosts = null)
         {
             var globals = new SortedSet<string>(scope.Names, StringComparer.Ordinal);
             globals.UnionWith(functions.TopLevelNames);
@@ -67,7 +67,7 @@ namespace Kesa.Engine.Script
             {
                 var walker = new Walker(globals, isLoadTimeName, context, isSchemaRuntimeName ?? (_ => false),
                     notVisible ?? (_ => null), functions.SpawnedDefs, schemaRuntimeNames ?? Array.Empty<string>(),
-                    functions.QueriedNames);
+                    functions.QueriedNames, hosts ?? HostNames.None);
                 if (function.Definition != null)
                     walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
                 else
@@ -86,13 +86,15 @@ namespace Kesa.Engine.Script
             private readonly List<KeyValuePair<string, SourceSpan>> _spawned;
             private readonly List<List<KeyValuePair<string, SourceSpan>>> _queried;
             private readonly IEnumerable<string> _schemaRuntimeNames;
+            private readonly HostNames _hosts;
 
             public Walker(SortedSet<string> globals, Func<string, bool> isLoadTimeName, CallContext context,
                 Func<string, bool> isSchemaRuntimeName, Func<string, string?> notVisible,
                 List<KeyValuePair<string, SourceSpan>> spawned, IEnumerable<string> schemaRuntimeNames,
-                List<List<KeyValuePair<string, SourceSpan>>> queried)
+                List<List<KeyValuePair<string, SourceSpan>>> queried, HostNames hosts)
             {
                 _queried = queried;
+                _hosts = hosts;
                 _globals = globals;
                 _isLoadTimeName = isLoadTimeName;
                 _context = context;
@@ -269,7 +271,7 @@ namespace Kesa.Engine.Script
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
                         break;
                     case AttributeExpr attr:
-                        Expr(attr.Target, locals);
+                        if (!HostChain(attr, locals)) Expr(attr.Target, locals);
                         break;
                     case IndexExpr index:
                         Expr(index.Target, locals);
@@ -306,10 +308,51 @@ namespace Kesa.Engine.Script
                 }
             }
 
+            /// <summary>
+            /// 맨 앞이 보이는 호스트 이름 공간인 속성 줄(<c>core.path.find</c>)을 본다 (G218): 함수까지 이어져야 하고, 이름 공간 자체는
+            /// 값이 아니며, 함수에는 속성이 없다. 호스트 이름 공간이 아니면(지역·최상위 이름이 가렸거나 다른 이름) false.
+            /// </summary>
+            private bool HostChain(AttributeExpr attr, SortedSet<string> locals)
+            {
+                if (!HostNames.TryChain(attr, out var root, out var attributes)) return false;
+                if (locals.Contains(root.Name) || _globals.Contains(root.Name) || !_hosts.IsRoot(root.Name)) return false;
+                var r = _hosts.Resolve(root.Name, attributes);
+                if (r.Missing != null)
+                {
+                    _context.Error(Codes.EvlUnknownName, r.Prefix + " has no host function '" + r.Missing + "'",
+                        attributes[r.Used].Span, Suggest.Hint(r.Missing, _hosts.Children(r.Prefix)));
+                }
+                else if (r.Function == null)
+                    NotAValue(r.Prefix, attr.Span);
+                else if (r.Used < attributes.Count)
+                {
+                    _context.Error(Codes.HostName,
+                        r.Function + " is a host function, so it has no attribute '" + attributes[r.Used].Name + "'",
+                        attributes[r.Used].Span);
+                }
+                return true;
+            }
+
+            private void NotAValue(string prefix, SourceSpan span) =>
+                _context.Error(Codes.HostName, prefix + " is a group of host functions, not a value", span,
+                    "call one of them, such as " + _hosts.FirstFunctionUnder(prefix) + "(...) (spec-gaps G218)");
+
             private void Name(NameExpr name, SortedSet<string> locals)
             {
                 string n = name.Name;
                 if (locals.Contains(n) || _globals.Contains(n) || PureBuiltins.IsRuntimeName(n) || _isSchemaRuntimeName(n)) return;
+                if (_hosts.IsRoot(n))
+                {
+                    NotAValue(n, name.Span);
+                    return;
+                }
+                if (_hosts.IsHidden(n))
+                {
+                    _context.Error(Codes.SchNotVisible,
+                        "the host functions of mod '" + n + "' can only be used by mods that depend on it", name.Span,
+                        "add \"" + n + "\" to dependencies in mod.py (spec-gaps G218)");
+                    return;
+                }
                 var hidden = _notVisible(n);
                 if (hidden != null)
                 {
@@ -338,6 +381,7 @@ namespace Kesa.Engine.Script
                 candidates.AddRange(_globals);
                 candidates.AddRange(PureBuiltins.RuntimeNames);
                 candidates.AddRange(_schemaRuntimeNames);
+                candidates.AddRange(_hosts.Roots);
                 _context.Error(Codes.EvlUnknownName, "name '" + n + "' is not defined", name.Span,
                     hint: Suggest.Hint(n, candidates));
             }

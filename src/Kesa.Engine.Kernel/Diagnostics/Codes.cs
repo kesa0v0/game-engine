@@ -127,6 +127,10 @@ namespace Kesa.Engine.Diagnostics
         public const string RunNoViewPolicy = "RUN017";
         public const string RunViewPolicy = "RUN018";
 
+        // 호스트 함수 경계 (spec S7, spec-gaps G219): 구현이 예외를 던짐 / 서명과 다른 값을 돌려줌 (둘 다 호스트 코드의 버그)
+        public const string RunHostFailed = "RUN019";
+        public const string RunHostReturn = "RUN020";
+
         // 저장과 불러오기 (spec S8, spec-gaps G140): 깨졌거나 형식이 다른 저장 / 지금 내용과 어긋나는 저장 / 모드 목록이 달라짐(경고)
         public const string SaveCorrupt = "SAV001";
         public const string SaveMismatch = "SAV002";
@@ -143,6 +147,9 @@ namespace Kesa.Engine.Diagnostics
 
         // 호스트 함수의 서명을 지금 스키마로 풀지 못함: 없는 Def 타입, 소유 모드에 안 보이는 타입, 맞지 않는 기본값 (spec S7, spec-gaps G215)
         public const string HostSignature = "HST001";
+
+        // 호스트 함수 이름의 잘못된 사용: 이름 공간을 값으로 씀, 함수에 속성을 붙임, 모드 최상위 이름이 이름 공간을 가림 (spec S7, spec-gaps G218)
+        public const string HostName = "HST002";
 
         // 커맨드 선언 (spec S6, spec-gaps G109)
         public const string CmdBadDecorator = "CMD001";

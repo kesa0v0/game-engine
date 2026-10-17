@@ -36,6 +36,15 @@ namespace Kesa.Engine.Host
             ModVisibility visibility, CallContext context)
         {
             var resolved = new List<HostSignature>();
+            // 내장 이름이 먼저 찾아지므로 그 이름 공간에 닿을 수 없다 (G218)
+            if (functions.Count > 0 && PureBuiltins.IsRuntimeName(functions[0].Mod))
+            {
+                context.Error(Codes.HostSignature,
+                    "mod id '" + functions[0].Mod + "' is a built-in name, so scripts cannot reach its host functions",
+                    new SourceSpan(HostFunction.File(functions[0].Mod, functions[0].Path), 1, 1),
+                    "register them for another mod (spec-gaps G218)");
+                return resolved;
+            }
             foreach (var function in functions)
             {
                 var reader = new CommandSignatures.Reader(schema, visibility, null, context, function.Mod, Codes.HostSignature);

@@ -280,8 +280,10 @@ namespace Kesa.Engine.Loading
                 var builtins = new DefBuiltins(schema, visibility, u.Manifest,
                     id => units.Exists(o => o.Manifest.Id == id && !o.Failed), u.Defs, u.Patches);
                 foreach (var file in u.DefFiles) Execute(u, file, builtins);
-                CheckFunctionNames(u, builtins);
-                FunctionEffects.Check(u.Functions, u.Scope, schema, new CallContext(u.Manifest.Id, u.Bag));
+                var hostNames = HostNamesFor(u, units, visibility, host);
+                CheckHostShadowing(u, hostNames);
+                CheckFunctionNames(u, builtins, hostNames);
+                FunctionEffects.Check(u.Functions, u.Scope, schema, new CallContext(u.Manifest.Id, u.Bag), hostNames);
                 CommandSignatures.Resolve(u.Functions.Commands, schema, visibility, u.Scope,
                     new CallContext(u.Manifest.Id, u.Bag));
                 HandlerStages.Check(u.Functions.Handlers, schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
@@ -574,7 +576,7 @@ namespace Kesa.Engine.Loading
         /// 모드의 모든 파일을 실행한 뒤 함수 본문의 이름을 본다 (spec-gaps G108). 스키마 파일의 함수가 Def 파일의 이름을
         /// 써도 되므로 ②b 끝에서 한다. 로드 시점 이름(<c>field</c>, <c>patch</c>, Def 생성자 등)은 따로 안내한다.
         /// </summary>
-        private static void CheckFunctionNames(ModUnit u, DefBuiltins builtins) =>
+        private static void CheckFunctionNames(ModUnit u, DefBuiltins builtins, HostNames hostNames) =>
             FunctionNameChecker.Check(u.Functions, u.Scope,
                 name => name == Interpreter.InheritName || builtins.Lookup(name) != null || builtins.Explain(name) != null,
                 new CallContext(u.Manifest.Id, u.Bag), builtins.IsVisibleRuntimeSchemaName,
@@ -582,7 +584,44 @@ namespace Kesa.Engine.Loading
                 name => builtins.Lookup(name) == null && builtins.Explain(name) is { } e && e.Code == Codes.SchNotVisible
                     ? e.Message
                     : null,
-                builtins.RuntimeSchemaNames);
+                builtins.RuntimeSchemaNames, hostNames);
+
+        /// <summary>
+        /// 이 모드의 함수 본문에서 보이는 호스트 함수 (G218): 소유 모드가 자신이거나 필수 의존(전이)인 함수. 다른 활성 모드의 함수는
+        /// "의존을 더하라"는 안내를 위해 소유 모드 id만 남긴다.
+        /// </summary>
+        private static HostNames HostNamesFor(ModUnit u, List<ModUnit> units, ModVisibility visibility, HostFunctions? host)
+        {
+            if (host == null) return HostNames.None;
+            var visible = new List<KeyValuePair<string, bool>>();
+            var hidden = new List<string>();
+            foreach (var owner in units)
+            {
+                if (owner.Excluded) continue;
+                var functions = host.Of(owner.Manifest.Id);
+                if (functions.Count == 0) continue;
+                if (!visibility.CanSee(u.Manifest.Id, owner.Manifest.Id))
+                {
+                    hidden.Add(owner.Manifest.Id);
+                    continue;
+                }
+                foreach (var f in functions) visible.Add(new KeyValuePair<string, bool>(f.Name, f.Effect == HostEffect.Writes));
+            }
+            return new HostNames(visible, hidden);
+        }
+
+        /// <summary>모드가 최상위에 호스트 이름 공간과 같은 이름을 묶으면 그 함수들이 가려지므로 로드 오류다 (G218).</summary>
+        private static void CheckHostShadowing(ModUnit u, HostNames hostNames)
+        {
+            foreach (var name in u.Scope.Names)
+            {
+                if (!hostNames.IsRoot(name)) continue;
+                u.Scope.TryGet(name, out _, out var span);
+                u.Bag.Error(Codes.HostName,
+                    "the top-level name '" + name + "' hides the host functions of mod '" + name + "'", span, u.Manifest.Id,
+                    "rename it (spec-gaps G218)");
+            }
+        }
 
         /// <summary>
         /// 필수 의존 중 실패한 모드가 있으면 이 모드를 비활성화한다 (MOD009). 로드 순서상 의존 대상이 앞에 있으므로
