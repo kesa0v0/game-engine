@@ -119,6 +119,11 @@ namespace Kesa.Engine.Script
                         Expr(s.Iterable);
                         Block(s.Body);
                         return;
+                    case WhileStmt s:
+                        Tag("while");
+                        Expr(s.Condition);
+                        Block(s.Body);
+                        return;
                     case IfStmt s:
                         Tag("if");
                         Number(s.Branches.Count);

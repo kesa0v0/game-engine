@@ -125,6 +125,10 @@ namespace Kesa.Engine.Script
                             Expr(loop.Iterable, locals);
                             Block(loop.Body, locals);
                             break;
+                        case WhileStmt loop:
+                            Expr(loop.Condition, locals);
+                            Block(loop.Body, locals);
+                            break;
                         case WithStmt with:
                             // 자리와 모양은 FunctionChecker가 본다 (G111). preconditions는 이름이 아니라 표지다
                             if (!(with.Context is NameExpr context && context.Name == FunctionChecker.PreconditionsName))

@@ -305,6 +305,11 @@ namespace Kesa.Engine.Script
                         Block(loop.Body);
                         break;
 
+                    case WhileStmt loop:
+                        Expr(loop.Condition);
+                        Block(loop.Body);
+                        break;
+
                     case ReturnStmt ret:
                         if (ret.Value != null) Expr(ret.Value);
                         break;

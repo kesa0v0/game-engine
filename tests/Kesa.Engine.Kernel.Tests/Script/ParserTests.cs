@@ -110,7 +110,7 @@ namespace Kesa.Engine.Tests.Script
         [TestCase("for x in y:\n    pass\nelse:\n    pass\n")]
         [TestCase("def f():\n    def g():\n        pass\n")]
         [TestCase("def f():\n    return 1, 2\n")]
-        [TestCase("while x:\n    pass\n")]
+        [TestCase("while x:\n    pass\nelse:\n    pass\n")]
         [TestCase("import os\n")]
         [TestCase("x = (1, 2)\n")]
         [TestCase("x = [a for a, b in y]\n")]
@@ -195,8 +195,20 @@ namespace Kesa.Engine.Tests.Script
         [Test]
         public void ParsingContinuesAfterUnsupportedBlock()
         {
-            var (module, _) = Parse("while x:\n    y = 1\nx = 2\n");
+            var (module, _) = Parse("match x:\n    case 1:\n        y = 1\nx = 2\n");
             Assert.That(module.Body.Last(), Is.InstanceOf<AssignStmt>());
+        }
+
+        // ---- while (spec-gaps G195) ----
+
+        [Test]
+        public void WhileHasAConditionAndABodyWhereBreakIsAllowed()
+        {
+            var (module, diags) = Parse("def f():\n    while x < 3:\n        x += 1\n        if x == 2:\n            break\n    return x\n");
+            Assert.That(diags, Is.Empty);
+            var loop = (WhileStmt)((FunctionDef)module.Body.Single()).Body[0];
+            Assert.That(loop.Condition, Is.InstanceOf<BinaryExpr>());
+            Assert.That(loop.Body, Has.Count.EqualTo(2));
         }
 
         // ---- if / elif / else (spec-gaps G46) ----

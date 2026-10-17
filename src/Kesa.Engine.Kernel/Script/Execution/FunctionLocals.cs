@@ -36,6 +36,9 @@ namespace Kesa.Engine.Script
                         locals.Add(loop.Target.Name);
                         Collect(loop.Body, locals);
                         break;
+                    case WhileStmt loop:
+                        Collect(loop.Body, locals);
+                        break;
                     case IfStmt ifs:
                         foreach (var branch in ifs.Branches) Collect(branch.Body, locals);
                         if (ifs.OrElse != null) Collect(ifs.OrElse, locals);

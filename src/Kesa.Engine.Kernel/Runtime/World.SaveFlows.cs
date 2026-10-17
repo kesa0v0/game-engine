@@ -238,8 +238,13 @@ namespace Kesa.Engine.Runtime
                             // 엔진이 준 묶음을 돌던 중이면 그 묶음도: 이어서 돌 때도 사라진 항목을 건너뛴다 (G194)
                             if (block.Live != null) obj.Add("live", SaveScriptValue((Value)block.Live, writer));
                             break;
+                        case WhileStmt loop:
+                            // 위치만 적는다: 조건은 이어서 실행할 때 다시 평가한다 (G195)
+                            if (!ReferenceEquals(block.While, loop))
+                                throw new InvalidOperationException("engine: a paused block is not the body of its while");
+                            break;
                         default:
-                            throw new InvalidOperationException("engine: a paused block was not opened by an if or a for");
+                            throw new InvalidOperationException("engine: a paused block was not opened by an if, a for or a while");
                     }
                 }
                 blocks.Add(obj);
@@ -754,6 +759,9 @@ namespace Kesa.Engine.Runtime
                             block.Count = block.Range?.Count ?? block.Items!.Count;
                             if (block.Index < -1 || block.Index >= block.Count)
                                 throw new JsonFormatException("a loop index is out of range");
+                            break;
+                        case WhileStmt loop:
+                            block = new PureEvaluator.Block(loop.Body) { While = loop };
                             break;
                         default:
                             problems.Add(changed);

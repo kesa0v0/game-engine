@@ -269,6 +269,12 @@ namespace Kesa.Engine.Script
             /// <summary>이 블록이 <c>for</c>의 몸체면 그 문장.</summary>
             public ForStmt? Loop { get; set; }
 
+            /// <summary>이 블록이 <c>while</c>의 몸체면 그 문장. 바퀴마다 조건을 다시 평가한다 (G195).</summary>
+            public WhileStmt? While { get; set; }
+
+            /// <summary><c>break</c>·<c>continue</c>가 찾는 반복의 몸체인가.</summary>
+            public bool IsLoop => Loop != null || While != null;
+
             /// <summary>반복 항목: <see cref="Range"/>가 아니면 시작할 때 펼친 목록.</summary>
             public IReadOnlyList<Value>? Items { get; set; }
 
@@ -287,6 +293,7 @@ namespace Kesa.Engine.Script
             public Block Copy() => new Block(Body, Next)
             {
                 Loop = Loop,
+                While = While,
                 Items = Items,
                 Range = Range,
                 Live = Live,
@@ -983,12 +990,31 @@ namespace Kesa.Engine.Script
                     Exec(block.Body[block.Next++], frame);
                     return;
                 }
-                if (block.Loop == null || !NextIteration(block, frame)) frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
+                if (!block.IsLoop || !NextIteration(block, frame)) frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
             }
 
-            /// <summary>반복의 다음 항목으로 넘어간다. 항목이 더 없으면 false.</summary>
+            /// <summary>반복의 다음 항목으로 넘어간다. 항목이 더 없으면(<c>while</c>은 조건이 거짓이면) false.</summary>
             private bool NextIteration(Block block, Frame frame)
             {
+                if (block.While != null)
+                {
+                    // 조건 검사가 바퀴마다 한 단계를 써서, 묻지 않고 혼자 도는 while은 단계 예산이 끊는다 (G195)
+                    bool again;
+                    try
+                    {
+                        Tick();
+                        again = PureOps.Truthy(Eval(block.While.Condition, frame));
+                    }
+                    catch (ScriptRuntimeException e)
+                    {
+                        Attach(e, block.While.Span);
+                        throw;
+                    }
+                    if (!again) return false;
+                    block.Next = 0;
+                    return true;
+                }
+
                 // 엔진이 준 묶음이면 그사이 죽은 엔티티와 뗀 줄은 건너뛴다 (G88·G194)
                 while (block.Live != null && block.Index + 1 < block.Count && block.Live.IsGone(block.ItemAt(block.Index + 1)))
                     block.Index++;
@@ -1068,6 +1094,11 @@ namespace Kesa.Engine.Script
                         StartFor(loop, frame);
                         return;
 
+                    case WhileStmt loop:
+                        // 끝에 선 빈 몸체를 쌓는다: 첫 조건 검사도 실행 고리가 NextIteration에서 한다
+                        frame.Blocks.Add(new Block(loop.Body) { While = loop, Next = loop.Body.Count });
+                        return;
+
                     case ReturnStmt ret:
                         Finish(ret.Value == null ? NoneValue.Instance : Eval(ret.Value, frame));
                         return;
@@ -1077,12 +1108,12 @@ namespace Kesa.Engine.Script
 
                     case BreakStmt _:
                         // 가장 안쪽 반복의 몸체까지 걷어 낸다 (반복 밖의 break는 파서가 막는다)
-                        while (frame.Blocks[frame.Blocks.Count - 1].Loop == null) frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
+                        while (!frame.Blocks[frame.Blocks.Count - 1].IsLoop) frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
                         frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
                         return;
 
                     case ContinueStmt _:
-                        while (frame.Blocks[frame.Blocks.Count - 1].Loop == null) frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
+                        while (!frame.Blocks[frame.Blocks.Count - 1].IsLoop) frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
                         var body = frame.Blocks[frame.Blocks.Count - 1];
                         body.Next = body.Body.Count;
                         return;

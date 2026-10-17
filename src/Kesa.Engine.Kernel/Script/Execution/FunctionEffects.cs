@@ -316,6 +316,10 @@ namespace Kesa.Engine.Script
                             Expr(loop.Iterable, locals);
                             Block(loop.Body, locals);
                             break;
+                        case WhileStmt loop:
+                            Expr(loop.Condition, locals);
+                            Block(loop.Body, locals);
+                            break;
                         case WithStmt with:
                             // 사전 조건 블록의 문장은 require 호출과 이름 대입뿐이다 (G111): 그 안의 호출은 모두 식 안이다
                             _inPreconditions = true;

@@ -409,6 +409,19 @@ namespace Kesa.Engine.Script
         public IReadOnlyList<Stmt> Body { get; }
     }
 
+    /// <summary><c>while 식:</c>. 따로 상한은 없고 단계 예산이 막는다 (<c>else</c> 절은 아직 없음, spec-gaps G195).</summary>
+    public sealed class WhileStmt : Stmt
+    {
+        public WhileStmt(Expr condition, IReadOnlyList<Stmt> body, SourceSpan span) : base(span)
+        {
+            Condition = condition;
+            Body = body;
+        }
+
+        public Expr Condition { get; }
+        public IReadOnlyList<Stmt> Body { get; }
+    }
+
     public sealed class PassStmt : Stmt
     {
         public PassStmt(SourceSpan span) : base(span) { }

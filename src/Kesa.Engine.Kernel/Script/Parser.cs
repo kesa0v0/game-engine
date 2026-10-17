@@ -156,6 +156,12 @@ namespace Kesa.Engine.Script
                 return;
             }
 
+            if (Cur.IsName("while"))
+            {
+                body.Add(ParseWhile());
+                return;
+            }
+
             if (Cur.IsName("with"))
             {
                 body.Add(ParseWith());
@@ -339,6 +345,42 @@ namespace Kesa.Engine.Script
                 SkipToNewline();
                 if (Cur.Kind == TokenKind.Indent) SkipBlock();
                 return new UnsupportedStmt("for", keyword.Span);
+            }
+        }
+
+        /// <summary><c>while 식:</c> 블록. <c>else</c> 절은 미지원으로 보고한다 (spec-gaps G195).</summary>
+        private Stmt ParseWhile()
+        {
+            var keyword = Advance();
+            try
+            {
+                var condition = ParseExpression();
+                Expect(":");
+
+                List<Stmt> body;
+                _loopDepth++;
+                try
+                {
+                    body = ParseSuite();
+                }
+                finally
+                {
+                    _loopDepth--;
+                }
+
+                if (Cur.IsName("else"))
+                {
+                    _diagnostics.Error(Codes.ParUnsupported, "'else' on a 'while' loop is not supported", Cur.Span);
+                    SkipToNewline();
+                    if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                }
+                return new WhileStmt(condition, body, keyword.Span);
+            }
+            catch (ParseError)
+            {
+                SkipToNewline();
+                if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                return new UnsupportedStmt("while", keyword.Span);
             }
         }
 

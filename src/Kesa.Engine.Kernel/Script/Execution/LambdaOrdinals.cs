@@ -58,6 +58,10 @@ namespace Kesa.Engine.Script
                     Expr(s.Iterable, found);
                     Block(s.Body, found);
                     return;
+                case WhileStmt s:
+                    Expr(s.Condition, found);
+                    Block(s.Body, found);
+                    return;
                 case IfStmt s:
                     foreach (var branch in s.Branches)
                     {
