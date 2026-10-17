@@ -326,6 +326,88 @@ namespace Kesa.Engine.Runtime
             };
         }
 
+        // ---- 근거 (G199·G205) ----
+
+        /// <summary>
+        /// 보이는 <c>derived</c> 값과 그 근거. 값은 보인다(그 칸을 공개한 것은 모드의 결정, G199). 근거 중 못 보는 엔티티·컴포넌트를
+        /// 읽은 것과 못 보는 출처의 기여 행은 빠지고, 그런 것이 있었던 단계마다 끝에 <see cref="ExplainKind.Hidden"/> 하나가 붙는다(G205).
+        /// <c>query</c> 근거의 목록에서는 못 보는 엔티티가 빠진다. 정책은 월드가 근거를 다 모은 뒤에 부른다.
+        /// </summary>
+        public ExplainNode Explain(EntityId id, MemberHandle member)
+        {
+            Visible(id);
+            if (member.Component != null && !_world.MaySee(Issuer, id, member.Component.Name, _diagnostics))
+                throw _world.NotAttachedForView(id, member.Component.Name);
+            return Strip(_world.Explain(id, member));
+        }
+
+        public ExplainNode Explain(EntityId id, MemberHandle member, string key)
+        {
+            RowVisible(id, member);
+            return Strip(_world.Explain(id, member, key));
+        }
+
+        public ExplainNode Explain(EntityId id, MemberHandle member, EntityId key)
+        {
+            RowVisible(id, member);
+            if (_world.IsAlive(key) && !Sees(key)) throw _world.KeyGoneForView(key);
+            return Strip(_world.Explain(id, member, key));
+        }
+
+        private ExplainNode Strip(ExplainNode node) => node.With(Filter(node.Value), Strip(node.Reads));
+
+        private IReadOnlyList<ExplainNode> Strip(IReadOnlyList<ExplainNode> reads)
+        {
+            var kept = new List<ExplainNode>(reads.Count);
+            bool hidden = false;
+            foreach (var read in reads)
+            {
+                switch (read.Kind)
+                {
+                    case ExplainKind.Time:
+                        kept.Add(read);
+                        continue;
+                    case ExplainKind.Query:
+                    {
+                        var items = new List<Value>();
+                        foreach (var item in ((ListValue)read.Value).Items)
+                            if (SeesListed(((IEntityReference)item).EntityId, read.Names)) items.Add(item);
+                        kept.Add(read.With(new ListValue(items), read.Reads));
+                        continue;
+                    }
+                    case ExplainKind.Contribution:
+                        if (SeesRead(read) && (read.Source == null || !_world.IsAlive(read.Source.Value) || Sees(read.Source.Value)))
+                            kept.Add(read.With(Filter(read.Value), read.Reads));
+                        else hidden = true;
+                        continue;
+                }
+                if (SeesRead(read)) kept.Add(Strip(read));
+                else hidden = true;
+            }
+            if (hidden) kept.Add(ExplainNode.Hidden());
+            return kept;
+        }
+
+        /// <summary>읽은 칸이 보이는가: 엔티티, 컴포넌트(Def 상수면 엔티티 층, G197), 엔티티 키.</summary>
+        private bool SeesRead(ExplainNode read)
+        {
+            if (!_world.IsAlive(read.Entity)) return true;
+            if (_world.IsComponentName(read.Component) ? !Sees(read.Entity, read.Component) : !Sees(read.Entity)) return false;
+            return read.Key == null || !read.Key.StartsWith("#", System.StringComparison.Ordinal) ||
+                   !long.TryParse(read.Key.Substring(1), System.Globalization.NumberStyles.None,
+                       System.Globalization.CultureInfo.InvariantCulture, out var key) ||
+                   !IsUnseenEntity(new EntityValue(new EntityId(key)));
+        }
+
+        /// <summary><c>query</c>가 꺼낸 엔티티를 이 연결도 같은 query로 꺼내는가 (<see cref="Query"/>와 같다).</summary>
+        private bool SeesListed(EntityId id, IReadOnlyList<string> names)
+        {
+            if (!Sees(id)) return false;
+            foreach (var name in names)
+                if (_world.IsComponentName(name) && !_world.MaySee(Issuer, id, name, _diagnostics)) return false;
+            return true;
+        }
+
         // ---- 합법 수와 후보 (G202) ----
 
         /// <summary>

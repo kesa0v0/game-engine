@@ -21,6 +21,12 @@ namespace Kesa.Engine.Runtime
 
         /// <summary><c>query(...)</c>로 엔티티 목록을 읽었다 (G193). <see cref="ExplainNode.Member"/>가 출처 이름들, <see cref="ExplainNode.Value"/>가 그 목록이다.</summary>
         Query,
+
+        /// <summary>
+        /// 거른 읽기에서만: 이 단계에 그 연결이 못 보는 근거가 있었다 (spec-gaps G205). 단계마다 많아야 하나이고 그 단계의 끝에 온다.
+        /// 몇 개였는지, 어디였는지는 보이지 않는다.
+        /// </summary>
+        Hidden,
     }
 
     /// <summary>
@@ -50,8 +56,21 @@ namespace Kesa.Engine.Runtime
         {
             var quoted = new List<string>();
             foreach (var n in names) quoted.Add("\"" + n + "\"");
-            return new ExplainNode(ExplainKind.Query, default, "", null, string.Join(", ", quoted), result, new List<ExplainNode>());
+            return new ExplainNode(ExplainKind.Query, default, "", null, string.Join(", ", quoted), result, new List<ExplainNode>())
+            {
+                Names = names,
+            };
         }
+
+        internal static ExplainNode Hidden() =>
+            new ExplainNode(ExplainKind.Hidden, default, "", null, "", HiddenValue.Instance, new List<ExplainNode>());
+
+        /// <summary>같은 근거에 값과 아래 근거만 바꾼 것 (거른 읽기).</summary>
+        internal ExplainNode With(Value value, IReadOnlyList<ExplainNode> reads) =>
+            new ExplainNode(Kind, Entity, Component, Key, Member, value, reads, Op, Source) { Names = Names };
+
+        /// <summary><see cref="ExplainKind.Query"/>의 출처 이름들 (Def 타입·컴포넌트).</summary>
+        internal IReadOnlyList<string> Names { get; private set; } = new string[0];
 
         public ExplainKind Kind { get; }
         public EntityId Entity { get; }
@@ -82,7 +101,11 @@ namespace Kesa.Engine.Runtime
         private void Append(StringBuilder text, int depth)
         {
             text.Append(' ', depth * 2);
-            if (Kind == ExplainKind.Time)
+            if (Kind == ExplainKind.Hidden)
+            {
+                text.Append("(hidden)");
+            }
+            else if (Kind == ExplainKind.Time)
             {
                 text.Append("now() = ").Append(World.Show(Value));
             }

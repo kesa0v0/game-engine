@@ -257,6 +257,82 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(ok.Reactions, Is.Empty);
         }
 
+        // ---- 근거 (G199·G205) ----
+
+        private World ThreatWorld(params (int atk, bool hidden)[] units)
+        {
+            Mod("scouts", schema:
+                    "component(\"Side\", conn=field(str, default=\"\"))\n" +
+                    "component(\"Combat\", atk=field(int, default=0))\n" +
+                    "component(\"Fog\", hidden=field(bool, default=False))\n" +
+                    "def threat(d):\n" +
+                    "    total = 0\n" +
+                    "    for u in query(\"Combat\"):\n" +
+                    "        total += u.Combat.atk\n" +
+                    "    for r in contribs(d, \"threat\"):\n" +
+                    "        total += r.value\n" +
+                    "    return floor(total)\n" +
+                    "component(\"Defense\", threat=derived(int, threat))\n" +
+                    "deftype(\"Unit\", components=[\"Side\", \"Combat\", \"Fog\"])\n" +
+                    "deftype(\"Castle\", components=[\"Side\", \"Defense\"])\n",
+                defs: "Unit(\"Raider\")\nCastle(\"Keep\")\n" +
+                      "@view_policy\ndef may_see(issuer, entity, component):\n" +
+                      "    return entity.Fog is None or not entity.Fog.hidden or entity.Side.conn == issuer\n");
+            var w = new World(LoadClean());
+            var castle = w.Create("Keep");
+            w.Set(castle, w.Member("Side", "conn"), new StrValue("B"));
+            foreach (var (atk, hidden) in units)
+            {
+                var u = w.Create("Raider");
+                w.Set(u, w.Member("Side", "conn"), new StrValue("A"));
+                w.Set(u, w.Member("Combat", "atk"), new IntValue(atk));
+                w.Set(u, w.Member("Fog", "hidden"), hidden ? BoolValue.True : BoolValue.False);
+            }
+            return w;
+        }
+
+        [Test]
+        public void TheExplanationKeepsTheValueAndFoldsHiddenReadsIntoOneLineAtTheEnd()
+        {
+            var w = ThreatWorld((4, true), (3, false), (5, true), (0, false));
+            var castle = new EntityId(1);
+            var threat = w.Member("Defense", "threat");
+            w.AddContribution(castle, threat, "add", new IntValue(2), new EntityId(2)); // 숨긴 #2에서
+            w.AddContribution(castle, threat, "add", new IntValue(1), new EntityId(3)); // 보이는 #3에서
+            Assert.That(w.Explain(castle, threat).Render(), Is.EqualTo(
+                "Defense.threat of #1 = 15\n" +
+                "  query(\"Combat\") = [#2, #3, #4, #5]\n" +
+                "  Combat.atk of #2 = 4\n  Combat.atk of #3 = 3\n  Combat.atk of #4 = 5\n  Combat.atk of #5 = 0\n" +
+                "  contribution add 2.0 from #2\n  contribution add 1.0 from #3"));
+
+            var b = w.ViewAs("B");
+            Assert.That(b.Explain(castle, threat).Render(), Is.EqualTo(
+                "Defense.threat of #1 = 15\n" +
+                "  query(\"Combat\") = [#3, #5]\n" +
+                "  Combat.atk of #3 = 3\n  Combat.atk of #5 = 0\n" +
+                "  contribution add 1.0 from #3\n" +
+                "  (hidden)"));
+            Assert.That(b.Diagnostics, Is.Empty);
+            // A는 자기 유닛이라 전부 본다
+            Assert.That(w.ViewAs("A").Explain(castle, threat).Render(), Is.EqualTo(w.Explain(castle, threat).Render()));
+            // 못 보는 유닛의 값은 설명할 수도 없다(죽은 id와 같다)
+            Assert.That(Assert.Throws<WorldException>(() => b.Explain(new EntityId(2), w.Member("Combat", "atk")))!.Code,
+                Is.EqualTo(Codes.RunDeadEntity));
+        }
+
+        [Test]
+        public void HowManyHiddenReadsThereWereDoesNotShow()
+        {
+            var one = ThreatWorld((4, true), (3, false));
+            var two = ThreatWorld((4, true), (3, false), (0, true));
+            var threat = one.Member("Defense", "threat");
+            Assert.That(two.Explain(new EntityId(1), threat).Render(), Is.Not.EqualTo(one.Explain(new EntityId(1), threat).Render()));
+            Assert.That(two.ViewAs("B").Explain(new EntityId(1), threat).Render(),
+                Is.EqualTo(one.ViewAs("B").Explain(new EntityId(1), threat).Render()));
+            var nothing = ThreatWorld((3, false));
+            Assert.That(nothing.ViewAs("B").Explain(new EntityId(1), threat).Render(), Does.Not.Contain("hidden"));
+        }
+
         // ---- 합법 수와 후보 (G202) ----
 
         private const string MoveDefs =
