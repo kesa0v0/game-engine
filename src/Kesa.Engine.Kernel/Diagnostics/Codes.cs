@@ -135,6 +135,9 @@ namespace Kesa.Engine.Diagnostics
         // 멈춘 Flow의 함수(프레임의 함수, 람다가 든 함수)의 본문이 저장 뒤에 바뀜 (spec S8·C5, spec-gaps G144)
         public const string SaveFunctionChanged = "SAV004";
 
+        // 호스트가 허락해(dropRemoved) 지워진 컴포넌트·멤버·Def 키 줄의 저장된 값을 버리고 불러옴 (경고, spec S8, spec-gaps G210)
+        public const string SaveDropped = "SAV005";
+
         // 커맨드 선언 (spec S6, spec-gaps G109)
         public const string CmdBadDecorator = "CMD001";
         public const string CmdPreconditions = "CMD002";

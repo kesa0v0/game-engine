@@ -172,10 +172,12 @@ namespace Kesa.Engine.Runtime
         /// 저장을 새 월드로 불러온다 (S8 "로드는 원자적": 지금 월드는 건드리지 않는다). 실패해도 예외가 아니라
         /// 진단 목록으로 알린다. 저장이 지금 내용(Def·컴포넌트·멤버·타입)과 맞지 않으면 무엇이 어긋나는지 모두 적고 거부한다.
         /// 모드 목록이 달라진 것은 경고로만 알린다(Def 값 변경은 항상 허용, S8).
+        /// <paramref name="dropRemoved"/>를 켜면 지워진 것(컴포넌트, 멤버, Def 목록에서 빠진 컴포넌트, 없어진 Def를 키로 한 줄)의
+        /// 저장된 값은 버리고 버린 곳마다 경고(<c>SAV005</c>)를 남긴 채 불러온다(G210). 타입이 바뀐 값 같은 나머지 어긋남은 그래도 거부한다.
         /// </summary>
         public static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, int stepBudget = DefaultStepBudget,
             bool requireSubmitPolicy = false, int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
-            int maxSettleRounds = DefaultMaxSettleRounds, bool requireViewPolicy = false)
+            int maxSettleRounds = DefaultMaxSettleRounds, bool requireViewPolicy = false, bool dropRemoved = false)
         {
             var diagnostics = new List<Diagnostic>();
             World world;
@@ -192,7 +194,7 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var root = AsObject(CanonicalJson.Read(save), "the save");
-                world.Restore(root, diagnostics);
+                world.Restore(root, diagnostics, dropRemoved);
             }
             catch (JsonFormatException e)
             {
@@ -203,7 +205,7 @@ namespace Kesa.Engine.Runtime
             return new WorldLoadResult(world, diagnostics);
         }
 
-        private void Restore(JsonObject root, List<Diagnostic> diagnostics)
+        private void Restore(JsonObject root, List<Diagnostic> diagnostics, bool dropRemoved)
         {
             long format = Long(Field(root, "format"), "format");
             if (format != SaveFormatVersion)
@@ -220,7 +222,7 @@ namespace Kesa.Engine.Runtime
             _nextFlow = Positive(Field(counters, "flow"), "counters.flow");
             _nextRequest = Positive(Field(counters, "request"), "counters.request");
 
-            var problems = new LoadProblems(diagnostics);
+            var problems = new LoadProblems(diagnostics, dropRemoved);
             var entities = AsArray(Field(root, "entities"), "entities");
 
             // 1차: 엔티티를 모두 만든다 (값과 줄이 다른 엔티티를 가리킬 수 있다)
@@ -314,7 +316,7 @@ namespace Kesa.Engine.Runtime
             {
                 string name = Text(node, "a runtime component");
                 if (!_schema.TryGetComponent(name, out var component))
-                    problems.Add(where + ": the component '" + name + "' no longer exists");
+                    problems.Removed(where + ": the component '" + name + "' no longer exists");
                 else if (entity.Def.Components.Contains(name))
                     problems.Add(where + ": '" + name + "' was attached at runtime, but its Def now has it");
                 else entity.Runtime.Add(name, component);
@@ -410,12 +412,13 @@ namespace Kesa.Engine.Runtime
         {
             if (!_schema.TryGetComponent(name, out var component))
             {
-                problems.Add(where + ": the component '" + name + "' no longer exists");
+                problems.Removed(where + ": the component '" + name + "' no longer exists");
                 return null;
             }
             if (!Has(entity, component))
             {
-                problems.Add(where + ": the entity no longer has '" + name + "'");
+                // 런타임 목록은 값보다 먼저 되살리므로, 여기 오는 것은 Def 목록에서 빠진 컴포넌트다
+                problems.Removed(where + ": the entity no longer has '" + name + "'");
                 return null;
             }
             return component;
@@ -429,7 +432,7 @@ namespace Kesa.Engine.Runtime
                 string display = where + "." + pair.Key;
                 if (!component.TryGetMember(pair.Key, out var member))
                 {
-                    problems.Add(display + ": the member no longer exists");
+                    problems.Removed(display + ": the member no longer exists");
                     continue;
                 }
                 if (member.Kind == MemberKind.Const || member.Kind == MemberKind.Derived)
@@ -488,7 +491,12 @@ namespace Kesa.Engine.Runtime
             {
                 case KeyKind.Def:
                     string id = Text(node, "a row key");
-                    if (!_defs.TryGet(id, out var def) || def.Type != component.Key)
+                    if (!_defs.TryGet(id, out var def))
+                    {
+                        problems.Removed(where + ": there is no " + component.Key!.Name + " '" + id + "' to key a row by any more");
+                        return null;
+                    }
+                    if (def.Type != component.Key)
                     {
                         problems.Add(where + ": there is no " + component.Key!.Name + " '" + id + "' to key a row by any more");
                         return null;
@@ -530,7 +538,12 @@ namespace Kesa.Engine.Runtime
             var component = ComponentOf(entity, Text(Field(obj, "component"), "a contribution component"), where, problems);
             if (component == null) return;
             string memberName = Text(Field(obj, "member"), "a contribution member");
-            if (!component.TryGetMember(memberName, out var member) || member.Kind != MemberKind.Derived)
+            if (!component.TryGetMember(memberName, out var member))
+            {
+                problems.Removed(where + ": '" + component.Name + "." + memberName + "' no longer exists");
+                return;
+            }
+            if (member.Kind != MemberKind.Derived)
             {
                 problems.Add(where + ": '" + component.Name + "." + memberName + "' is no longer a derived value");
                 return;
@@ -647,7 +660,13 @@ namespace Kesa.Engine.Runtime
         {
             private readonly List<Diagnostic> _diagnostics;
             private readonly HashSet<string> _seen = new HashSet<string>(StringComparer.Ordinal);
-            public LoadProblems(List<Diagnostic> diagnostics) => _diagnostics = diagnostics;
+            private readonly bool _dropRemoved;
+
+            public LoadProblems(List<Diagnostic> diagnostics, bool dropRemoved)
+            {
+                _diagnostics = diagnostics;
+                _dropRemoved = dropRemoved;
+            }
 
             /// <summary>Def가 없어져 만들지 못한 엔티티. 그것을 가리키는 줄·기여 행은 따로 보고하지 않는다(로드는 어차피 실패한다).</summary>
             public HashSet<long> Skipped { get; } = new HashSet<long>();
@@ -660,6 +679,22 @@ namespace Kesa.Engine.Runtime
                 if (!_seen.Add(message)) return;
                 _diagnostics.Add(new Diagnostic(Codes.SaveMismatch, Severity.Error, message, null, SourceSpan.None,
                     "the content changed in a way the save cannot follow (spec S8)"));
+            }
+
+            /// <summary>
+            /// 저장된 값의 자리가 지워짐 (G210). 기본은 <see cref="Add"/>처럼 거부하고, 호스트가 <c>dropRemoved</c>를 켰으면
+            /// 그 값을 버리고 경고만 남긴다(호출한 쪽은 어느 경우든 그 값을 되살리지 않는다).
+            /// </summary>
+            public void Removed(string message)
+            {
+                if (!_dropRemoved)
+                {
+                    Add(message);
+                    return;
+                }
+                if (!_seen.Add(message)) return;
+                _diagnostics.Add(new Diagnostic(Codes.SaveDropped, Severity.Warning, message + "; its saved value was dropped", null,
+                    SourceSpan.None, "the host allowed dropping what the content removed (spec S8)"));
             }
 
             /// <summary>멈춘 Flow의 함수 본문이 저장 뒤에 바뀜 (C5, G144). 위치를 옮겨 보지 않고 거부한다.</summary>

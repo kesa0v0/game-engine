@@ -236,6 +236,87 @@ namespace Kesa.Engine.Tests.Runtime
             }));
         }
 
+        /// <summary>호스트가 허락하면 지워진 컴포넌트·멤버·Def 키 줄의 값을 버리고, 버린 곳마다 경고를 남기고 불러온다 (G210).</summary>
+        [Test]
+        public void TheHostCanDropWhatTheContentRemovedAndLoadWithWarnings()
+        {
+            BuildNastyWorld();
+            var save = _world.Save();
+            Mod("banking",
+                schema: Schema.Replace("component(\"Wounded\", turns=field(int))\n", "")
+                    .Replace(", calm=field(bool, default=True)", ""),
+                defs: Defs.Replace("SkillDef(\"Mining\")\n", ""), extra: ", version=\"1.0\"");
+            var result = World.Load(LoadClean(), save, dropRemoved: true);
+
+            Assert.That(result.Succeeded, Is.True, string.Join("\n", result.Diagnostics));
+            Assert.That(result.Diagnostics.Select(d => d.Code + " " + d.Severity + " " + d.Message).ToList(), Is.EquivalentTo(new[]
+            {
+                "SAV005 Warning #2 (Scout): the component 'Wounded' no longer exists; its saved value was dropped",
+                "SAV005 Warning #2 (Scout) Name.calm: the member no longer exists; its saved value was dropped",
+                "SAV005 Warning #2 (Scout) Mood: there is no SkillDef 'Mining' to key a row by any more; its saved value was dropped",
+                "SAV005 Warning #2 (Scout) Skill: there is no SkillDef 'Mining' to key a row by any more; its saved value was dropped",
+            }));
+
+            // 버리지 않은 값은 그대로다
+            var w = result.World!;
+            Assert.That(((StrValue)w.Get(_a, w.Member("Name", "text"))).Value, Is.EqualTo("검은 늑대 \"대장\"\n\\"));
+            Assert.That(w.RowKeys(_a, "Skill"), Is.EqualTo(new[] { "Cooking" }));
+            Assert.That(((IntValue)w.GetRow(_a, w.Member("Skill", "level"), "Cooking")).Value, Is.EqualTo(3));
+            Assert.That(((IntValue)w.Get(_a, w.Member("Power", "total"))).Value, Is.EqualTo(2));
+
+            // 버린 뒤의 저장은 지금 내용과 맞는다: 경고 없이 다시 불러오고 바이트가 같다
+            var dropped = w.Save();
+            var again = World.Load(LoadClean(), dropped);
+            Assert.That(again.Diagnostics, Is.Empty, string.Join("\n", again.Diagnostics));
+            Assert.That(again.World!.Save(), Is.EqualTo(dropped));
+        }
+
+        /// <summary>Def 목록에서 빠진 컴포넌트는 그 값과 그 컴포넌트의 기여 행을 함께 버린다 (G210).</summary>
+        [Test]
+        public void DroppingAComponentADefNoLongerListsDropsItsValuesAndContributions()
+        {
+            BuildNastyWorld();
+            var save = _world.Save();
+            Mod("banking",
+                schema: Schema.Replace("\"Mood\", \"Home\", \"Power\"]", "\"Mood\"]"),
+                defs: Defs, extra: ", version=\"1.0\"");
+
+            var rejected = World.Load(LoadClean(), save);
+            Assert.That(rejected.Succeeded, Is.False);
+
+            var result = World.Load(LoadClean(), save, dropRemoved: true);
+            Assert.That(result.Succeeded, Is.True, string.Join("\n", result.Diagnostics));
+            var messages = result.Diagnostics.Select(d => d.Code + " " + d.Message).ToList();
+            Assert.That(messages, Is.EquivalentTo(rejected.Diagnostics.Select(d => "SAV005 " + d.Message + "; its saved value was dropped")));
+            Assert.That(messages, Has.Some.Contains("#2 (Scout): the entity no longer has 'Home'"));
+            Assert.That(messages, Has.Some.Contains("to #2: the entity no longer has 'Power'"));
+            Assert.That(messages, Has.Some.Contains("to #4: the entity no longer has 'Power'"));
+
+            var dropped = result.World!.Save();
+            var again = World.Load(LoadClean(), dropped);
+            Assert.That(again.Diagnostics, Is.Empty, string.Join("\n", again.Diagnostics));
+            Assert.That(Encoding.UTF8.GetString(dropped), Does.Not.Contain("\"Home\"").And.Not.Contain("\"Power\""));
+        }
+
+        /// <summary>버리기를 허락해도 타입이 바뀐 값은 버리지 않고 거부한다 (G210: 그것은 나중의 migrate 몫).</summary>
+        [Test]
+        public void DroppingDoesNotCoverAChangedType()
+        {
+            BuildNastyWorld();
+            var save = _world.Save();
+            Mod("banking",
+                schema: Schema.Replace("component(\"Wounded\", turns=field(int))\n", "")
+                    .Replace("text=field(str, default=\"\")", "text=field(int, default=0)"),
+                defs: Defs, extra: ", version=\"1.0\"");
+            var result = World.Load(LoadClean(), save, dropRemoved: true);
+
+            Assert.That(result.Succeeded, Is.False);
+            var codes = result.Diagnostics.Select(d => d.Code + " " + d.Severity).ToList();
+            Assert.That(codes, Does.Contain("SAV005 Warning"));
+            Assert.That(result.Diagnostics.Where(d => d.Severity == Severity.Error).Select(d => d.Message).Single(),
+                Does.StartWith("#2 (Scout) Name.text:"));
+        }
+
         [Test]
         public void ARemovedDefIsReportedOnceAndWhatPointsAtItDoesNotLookCorrupt()
         {
