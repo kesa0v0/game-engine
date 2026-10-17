@@ -228,7 +228,7 @@ namespace Kesa.Engine.Runtime
                     var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
                     foreach (var p in h.Function.Definition!.Parameters) args[p.Name] = ToScript(e.Signal.Value(p.Name));
                     bool outermost = _meter == null;
-                    if (outermost) _meter = new StepMeter(_stepBudget);
+                    if (outermost) _meter = new StepMeter(_actionStepBudget);
                     try
                     {
                         Evaluator.RunCommand(h.Function, args, out var suspended, h.Span, _meter, () => StartStream(id));

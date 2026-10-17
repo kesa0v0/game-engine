@@ -37,8 +37,19 @@ namespace Kesa.Engine.Runtime
 
         private static readonly Dictionary<MemberDecl, Value> NoValues = new Dictionary<MemberDecl, Value>();
 
+        /// <summary>
+        /// 읽기 실행 하나(<c>derived</c>, 사전 조건, 입구·정책 함수, <c>choose</c> 후보)의 기본 단계 예산 (G101). 값 하나를 읽는 일이라 작다.
+        /// </summary>
         public const int DefaultStepBudget = 100000;
 
+        /// <summary>
+        /// 행동 실행 하나(커맨드 본문, <c>@on</c>·<c>@when</c> 핸들러, 멈춘 Flow를 이어서 실행하는 구간)의 기본 단계 예산 (G224).
+        /// 행동은 세계 전체를 돌 수 있어 크게 둔다: 한 단계 약 45ns(규모 벤치)로 약 0.5초, 유닛 하나에 7단계면 약 140만 개.
+        /// </summary>
+        public const int DefaultActionStepBudget = 10_000_000;
+
+        /// <param name="stepBudget">읽기 실행 하나의 단계 예산 (<see cref="DefaultStepBudget"/>, G101).</param>
+        /// <param name="actionStepBudget">행동 실행 하나의 단계 예산 (<see cref="DefaultActionStepBudget"/>, G224).</param>
         /// <param name="requireSubmitPolicy">
         /// 멀티 게임처럼 제출 정책 함수가 꼭 있어야 하는 호스트가 켠다. 켰는데 정책이 없으면 만들지 않는다 (spec-gaps G124).
         /// </param>
@@ -61,8 +72,9 @@ namespace Kesa.Engine.Runtime
         /// </param>
         public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget, bool requireSubmitPolicy = false,
             int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
-            int maxSettleRounds = DefaultMaxSettleRounds, long seed = 0, bool requireViewPolicy = false)
-            : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, loaded.SubmitPolicy)
+            int maxSettleRounds = DefaultMaxSettleRounds, long seed = 0, bool requireViewPolicy = false,
+            int actionStepBudget = DefaultActionStepBudget)
+            : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, loaded.SubmitPolicy, actionStepBudget)
         {
             _viewPolicy = loaded.ViewPolicy;
             _mods = loaded.Mods;
@@ -102,12 +114,13 @@ namespace Kesa.Engine.Runtime
 
         public World(DefSet defs, SchemaSet schema, IReadOnlyDictionary<string, ModScope>? scopes = null,
             int stepBudget = DefaultStepBudget, IReadOnlyDictionary<string, CommandDecl>? commands = null,
-            PolicyDecl? submitPolicy = null)
+            PolicyDecl? submitPolicy = null, int actionStepBudget = DefaultActionStepBudget)
         {
             _defs = defs;
             _schema = schema;
             _scopes = scopes ?? new SortedDictionary<string, ModScope>(StringComparer.Ordinal);
             _stepBudget = stepBudget;
+            _actionStepBudget = actionStepBudget;
             _commands = commands ?? new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
             _submitPolicy = submitPolicy;
         }

@@ -83,7 +83,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void NewWorld()
         {
             Mod("banking", schema: Schema, defs: Defs);
-            _world = new World(LoadClean());
+            _world = new World(LoadClean(), actionStepBudget: World.DefaultStepBudget); // spin()이 넘도록 작게
             _scout = _world.Create("Scout");
         }
 

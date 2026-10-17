@@ -110,8 +110,8 @@ namespace Kesa.Engine.Bench
         private static void Run(ContentLoadResult content, int n, bool print)
         {
             int reps = n >= 100000 ? 3 : 7;
-            // 스크립트가 N개를 도는 장면이 기본 예산(100,000걸음)을 넘으므로 예산을 풀고 잰다
-            var world = new World(content, stepBudget: int.MaxValue);
+            // 기본 예산 그대로 잰다: 스크립트가 N개를 도는 틱·커맨드는 행동 예산(1천만 단계, G224) 안이다
+            var world = new World(content);
             var amount = world.Member("Food", "amount");
             var max = world.Member("Health", "max");
 
@@ -193,7 +193,7 @@ namespace Kesa.Engine.Bench
         /// <summary>프로파일러용(<c>--profile-tick</c>): 유닛 1만 개를 갱신하는 스크립트 틱을 10초 동안 돌린다.</summary>
         private static void ProfileTick(ContentLoadResult content)
         {
-            var world = new World(content, stepBudget: int.MaxValue);
+            var world = new World(content);
             for (int i = 0; i < 10000; i++) world.Create("Soldier");
             long ticks = 0;
             var sw = Stopwatch.StartNew();

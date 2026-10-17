@@ -492,7 +492,7 @@ namespace Kesa.Engine.Runtime
             DropFlow(flow);
             _rand = flow.Rand?.Copy(); // 같은 난수열을 잇는다 (spec S2, G182)
             bool outermost = _meter == null;
-            if (outermost) _meter = new StepMeter(_stepBudget);
+            if (outermost) _meter = new StepMeter(_actionStepBudget);
             try
             {
                 var next = Evaluator.Resume(flow.Run, answer, _meter);

@@ -133,7 +133,7 @@ namespace Kesa.Engine.Runtime
             foreach (var pair in checkedArgs) scriptArgs[pair.Key] = ToScript(pair.Value);
 
             bool outermost = _meter == null;
-            if (outermost) _meter = new StepMeter(_stepBudget);
+            if (outermost) _meter = new StepMeter(_actionStepBudget); // 사전 검사만 할 때도 제출과 같은 예산 (G224)
             try
             {
                 var raw = runBody

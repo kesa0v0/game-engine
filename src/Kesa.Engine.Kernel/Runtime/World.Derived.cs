@@ -20,6 +20,9 @@ namespace Kesa.Engine.Runtime
 
         private readonly IReadOnlyDictionary<string, ModScope> _scopes;
         private readonly int _stepBudget;
+
+        /// <summary>행동 실행(커맨드 본문, 핸들러, Flow 이어 하기) 하나의 단계 예산 (G224).</summary>
+        private readonly int _actionStepBudget;
         private PureEvaluator? _evaluator;
 
         /// <summary>지금 계산 중인 <c>derived</c>·기본값들 (바깥부터). 같은 값을 다시 읽으면 순환이다 (G100).</summary>
