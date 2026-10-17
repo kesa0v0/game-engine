@@ -1230,11 +1230,14 @@ namespace Kesa.Engine.Script
                 else
                 {
                     // 상태 칸에는 리스트·맵이 없으므로(SCH004, G129) 리스트 +=의 제자리 수정 문제(G104)는 생기지 않는다
-                    var current = ((IRuntimeAttributes)owner).GetAttribute(attr.Name);
+                    var current = owner is ISiteAttributes site
+                        ? site.GetAttribute(attr)
+                        : ((IRuntimeAttributes)owner).GetAttribute(attr.Name);
                     var right = Eval(assign.Value, frame);
                     value = Binary(assign.Op.Substring(0, assign.Op.Length - 1), current, right);
                 }
-                target.SetAttribute(attr.Name, value);
+                if (target is ISiteAssignable siteTarget) siteTarget.SetAttribute(attr, value);
+                else target.SetAttribute(attr.Name, value);
             }
 
             /// <summary>
@@ -1307,6 +1310,7 @@ namespace Kesa.Engine.Script
 
                     case AttributeExpr attr:
                         var owner = Eval(attr.Target, frame);
+                        if (owner is ISiteAttributes site) return site.GetAttribute(attr);
                         if (owner is IRuntimeAttributes source) return source.GetAttribute(attr.Name);
                         throw Fail(Codes.RunScript, "'" + owner.KindName + "' has no attribute '" + attr.Name + "'");
 

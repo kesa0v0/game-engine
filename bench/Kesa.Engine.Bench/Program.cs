@@ -51,10 +51,11 @@ namespace Kesa.Engine.Bench
         public static int Main(string[] args)
         {
             var sizes = new List<int>();
-            bool profileDerived = false;
+            bool profileDerived = false, profileTick = false;
             foreach (var a in args)
             {
                 if (a == "--profile-derived") profileDerived = true;
+                else if (a == "--profile-tick") profileTick = true;
                 else sizes.Add(int.Parse(a, CultureInfo.InvariantCulture));
             }
             if (sizes.Count == 0) sizes.AddRange(new[] { 1000, 10000, 100000 });
@@ -65,9 +66,10 @@ namespace Kesa.Engine.Bench
             Write(root, "core/defs/defs.py", Defs);
             Write(root, "core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse_all(\"defs/\")\n");
             var content = Load(root);
-            if (profileDerived)
+            if (profileDerived || profileTick)
             {
-                ProfileDerived(content);
+                if (profileDerived) ProfileDerived(content);
+                else ProfileTick(content);
                 Directory.Delete(root, true);
                 return 0;
             }
@@ -186,6 +188,22 @@ namespace Kesa.Engine.Bench
             }
             Console.WriteLine("derived reads: " + reads.ToString("N0", CultureInfo.InvariantCulture) + ", " +
                               (sw.Elapsed.TotalMilliseconds * 1e6 / reads).ToString("0", CultureInfo.InvariantCulture) + " ns each");
+        }
+
+        /// <summary>프로파일러용(<c>--profile-tick</c>): 유닛 1만 개를 갱신하는 스크립트 틱을 10초 동안 돌린다.</summary>
+        private static void ProfileTick(ContentLoadResult content)
+        {
+            var world = new World(content, stepBudget: int.MaxValue);
+            for (int i = 0; i < 10000; i++) world.Create("Soldier");
+            long ticks = 0;
+            var sw = Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < 10000)
+            {
+                world.Advance(1);
+                ticks++;
+            }
+            Console.WriteLine("ticks: " + ticks.ToString("N0", CultureInfo.InvariantCulture) + ", " +
+                              (sw.Elapsed.TotalMilliseconds / ticks).ToString("0.00", CultureInfo.InvariantCulture) + " ms each");
         }
 
         private static void Submit(World world, string command, Dictionary<string, Value> args, bool succeeds)

@@ -79,6 +79,21 @@ namespace Kesa.Engine.Script
     }
 
     /// <summary>
+    /// 속성 자리(<see cref="AttributeExpr"/>)를 받아 그 자리의 캐시(<see cref="AttributeExpr.Cache"/>)를 쓰는 런타임 값.
+    /// 결과는 <see cref="IRuntimeAttributes.GetAttribute"/>와 같아야 한다: 이름을 문자열로 다시 찾지 않을 뿐이다.
+    /// </summary>
+    internal interface ISiteAttributes
+    {
+        Value GetAttribute(AttributeExpr site);
+    }
+
+    /// <summary><see cref="ISiteAttributes"/>의 쓰기 쪽. 결과는 <see cref="IRuntimeAssignable.SetAttribute"/>와 같다.</summary>
+    internal interface ISiteAssignable
+    {
+        void SetAttribute(AttributeExpr site, Value value);
+    }
+
+    /// <summary>
     /// <c>cost</c>·<c>pay</c>의 첫 자리가 가리키는 칸을 가진 런타임 값 (컴포넌트, 키 컴포넌트의 줄, spec-gaps G186).
     /// </summary>
     public interface IRuntimeSlots

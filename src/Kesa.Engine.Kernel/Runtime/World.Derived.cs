@@ -308,11 +308,10 @@ namespace Kesa.Engine.Runtime
         private Value ReadMember(EntityRecord entity, ComponentType component, RowKey? row, MemberDecl member)
         {
             if (member.Kind == MemberKind.Derived) return ComputeDerived(entity, component, row, member);
-            string display = member.Display;
-            if (row == null) return Read(display, component, member, DefMembers(entity, component), entity.Values);
+            if (row == null) return Read(null, component, member, DefMembers(entity, component), entity.Values);
             if (!FindRow(entity, component, row.Value, out var defRow, out var record))
                 throw NoRow(new EntityId(entity.Id), component, row.Value);
-            return Read(display + "[" + row.Value + "]", component, member, defRow?.Members, record?.Values ?? NoValues);
+            return Read(row, component, member, defRow?.Members, record?.Values ?? NoValues);
         }
 
         // ---- 함수 본문이 보는 값 ----
@@ -322,7 +321,75 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>엔티티. 컴포넌트 이름으로 그 컴포넌트를, 역방향 이름으로 그 컬렉션을 읽는다 (spec S3).</summary>
-        private sealed class EntityView : Value, IRuntimeAttributes, IValueEquality, IEntityReference
+        // ---- 속성 자리의 캐시 (AttributeExpr.Cache, 규모 벤치) ----
+
+        /// <summary><c>u.Food</c>: 그 이름이 이 스키마의 컴포넌트다.</summary>
+        private sealed class ComponentSite
+        {
+            public ComponentSite(SchemaSet schema, ComponentType component)
+            {
+                Schema = schema;
+                Component = component;
+            }
+
+            public SchemaSet Schema { get; }
+            public ComponentType Component { get; }
+        }
+
+        /// <summary><c>c.amount</c>: 이 컴포넌트의 멤버이고, 쓸 때의 핸들도 함께 둔다.</summary>
+        private sealed class MemberSite
+        {
+            public MemberSite(ComponentType component, MemberDecl member)
+            {
+                Component = component;
+                Member = member;
+                Handle = new MemberHandle(component, null, member);
+            }
+
+            public ComponentType Component { get; }
+            public MemberDecl Member { get; }
+            public MemberHandle Handle { get; }
+        }
+
+        /// <summary>엔티티의 속성을 자리 캐시로. 컴포넌트 이름이 아니면(Def 타입, 역방향 컬렉션) 캐시 없이 이름으로 찾는다.</summary>
+        private Value EntityAttribute(EntityId id, AttributeExpr site)
+        {
+            if (site.Cache is ComponentSite cached && ReferenceEquals(cached.Schema, _schema))
+                return SiblingOrNone(Record(id), cached.Component);
+            if (_schema.TryGetComponent(site.Name, out var component)) site.Cache = new ComponentSite(_schema, component);
+            return EntityAttribute(id, site.Name);
+        }
+
+        /// <summary>컴포넌트의 속성을 자리 캐시로. 멤버가 아니면(<c>entity</c>, <c>key</c>, 형제) 이름으로 찾는다.</summary>
+        private Value ComponentAttribute(ComponentView view, AttributeExpr site)
+        {
+            var member = MemberAt(view.Component, site);
+            if (member == null) return ComponentAttribute(view, site.Name);
+            return ToScript(ReadMemberTraced(Record(view.Id), view.Component, view.Row, member.Member));
+        }
+
+        private void WriteMember(ComponentView view, AttributeExpr site, Value value)
+        {
+            var member = MemberAt(view.Component, site);
+            if (member == null)
+            {
+                WriteMember(view, site.Name, value);
+                return;
+            }
+            WriteMember(view, member.Handle, value);
+        }
+
+        /// <summary>자리가 이 컴포넌트의 멤버를 가리키면 그 캐시. 컴포넌트 객체가 같으면 스키마도 같다.</summary>
+        private static MemberSite? MemberAt(ComponentType component, AttributeExpr site)
+        {
+            if (site.Cache is MemberSite cached && ReferenceEquals(cached.Component, component)) return cached;
+            if (!component.TryGetMember(site.Name, out var member)) return null;
+            var found = new MemberSite(component, member);
+            site.Cache = found;
+            return found;
+        }
+
+        private sealed class EntityView : Value, IRuntimeAttributes, ISiteAttributes, IValueEquality, IEntityReference
         {
             private readonly World _world;
 
@@ -339,10 +406,24 @@ namespace Kesa.Engine.Runtime
             public bool ValueEquals(Value other) => other is IEntityReference r && r.EntityId == Id;
 
             public Value GetAttribute(string name) => Guard(() => _world.EntityAttribute(Id, name));
+
+            // 자주 도는 길이라 Guard의 람다(할당)를 쓰지 않는다
+            public Value GetAttribute(AttributeExpr site)
+            {
+                try
+                {
+                    return _world.EntityAttribute(Id, site);
+                }
+                catch (WorldException e)
+                {
+                    throw new ScriptRuntimeException(e.Code, e.Message, e.Hint);
+                }
+            }
         }
 
         /// <summary>컴포넌트 하나(키 컴포넌트면 줄 하나). 자기 멤버, 형제 컴포넌트, <c>entity</c>, <c>key</c>를 읽는다 (G103).</summary>
-        private sealed class ComponentView : ComponentViewBase, IRuntimeAttributes, IRuntimeAssignable, IRuntimeSlots, IValueEquality
+        private sealed class ComponentView : ComponentViewBase, IRuntimeAttributes, IRuntimeAssignable, ISiteAttributes, ISiteAssignable,
+            IRuntimeSlots, IValueEquality
         {
             /// <summary>같은 엔티티의 같은 컴포넌트(같은 줄)면 같다 (G142).</summary>
             public bool ValueEquals(Value other) =>
@@ -368,6 +449,30 @@ namespace Kesa.Engine.Runtime
             public Value GetAttribute(string name) => Guard(() => _world.ComponentAttribute(this, name));
 
             public void SetAttribute(string name, Value value) => Guard(() => _world.WriteMember(this, name, value));
+
+            public Value GetAttribute(AttributeExpr site)
+            {
+                try
+                {
+                    return _world.ComponentAttribute(this, site);
+                }
+                catch (WorldException e)
+                {
+                    throw new ScriptRuntimeException(e.Code, e.Message, e.Hint);
+                }
+            }
+
+            public void SetAttribute(AttributeExpr site, Value value)
+            {
+                try
+                {
+                    _world.WriteMember(this, site, value);
+                }
+                catch (WorldException e)
+                {
+                    throw new ScriptRuntimeException(e.Code, e.Message, e.Hint);
+                }
+            }
 
             public Value ReadSlot(string name) => Guard(() => _world.ReadSlot(this, name));
 
@@ -415,11 +520,15 @@ namespace Kesa.Engine.Runtime
                 throw new WorldException(Codes.RunUnknownName, "'" + component.Name + "' has no member '" + name + "'",
                     Suggest.Hint(name, names) ?? "only members of a component can be written");
             }
-            var handle = new MemberHandle(component, null, member);
+            WriteMember(view, new MemberHandle(component, null, member), value);
+            return true;
+        }
+
+        private void WriteMember(ComponentView view, MemberHandle handle, Value value)
+        {
             var plain = ToPlain(handle.Display, value);
             if (view.Row == null) Set(view.Id, handle, plain);
             else SetRow(view.Id, handle, view.Row.Value, plain);
-            return true;
         }
 
         /// <summary>키 컴포넌트 전체: 키로 줄 하나를 꼬집는다 (<c>h.Skill.Medicine</c>, <c>h.Skill[s]</c>, <c>for s in h.Skill</c>).</summary>

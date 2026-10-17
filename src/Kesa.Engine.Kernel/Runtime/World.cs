@@ -285,7 +285,7 @@ namespace Kesa.Engine.Runtime
             var component = NotKeyed(member);
             Require(entity, component);
             if (member.Kind == MemberKind.Derived) return ReadDerivedTop(entity, component, null, member.Member);
-            return Read(member.Display, component, member.Member, DefMembers(entity, component), entity.Values);
+            return Read(null, component, member.Member, DefMembers(entity, component), entity.Values);
         }
 
         /// <summary><c>field</c>·Ref에 쓴다. 타입과 범위가 맞아야 하고(G92), 쓴 값은 Def 값과 같아도 엔티티 값이 된다.</summary>
@@ -513,7 +513,7 @@ namespace Kesa.Engine.Runtime
             var row = FindRow(entity, component, key, out var defRow, out var record);
             if (!row) throw NoRow(id, component, key);
             if (member.Kind == MemberKind.Derived) return ReadDerivedTop(entity, component, key, member.Member);
-            return Read(member.Display + "[" + key + "]", component, member.Member, defRow?.Members,
+            return Read(key, component, member.Member, defRow?.Members,
                 record?.Values ?? NoValues);
         }
 
@@ -797,12 +797,12 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>엔티티 값 → Def 값 → 스키마 기본값 (Flyweight, spec S4).</summary>
-        private Value Read(string display, ComponentType component, MemberDecl member, OrderedMap<ResolvedValue>? defMembers,
+        private Value Read(RowKey? row, ComponentType component, MemberDecl member, OrderedMap<ResolvedValue>? defMembers,
             Dictionary<MemberDecl, Value> values)
         {
             var spec = member.Spec;
             if (member.Kind == MemberKind.Derived)
-                throw new WorldException(Codes.RunNotComputed, "'" + display + "' is derived and cannot be computed yet (spec-gaps G90)");
+                throw new WorldException(Codes.RunNotComputed, "'" + Shown(member, row) + "' is derived and cannot be computed yet (spec-gaps G90)");
 
             Value? value = null;
             if (member.Kind != MemberKind.Const && values.TryGetValue(member, out var own)) value = own;
@@ -815,7 +815,7 @@ namespace Kesa.Engine.Runtime
             // 생성 순간의 검사(G93)가 구멍을 막으므로 여기 오면 월드의 버그다
             // (함수 기본값이 아직 계산되지 않은 칸을 읽은 경우도 여기다: 선언 순서상 뒤의 칸이다, G106)
             if (value == null)
-                throw new WorldException(Codes.RunMissingValue, "'" + display + "' has no value yet",
+                throw new WorldException(Codes.RunMissingValue, "'" + Shown(member, row) + "' has no value yet",
                     "a default computed at creation can only read members declared before it (spec-gaps G106)");
 
             // Ref 칸은 대상이 살아 있는지에 따라 읽는 값이 달라진다(G91): when 조건이면 대상도 읽은 것이다
@@ -823,11 +823,15 @@ namespace Kesa.Engine.Runtime
             if (member.Kind == MemberKind.Ref && value is EntityValue ev && !_entities.ContainsKey(ev.Id.Value))
             {
                 if (spec.Optional) return NoneValue.Instance;
-                throw new WorldException(Codes.RunDeadRef, "'" + display + "' refers to " + ev.Id + ", which was destroyed",
+                throw new WorldException(Codes.RunDeadRef, "'" + Shown(member, row) + "' refers to " + ev.Id + ", which was destroyed",
                     "declare the ref optional=True if it may outlive its target (spec-gaps G91)");
             }
             return member.Kind == MemberKind.Ref ? value : Normalize(spec.Type, value);
         }
+
+        /// <summary>진단의 칸 이름 <c>Skill.level['Cooking']</c>. 오류일 때만 만든다(읽을 때마다 이어 붙이지 않는다).</summary>
+        private static string Shown(MemberDecl member, RowKey? row) =>
+            row == null ? member.Display : member.Display + "[" + row.Value + "]";
 
         /// <summary><c>fixed</c> 칸의 정수는 <c>fixed</c>로 바꾼다 (Def 리터럴은 정수로 적을 수 있다).</summary>
         private static Value Normalize(TypeRef type, Value value)

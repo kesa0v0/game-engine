@@ -114,6 +114,13 @@ namespace Kesa.Engine.Script
 
         public Expr Target { get; }
         public string Name { get; }
+
+        /// <summary>
+        /// 이 자리에서 이름을 처음 푼 결과 (인라인 캐시, <see cref="ISiteAttributes"/>). 실행이 채우고 실행만 읽는다.
+        /// 타입을 로드 때 알 수 없는 <c>u.Food</c>도 같은 자리는 대개 같은 것을 가리키므로 두 번째부터 문자열로 찾지 않는다.
+        /// 들어 있는 것은 바뀌지 않는 객체이고 맞는지 확인하고 쓰므로, 틀린 것이 들어 있어도 결과는 캐시가 없을 때와 같다.
+        /// </summary>
+        internal object? Cache { get; set; }
     }
 
     public sealed class IndexExpr : Expr
