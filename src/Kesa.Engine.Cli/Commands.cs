@@ -68,7 +68,20 @@ namespace Kesa.Engine.Cli
         /// <summary>스키마 파일 폴더 (<see cref="ContentLoader.SchemaFolder"/>에서 끝의 <c>/</c>를 뺀 것).</summary>
         private static readonly string SchemaDirectory = ContentLoader.SchemaFolder.TrimEnd('/');
         public const string PyrightConfigFileName = "pyrightconfig.json";
-        public const string PyrightConfig = "{\n  \"pythonVersion\": \"3.12\"\n}\n";
+        /// <summary>
+        /// "None일 수 있음" 계열은 경고다 (spec-gaps G208): 모드가 규칙으로 아는 값(<c>optional=True</c> Ref 등)에 빨간 오류를 내지 않고,
+        /// 이 언어에는 <c>assert</c>가 없어 좁힐 방법이 <c>if</c>뿐이기 때문이다.
+        /// </summary>
+        public const string PyrightConfig =
+            "{\n" +
+            "  \"pythonVersion\": \"3.12\",\n" +
+            "  \"reportOptionalMemberAccess\": \"warning\",\n" +
+            "  \"reportOptionalSubscript\": \"warning\",\n" +
+            "  \"reportOptionalIterable\": \"warning\",\n" +
+            "  \"reportOptionalCall\": \"warning\",\n" +
+            "  \"reportOptionalOperand\": \"warning\",\n" +
+            "  \"reportOptionalContextManager\": \"warning\"\n" +
+            "}\n";
 
         /// <summary>
         /// <c>engine stubs &lt;mods-dir&gt;</c>: 매니페스트를 읽은 모드마다 <c>__builtins__.pyi</c>를 덮어쓰고(G81, 비활성 모드는 G83),

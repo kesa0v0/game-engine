@@ -43,6 +43,88 @@ namespace Kesa.Engine.Stubs
             "# the mod failed to load (see engine check), so only the mod.py names are declared.\n" +
             ManifestNames;
 
+        /// <summary>
+        /// <c>derived</c> 함수와 로직이 함께 쓰는 순수 내장 (spec-gaps G207). 파이썬 내장과 이름이 같은 것(<c>len</c>·<c>min</c>·<c>sum</c>·
+        /// <c>any</c> 등)은 pyright가 이미 알므로 적지 않는다. 타입을 모르면 <c>Any</c>다: 엔진이 받는 파일에 가짜 오류를 내지 않는 것이 먼저다.
+        /// </summary>
+        private const string PureNames =
+            "class Text: ...\n" +
+            "def text(key: str, /, **args: Any) -> Text: ...\n" +
+            "def floor(x: int | float, /) -> int: ...\n" +
+            "def ceil(x: int | float, /) -> int: ...\n" +
+            "def clamp(x: Any, low: Any, high: Any, /) -> Any: ...\n" +
+            "class Contribution:\n" +
+            "    op: str\n" +
+            "    value: Any\n" +
+            "    source: Any\n" +
+            "def contribs(component: Any, member: str, /) -> list[Contribution]: ...\n" +
+            "def now() -> int: ...\n";
+
+        /// <summary>
+        /// 로직 파일의 이름 (spec-gaps G207): 데코레이터(함수를 그대로 돌려줌), 사전 조건 블록, 쓰는 내장, <c>ask</c>의 답, 난수.
+        /// 인자 이름은 엔진이 읽는 이름 그대로다(<c>World.Flows</c>·<c>World.Structure</c>·<c>World.Random</c>·<c>Interpreter</c>).
+        /// </summary>
+        private const string LogicNames =
+            "type Ref[T] = T\n" +
+            "type DefId[T] = str\n" +
+            "\n" +
+            "@overload\n" +
+            "def command[F: Callable[..., Any]](f: F, /) -> F: ...\n" +
+            "@overload\n" +
+            "def command[F: Callable[..., Any]](*, free: bool = ..., acts_for: Any = ..., on_stale: Any = ...) -> Callable[[F], F]: ...\n" +
+            "@overload\n" +
+            "def submit_policy[F: Callable[..., Any]](f: F, /) -> F: ...\n" +
+            "@overload\n" +
+            "def submit_policy[F: Callable[..., Any]](*, override: bool = ...) -> Callable[[F], F]: ...\n" +
+            "@overload\n" +
+            "def view_policy[F: Callable[..., Any]](f: F, /) -> F: ...\n" +
+            "@overload\n" +
+            "def view_policy[F: Callable[..., Any]](*, override: bool = ...) -> Callable[[F], F]: ...\n" +
+            "def on[F: Callable[..., Any]](signal: Any, /, *, stage: str = ...) -> Callable[[F], F]: ...\n" +
+            "def when[F: Callable[..., Any]](condition: Callable[..., Any], /, *, stage: str = ..., repeat: bool = ..., " +
+            "cooldown: int = ..., once: bool | Literal[\"game\"] = ...) -> Callable[[F], F]: ...\n" +
+            "\n" +
+            "class _Preconditions:\n" +
+            "    def __enter__(self) -> None: ...\n" +
+            "    def __exit__(self, *args: object) -> None: ...\n" +
+            "preconditions: _Preconditions\n" +
+            "def require(condition: object, message: str | Text = ..., /) -> None: ...\n" +
+            "def cost(slot: Any, amount: Any, /) -> None: ...\n" +
+            "def choose(parameter: Any, /, *, where: Callable[[Any], object] = ..., from_: Any = ...) -> None: ...\n" +
+            "def pay(slot: Any, amount: Any, /) -> bool: ...\n" +
+            "\n" +
+            "class Answer:\n" +
+            "    choice: Any\n" +
+            "    index: int\n" +
+            "    by: Any\n" +
+            "    response: Any\n" +
+            "def ask(who: Any, title: str | Text, /, *, choices: list[Any] = ..., responses: list[str] = ..., hint: Any = ..., " +
+            "data: Any = ..., blocks_time: bool = ..., deadline: int = ..., about: Any = ..., on_timeout: Any = ...) -> Answer: ...\n" +
+            "def wait(*, ticks: int, about: Any = ...) -> None: ...\n" +
+            "def advance(ticks: int, /) -> None: ...\n" +
+            "def emit(signal: Any, /) -> None: ...\n" +
+            "def destroy(entity: Any, /) -> None: ...\n" +
+            "def attach(entity: Any, component: Any, /) -> None: ...\n" +
+            "def detach(component: Any, /) -> None: ...\n" +
+            "def add_row(rows: Any, key: Any, row: Any, /) -> None: ...\n" +
+            "def remove_row(rows: Any, key: Any, /) -> None: ...\n" +
+            "def replace_rows(rows: Any, new_rows: list[Any], /) -> None: ...\n" +
+            "def append_row(rows: Any, row: Any, /) -> Any: ...\n" +
+            "\n" +
+            "class random:\n" +
+            "    @staticmethod\n" +
+            "    def randint(a: int, b: int, /) -> int: ...\n" +
+            "    @staticmethod\n" +
+            "    def randrange(start: int, stop: int = ..., step: int = ..., /) -> int: ...\n" +
+            "    @staticmethod\n" +
+            "    def choice[T](seq: Sequence[T], /) -> T: ...\n" +
+            "    @staticmethod\n" +
+            "    def choices[T](population: Sequence[T], /, weights: Any = ..., *, k: int = ...) -> list[T]: ...\n" +
+            "    @staticmethod\n" +
+            "    def sample[T](population: Sequence[T], /, k: int) -> list[T]: ...\n" +
+            "    @staticmethod\n" +
+            "    def random() -> float: ...\n";
+
         private const string ManifestNames =
             "def Mod(*, id: str, version: str = ..., defaultLanguage: str = ..., dependencies: list[str] = ..., " +
             "loadAfter: list[str] = ..., optional: list[str] = ...) -> None: ...\n" +
@@ -84,7 +166,11 @@ namespace Kesa.Engine.Stubs
             "def field(type: Any, /, *, default: Any = ..., default_from: str = ..., min: int | float = ..., " +
             "max: int | float = ...) -> MemberDecl: ...\n" +
             "def derived(type: Any, fn: Callable[..., Any], /) -> MemberDecl: ...\n" +
-            "def ref(type_name: str, /, *, inverse: str = ..., optional: bool = ..., order_by: str = ...) -> MemberDecl: ...\n";
+            "def ref(type_name: str, /, *, inverse: str = ..., optional: bool = ..., order_by: str = ...) -> MemberDecl: ...\n" +
+            "\n" +
+            // derived 함수가 쓰는 순수 내장 (G207). 스키마 파일은 모드와 무관하므로 query는 느슨하게
+            PureNames +
+            "def query(*names: str) -> list[Any]: ...\n";
 
         private sealed class Writer
         {
@@ -114,7 +200,7 @@ namespace Kesa.Engine.Stubs
                 Line("# generated by the engine for mod '" + _mod.Id + "'. Do not edit. Needs pythonVersion 3.12 or later.");
                 if (_fromFirstRound)
                     Line("# the mod failed to load (see engine check); these declarations come from before it was disabled.");
-                Line("from typing import Any, Callable, Literal, Never");
+                Line("from typing import Any, Callable, Iterator, Literal, Never, Sequence, overload");
                 Line();
                 Line("type fixed = int | float");
                 Line("type TextKey = str");
@@ -131,6 +217,9 @@ namespace Kesa.Engine.Stubs
                 WriteModLoaded();
                 Line("inherit: Any");
                 Line();
+                // Def 파일에 로직(@command 등)도 함께 쓴다 (G207)
+                _out.Append(PureNames).Append('\n').Append(LogicNames).Append('\n');
+                WriteEntityLookups();
                 // mod.py는 모드 폴더 바로 아래라 이 스텁을 같이 쓴다 (spec-gaps G82)
                 _out.Append(ManifestNames);
                 return _out.ToString();
@@ -141,15 +230,57 @@ namespace Kesa.Engine.Stubs
             private void WriteComponent(ComponentType component)
             {
                 Line("class " + component.Name + ":");
+                // 엔티티로 읽는 속성 (G207): field·Ref는 쓸 수 있고 const·derived는 읽기만
+                foreach (var member in component.Members)
+                {
+                    if (!Sees(member.Mod)) continue;
+                    string type = TypeText(member.Spec.Type);
+                    if (member.Kind == MemberKind.Ref && member.Spec.Optional) type += " | None";
+                    if (member.Kind == MemberKind.Field || member.Kind == MemberKind.Ref) Line("    " + member.Name + ": " + type);
+                    else ReadOnly(member.Name, type);
+                }
                 var parameters = new List<string>();
                 foreach (var member in component.Members)
                 {
-                    if (member.Kind == MemberKind.Derived || member.Kind == MemberKind.Ref) continue;
-                    parameters.Add(member.Name + ": " + TypeText(member.Spec.Type) + " = ...");
+                    if (member.Kind == MemberKind.Derived) continue;
+                    // Ref는 로직의 spawn·attach에서 준다(Def 파일에는 엔티티가 없다, G207)
+                    string type = TypeText(member.Spec.Type);
+                    if (member.Kind == MemberKind.Ref && member.Spec.Optional) type += " | None";
+                    parameters.Add(member.Name + ": " + type + " = ...");
                 }
                 WriteInit(parameters, keywordOnly: true);
                 Line();
+                if (component.IsKeyed) WriteRows(component);
             }
+
+            private void ReadOnly(string name, string type)
+            {
+                Line("    @property");
+                Line("    def " + name + "(self) -> " + type + ": ...");
+            }
+
+            /// <summary>
+            /// 키 컴포넌트를 엔티티에서 읽은 것 (<c>u.Skill</c>): 키로 줄을 꺼내고(<c>u.Skill["Cooking"]</c>, Def 키는 <c>u.Skill.Cooking</c>도),
+            /// 돌면 키가 나온다. <c>keys="listed"</c>면 없는 줄은 None이다.
+            /// </summary>
+            private void WriteRows(ComponentType component)
+            {
+                string row = component.Name + (component.Keys == KeysMode.Listed ? " | None" : "");
+                Line("class " + RowsName(component) + ":");
+                if (component.KeyKind == KeyKind.Def && component.Key != null)
+                    foreach (var id in ConcreteIds(component.Key.Name))
+                        if (IsIdentifier(id)) ReadOnly(id, row);
+                Line("    def __getitem__(self, key: Any, /) -> " + row + ": ...");
+                Line("    def __iter__(self) -> Iterator[Any]: ...");
+                Line("    def __len__(self) -> int: ...");
+                Line("    def __contains__(self, key: object, /) -> bool: ...");
+                Line();
+            }
+
+            private static string RowsName(ComponentType component) => "_" + component.Name + "_rows";
+
+            /// <summary>엔티티의 컴포넌트 속성 타입: 키 컴포넌트면 줄 묶음.</summary>
+            private static string Attached(ComponentType component) => component.IsKeyed ? RowsName(component) : component.Name;
 
             /// <summary>신호 (spec-gaps G145): 인자는 모두 필수인 키워드 인자이고 <c>d.amount</c>로 읽는다.</summary>
             private void WriteSignal(SignalType signal)
@@ -174,7 +305,32 @@ namespace Kesa.Engine.Stubs
 
             private void WriteDefType(DefType type)
             {
+                // Def 상수는 엔티티에서 Def 타입 이름으로 읽는다 (u.Unit.speed, G107)
+                Line("class " + ConstsName(type) + ":");
+                bool any = false;
+                foreach (var k in type.Consts)
+                {
+                    if (!Sees(k.Mod)) continue;
+                    ReadOnly(k.Name, TypeText(k.Spec.Type));
+                    any = true;
+                }
+                if (!any) Line("    ...");
+                Line();
+
                 Line("class " + type.Name + ":");
+                // 엔티티로 읽는 속성 (G207): Def 타입이 가진 컴포넌트는 늘 있고(뗄 수 없다), 그 밖의 컴포넌트는 붙어 있지 않으면 None
+                var listed = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var slot in type.Components)
+                {
+                    if (!Sees(slot.Mod)) continue;
+                    listed.Add(slot.Component.Name);
+                    Line("    " + slot.Component.Name + ": " + Attached(slot.Component));
+                }
+                foreach (var c in _schema.Components)
+                    if (Sees(c.Mod) && !listed.Contains(c.Name)) Line("    " + c.Name + ": " + Attached(c) + " | None");
+                Line("    " + type.Name + ": " + ConstsName(type));
+                foreach (var inverse in type.Inverses)
+                    if (Sees(inverse.Mod)) ReadOnly(inverse.Name, "Sequence[Any]");
                 var parameters = new List<string>
                 {
                     "id: str",
@@ -235,6 +391,9 @@ namespace Kesa.Engine.Stubs
                         return "dict[" + TypeText(dict.Key) + ", " + TypeText(dict.Value) + "]";
                     case DefIdTypeRef id:
                         return DefIdLiteral(id.Target.Name);
+                    case EntityRefTypeRef entity:
+                        // 엔티티는 그 Def 타입의 클래스로 읽는다 (G207)
+                        return _schema.TryGetType(entity.Target.Name, out var target) && Sees(target.Mod) ? target.Name : "Any";
                     case FunctionTypeRef f:
                         return f.Kind == FunctionSlotKind.Cond ? "Callable[..., bool]" : "Callable[..., None]";
                 }
@@ -244,10 +403,62 @@ namespace Kesa.Engine.Stubs
             /// <summary>보이는 <b>구체</b> Def의 id (abstract는 가리킬 수 없다, G66).</summary>
             private string DefIdLiteral(string typeName)
             {
+                var ids = ConcreteIds(typeName);
+                return ids.Count == 0 ? "Never" : Literal(ids);
+            }
+
+            private List<string> ConcreteIds(string typeName)
+            {
                 var ids = new List<string>();
                 foreach (var d in _defs.Defs)
                     if (d.Type.Name == typeName && !d.IsAbstract && VisibleDef(d)) ids.Add(d.Id);
-                return ids.Count == 0 ? "Never" : Literal(ids);
+                return ids;
+            }
+
+            private static string ConstsName(DefType type) => "_" + type.Name + "_consts";
+
+            private static readonly HashSet<string> PythonKeywords = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del",
+                "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal",
+                "not", "or", "pass", "raise", "return", "try", "while", "with", "yield",
+            };
+
+            /// <summary>속성 이름으로 쓸 수 있는가 (<c>u.Skill.Cooking</c>). 아니면 <c>u.Skill["..."]</c>로만 읽는다.</summary>
+            private static bool IsIdentifier(string text)
+            {
+                if (text.Length == 0 || PythonKeywords.Contains(text) || !(char.IsLetter(text[0]) || text[0] == '_')) return false;
+                foreach (var ch in text)
+                    if (!(char.IsLetterOrDigit(ch) || ch == '_') || ch > 127) return false;
+                return true;
+            }
+
+            // ---- query, spawn: Def 타입이면 그 클래스의 엔티티 (G207) ----
+
+            private void WriteEntityLookups()
+            {
+                var types = new List<DefType>();
+                foreach (var t in _schema.Types)
+                    if (Sees(t.Mod)) types.Add(t);
+                foreach (var t in types)
+                {
+                    Line("@overload");
+                    Line("def query(name: " + Literal(new List<string> { t.Name }) + ", /, *more: str) -> list[" + t.Name + "]: ...");
+                }
+                if (types.Count > 0) Line("@overload");
+                Line("def query(name: str, /, *more: str) -> list[Any]: ...");
+
+                var spawnable = new List<DefType>();
+                foreach (var t in types)
+                    if (ConcreteIds(t.Name).Count > 0) spawnable.Add(t);
+                foreach (var t in spawnable)
+                {
+                    Line("@overload");
+                    Line("def spawn(def_id: " + DefIdLiteral(t.Name) + ", /, **components: Any) -> " + t.Name + ": ...");
+                }
+                if (spawnable.Count > 0) Line("@overload");
+                Line("def spawn(def_id: str, /, **components: Any) -> Any: ...");
+                Line();
             }
 
             private bool VisibleDef(DefRecord record)
