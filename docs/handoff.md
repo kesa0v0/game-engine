@@ -18,7 +18,8 @@
 | 로직용 `.pyi`(모드별 스텁, pyright 확인) | 끝남 (G207~G209) |
 | 적합성 C1~C10, 검증 시나리오 ①~④ | 모두 통과 |
 | **S7 호스트 함수** | 결정 G215~G222, ①~⑦ 구현 끝(남긴 것은 아래 "②에서 남긴 것") |
-| 규모 벤치(spec 9절), X4 번역 파일·포매터, S10 UI 구독 API(호스트 엔진 미정) | 없음 |
+| 규모 벤치(spec 9절, G223) | 첫 판 측정함 (아래 "규모 벤치 첫 판") |
+| X4 번역 파일·포매터, S10 UI 구독 API(호스트 엔진 미정) | 없음 |
 
 결정은 `docs/spec-gaps.md`의 G1~G214. 아래 절들은 슬라이스마다의 자세한 기록이다(날짜순). 처음 슬라이스들의 기록:
 
@@ -422,15 +423,37 @@ G189(확인): 리스트·딕트 컴프리헨션과 제너레이터 식을 받는
 - **③ 했음 (커밋 491452d):** `Host/HostAccess.cs`. 읽기 창구 `HostReader`(순수 함수는 람다의 첫 매개변수를 `HostReader`로 두면 받는다, 선택), 쓰기 창구 `HostAccess : HostReader`(`Writes`는 항상 받음, 순수 함수에 `HostAccess`를 두면 등록 오류). 창구는 월드의 공개 API를 그대로 불러 읽기 기록·롤백이 스크립트와 같고, 난수는 스크립트 `random`의 몸체를 그대로 쓴다(`RandInt`·`RandRange`·`Random`·`Choice`·`Sample`, `choices`는 없음). 호출이 끝나면 닫혀 붙잡아 두고 쓰면 `InvalidOperationException`. `World._hostDepth`: 호스트 C# 코드가 도는 동안 월드의 공개 쓰기(`Create`·`Destroy`·`Set`·`Add`·`Remove`·줄·기여 행)와 `Submit`·`Answer`·`Respond`·`Advance`를 직접 부르면 `InvalidOperationException`(호스트 버그라 `RUN019`가 된다), 창구를 거치는 동안은 0으로 풀린다. 창구가 낸 `WorldException`(죽은 엔티티 등)은 `RUN019`가 아니라 원래 코드 그대로 "in host function X: ..."로 낸다(스크립트의 같은 읽기와 같은 오류). 테스트 `Runtime/HostCallTests`(26, `when` 조건 안 호스트 읽기가 기록되어 반응이 남, 창구 쓰기의 롤백 등). 직접 쓰기 막기와 창구 닫기를 끊으면 실패하는 것을 확인했다.
 - **⑤ 했음 (커밋 31edfa5):** 멈춘 Flow의 호스트 함수 값은 `{"host": "core.math.double"}`(이름뿐), 불러올 때 지금 등록에 없으면 그 값의 자리에서 `SAV002`(G214의 `cancelBrokenFlows`로 그 Flow만 취소 가능). 저장 최상위 `"host"`에 등록 목록(이름, 정규 서명 `HostSignature.Canonical`, `pure`/`writes`)을 이름 순으로 싣는다. 등록이 없으면 키 자체를 싣지 않아 호스트 함수를 안 쓰는 게임의 저장 바이트는 그대로다. 불러올 때 다르면 모드 경고와 따로 `SAV003` "the host functions differ from the save: changed X (옛 서명) -> (새 서명), added Y, removed Z". 정규 서명은 풀린 타입과 기본값으로 만들어 공백 등 적은 모양만 다르면 같다. 테스트 `Runtime/HostSaveTests`(7). 값 복원과 서명 비교를 끊으면 실패하는 것을 확인했다.
 - **⑥ 했음 (커밋 전):** `HostFunctions.ExportDeclarations()`가 등록 목록을 JSON(`"format": "kesa-engine-host-functions"`, `"version": 1`, 함수마다 전체 이름·등록한 `def` 한 줄·`pure`/`writes`·독스트링, 이름 순, 정규 JSON이라 같은 등록이면 같은 글)으로 내보내고, `HostFunctions.ImportDeclarations(text)`가 구현 없는 등록부를 만든다(서명은 등록과 같은 검사, 람다 대조만 뺌. 틀리면 `FormatException`, 모르는 키는 건너뜀). `HostFunction.IsDeclarationOnly`, 그런 함수가 있으면 `new World`가 `ArgumentException`. CLI는 `check`·`dump`·`stubs` 모두 `--host <file>`(못 읽거나 틀리면 종료 코드 2). 스텁: 그 모드가 볼 수 있는 호스트 함수(소유 모드가 자신이거나 의존)를 `class core:` 안의 `class path:` 안의 `@staticmethod def find(...)`로, `Ref[Tile]`은 `Tile`, 기본값은 `= ...`, 독스트링 포함, 로직 스텁과 스키마 스텁 양쪽(`WriteClasses`에서). `OptionalTypeRef`를 `T | None`으로 쓰게 함. 함께 고친 것: `check` 텍스트가 `<host core.x>` 위치 앞에도 모드 폴더 경로를 붙이던 것(재현 후 고침). 테스트 `Loading/HostDeclarationTests`(20), CLI `CommandsTests`(+8). 월드 거부·가시성 거르기·경로 접두사·CLI 전달을 끊으면 실패하는 것을 확인했다.
-- **⑦ 했음 (커밋 전):** 금지 목록을 `src/Kesa.Engine.Analyzers/BannedSymbols.txt`로 옮기고 `src/Kesa.Engine.Analyzers/Determinism.props`(금지 목록 분석기, `DeterminismAnalyzer`, `RS0030`을 오류로)를 만들어 커널 `.csproj`도 그것을 `Import`한다. 호스트 함수 프로젝트는 같은 한 줄로 켠다. `KE0001` 문구와 금지 목록의 "커널 RNG/해시" 안내를 커널에 묶이지 않게 고침. 안내 문서 `docs/host-determinism.md`(켜는 법, 잡는 것, 못 잡는 것, Unity는 미확인). 저장소 밖 임시 호스트 프로젝트에서 `double`·`DateTime.Now`·`Dictionary` 순회가 `KE0001`·`RS0030`·`KE0002` 오류가 되고 깨끗한 코드는 경고 0으로 빌드되는 것, 커널에 같은 위반을 넣으면 여전히 막히는 것을 확인했다(자동 테스트는 아님).
+- **⑦ 했음 (커밋 28d3a19):** 금지 목록을 `src/Kesa.Engine.Analyzers/BannedSymbols.txt`로 옮기고 `src/Kesa.Engine.Analyzers/Determinism.props`(금지 목록 분석기, `DeterminismAnalyzer`, `RS0030`을 오류로)를 만들어 커널 `.csproj`도 그것을 `Import`한다. 호스트 함수 프로젝트는 같은 한 줄로 켠다. `KE0001` 문구와 금지 목록의 "커널 RNG/해시" 안내를 커널에 묶이지 않게 고침. 안내 문서 `docs/host-determinism.md`(켜는 법, 잡는 것, 못 잡는 것, Unity는 미확인). 저장소 밖 임시 호스트 프로젝트에서 `double`·`DateTime.Now`·`Dictionary` 순회가 `KE0001`·`RS0030`·`KE0002` 오류가 되고 깨끗한 코드는 경고 0으로 빌드되는 것, 커널에 같은 위반을 넣으면 여전히 막히는 것을 확인했다(자동 테스트는 아님).
 - **②에서 남긴 것:** 인자 8개 초과용 이름으로 꺼내기(`call.Int`), 콘텐츠 파일 최상위에서 호스트 함수를 값으로 참조(G221, 지금은 "이름 없음" 오류. Def의 `Cond`·`Action` 칸은 스크립트 함수만 받으므로 따로 정해야 함).
-- 그다음 후보는 규모 벤치(호스트 함수가 생긴 뒤에 재야 실제에 가깝다).
+
+**규모 벤치 첫 판 (G223, 커밋 전).** `bench/Kesa.Engine.Bench`(콘솔, `dotnet run -c Release --project bench/Kesa.Engine.Bench [-- 1000 10000]`, 단계별 JIT를 꺼서 처음부터 최적화된 코드로 잼, 실행 예산은 풀고 잼). 장면: 유닛 N개(`Health`의 `derived` max는 기여 행을 합침, `Food.amount` 칸). 두 번 돌려 서로 몇 % 안에서 같았다. 이 기계(Windows, 개발 PC) 기준 개체당 시간:
+
+| 장면 | 1천 | 1만 | 10만 | 한 번 할당 |
+|---|---:|---:|---:|---:|
+| C# `Get` 칸 | 79ns | 69ns | 122ns | 47B |
+| C# `Set` 칸 | 105ns | 87ns | 139ns | 100B |
+| `Query("Food")`(컴포넌트만, 색인 없음) | 61ns | 51ns | 76ns | |
+| `derived` 읽기, 기여 행 없음 | 2.6µs | 2.0µs | 2.0µs | 2.3KB |
+| `derived` 읽기, 기여 행 2개 | 3.4µs | 3.0µs | 3.1µs | 2.7KB |
+| 스크립트 `@on(Tick)`이 전부 갱신 | 540ns | 650ns | 1.6µs | 810B |
+| 스크립트 커맨드가 전부 갱신 | 560ns | 680ns | 1.1µs | 810B |
+| 같은 커맨드가 끝에 실패(롤백) | 630ns | 670ns | 1.5µs | 810B |
+| `Writes` 호스트 함수가 전부 갱신 | 290ns | 280ns | 840ns | 590B |
+| 생성 | 1.1µs | 1.5µs | 2.1µs | 1.7KB |
+
+읽은 것:
+1. **`derived` 읽기가 가장 비싸다.** 작은 함수 한 번에 2~3µs와 2.3KB로, 칸 읽기의 약 30배이고 스크립트가 개체 하나를 읽고 쓰는 것보다도 비싸다. 함수 본문이 작으므로 계산 자체보다 계산마다 드는 준비 비용으로 보인다(추측, 프로파일 전). 캐시(G105)보다 이것을 먼저 줄이는 것이 맞아 보인다.
+2. **기본 실행 예산(100,000걸음)이면 전체 유닛을 도는 틱 핸들러가 1만~2만 개 사이에서 예산을 넘어 실패한다**(재현: 1만은 되고 2만부터 틱이 아무것도 바꾸지 못함). 예산을 개체 수에 맞게 어떻게 할지는 정해야 한다.
+3. 스크립트는 1만 개 틱이 6.5ms, 10만 개가 약 150ms다. 10만에서 개체당 시간이 늘어난 것은 개체당 810B 할당의 GC로 보인다(추측).
+4. 호스트 함수는 스크립트의 2~2.5배 빠르지만 창구를 거친 읽기+쓰기(280ns)가 C# 직접 읽기+쓰기(약 160ns)보다 느리다(커맨드 안 쓰기 기록 포함).
+5. 롤백은 성공과 거의 같은 비용이다. 쓰기 로그 방식으로 충분하다(spec 9절의 "전체 스냅샷 vs 쓰기 로그"는 쓰기 로그로 닫아도 됨).
+6. 컴포넌트만인 쿼리는 10만에서 7.6ms로 색인이 급하지 않다.
 
 지금까지의 기록(날짜순): 반응 ①(G145~G153)이 끝났고 시간 슬라이스 ①(틱·`Advance`·`Tick`·`now()`, G154~G156)과 ② `wait`(G157·G158)를 했고 ③ 마감(G159~G162, 커밋함)과 ④ 대상 소멸(G163~G166)과 스크립트의 `advance`(G167)·호출당 상한(G168)을 했다(커밋 `7b0d5c9`). 반응 ② `when`과 정착(G169~G172), `repeat`·`cooldown`·`once`(G173~G175)를 했다(커밋 `e9a65d6`). S5 열린 질문 G176·G177과 "읽은 칸이 바뀔 때만 재평가"를 했다(커밋 `f44f472`). `field`가 `derived` 상한을 넘는 경우(G99의 패턴 B 확인, 문서 갱신)를 했다(커밋 `d4703fe`). S5 열린 질문은 끝났다. 적합성 점검 뒤 난수(G178~G182)를 했다(커밋 `d908c91`). `cost`·`pay`·`choose` 슬라이스(G183~G188)를 했다(커밋 `52b97e6`). 검증 시나리오 ③을 런타임 테스트로 했다(커밋 `9584650`). 컴프리헨션(G189~G191)을 했다(커밋 `fcf766d`). 전역 순회 `query`(G192·G193)를 했다(커밋 `f4a6902`). 스크립트 순회의 G88(G194)을 고쳤다(커밋 `0e924a6`). 검증 시나리오 ①과 `while`(G195)을 했다(커밋 `68a4398`). 검증 시나리오 ②와 보기 정책·거른 읽기의 첫 조각(G196~G203)을 했다(커밋 `427345c`). 거른 결과 `Show`(G201·G204)와 `LegalMoves`·`Candidates`(G202)를 했다(커밋 `12d1872`). 거른 `Explain`(G205)을 했다(커밋 `780e595`). 검증 시나리오 ④를 코어 수정 없이 런타임 테스트로 했다(`ScenarioRealtimeTests`). 이로써 시나리오 ①~④가 다 됐다. 거른 `Advance` 결과(`Show`, `BlockedBy`는 답할 수 있는 질문만, `Blocked`는 그대로)도 정해 구현했다(G206, 커밋 `d987345`). 로직용 `.pyi`(G207·G208, 커밋 `09da3e8`)와 모드별 스키마 스텁(G209, 커밋 `ad362ba`)을 했다(아래 남은 일 2). 적합성 기준 C1~C10을 점검했다(spine-spec 7절, C9의 `Respond` 테스트만 더함, 커밋 `eb04421`). S8 칼럼 삭제는 고아 영역 대신 "기본 거부, 호스트가 허락하면 버리고 경고"로 정해 구현했다(G210, 커밋 `4b5f955`). Def 삭제도 같은 옵션으로 "불러올 때 파괴"로 했다(G211, 커밋 `21ef858`). 모드 내용 해시(G212, 엔진은 파일별 지문이라는 사실만, 무시할지는 사용처)와 그 전제인 파일 이름 NFC 정규화(G213, 재현한 자소 분리 버그)를 했다. 이어 "Flow 취소 후 로드"(G214, 호스트 옵션 `cancelBrokenFlows`, `SAV006`)를 했다(G212~G214 커밋 `012f5f4`). S8에 남은 것은 `migrate`다.
 
 그 밖의 후보:
 
-- 규모 벤치(spec 9절): 엔티티 1천·1만·10만에서 읽기, `derived` 추적, 쿼리, 커맨드 롤백 비용.
+- 규모 벤치에서 나온 것: `derived` 계산 준비 비용 줄이기, 전체를 도는 핸들러와 실행 예산, 할당 줄이기.
 - X4 로컬라이제이션(번역 파일 형식·폴백·포매터, spec은 "v1 직전 재확인").
 - S10 UI 구독 API(호스트 엔진 결정과 묶임).
 - S8 `migrate`(실제 모드 업데이트 사례가 생기면).

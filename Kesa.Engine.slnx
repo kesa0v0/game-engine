@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/bench/">
+    <Project Path="bench/Kesa.Engine.Bench/Kesa.Engine.Bench.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Kesa.Engine.Analyzers/Kesa.Engine.Analyzers.csproj" />
     <Project Path="src/Kesa.Engine.Cli/Kesa.Engine.Cli.csproj" />
