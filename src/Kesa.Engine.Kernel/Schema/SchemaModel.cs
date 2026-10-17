@@ -412,6 +412,13 @@ namespace Kesa.Engine.Schema
         }
 
         public ComponentDecl Decl { get; }
+
+        /// <summary>
+        /// 이 컴포넌트가 든 스키마(<see cref="SchemaSet.Components"/>) 안의 번호. 월드가 이름 해시 대신 이 번호로 Def의 컴포넌트를 찾는다.
+        /// 다른 스키마의 컴포넌트와 번호가 겹칠 수 있으므로 쓰는 쪽은 객체가 같은지도 본다.
+        /// </summary>
+        internal int Index { get; set; }
+
         public string Name => Decl.Name;
         public string Mod => Decl.Mod;
         public IReadOnlyList<MemberDecl> Members => Decl.Members;
@@ -515,6 +522,7 @@ namespace Kesa.Engine.Schema
 
         internal void Add(ComponentType component)
         {
+            component.Index = _componentList.Count;
             _components.Add(component.Name, component);
             _componentList.Add(component);
         }

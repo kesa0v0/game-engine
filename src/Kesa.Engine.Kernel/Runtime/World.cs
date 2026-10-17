@@ -174,7 +174,7 @@ namespace Kesa.Engine.Runtime
                 "'" + defId + "' has no such component, or it is keyed (add rows with AddRow)");
             // 모든 검사를 마친 뒤에 월드를 바꾼다 (실패한 호출은 흔적이 없다)
             var planned = new Planned();
-            var plannedRows = new EntityRecord(0, def);
+            var plannedRows = new EntityRecord(0, def, LayoutOf(def));
             foreach (var name in def.Components.Keys)
             {
                 def.Components.TryGet(name, out var rc);
@@ -200,7 +200,7 @@ namespace Kesa.Engine.Runtime
             }
 
             var id = _nextId++;
-            var entity = new EntityRecord(id, def);
+            var entity = new EntityRecord(id, def, LayoutOf(def));
             planned.CopyTo(entity.Values);
             foreach (var pair in plannedRows.Rows) entity.Rows.Add(pair.Key, pair.Value);
             _entities.Add(id, entity);
@@ -941,7 +941,7 @@ namespace Kesa.Engine.Runtime
         }
 
         private static bool Has(EntityRecord entity, ComponentType component) =>
-            entity.Def.Components.Contains(component.Name) || entity.Runtime.ContainsKey(component.Name);
+            entity.Layout.Find(component) != null || entity.Runtime.Count > 0 && entity.Runtime.ContainsKey(component.Name);
 
         private static void Require(EntityRecord entity, ComponentType component)
         {
@@ -952,7 +952,7 @@ namespace Kesa.Engine.Runtime
         }
 
         private static OrderedMap<ResolvedValue>? DefMembers(EntityRecord entity, ComponentType component) =>
-            entity.Def.Components.TryGet(component.Name, out var rc) ? rc.Members : null;
+            entity.Layout.Find(component)?.Members;
 
         /// <summary>엔티티가 가진 컴포넌트: Def의 것(순서대로) 뒤에 런타임에 붙인 것(이름 순).</summary>
         private static List<ComponentType> ComponentsOf(EntityRecord entity)
@@ -1052,16 +1052,61 @@ namespace Kesa.Engine.Runtime
             }
         }
 
+        /// <summary>
+        /// Def 하나의 컴포넌트를 컴포넌트 번호(<see cref="ComponentType.Index"/>)로 바로 찾는 표. 읽기·쓰기마다 "이 Def가 이 컴포넌트를
+        /// 가졌나"를 이름 해시로 찾지 않는다(규모 벤치). Def마다 월드가 한 번 만들어 그 Def의 엔티티들이 나눠 쓴다.
+        /// </summary>
+        private sealed class DefLayout
+        {
+            private readonly ComponentType?[] _types;
+            private readonly ResolvedComponent?[] _components;
+            private readonly FrozenDef _def;
+
+            public DefLayout(FrozenDef def, SchemaSet schema)
+            {
+                _def = def;
+                _types = new ComponentType?[schema.Components.Count];
+                _components = new ResolvedComponent?[_types.Length];
+                foreach (var name in def.Components.Keys)
+                {
+                    if (!schema.TryGetComponent(name, out var type)) continue;
+                    def.Components.TryGet(name, out var rc);
+                    _types[type.Index] = type;
+                    _components[type.Index] = rc;
+                }
+            }
+
+            /// <summary>이 Def의 그 컴포넌트, 없으면 null. 다른 로드의 컴포넌트 타입이면(번호가 같아도 다른 객체) 이름으로 찾는다.</summary>
+            public ResolvedComponent? Find(ComponentType component)
+            {
+                int i = component.Index;
+                if (i < _types.Length && ReferenceEquals(_types[i], component)) return _components[i];
+                return _def.Components.TryGet(component.Name, out var rc) ? rc : null;
+            }
+        }
+
+        private readonly Dictionary<FrozenDef, DefLayout> _layouts = new Dictionary<FrozenDef, DefLayout>();
+
+        private DefLayout LayoutOf(FrozenDef def)
+        {
+            if (!_layouts.TryGetValue(def, out var layout)) _layouts.Add(def, layout = new DefLayout(def, _schema));
+            return layout;
+        }
+
         private sealed class EntityRecord
         {
-            public EntityRecord(long id, FrozenDef def)
+            public EntityRecord(long id, FrozenDef def, DefLayout layout)
             {
                 Id = id;
                 Def = def;
+                Layout = layout;
             }
 
             public long Id { get; }
             public FrozenDef Def { get; }
+
+            /// <summary>Def의 컴포넌트를 번호로 찾는 표 (같은 Def의 엔티티가 나눠 씀).</summary>
+            public DefLayout Layout { get; }
 
             /// <summary>키 없는 컴포넌트의 엔티티 값 (쓴 값, 생성 순간에 계산한 값).</summary>
             public Dictionary<MemberDecl, Value> Values { get; } = new Dictionary<MemberDecl, Value>();
