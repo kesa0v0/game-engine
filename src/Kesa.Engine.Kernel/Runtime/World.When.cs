@@ -587,7 +587,7 @@ namespace Kesa.Engine.Runtime
             _settling = true;
             try
             {
-                var opened = Atomically(() =>
+                var opened = WithWarnings(() => Atomically(() =>
                 {
                     var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
                     foreach (var pair in values) args[pair.Key] = ToScript(pair.Value);
@@ -606,15 +606,18 @@ namespace Kesa.Engine.Runtime
                     }
                     finally
                     {
-                        if (outermost) _meter = null;
+                        if (outermost && CloseActionMeter() is var heavy && heavy > 0)
+                            WarnHeavy(heavy, "the reaction " + w.Id, w.Span);
                     }
-                });
-                if (opened.Item1 == null) return new Reaction(Reaction.WhenSignal, values, w.Id, 0, ReactionOutcome.Finished);
+                }), out var warnings);
+                if (opened.Item1 == null)
+                    return new Reaction(Reaction.WhenSignal, values, w.Id, 0, ReactionOutcome.Finished) { Warnings = warnings };
                 return new Reaction(Reaction.WhenSignal, values, w.Id, 0, ReactionOutcome.Suspended)
                 {
                     Flow = opened.Item1,
                     OpenedRequest = opened.Item2,
                     SleepsUntil = SleepsUntil(opened.Item1.Value),
+                    Warnings = warnings,
                 };
             }
             catch (WorldException ex)

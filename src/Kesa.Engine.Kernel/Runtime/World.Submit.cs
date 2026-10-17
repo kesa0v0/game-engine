@@ -86,6 +86,12 @@ namespace Kesa.Engine.Runtime
         /// 본문이 낸 신호로 돈 핸들러들, 돈 순서대로 (spec S5, spec-gaps G148). 핸들러가 실패해도 <see cref="Outcome"/>은 그대로다.
         /// </summary>
         public IReadOnlyList<Reaction> Reactions { get; internal set; } = Array.Empty<Reaction>();
+
+        /// <summary>
+        /// 실패하지 않은 경고 (spec-gaps G225): 사전 조건과 본문이 읽기 예산보다 많은 단계를 썼으면 <c>RUN021</c>. 핸들러의 경고는 각
+        /// <see cref="Reaction"/>에 있다.
+        /// </summary>
+        public IReadOnlyList<Diagnostic> Warnings { get; internal set; } = Array.Empty<Diagnostic>();
     }
 
     /// <summary>커맨드 제출 (spec S6 권한 3층, spec-gaps G122~G124·G131).</summary>
@@ -122,19 +128,35 @@ namespace Kesa.Engine.Runtime
                 // 본문이 중간에 실패하면 그때까지의 쓰기를 되감는다 (C8, G133)
                 Request? opened = null;
                 long? flow = null;
-                var report = Atomically(() =>
+                PreconditionReport report;
+                IReadOnlyList<Diagnostic> warnings;
+                var outerWarnings = OpenWarnings();
+                try
                 {
-                    var r = EvaluateRequires(decl, checkedArgs, runBody: true, out var suspended);
-                    // ask·wait에서 멈췄으면 여기까지가 한 트랜잭션이고 Flow가 질문을 들거나 잠들어 남는다 (S5·X1·X2)
-                    if (suspended != null)
+                    report = Atomically(() =>
                     {
-                        flow = _nextFlow;
-                        opened = OpenFlow(command, suspended, SubjectsOf(checkedArgs.Values));
-                    }
-                    return r;
-                });
-                if (!report.Passed) return Copy(result, SubmitOutcome.PreconditionsFailed, target, report);
+                        var r = EvaluateRequires(decl, checkedArgs, runBody: true, out var suspended);
+                        // ask·wait에서 멈췄으면 여기까지가 한 트랜잭션이고 Flow가 질문을 들거나 잠들어 남는다 (S5·X1·X2)
+                        if (suspended != null)
+                        {
+                            flow = _nextFlow;
+                            opened = OpenFlow(command, suspended, SubjectsOf(checkedArgs.Values));
+                        }
+                        return r;
+                    });
+                }
+                finally
+                {
+                    warnings = CloseWarnings(outerWarnings);
+                }
+                if (!report.Passed)
+                {
+                    var failed = Copy(result, SubmitOutcome.PreconditionsFailed, target, report);
+                    failed.Warnings = warnings;
+                    return failed;
+                }
                 var done = Copy(result, SubmitOutcome.Succeeded, target, report);
+                done.Warnings = warnings;
                 // 커맨드의 트랜잭션이 끝난 뒤 핸들러를 각자의 트랜잭션으로 돌린다 (S5, G148)
                 done.Reactions = AfterRun();
                 // 신호 처리와 대상 소멸 확인(G164)이 끝난 뒤의 상태: 그 사이 취소된 Flow의 질문·잠은 보이지 않는다

@@ -40,7 +40,12 @@ namespace Kesa.Engine.Tests.Runtime
             "    with preconditions:\n" +
             "        n = count_units()\n" +
             "        require(n > 0, text(\"msg.none\"))\n" +
-            "    pass\n";
+            "    pass\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def AskThenFeed(u: Ref[Unit]):\n" +
+            "    r = ask(u, \"go?\", choices=[\"go\"])\n" +
+            "    for x in query(\"Unit\"):\n" +
+            "        x.Food.amount += 1\n";
 
         private const string Grow =
             "@on(Tick)\n" +
@@ -59,12 +64,22 @@ namespace Kesa.Engine.Tests.Runtime
         private World _world = null!;
         private readonly List<EntityId> _units = new List<EntityId>();
 
-        private void NewWorld(string handlers = "")
+        private void NewWorld(string handlers = "", int units = 100)
         {
             Mod("banking", schema: Schema, defs: Defs + handlers);
             _world = new World(LoadClean(), stepBudget: 300, actionStepBudget: 20_000);
             _units.Clear();
-            for (int i = 0; i < 100; i++) _units.Add(_world.Create("Soldier"));
+            for (int i = 0; i < units; i++) _units.Add(_world.Create("Soldier"));
+        }
+
+        private static void IsHeavy(IReadOnlyList<Diagnostic> warnings, string label)
+        {
+            Assert.That(warnings, Has.Count.EqualTo(1));
+            var w = warnings[0];
+            Assert.That(w.Code, Is.EqualTo(Codes.RunHeavy));
+            Assert.That(w.Severity, Is.EqualTo(Severity.Warning));
+            Assert.That(w.Message, Does.StartWith(label + " used "));
+            Assert.That(w.Message, Does.Contain("evaluation steps, more than the read budget of 300 (it fails at 20000)"));
         }
 
         private long Food(EntityId id) => ((IntValue)_world.Get(id, _world.Member("Food", "amount"))).Value;
@@ -101,6 +116,52 @@ namespace Kesa.Engine.Tests.Runtime
             var office = _world.Create("Bureau");
             var e = Assert.Throws<WorldException>(() => _world.Get(office, _world.Member("Census", "total")))!;
             Assert.That(e.Code, Is.EqualTo(Codes.RunBudget));
+        }
+
+        // ---- 경고 문턱 (G225): 읽기 예산을 넘은 행동은 실패하지 않고 결과에 경고가 붙는다 ----
+
+        [Test]
+        public void AHandlerOverTheReadBudgetGetsAWarningEveryTime()
+        {
+            NewWorld(Grow);
+            for (int tick = 0; tick < 2; tick++)
+            {
+                var r = _world.Advance(1).Reactions[0];
+                Assert.That(r.Outcome, Is.EqualTo(ReactionOutcome.Finished));
+                IsHeavy(r.Warnings, "the handler banking.grow for Tick");
+                Assert.That(r.Warnings[0].Span.Line, Is.GreaterThan(0), "it points at the handler");
+            }
+            Assert.That(Food(_units[0]), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void ALightHandlerHasNoWarning()
+        {
+            NewWorld(Grow, units: 10);
+            var r = _world.Advance(1).Reactions[0];
+            Assert.That(r.Warnings, Is.Empty);
+        }
+
+        [Test]
+        public void ACommandOverTheReadBudgetGetsAWarningOnItsResult()
+        {
+            NewWorld(Grow);
+            var fed = Submit("FeedAll");
+            Assert.That(fed.Succeeded, Is.True);
+            IsHeavy(fed.Warnings, "the command banking.FeedAll");
+            // 연결마다 거른 결과에는 오류처럼 개발자용 글이 빠진다
+            Assert.That(_world.ViewAs("host").Show(fed).Warnings, Is.Empty);
+        }
+
+        [Test]
+        public void ContinuingAfterAnAnswerWarnsOnTheAnswer()
+        {
+            NewWorld();
+            var asked = _world.Submit("host", "banking.AskThenFeed", new Dictionary<string, Value> { ["u"] = new EntityValue(_units[0]) });
+            Assert.That(asked.Warnings, Is.Empty, "asking was light");
+            var answered = _world.Answer("host", asked.OpenedRequest!.Id, _units[0], 0);
+            Assert.That(answered.Succeeded, Is.True, answered.Message);
+            IsHeavy(answered.Warnings, "the command banking.AskThenFeed (after an answer)");
         }
 
         [Test]

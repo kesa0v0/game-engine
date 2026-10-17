@@ -93,6 +93,9 @@ namespace Kesa.Engine.Runtime
 
         /// <summary><see cref="ReactionOutcome.Dropped"/>일 때 고칠 방법.</summary>
         public string? Hint { get; internal set; }
+
+        /// <summary>실패하지 않은 경고 (spec-gaps G225): 이 핸들러가 읽기 예산보다 많은 단계를 썼으면 <c>RUN021</c>.</summary>
+        public IReadOnlyList<Diagnostic> Warnings { get; internal set; } = Array.Empty<Diagnostic>();
     }
 
     /// <summary>
@@ -222,7 +225,7 @@ namespace Kesa.Engine.Runtime
             _reactingHandler = id;
             try
             {
-                var opened = Atomically(() =>
+                var opened = WithWarnings(() => Atomically(() =>
                 {
                     // 인자도 핸들러 안에서 만든다: 실패하면 그 핸들러만의 오류다
                     var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
@@ -242,14 +245,20 @@ namespace Kesa.Engine.Runtime
                     }
                     finally
                     {
-                        if (outermost) _meter = null;
+                        if (outermost && CloseActionMeter() is var heavy && heavy > 0)
+                            WarnHeavy(heavy, "the handler " + id + " for " + e.Signal.Signal.Name, h.Span);
                     }
-                });
-                if (opened.Item1 == null) return reaction;
+                }), out var warnings);
+                if (opened.Item1 == null)
+                {
+                    reaction.Warnings = warnings;
+                    return reaction;
+                }
                 return new Reaction(reaction.Signal, reaction.Values, id, e.Generation, ReactionOutcome.Suspended)
                 {
                     OpenedRequest = opened.Item2,
                     SleepsUntil = SleepsUntil(opened.Item1.Value),
+                    Warnings = warnings,
                 };
             }
             catch (WorldException ex)

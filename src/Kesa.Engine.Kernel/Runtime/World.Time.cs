@@ -202,15 +202,26 @@ namespace Kesa.Engine.Runtime
         private void Resume(FlowRecord flow, string signal, Value answer, string after, List<Reaction> reactions)
         {
             var values = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+            var outerWarnings = OpenWarnings();
             try
             {
-                var opened = Atomically(() => Continue(flow, answer, after));
+                Request? opened;
+                IReadOnlyList<Diagnostic> warnings;
+                try
+                {
+                    opened = Atomically(() => Continue(flow, answer, after));
+                }
+                finally
+                {
+                    warnings = CloseWarnings(outerWarnings);
+                }
                 bool paused = _flows.ContainsKey(flow.Id);
                 reactions.Add(new Reaction(signal, values, flow.Command, 0, paused ? ReactionOutcome.Suspended : ReactionOutcome.Finished)
                 {
                     Flow = flow.Id,
                     OpenedRequest = opened,
                     SleepsUntil = SleepsUntil(flow.Id),
+                    Warnings = warnings,
                 });
             }
             catch (WorldException e)

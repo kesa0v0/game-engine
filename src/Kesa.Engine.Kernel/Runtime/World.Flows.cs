@@ -144,6 +144,11 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>응답 커맨드의 사전 검사 결과. 입구를 통과했을 때만 있다.</summary>
         public PreconditionReport? Preconditions { get; internal set; }
+
+        /// <summary>
+        /// 실패하지 않은 경고 (spec-gaps G225): 응답 커맨드나 이어서 실행한 구간이 읽기 예산보다 많은 단계를 썼으면 <c>RUN021</c>.
+        /// </summary>
+        public IReadOnlyList<Diagnostic> Warnings { get; internal set; } = Array.Empty<Diagnostic>();
     }
 
     /// <summary>
@@ -359,10 +364,20 @@ namespace Kesa.Engine.Runtime
 
             try
             {
-                var opened = Atomically(() => Continue(flow, new AnswerValue(this, null, choice, open.Choices[(int)choice], by)));
+                IReadOnlyList<Diagnostic> warnings;
+                var outerWarnings = OpenWarnings();
+                try
+                {
+                    Atomically(() => Continue(flow, new AnswerValue(this, null, choice, open.Choices[(int)choice], by)));
+                }
+                finally
+                {
+                    warnings = CloseWarnings(outerWarnings);
+                }
                 return new AnswerResult(request, issuer, AnswerOutcome.Succeeded)
                 {
                     Reactions = AfterRun(), OpenedRequest = HeldRequest(flow.Id), SleepsUntil = SleepsUntil(flow.Id),
+                    Warnings = warnings,
                 };
             }
             catch (WorldException e)
@@ -423,26 +438,36 @@ namespace Kesa.Engine.Runtime
 
             try
             {
-                Request? opened = null;
-                var report = Atomically(() =>
+                PreconditionReport report;
+                IReadOnlyList<Diagnostic> warnings;
+                var outerWarnings = OpenWarnings();
+                try
                 {
-                    var r = EvaluateRequires(decl, checkedArgs, runBody: true, out var inner);
-                    if (!r.Passed) return r; // 본문이 돌지 않았다: 쓴 것이 없다
-                    if (inner != null)
+                    report = Atomically(() =>
                     {
-                        string at = inner.Request is WaitPayload ? "wait()" : inner.Request is AdvancePayload ? "advance()" : "ask()";
-                        throw new WorldException(Codes.RunScript,
-                            "the response command " + command + " stopped at " + at + ", which is not supported yet",
-                            "ask from the command that is waiting instead (spec-gaps G139)");
-                    }
-                    opened = Continue(flow, new AnswerValue(this, open.ResponseNames[accepted], null, null, by));
-                    return r;
-                });
+                        var r = EvaluateRequires(decl, checkedArgs, runBody: true, out var inner);
+                        if (!r.Passed) return r; // 본문이 돌지 않았다: 쓴 것이 없다
+                        if (inner != null)
+                        {
+                            string at = inner.Request is WaitPayload ? "wait()" : inner.Request is AdvancePayload ? "advance()" : "ask()";
+                            throw new WorldException(Codes.RunScript,
+                                "the response command " + command + " stopped at " + at + ", which is not supported yet",
+                                "ask from the command that is waiting instead (spec-gaps G139)");
+                        }
+                        Continue(flow, new AnswerValue(this, open.ResponseNames[accepted], null, null, by));
+                        return r;
+                    });
+                }
+                finally
+                {
+                    warnings = CloseWarnings(outerWarnings);
+                }
                 var outcome = report.Passed ? AnswerOutcome.Succeeded : AnswerOutcome.PreconditionsFailed;
                 return new AnswerResult(request, issuer, outcome)
                 {
                     Arguments = checkedArgs, Preconditions = report, Reactions = AfterRun(),
                     OpenedRequest = HeldRequest(flow.Id), SleepsUntil = SleepsUntil(flow.Id),
+                    Warnings = warnings,
                 };
             }
             catch (WorldException e)
@@ -504,7 +529,8 @@ namespace Kesa.Engine.Runtime
             }
             finally
             {
-                if (outermost) _meter = null;
+                if (outermost && CloseActionMeter() is var heavy && heavy > 0)
+                    WarnHeavy(heavy, (flow.Handler ? "the handler " : "the command ") + flow.Command + " (" + after + ")", SourceSpan.None);
             }
         }
 

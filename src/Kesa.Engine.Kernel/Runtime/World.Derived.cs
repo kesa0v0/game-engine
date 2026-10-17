@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Loading;
@@ -23,6 +24,63 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>행동 실행(커맨드 본문, 핸들러, Flow 이어 하기) 하나의 단계 예산 (G224).</summary>
         private readonly int _actionStepBudget;
+
+        /// <summary>
+        /// 지금 만드는 결과(제출, 답, 핸들러 하나)에 붙일 경고 (G225). 결과 단위가 열려 있을 때만 null이 아니다: 결과가 없는 실행
+        /// (사전 검사만, <c>choose</c> 나열)의 경고는 버린다.
+        /// </summary>
+        private List<Diagnostic>? _warnings;
+
+        /// <summary>결과 단위를 연다. 돌려준 값은 <see cref="CloseWarnings"/>에 넘긴다(안쪽 결과 단위가 바깥 것을 섞지 않게).</summary>
+        private List<Diagnostic>? OpenWarnings()
+        {
+            var outer = _warnings;
+            _warnings = new List<Diagnostic>();
+            return outer;
+        }
+
+        /// <summary><paramref name="run"/>을 결과 단위 하나로 돌리고 그동안 모은 경고를 <paramref name="warnings"/>로 준다.</summary>
+        private T WithWarnings<T>(Func<T> run, out IReadOnlyList<Diagnostic> warnings)
+        {
+            var outer = OpenWarnings();
+            try
+            {
+                return run();
+            }
+            finally
+            {
+                warnings = CloseWarnings(outer);
+            }
+        }
+
+        /// <summary>결과 단위를 닫고 그동안 모은 경고를 돌려준다.</summary>
+        private IReadOnlyList<Diagnostic> CloseWarnings(List<Diagnostic>? outer)
+        {
+            var mine = _warnings!;
+            _warnings = outer;
+            return mine.Count == 0 ? (IReadOnlyList<Diagnostic>)Array.Empty<Diagnostic>() : mine;
+        }
+
+        /// <summary>
+        /// 가장 바깥 행동 실행의 계량기를 닫는다. 읽기 예산보다 많이 썼으면 실패시키지 않고 경고를 남긴다 (G225): 오류 상한(행동 예산)에
+        /// 닿기 전에 무거운 곳을 알게 한다. 넘을 때마다 남기고, 걸러 보여 줄지는 게임이 정한다.
+        /// </summary>
+        /// <returns>경고를 남길 만큼 썼으면 쓴 단계 수(<see cref="WarnHeavy"/>에 넘긴다), 아니면 0. 문구는 그때만 만든다.</returns>
+        private int CloseActionMeter()
+        {
+            var meter = _meter!;
+            _meter = null;
+            return meter.Used > _stepBudget && _warnings != null ? meter.Used : 0;
+        }
+
+        private void WarnHeavy(int used, string label, SourceSpan span)
+        {
+            _warnings!.Add(new Diagnostic(Codes.RunHeavy, Severity.Warning,
+                label + " used " + used.ToString(CultureInfo.InvariantCulture) + " evaluation steps, more than the read budget of " +
+                _stepBudget.ToString(CultureInfo.InvariantCulture) + " (it fails at " +
+                _actionStepBudget.ToString(CultureInfo.InvariantCulture) + ")",
+                null, span, "spread the work over ticks, or move it into a host function (spec-gaps G225)"));
+        }
         private PureEvaluator? _evaluator;
 
         /// <summary>지금 계산 중인 <c>derived</c>·기본값들 (바깥부터). 같은 값을 다시 읽으면 순환이다 (G100).</summary>

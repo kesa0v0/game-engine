@@ -155,7 +155,8 @@ namespace Kesa.Engine.Runtime
             }
             finally
             {
-                if (outermost) _meter = null;
+                if (outermost && CloseActionMeter() is var heavy && heavy > 0)
+                    WarnHeavy(heavy, (runBody ? "the command " : "the preconditions of ") + command, decl.Span);
             }
         }
 
