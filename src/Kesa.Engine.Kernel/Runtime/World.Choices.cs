@@ -6,60 +6,6 @@ using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Runtime
 {
-    /// <summary><see cref="World.Candidates"/>의 결과 (spec-gaps G184).</summary>
-    public sealed class CandidateList
-    {
-        internal CandidateList(string command, string parameter, IReadOnlyList<Value> values, IReadOnlyList<string> needs,
-            IReadOnlyList<ArgumentRejection> arguments)
-        {
-            Command = command;
-            Parameter = parameter;
-            Values = values;
-            Needs = needs;
-            Arguments = arguments;
-        }
-
-        public string Command { get; }
-        public string Parameter { get; }
-
-        /// <summary>후보, <c>where=</c>면 id 순, <c>from_=</c>면 목록 순(같은 값은 처음 것만). 엔티티는 <see cref="EntityValue"/>.</summary>
-        public IReadOnlyList<Value> Values { get; }
-
-        /// <summary>후보 식이 읽는데 아직 정하지 않은 매개변수 (매개변수 순). 있으면 <see cref="Values"/>는 비어 있다.</summary>
-        public IReadOnlyList<string> Needs { get; }
-
-        /// <summary>넘긴 인자의 거절 (G115). 있으면 <see cref="Values"/>는 비어 있다.</summary>
-        public IReadOnlyList<ArgumentRejection> Arguments { get; }
-
-        public bool Ready => Needs.Count == 0 && Arguments.Count == 0;
-    }
-
-    /// <summary><see cref="World.LegalMoves"/>의 결과 (spec-gaps G184).</summary>
-    public sealed class LegalMoveList
-    {
-        internal LegalMoveList(string command, IReadOnlyList<IReadOnlyDictionary<string, Value>> moves, bool truncated,
-            IReadOnlyList<ArgumentRejection> arguments)
-        {
-            Command = command;
-            Moves = moves;
-            Truncated = truncated;
-            Arguments = arguments;
-        }
-
-        public string Command { get; }
-
-        /// <summary>
-        /// 사전 검사를 통과한 전체 인자들 (기본값까지 채움), <c>choose</c> 순서 → 후보 순서. 그대로 제출할 수 있다.
-        /// </summary>
-        public IReadOnlyList<IReadOnlyDictionary<string, Value>> Moves { get; }
-
-        /// <summary>최대 개수에 닿아 더 있는 수를 버렸다.</summary>
-        public bool Truncated { get; }
-
-        /// <summary>넘긴 인자의 거절 (G115). 있으면 <see cref="Moves"/>는 비어 있다.</summary>
-        public IReadOnlyList<ArgumentRejection> Arguments { get; }
-    }
-
     /// <summary>
     /// <c>choose</c>의 후보와 합법 수를 호스트에 준다 (spec S2·S6, spec-gaps G183·G184·G188). 상태를 바꾸지 않는다.
     /// </summary>

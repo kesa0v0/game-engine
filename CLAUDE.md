@@ -15,6 +15,8 @@
 
 저장소 루트에서 `dotnet build`, `dotnet test`. 커널은 `netstandard2.1`, C# 9, 부동소수점·시계·비시드 난수 등은 `src/Kesa.Engine.Analyzers/BannedSymbols.txt`와 `DeterminismAnalyzer`로 금지(결정론, spec P2). 둘 다 `Determinism.props`로 켠다(호스트 함수 프로젝트도 같은 파일, G220).
 
+파일 배치(2026-10-18): 동작 클래스(`World`·`Interpreter`·`ContentLoader` 등)의 파일에는 그 클래스만 둔다. 공개 결과 타입은 제 파일(주된 타입 이름)에 그 열거형과 함께 둔다(`SubmitResult.cs`에 `SubmitOutcome`과 `SubmitResult`). 같은 종류의 작은 타입을 묶은 모델 파일(`Ast.cs`·`Values.cs`·`SchemaModel.cs` 등)은 그대로 묶는다. 한 파일이 900줄을 넘으면 `// ----` 절을 따라 partial 파일로 나눈다.
+
 ## 문서 편집 주의 (겪은 사고)
 
 - `docs/spec-gaps.md`는 색인이고 G 번호마다의 전문은 `docs/gaps/`의 영역 파일에 `## G번호` 절로 있다(2026-10-18에 나눔). 새 결정은 두 곳에 함께 적는다. 색인 표의 셀 안에 `|`나 `\|`를 쓰지 않는다(표가 깨진다). 확인: `awk -F'|' '/^\| \[G/{print NF}' docs/spec-gaps.md | sort | uniq -c` → 값이 하나뿐이어야 한다.
