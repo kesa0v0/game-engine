@@ -4,280 +4,280 @@
 
 **상태:** 잠정 = 구현이 이렇게 동작하지만 확인 필요 · 확인 = 사용자가 동의함 · 반영 = spec에 옮김.
 
-**모양:** 이 파일은 색인이다. G 번호마다의 전문(무엇이 비어 있었나·어떻게 정했나·이유)은 `docs/gaps/`의 영역 파일에 있다. 새 항목은 그 영역 파일 끝에 `## G번호` 절(위치·무엇이 비어 있었나·어떻게 정했나·이유·상태)을 쓰고 이 색인의 그 영역 표에 한 행을 더한다. 번호는 영역과 상관없이 전체에서 이어 매긴다(다음 번호는 G228). 영역은 위치의 첫 표시로 고르고, 다른 G에서 이어진 항목은 그 G의 영역에 둔다. 영역 표에 "무엇을 정했나" 요약 칸을 더하는 중이다(2026-10-18 시작).
+**모양:** 이 파일은 색인이다. G 번호마다의 전문(무엇이 비어 있었나·어떻게 정했나·이유)은 `docs/gaps/`의 영역 파일에 있다. 새 항목은 그 영역 파일 끝에 `## G번호` 절(위치·무엇이 비어 있었나·어떻게 정했나·이유·상태)을 쓰고 이 색인의 그 영역 표에 한 행을 더한다. 번호는 영역과 상관없이 전체에서 이어 매긴다(다음 번호는 G228). 영역은 위치의 첫 표시로 고르고, 다른 G에서 이어진 항목은 그 G의 영역에 둔다. 색인의 "무엇을 정했나"는 영역 파일의 "어떻게 정했나"를 줄인 것이고(2026-10-18), 새 항목도 한두 문장으로 적는다. 요약과 전문이 다르면 전문이 맞다.
 
 ## S1 콘텐츠 로딩·스텁
 
-| # | 위치 | 상태 |
-|---|---|---|
-| [G1](gaps/S1-loading.md#g1) | S1 ① 정렬 | 확인 |
-| [G2](gaps/S1-loading.md#g2) | S1 매니페스트 | 잠정 |
-| [G3](gaps/S1-loading.md#g3) | S1 매니페스트 | 잠정 |
-| [G7](gaps/S1-loading.md#g7) | S1 ① 발견 | 잠정 |
-| [G8](gaps/S1-loading.md#g8) | S1 ① 정렬 | 확인 |
-| [G9](gaps/S1-loading.md#g9) | S1 ① 정렬 | 잠정 |
-| [G10](gaps/S1-loading.md#g10) | S1 ① 정렬 | 잠정 |
-| [G11](gaps/S1-loading.md#g11) | S1 ① 정렬 | 확인 |
-| [G12](gaps/S1-loading.md#g12) | S1 매니페스트 | 잠정 |
-| [G15](gaps/S1-loading.md#g15) | S1 ① 정렬 | 잠정 |
-| [G16](gaps/S1-loading.md#g16) | S1 ②a 스키마 파일 | 확인 |
-| [G18](gaps/S1-loading.md#g18) | S1 `use_all` | 잠정 |
-| [G19](gaps/S1-loading.md#g19) | S1 중복 Def ID | 잠정 |
-| [G21](gaps/S1-loading.md#g21) | S1 `override=True` | 잠정 |
-| [G25](gaps/S1-loading.md#g25) | S1 Def 리터럴 | 잠정 |
-| [G26](gaps/S1-loading.md#g26) | S1 ② 단계 분리 | 잠정 |
-| [G28](gaps/S1-loading.md#g28) | S1 오류 정책 (②) | 잠정 |
-| [G29](gaps/S1-loading.md#g29) | S1 매니페스트 `extensions` | 잠정 |
-| [G30](gaps/S1-loading.md#g30) | S1 `inherit.필드` | 잠정 |
-| [G34](gaps/S1-loading.md#g34) | S1 패치 호출 모양 | 확인 |
-| [G35](gaps/S1-loading.md#g35) | S1 ③ 패치 파일·실행 시점 | 확인 |
-| [G36](gaps/S1-loading.md#g36) | S1 패치 연산별 허용 필드 | 확인 |
-| [G37](gaps/S1-loading.md#g37) | S1 `set` 충돌의 "의존 관계" | 확인 |
-| [G38](gaps/S1-loading.md#g38) | S1 패치 대상의 보이는 범위 | 확인 |
-| [G39](gaps/S1-loading.md#g39) | S1 패치 값의 검사 시점 | 확인 |
-| [G41](gaps/S1-loading.md#g41) | S1 패치 적용 순서 (spec의 "단계 고정"을 바꿈) | 확인 |
-| [G42](gaps/S1-loading.md#g42) | S1 ③·④ 값에 의존하는 패치 검사는 ④로 (G42 일반화) | 확인 |
-| [G43](gaps/S1-loading.md#g43) | S1·S3 추상 Def·`override`된 Def의 패치 | 확인 |
-| [G44](gaps/S1-loading.md#g44) | S1·S4 컴포넌트를 붙이고 떼는 패치 | 확인 |
-| [G45](gaps/S1-loading.md#g45) | S1·S9 패치 변경 이력의 구현 모양 | 확인 |
-| [G47](gaps/S1-loading.md#g47) | S1·S3 패치 경로의 키 표기 (G34 보강) | 확인 |
-| [G49](gaps/S1-loading.md#g49) | S1 오류 정책 (G28 확장) | 확인 |
-| [G50](gaps/S1-loading.md#g50) | S1 패치 "같은 필드"의 판정과 Def별 적용 순서 | 확인 |
-| [G51](gaps/S1-loading.md#g51) | S1 패치 연산의 값 모양 (G36 보강) | 확인 |
-| [G52](gaps/S1-loading.md#g52) | S1 ④의 결과를 담는 자료구조 | 확인 |
-| [G53](gaps/S1-loading.md#g53) | S1 `add`의 기준값 (G42 보강) | 확인 |
-| [G54](gaps/S1-loading.md#g54) | S1 맵 항목 경로 `set`에서 없는 키 (G36 보강) | 확인 |
-| [G55](gaps/S1-loading.md#g55) | S1 ④ Def 하나의 처리 순서와 `inherit` 식 (G30·G50 보강) | 확인 |
-| [G56](gaps/S1-loading.md#g56) | S1 `inherit` 식의 범위 (G30·G55 보강) | 확인 |
-| [G57](gaps/S1-loading.md#g57) | S1 ④ `parent` 검증 | 확인 |
-| [G58](gaps/S1-loading.md#g58) | S1 ④ 컴포넌트 값의 상속 병합 단위 | 확인 |
-| [G59](gaps/S1-loading.md#g59) | S1 `merge="append"` 필드의 `inherit` 식 (G58 보강) | 확인 |
-| [G60](gaps/S1-loading.md#g60) | S1 ④ 패치 적용과 실패한 패치 (G42·G44 보강) | 확인 |
-| [G62](gaps/S1-loading.md#g62) | S1 패치 값 안의 `inherit` (G30 보강) | 확인 |
-| [G63](gaps/S1-loading.md#g63) | S1 ⑤ 링크가 만드는 것 | 확인 |
-| [G64](gaps/S1-loading.md#g64) | S1 ⑤ 참조가 유효한 조건 | 확인 |
-| [G65](gaps/S1-loading.md#g65) | S1 ⑤ 가드 안 패치 값의 `optional` 모드 Def (G38 보강) | 확인 |
-| [G66](gaps/S1-loading.md#g66) | S1 ⑤ `abstract` Def를 가리키는 참조 (G57 보강) | 확인 |
-| [G67](gaps/S1-loading.md#g67) | S1 ⑥ 필수 값 (G25 보강) | 확인 |
-| [G68](gaps/S1-loading.md#g68) | S1 ⑥ 최종 값의 타입 검사와 `min`/`max` (G25·G39·G48 모음) | 확인 |
-| [G69](gaps/S1-loading.md#g69) | S1 ⑥ 동결본이 기본값을 채우는가 (S4 보강) | 확인 |
-| [G70](gaps/S1-loading.md#g70) | S1 ⑥ 동결 집합과 `abstract` Def (G57·G66 보강) | 확인 |
-| [G71](gaps/S1-loading.md#g71) | S1 ⑥ `.pyi` 스텁의 범위와 생성 방식 (schema-design 4.3 보강) | 확인 |
-| [G72](gaps/S1-loading.md#g72) | S1 ⑥ 작성용 `.pyi`의 모양 (G71 보강) | 확인 |
-| [G73](gaps/S1-loading.md#g73) | S1 ⑤⑥ 스키마가 선언한 `default` 값의 검사 (G69 보강) | 확인 |
-| [G74](gaps/S1-loading.md#g74) | S1 ⑥ `extend`로 더한 `const`의 기본값 (G67·G69 보강) | 확인 |
-| [G77](gaps/S1-loading.md#g77) | S1 ⑥ `keys="all"` 키 컴포넌트의 줄과 기본값 (G69·G74 보강) | 확인 |
-| [G81](gaps/S1-loading.md#g81) | S1 ⑥ `.pyi` 스텁의 파일 배치와 CLI (G71 보강, schema-design 4.3) | 확인 |
-| [G82](gaps/S1-loading.md#g82) | S1 `.pyi` 스텁: 매니페스트와 스키마 파일 (G72·G81 보강) | 확인 |
-| [G83](gaps/S1-loading.md#g83) | S1 비활성화된 모드의 `.pyi` 스텁 (G81의 열린 점, G49 보강) | 확인 |
-| [G94](gaps/S1-loading.md#g94) | S1 ⑥·S4 Def가 적은 `keys="listed"` 줄의 필수 칸 (G93 보강) | 확인 |
-| [G207](gaps/S1-loading.md#g207) | 로직용 `.pyi`(handoff 남은 일 2)에서 `Ref[T]`와 엔티티 타입 | 확인 |
-| [G208](gaps/S1-loading.md#g208) | G207 로직용 스텁에서 None일 수 있는 값을 확인 없이 읽을 때 | 확인 |
-| [G209](gaps/S1-loading.md#g209) | G82 스키마 스텁에 컴포넌트·Def 타입 이름이 없음 | 확인 |
-| [G213](gaps/S1-loading.md#g213) | S1 ① 파일 이름의 유니코드 정규화 (G7 보강) | 확인 |
+| # | 위치 | 무엇을 정했나 | 상태 |
+|---|---|---|---|
+| [G1](gaps/S1-loading.md#g1) | S1 ① 정렬 | 모드 정렬: 의존을 지키며 지금 로드할 수 있는 모드 중 id가 서수상 가장 작은 것부터(Kahn). | 확인 |
+| [G2](gaps/S1-loading.md#g2) | S1 매니페스트 | 모드 id는 `[a-z][a-z0-9_]*`, 점 금지. | 잠정 |
+| [G3](gaps/S1-loading.md#g3) | S1 매니페스트 | mod.py에는 `Mod(...)` 하나와 `use`·`use_all`만, 인자는 리터럴, 경로는 모드 폴더 기준 상대 경로(`/`, `..`·절대 경로 금지), `use`는 `.py`만. | 잠정 |
+| [G7](gaps/S1-loading.md#g7) | S1 ① 발견 | `mod.py` 없는 폴더는 경고 후 건너뛰고 `.` 폴더는 무시, 대소문자만 다른 이름은 오류(`use` 경로는 `MOD002` + "혹시 …?"). | 잠정 |
+| [G8](gaps/S1-loading.md#g8) | S1 ① 정렬 | 설치됐지만 로드에 실패한 `optional` 의존은 없는 것으로 본다: 순서만 잃고 이 모드는 로드, 추가 진단 없음. | 확인 |
+| [G9](gaps/S1-loading.md#g9) | S1 ① 정렬 | 설치 안 된 `loadAfter`·`optional` 대상은 조용히 무시, 이름이 아주 비슷한 설치 모드가 있으면 경고 + "혹시 …?". | 잠정 |
+| [G10](gaps/S1-loading.md#g10) | S1 ① 정렬 | 두 폴더가 같은 모드 id를 선언하면 둘 다 비활성화, `related`에 서로의 위치. | 잠정 |
+| [G11](gaps/S1-loading.md#g11) | S1 ① 정렬 | 사이클 모드에 `loadAfter`·`optional`로만 걸린 모드는 로드(순서만 잃음), 필수 의존이면 비활성화. | 확인 |
+| [G12](gaps/S1-loading.md#g12) | S1 매니페스트 | `Mod(...)`에 `version`·`defaultLanguage` 추가, 필드 이름은 camelCase, 모르는 필드는 오류 + "혹시 …?". | 잠정 |
+| [G15](gaps/S1-loading.md#g15) | S1 ① 정렬 | 매니페스트가 깨진 모드: `id`만 읽히면 의존 모드에 `MOD009`(의존성 로드 실패), `id`도 못 읽으면 `MOD007`(설치 안 됨). | 잠정 |
+| [G16](gaps/S1-loading.md#g16) | S1 ②a 스키마 파일 | 스키마 파일 구분: `use` 목록을 파일로 편 뒤 `schema/`로 시작하는 경로는 ②a, 나머지는 ②b, 묶음 안은 목록 순서. | 확인 |
+| [G18](gaps/S1-loading.md#g18) | S1 `use_all` | `use_all("dir/")`은 하위 폴더까지 `.py` 전부를 상대 경로 서수 순으로(`mod.py` 제외), 이미 나온 파일은 처음 자리에서 한 번만. | 잠정 |
+| [G19](gaps/S1-loading.md#g19) | S1 중복 Def ID | Def id는 타입과 무관하게 전역에서 하나: 같은 모드나 의존 관계면 나중 것만 `DEF001`, 서로 의존하지 않으면 둘 다 오류. | 잠정 |
+| [G21](gaps/S1-loading.md#g21) | S1 `override=True` | `override` 교체 대상은 이미 있고 남의 모드이며 보이는 범위·같은 타입이어야 함, 두 모드가 교체하면 순서가 있으면 나중이 이기고 없으면 둘 다 오류. | 잠정 |
+| [G25](gaps/S1-loading.md#g25) | S1 Def 리터럴 | Def 리터럴의 키워드는 쓰는 모드에 보이는 그 타입의 const와 컴포넌트만, ②b는 모양까지 검사하고 값은 ⑥, `parent`·`abstract`·`override`와 선언 함수 옵션 이름은 예약. | 잠정 |
+| [G26](gaps/S1-loading.md#g26) | S1 ② 단계 분리 | Def 파일에서 스키마 함수·타입 이름은 `SCH007`, 스키마 파일에서 Def 생성자·컴포넌트 값은 `SCH006`, Def 값은 리스트·맵 안까지 데이터(`DEF003`). | 잠정 |
+| [G28](gaps/S1-loading.md#g28) | S1 오류 정책 (②) | ②에서 실패한 모드는 의존 모드와 함께 빼고 고정점까지 다시 만든다, 충돌로만 생긴 오류는 자기 오류가 있는 모드를 먼저 뺀 뒤 판정, 구문 오류가 있는 모드는 어떤 파일도 실행하지 않음. | 잠정 |
+| [G29](gaps/S1-loading.md#g29) | S1 매니페스트 `extensions` | `Mod(...)`의 `extensions`는 이번에도 넣지 않음, 외부 값 타입(`spatial.Point`)은 스키마에서 아직 못 씀. | 잠정 |
+| [G30](gaps/S1-loading.md#g30) | S1 `inherit.필드` | ②b에서 `inherit`가 든 키워드 인자 식은 평가하지 않고 두었다가 ④에서 평가, 다른 자리의 `inherit`는 `EVL002`. | 잠정 |
+| [G34](gaps/S1-loading.md#g34) | S1 패치 호출 모양 | 패치 호출 모양은 문자열 둘: `patch.set("Scout", "Health.base_max", 20)`(Def id, 점 경로), 새 문법 없음, 검사는 ②b 모양 → ③ 대상 → ⑥ 값. | 확인 |
+| [G35](gaps/S1-loading.md#g35) | S1 ③ 패치 파일·실행 시점 | 패치는 일반 Def 파일에 쓴다, ②b는 호출을 기록만 하고 ③에서 모든 Def 등록 뒤 적용, 오류는 기록한 호출 위치로. | 확인 |
+| [G36](gaps/S1-loading.md#g36) | S1 패치 연산별 허용 필드 | 필드 종류별 패치 연산: `int`·`fixed`는 `set`·`add`, 다른 스칼라는 `set`, 리스트·맵은 `set`·`append`·`remove`(없거나 겹치면 오류), 안 되는 조합은 로드 오류 + 안내. | 확인 |
+| [G37](gaps/S1-loading.md#g37) | S1 `set` 충돌의 "의존 관계" | `set` 충돌: 어떤 의존 선언이든 전이 경로가 있으면 순서가 있는 것, 순서 있으면 경고 + 나중이 이김, 없으면 둘 다 오류, 같은 모드의 중복 `set`은 경고 + 나중 호출. | 확인 |
+| [G38](gaps/S1-loading.md#g38) | S1 패치 대상의 보이는 범위 | 패치 대상 범위는 보이는 범위 + 직접 `optional`로 선언한 모드, `optional` 모드의 Def 패치는 `if mod_loaded(...)` 참 가지 안에서만, 거짓이면 건너뛰고 정보 진단 하나. | 확인 |
+| [G39](gaps/S1-loading.md#g39) | S1 패치 값의 검사 시점 | 패치 값의 모양은 ③에서 적용 전에 검사(어긋나면 건너뜀), 범위·오버플로·참조 존재는 ⑤·⑥에서 최종 값으로. | 확인 |
+| [G41](gaps/S1-loading.md#g41) | S1 패치 적용 순서 (spec의 "단계 고정"을 바꿈) | 패치 연산은 연산 종류 단계가 아니라 로드 순서 하나로 적용, 순서 없는 두 모드가 같은 필드에 `set`·`remove`를 겹치면 오류, `add`끼리·`append`끼리는 충돌 아님. | 확인 |
+| [G42](gaps/S1-loading.md#g42) | S1 ③·④ 값에 의존하는 패치 검사는 ④로 (G42 일반화) | ③은 패치를 모양·허용 여부만 보고 Def별 목록으로 기록, 기준값·대상 유무 같은 값 의존 검사는 ④에서 부모 먼저 순서로 적용하며 한다. | 확인 |
+| [G43](gaps/S1-loading.md#g43) | S1·S3 추상 Def·`override`된 Def의 패치 | 추상 Def와 교체된 Def 모두 패치할 수 있고 대상은 항상 id로 찾은 현재 Def(교체본), 순서 없는 `override`와 패치 조합에는 정보 진단 하나. | 확인 |
+| [G44](gaps/S1-loading.md#g44) | S1·S4 컴포넌트를 붙이고 떼는 패치 | 컴포넌트 이름까지인 경로의 `patch.set`은 붙이기 전용, `patch.remove`는 떼기, 둘 다 패치로 붙인 컴포넌트에만(타입 슬롯 컴포넌트는 오류), 뗀 컴포넌트에 걸린 다른 패치는 오류. | 확인 |
+| [G45](gaps/S1-loading.md#g45) | S1·S9 패치 변경 이력의 구현 모양 | ③이 `PatchLog`(필드마다 대상·경로·연산·값·모드·위치·결과)를 만들고 ④·⑥·덤프는 읽기만, 출력 형식은 미룸. | 확인 |
+| [G47](gaps/S1-loading.md#g47) | S1·S3 패치 경로의 키 표기 (G34 보강) | 패치 경로 조각은 이름 또는 대괄호 첨자: 점이 든 `str` 키는 `"Cost['core.Wood']"`, `int` 키는 `"Table[3]"`, 점 표기로 쓰면 오류 + 안내. | 확인 |
+| [G49](gaps/S1-loading.md#g49) | S1 오류 정책 (G28 확장) | ③~⑥ 어디서든 모드가 비활성화되면 ②a부터 활성 집합에서 빼고 전부 다시 만든다(충돌 오류는 G28처럼 미룸), 증분 처리는 하지 않음. | 확인 |
+| [G50](gaps/S1-loading.md#g50) | S1 패치 "같은 필드"의 판정과 Def별 적용 순서 | 패치 경로는 정규형으로 비교하고 접두사 관계면 겹친다고 봄(겹치면 G37·G41 충돌 규칙), ④는 Def마다 기록된 전역 순서 하나로 적용. | 확인 |
+| [G51](gaps/S1-loading.md#g51) | S1 패치 연산의 값 모양 (G36 보강) | 패치 인자: `append`는 필드와 같은 종류의 컬렉션(리스트는 리스트, 맵은 맵)을 받고, `remove`는 셋째 인자로 원소(리스트)나 키(맵) 하나, 컴포넌트·줄 떼기는 인자 둘(셋째가 있으면 오류). | 확인 |
+| [G52](gaps/S1-loading.md#g52) | S1 ④의 결과를 담는 자료구조 | ④는 Def마다 새 `ResolvedDef`(칸마다 최종 값과 출처: 직접·상속·패치)를 회차마다 만들고, `DefRecord`·`PatchLog`는 읽기 전용. | 확인 |
+| [G53](gaps/S1-loading.md#g53) | S1 `add`의 기준값 (G42 보강) | `add`의 기준값은 상속과 스키마 `default`까지 합친 그 시점의 현재 값, 값도 `default`도 없는 필수 필드면 오류 + `set` 안내. | 확인 |
+| [G54](gaps/S1-loading.md#g54) | S1 맵 항목 경로 `set`에서 없는 키 (G36 보강) | 맵 항목 경로 `set`은 키가 없으면 새로 만든다(`append`는 새로 추가만), 키 오타는 `DefId` 키면 ⑤·⑥이 잡음. | 확인 |
+| [G55](gaps/S1-loading.md#g55) | S1 ④ Def 하나의 처리 순서와 `inherit` 식 (G30·G50 보강) | Def 하나는 부모 최종 값 확정 → 자식 값과 `inherit` 식 평가 → 그 Def의 패치 적용 순으로, 부모부터 위상 정렬해 한 번에 계산, 부모 체인 순환은 `parent` 오류. | 확인 |
+| [G56](gaps/S1-loading.md#g56) | S1 `inherit` 식의 범위 (G30·G55 보강) | `inherit.이름`은 부모의 최종 값을 읽고(없으면 오류), 식에는 수의 `+ - *`·단항 `-`, 리스트·문자열 `+`, 리스트·맵 리터럴, 괄호만(나머지는 `EVL002`). | 확인 |
+| [G57](gaps/S1-loading.md#g57) | S1 ④ `parent` 검증 | ④의 `parent` 오류(부모 없음·안 보임·타입 다름·순환)는 자식을 쓴 모드의 오류, 오류 난 Def의 자식은 건너뜀, `abstract` Def도 부모 역할을 하되 엔티티는 못 만든다는 표시. | 확인 |
+| [G58](gaps/S1-loading.md#g58) | S1 ④ 컴포넌트 값의 상속 병합 단위 | 상속 병합은 컴포넌트 값 단위(자식이 적은 값만 덮음), 키 컴포넌트는 키 단위 뒤 줄은 값 단위, const는 적으면 교체(`merge="append"` 리스트는 부모 뒤에 붙임). | 확인 |
+| [G59](gaps/S1-loading.md#g59) | S1 `merge="append"` 필드의 `inherit` 식 (G58 보강) | `merge="append"` 리스트 필드 값이 `inherit` 식이면 그 결과를 전체 값으로 보고 자동 병합을 건너뜀(리터럴 리스트만 부모 뒤에 붙음). | 확인 |
+| [G60](gaps/S1-loading.md#g60) | S1 ④ 패치 적용과 실패한 패치 (G42·G44 보강) | ④의 값 의존 패치 오류(`PAT012`~`PAT017`)는 호출 줄에 내고 그 패치만 건너뛰며 나머지는 계속 적용, 책임은 패치 모드, 이미 충돌 오류(`PAT010`)가 난 모드의 실패는 따로 알리지 않음, 이력 상태는 `Applied`·`Failed`·`Pending`. | 확인 |
+| [G62](gaps/S1-loading.md#g62) | S1 패치 값 안의 `inherit` (G30 보강) | 패치 값(컴포넌트 인자, 리스트·맵 안까지) 안의 `inherit`는 `EVL002`로 거부, 현재 값에 기대려면 `patch.add`. | 확인 |
+| [G63](gaps/S1-loading.md#g63) | S1 ⑤ 링크가 만드는 것 | ⑤는 `DefId` 값(리스트·맵 안, 맵 키 포함)과 키 컴포넌트 줄 키가 가리키는 Def가 있는지 검사만 하고 값은 id 문자열로 둠, 따옴표 없는 표기는 후속 과제. | 확인 |
+| [G64](gaps/S1-loading.md#g64) | S1 ⑤ 참조가 유효한 조건 | ⑤ 링크는 존재·타입·보이는 범위를 보고, 오류 책임은 값을 처음 적은 모드(직접은 그 Def의 모드, 패치는 패치 모드, 물려받은 값은 처음 적은 쪽). | 확인 |
+| [G65](gaps/S1-loading.md#g65) | S1 ⑤ 가드 안 패치 값의 `optional` 모드 Def (G38 보강) | `optional` 모드 m의 `mod_loaded("m")` 가드 안의 패치가 쓴 값에서는 m의 Def를 id로 쓸 수 있음, 가드 밖은 오류. | 확인 |
+| [G66](gaps/S1-loading.md#g66) | S1 ⑤ `abstract` Def를 가리키는 참조 (G57 보강) | `DefId` 값이나 키 컴포넌트 줄 키가 `abstract` Def를 가리키면 오류(`parent`는 해당 없음). | 확인 |
+| [G67](gaps/S1-loading.md#g67) | S1 ⑥ 필수 값 (G25 보강) | 기본값 없는 `const`(리스트·맵 제외, 이들은 빈 컬렉션)는 필수, 구체 Def가 최종 값을 못 가지면 `VAL001`(`abstract` 면제, 붙은 컴포넌트의 `const` 멤버도 같음, `field`는 필수 아님). | 확인 |
+| [G68](gaps/S1-loading.md#g68) | S1 ⑥ 최종 값의 타입 검사와 `min`/`max` (G25·G39·G48 모음) | ⑥ 타입 검사(`int`는 정수만, `fixed`는 정수·소수, 컬렉션은 재귀, 어긋나면 `VAL002`)와 `min`·`max`(숫자 값, 리스트·맵이면 원소와 맵 값 각각, 양끝 포함, 벗어나면 `VAL003`), 책임은 G64 출처 규칙. | 확인 |
+| [G69](gaps/S1-loading.md#g69) | S1 ⑥ 동결본이 기본값을 채우는가 (S4 보강) | 동결본에는 모든 `const`의 완성된 값(없으면 스키마 `default`, 출처 `Default`), `field`는 적혀 있을 때만, 동결본은 읽기 전용. | 확인 |
+| [G70](gaps/S1-loading.md#g70) | S1 ⑥ 동결 집합과 `abstract` Def (G57·G66 보강) | 동결 집합 `DefSet`에는 `abstract`가 아닌 Def만(등록 순서, id 조회, 타입별 목록), `abstract`는 `Expanded`와 덤프에만, 동결본의 부모는 id 문자열. | 확인 |
+| [G71](gaps/S1-loading.md#g71) | S1 ⑥ `.pyi` 스텁의 범위와 생성 방식 (schema-design 4.3 보강) | 이번 `.pyi`는 작성용만, 생성기는 순수 함수 `StubGenerator.Generate(모드 id, 로드 결과)`, 파일 배치·`pyrightconfig.json`·CLI는 나중에. | 확인 |
+| [G72](gaps/S1-loading.md#g72) | S1 ⑥ 작성용 `.pyi`의 모양 (G71 보강) | 작성용 스텁 모양: Def 타입·컴포넌트는 클래스 하나(생성자, 값 인자는 모두 선택), `fixed`·`TextKey`는 별칭, `DefId[X]`는 보이는 구체 Def id의 `Literal`, `Cond`·`Action`은 느슨한 `Callable`, 보이는 범위만 냄. | 확인 |
+| [G73](gaps/S1-loading.md#g73) | S1 ⑤⑥ 스키마가 선언한 `default` 값의 검사 (G69 보강) | 스키마 `default` 값은 Def 값과 같은 규칙(존재·타입·범위·`abstract` 금지)으로 선언마다 한 번 검사, 책임은 선언한 모드, `field`의 함수 기본값은 검사 안 함. | 확인 |
+| [G74](gaps/S1-loading.md#g74) | S1 ⑥ `extend`로 더한 `const`의 기본값 (G67·G69 보강) | 다른 모드가 `extend`로 더한 `const`(와 붙인 컴포넌트의 `const` 멤버)는 기본값 필수, 없으면 확장한 모드의 `SCH004`(리스트·맵 예외). | 확인 |
+| [G77](gaps/S1-loading.md#g77) | S1 ⑥ `keys="all"` 키 컴포넌트의 줄과 기본값 (G69·G74 보강) | `keys="all"` 키 컴포넌트의 `const` 멤버는 기본값 필수(없으면 `SCH004`), 동결본은 적힌 줄만 두고 `TryGetRow`가 키 타입의 구체 Def에 한해 빠진 줄을 기본값으로 채워 돌려줌. | 확인 |
+| [G81](gaps/S1-loading.md#g81) | S1 ⑥ `.pyi` 스텁의 파일 배치와 CLI (G71 보강, schema-design 4.3) | `engine stubs <mods-dir>`가 모드마다 `__builtins__.pyi`를 덮어쓰고 `pyrightconfig.json`은 없을 때만 만듦, 종료 코드는 G78, `check`는 파일을 쓰지 않음. | 확인 |
+| [G82](gaps/S1-loading.md#g82) | S1 `.pyi` 스텁: 매니페스트와 스키마 파일 (G72·G81 보강) | `schema/` 폴더가 있으면 `<모드>/schema/__builtins__.pyi`에 스키마 스텁(`deftype`·`const` 등의 느슨한 선언)을 더 씀(pyright는 가장 가까운 상위 폴더의 것을 씀). | 확인 |
+| [G83](gaps/S1-loading.md#g83) | S1 비활성화된 모드의 `.pyi` 스텁 (G81의 열린 점, G49 보강) | 스텁은 로드된 모드는 최종 결과로, ③~⑥에서 비활성화된 모드는 첫 회차 결과(`FirstRound`)로 만들어 머리에 실패 줄을 붙이고, ②에서 실패한 모드는 기존 스텁을 두거나 최소 스텁, 매니페스트를 읽은 모든 모드에 씀. | 확인 |
+| [G94](gaps/S1-loading.md#g94) | S1 ⑥·S4 Def가 적은 `keys="listed"` 줄의 필수 칸 (G93 보강) | Def가 적은 `keys="listed"` 줄에 필수 Ref가 있거나 기본값 없는 `field`를 안 적었으면 ⑥의 `VAL001`(`optional=True`·`AddRow`·기본값 안내), 책임은 줄을 적은 모드. | 확인 |
+| [G207](gaps/S1-loading.md#g207) | 로직용 `.pyi`(handoff 남은 일 2)에서 `Ref[T]`와 엔티티 타입 | 로직용 스텁: 같은 클래스가 생성자와 엔티티 읽기 속성을 겸함(`type Ref[T] = T`, 늘 붙은 컴포넌트는 그대로, 그 밖은 None 가능, `derived`는 읽기 전용), 기준은 엔진이 받는 파일에서 pyright 오류 0개. | 확인 |
+| [G208](gaps/S1-loading.md#g208) | G207 로직용 스텁에서 None일 수 있는 값을 확인 없이 읽을 때 | `engine stubs`가 만드는 `pyrightconfig.json`에서 "None일 수 있음" 계열을 경고로 낮춤(설정 파일이 이미 있으면 그대로). | 확인 |
+| [G209](gaps/S1-loading.md#g209) | G82 스키마 스텁에 컴포넌트·Def 타입 이름이 없음 | 스키마 스텁도 모드마다 `GenerateSchema(모드 id, 로드 결과)`로, 그 모드가 보는 컴포넌트·Def 타입 클래스를 더함(타입 자리의 `fixed`·`TextKey`는 `int`·`float` 합과 `str`). | 확인 |
+| [G213](gaps/S1-loading.md#g213) | S1 ① 파일 이름의 유니코드 정규화 (G7 보강) | 파일 경로는 NFC로 다루고 디스크의 실제 이름은 열 때만 씀, 한 폴더에 NFC로 같은 이름이 둘이면 `use`는 `MOD002`·`use_all`은 `LOD001`, 모드 폴더 이름은 그대로. | 확인 |
 
 ## S2 로직 언어·실행기 (P2·P6, 실행 예산·벤치 포함)
 
-| # | 위치 | 상태 |
-|---|---|---|
-| [G4](gaps/S2-logic.md#g4) | P2 `fixed` 리터럴 | 확인 |
-| [G13](gaps/S2-logic.md#g13) | S2 언어 | 잠정 |
-| [G14](gaps/S2-logic.md#g14) | S2 언어 | 확인 |
-| [G17](gaps/S2-logic.md#g17) | S2 함수 정의 | 확인 |
-| [G20](gaps/S2-logic.md#g20) | S2 최상위 이름 | 잠정 |
-| [G22](gaps/S2-logic.md#g22) | S2 로드 시점 평가 | 잠정 |
-| [G24](gaps/S2-logic.md#g24) | S2 함수 자리 타입 이름 | 잠정 |
-| [G32](gaps/S2-logic.md#g32) | S2·S3 참조 타입 | 확인 (예시만 반영: 옛 `const(Ref[...])` 예시가 로드되지 않게 되므로 spec·schema-design의 예시와 3.2 설명은 먼저 고쳤다. 규칙 자체를 spec에 옮기는 것은 남음) |
-| [G33](gaps/S2-logic.md#g33) | S2 람다 | 확인 |
-| [G40](gaps/S2-logic.md#g40) | S2 효과 표의 `patch.*` | 확인 |
-| [G46](gaps/S2-logic.md#g46) | S2 조건문 `if`와 `mod_loaded` | 확인 |
-| [G48](gaps/S2-logic.md#g48) | S2·S1 데이터 값의 `int` → `fixed` | 확인 |
-| [G90](gaps/S2-logic.md#g90) | S2·S4 `derived` 계산과 첫 런타임 슬라이스 (G86 보강) | 확인 |
-| [G95](gaps/S2-logic.md#g95) | P2·S2 `/` 연산자와 `int`·`fixed` 혼합 (순수 함수 실행기) | 확인 |
-| [G96](gaps/S2-logic.md#g96) | P2·S2 로직에서 허용하는 연산자 집합 (G95 보강) | 확인 |
-| [G97](gaps/S2-logic.md#g97) | S2 로직에서 쓰는 내장 함수 (순수 함수 실행기) | 확인 |
-| [G101](gaps/S2-logic.md#g101) | S2 실행 단계 상한 가드 (순수 함수 실행기) | 확인 |
-| [G102](gaps/S2-logic.md#g102) | S2 순수 함수 본문에서 허용할 문장과 식 (순수 함수 실행기) | 확인 |
-| [G104](gaps/S2-logic.md#g104) | S2 순수 함수 실행기의 구현 세부 (G95~G103 보강) | 확인 |
-| [G107](gaps/S2-logic.md#g107) | S2·S4 스크립트가 Def 타입 바로 아래의 `const`를 읽는 길 (G103 보강, schema-design 3.3.3) | 확인 |
-| [G108](gaps/S2-logic.md#g108) | S2·S9 함수 본문의 이름 오타 검사 (G102·G105 보강) | 확인 |
-| [G111](gaps/S2-logic.md#g111) | S2 `with preconditions:`의 위치와 안에 올 수 있는 문장 (S2 문구를 넓힘) | 확인 |
-| [G112](gaps/S2-logic.md#g112) | S2 엔진이 주는 이름과 모드 이름의 충돌 (G20의 “내장 이름은 다시 묶을 수 없다”를 바꿈) | 확인 |
-| [G113](gaps/S2-logic.md#g113) | S2·S6 `require`의 모양과 메시지 평가 시점 | 확인 |
-| [G117](gaps/S2-logic.md#g117) | S2 함수 효과 표의 “엔티티 쓰기” 판정과 G104 불변식의 경계 | 확인 |
-| [G120](gaps/S2-logic.md#g120) | S2 `me` ❓: 커맨드에서 행동하는 진영(행위자)은 어디서 오는가 | 확인 |
-| [G135](gaps/S2-logic.md#g135) | G117의 “문장으로만 부른다”와 값을 돌려주는 쓰기 함수 (G134에서 이어짐) | 확인 |
-| [G136](gaps/S2-logic.md#g136) | S2 `ask`/`await`/`wait`를 일반 함수 안에 쓸 수 있는가 | 확인 |
-| [G141](gaps/S2-logic.md#g141) | S2·S8 멈춘 Flow의 지역 변수에 든 런타임 값의 저장 | 확인 |
-| [G142](gaps/S2-logic.md#g142) | S2 `==`가 런타임 값을 비교하는 기준 (G104 보강) | 확인 |
-| [G143](gaps/S2-logic.md#g143) | S2 람다 값의 `==`와 S8 람다 저장 (G141·G142 보강) | 확인 |
-| [G178](gaps/S2-logic.md#g178) | S2 난수를 부를 수 있는 곳 | 확인 |
-| [G179](gaps/S2-logic.md#g179) | S2 난수 API의 모양 | 확인 |
-| [G180](gaps/S2-logic.md#g180) | S2 월드 시드 | 확인 |
-| [G181](gaps/S2-logic.md#g181) | S2 난수 해시 H의 구체 (spec은 후보로 SplitMix64) | 확인 |
-| [G182](gaps/S2-logic.md#g182) | S2 난수열 키와 횟수 카운터의 세부 | 확인 |
-| [G183](gaps/S2-logic.md#g183) | S2 `choose`가 하는 일 | 확인 |
-| [G184](gaps/S2-logic.md#g184) | S2·S6 후보와 합법 수를 호스트에 주는 API, `choose` 후보가 큰 경우(S6 열린 질문) | 확인 |
-| [G185](gaps/S2-logic.md#g185) | S2·S6 `cost`가 하는 일 (G120은 누가 내는지만 정함) | 확인 |
-| [G186](gaps/S2-logic.md#g186) | S2 `cost`의 첫 인자 (G185에서 이어짐) | 확인 |
-| [G187](gaps/S2-logic.md#g187) | S2 본문 중간의 `pay()`와 취소 때 돌려주기 | 확인 |
-| [G188](gaps/S2-logic.md#g188) | S2·S6 `choose` 후보 식이 다른 매개변수를 읽을 때 (G184에서 이어짐) | 확인 |
-| [G189](gaps/S2-logic.md#g189) | S2 컴프리헨션과 제너레이터 식 (G102가 미룸, schema-design 3.3.1의 🟡) | 확인 |
-| [G191](gaps/S2-logic.md#g191) | S2 최상위 콘텐츠 파일의 컴프리헨션 (G189에서 이어짐) | 확인 |
-| [G195](gaps/S2-logic.md#g195) | S2 `while`과 `limit` (G102가 미룸, 검증 시나리오 ①에서 드러남) | 확인 |
-| [G223](gaps/S2-logic.md#g223) | spec 9절 규모 벤치의 방식과 범위 | 확인 |
-| [G224](gaps/S2-logic.md#g224) | 읽기와 행동의 단계 예산 (G101 보강, 규모 벤치에서 드러남) | 확인 |
-| [G225](gaps/S2-logic.md#g225) | 무거운 행동의 경고 (G224와 함께 고름) | 확인 |
-| [G226](gaps/S2-logic.md#g226) | S2 실행기의 구조 (속도, G223 벤치에서 드러남) | 확인 |
-| [G227](gaps/S2-logic.md#g227) | P6 스크립트 경로의 바인딩 시점 (G226 뒤 spec 대조) | 확인 |
+| # | 위치 | 무엇을 정했나 | 상태 |
+|---|---|---|---|
+| [G4](gaps/S2-logic.md#g4) | P2 `fixed` 리터럴 | `fixed` 리터럴의 소수 자리가 6을 넘으면 `LEX007`, 넘는 자리가 모두 0이면 허용. | 확인 |
+| [G13](gaps/S2-logic.md#g13) | S2 언어 | 어휘 제한: 들여쓰기 탭은 오류, 16·8·2진수·지수·허수 금지, 문자열 접두사는 `u`만, 이스케이프는 정한 목록만, 미지원 문법은 `PAR002`(구문 오류와 구분). | 잠정 |
+| [G14](gaps/S2-logic.md#g14) | S2 언어 | 식별자는 ASCII만(`[A-Za-z_][A-Za-z0-9_]*`, 아니면 `LEX011`), 문자열·주석·Def id는 제한 없음, 나중에 파이썬 규칙으로 넓힐 수 있게 렉서 밖은 ASCII를 가정하지 않음. | 확인 |
+| [G17](gaps/S2-logic.md#g17) | S2 함수 정의 | 로딩 슬라이스에서 `def`는 머리부만 파싱해 함수 값으로 묶고 로드 중에는 호출하지 않음(`EVL005`), 본문은 식 언어 단계(G102가 대체). | 확인 |
+| [G20](gaps/S2-logic.md#g20) | S2 최상위 이름 | 최상위 이름은 모드마다 이름 공간 하나(스키마 파일 → Def 파일 순), 쓰기 전에 정의, 한 이름은 한 번만 묶음(`EVL004`), 다른 모드의 함수를 이름으로 쓰는 길은 없음. | 잠정 |
+| [G22](gaps/S2-logic.md#g22) | S2 로드 시점 평가 | 로드 중 평가하는 식은 리터럴·리스트·맵·이름·호출·타입 표기 `[...]`·수 앞 부호만(나머지는 `EVL002`), 맵 키는 `str`·`int`만, 스키마 `dict[K, V]`의 K도 `str`·`int`·`DefId`로 제한. | 잠정 |
+| [G24](gaps/S2-logic.md#g24) | S2 함수 자리 타입 이름 | 함수 자리 타입은 `Cond["T"]`·`Action["T"]`만(`Fn`은 미룸), `const`에만 쓸 수 있음(`field`·`derived`면 `SCH004`). | 잠정 |
+| [G32](gaps/S2-logic.md#g32) | S2·S3 참조 타입 | `Ref["X"]`는 어디서나 엔티티, `DefId["X"]`는 어디서나 Def id, `const`에 `Ref`는 `SCH004`, 엔티티 칼럼은 `ref(...)`로만, 대상은 컴포넌트를 가진 보이는 타입. | 확인 (예시만 반영: 옛 `const(Ref[...])` 예시가 로드되지 않게 되므로 spec·schema-design의 예시와 3.2 설명은 먼저 고쳤다. 규칙 자체를 spec에 옮기는 것은 남음) |
+| [G33](gaps/S2-logic.md#g33) | S2 람다 | 람다를 지원: 매개변수는 이름만, 본문 식은 끝까지 파싱, 평가하면 `<lambda>` 함수 값, 그 밖의 제한은 순수성 판정과 함께. | 확인 |
+| [G40](gaps/S2-logic.md#g40) | S2 효과 표의 `patch.*` | `patch.*`는 로드 시점에만, ②b의 Def 파일 어디서든(최상위·`if` 안·보조 함수 안) 문장으로 부름, 스키마 파일·런타임에서는 오류, 인자는 로드 시점 값. | 확인 |
+| [G46](gaps/S2-logic.md#g46) | S2 조건문 `if`와 `mod_loaded` | Def 파일에 `if/elif/else`를 열고 조건은 bool을 돌려주는 로드 시점 호출 하나(`mod_loaded("m")`, 선언한 의존 모드만), 가드 가지 안에는 `patch.*`와 중첩 `if`만, 스키마 파일에서는 `mod_loaded` 금지. | 확인 |
+| [G48](gaps/S2-logic.md#g48) | S2·S1 데이터 값의 `int` → `fixed` | 데이터 값(Def 리터럴과 패치)에서 `int` → `fixed`는 암묵 허용, `fixed` → `int`는 오류 + "정수를 쓰세요", 로직 식의 혼합 연산은 따로. | 확인 |
+| [G90](gaps/S2-logic.md#g90) | S2·S4 `derived` 계산과 첫 런타임 슬라이스 (G86 보강) | 첫 런타임 슬라이스에서 `derived` 계산을 빼고 읽으면 명시적으로 실패, 다음 슬라이스가 순수 함수 실행기. | 확인 |
+| [G95](gaps/S2-logic.md#g95) | P2·S2 `/` 연산자와 `int`·`fixed` 혼합 (순수 함수 실행기) | `/`는 항상 `fixed`(`int / int`도), 정수 몫은 `//`(floor), `int`와 `fixed`를 섞으면 `fixed`로 올림, 0으로 나누기·오버플로는 실행 오류. | 확인 |
+| [G96](gaps/S2-logic.md#g96) | P2·S2 로직에서 허용하는 연산자 집합 (G95 보강) | 허용 연산자는 `+ - * / // %`·단항 `-` `+`·비교·`and or not`·`in`·`not in`, `**`·비트 연산·`@`는 로드 오류(넓힐 후보는 `int ** int`, `int` 비트 연산). | 확인 |
+| [G97](gaps/S2-logic.md#g97) | S2 로직에서 쓰는 내장 함수 (순수 함수 실행기) | 내장 함수: 수치 `floor`·`ceil`·`round`(0에서 먼 쪽)·`abs`·`min`·`max`·`clamp`, 컬렉션 `len`·`range`·`sum`(파이썬 모양)·`min`·`max`, 기여 행 `contribs`, 변환 함수는 필요할 때. | 확인 |
+| [G101](gaps/S2-logic.md#g101) | S2 실행 단계 상한 가드 (순수 함수 실행기) | 실행 예산은 평가 노드 수 하나, 최상위 실행마다 새로 주고 안에서 읽은 `derived`는 남은 단계를 이어 씀(`StepMeter`), 넘으면 위치가 붙은 실행 오류, 한도는 `World` 옵션(G224가 둘로 나눔). | 확인 |
+| [G102](gaps/S2-logic.md#g102) | S2 순수 함수 본문에서 허용할 문장과 식 (순수 함수 실행기) | 순수 함수 문법을 연다(대입·복합 대입·`if`·`for`·`return`·`pass`·`break`·`continue`, 조건식·속성·인덱스·호출·람다), `while`·`match`·안쪽 `def`·컴프리헨션·f-string은 미뤄 로드 때 `PAR002`, 재귀 금지. | 확인 |
+| [G104](gaps/S2-logic.md#g104) | S2 순수 함수 실행기의 구현 세부 (G95~G103 보강) | 실행기 작은 규칙: 참/거짓은 파이썬과 같음(`and`·`or`는 피연산자 값을 돌려줌), `bool`은 수가 아님, `is`는 `None` 비교만, 람다는 늦게 묶임, 지역 변수는 파이썬 규칙(대입 전 읽기는 `RUN015`), 순수 함수 안의 값은 모두 불변. | 확인 |
+| [G107](gaps/S2-logic.md#g107) | S2·S4 스크립트가 Def 타입 바로 아래의 `const`를 읽는 길 (G103 보강, schema-design 3.3.3) | 엔티티의 Def 상수는 Def 타입 이름 속성으로 읽음(`g.ConflictGoal.succeeded(g)`), 다른 타입 이름이면 `None`, 없는 `const`는 "혹시 …?" 오류. | 확인 |
+| [G108](gaps/S2-logic.md#g108) | S2·S9 함수 본문의 이름 오타 검사 (G102·G105 보강) | `def`·람다 본문의 이름이 매개변수·지역·모드 최상위·런타임 내장 어디에도 없으면 로드 오류(`EVL001` + "혹시 …?"), 속성 이름은 보지 않음, 로드 시점에만 있는 이름은 따로 안내. | 확인 |
+| [G111](gaps/S2-logic.md#g111) | S2 `with preconditions:`의 위치와 안에 올 수 있는 문장 (S2 문구를 넓힘) | `with preconditions:`는 커맨드 본문의 첫 문장만, 안에는 `require`·`cost`·`choose`와 이름 대입만(순수 규칙), 블록의 변수는 본문에서도 보임. | 확인 |
+| [G112](gaps/S2-logic.md#g112) | S2 엔진이 주는 이름과 모드 이름의 충돌 (G20의 “내장 이름은 다시 묶을 수 없다”를 바꿈) | 엔진이 주는 이름은 모두 덮어쓸 수 있는 내장(파이썬 builtins처럼), 모양으로 뜻을 알아보는 자리는 내장일 때만 그 뜻, `@command`·`require`를 덮어쓰면 `CMD001`·`CMD002`. | 확인 |
+| [G113](gaps/S2-logic.md#g113) | S2·S6 `require`의 모양과 메시지 평가 시점 | `require(조건, text("키", 이름=값))`: 위치 인자 둘만, 둘째가 문자열 리터럴이면 로드 오류, 메시지는 조건이 거짓일 때만 평가. | 확인 |
+| [G117](gaps/S2-logic.md#g117) | S2 함수 효과 표의 “엔티티 쓰기” 판정과 G104 불변식의 경계 | 쓰기는 엔티티 상태 경로의 속성 대입뿐, 쓰기 함수 판정은 모드 안에서 전이적으로, 쓰기 함수는 문장으로만 부르고 순수 자리(`derived`·`Cond` 등)에는 못 둠, 이름으로 모르는 호출은 프레임의 순수/쓰기 모드로 막음(`RUN003`). | 확인 |
+| [G120](gaps/S2-logic.md#g120) | S2 `me` ❓: 커맨드에서 행동하는 진영(행위자)은 어디서 오는가 | 엔진은 커맨드에 행위자를 암묵적으로 넣지 않음: 행동하는 진영·지불자는 인자나 인자에서 끌어낸 값이고 모더가 정함. | 확인 |
+| [G135](gaps/S2-logic.md#g135) | G117의 “문장으로만 부른다”와 값을 돌려주는 쓰기 함수 (G134에서 이어짐) | 쓰기 함수는 한 줄 전체나 `x = f(...)`의 오른쪽 전체로 부름(그 밖은 `CMD004`), 쓰는 내장(G134의 여섯)을 부르는 것도 쓰기. | 확인 |
+| [G136](gaps/S2-logic.md#g136) | S2 `ask`/`await`/`wait`를 일반 함수 안에 쓸 수 있는가 | `ask`·`await`·`wait`를 포함하는 멈추는 함수는 쓰기 함수와 같은 규칙: 한 줄이나 이름 대입 오른쪽으로만, 식 안·순수 자리에서는 로드 오류, 프레임은 함수 호출마다 하나. | 확인 |
+| [G141](gaps/S2-logic.md#g141) | S2·S8 멈춘 Flow의 지역 변수에 든 런타임 값의 저장 | 멈춘 프레임의 지역 변수는 전부 저장(엔티티·뷰·Def·답·컴포넌트 값은 가리키는 대상, 함수 값은 이름, 람다는 함수·순서 번호·잡은 묶음), 본문이 바뀐 것은 S8 해시가 막음. | 확인 |
+| [G142](gaps/S2-logic.md#g142) | S2 `==`가 런타임 값을 비교하는 기준 (G104 보강) | `==`는 뷰·답·컴포넌트 값·`range`·기여 행·`text(...)`를 가리키는 대상이나 내용으로 비교. | 확인 |
+| [G143](gaps/S2-logic.md#g143) | S2 람다 값의 `==`와 S8 람다 저장 (G141·G142 보강) | 람다는 파이썬처럼 객체 비교, 이어서 실행할 때도 같은 객체임을 보존하고 저장은 Flow마다 람다·잡은 묶음 목록을 번호로. | 확인 |
+| [G178](gaps/S2-logic.md#g178) | S2 난수를 부를 수 있는 곳 | 난수는 따로 한 종류의 효과: Flow 본문(식 안 포함)에서만, 난수를 부르는 함수는 전이적으로 난수 함수라 순수 자리와 로드 시점에서는 로드 오류. | 확인 |
+| [G179](gaps/S2-logic.md#g179) | S2 난수 API의 모양 | `random` 이름 공간을 `import` 없이 주고 파이썬과 같은 이름·뜻만(`randint`·`randrange`·`choice`·`choices`·`sample`·`random()`은 `fixed`), `shuffle`·`seed`는 없음. | 확인 |
+| [G180](gaps/S2-logic.md#g180) | S2 월드 시드 | 난수 시드는 호스트가 월드를 만들 때 줌(없으면 0), 저장 `"seed"`에 남고 스크립트는 읽지도 바꾸지도 못함. | 확인 |
+| [G181](gaps/S2-logic.md#g181) | S2 난수 해시 H의 구체 (spec은 후보로 SplitMix64) | 난수 함수 H는 ChaCha20(RFC 8439), 키는 SHA-256(시드, 정의 id, 실행 횟수), 범위 줄이기는 버리고 다시 뽑기, RFC 값과 엔진 출력으로 골든 테스트. | 확인 |
+| [G182](gaps/S2-logic.md#g182) | S2 난수열 키와 횟수 카운터의 세부 | 난수열 키는 Flow 출처(커맨드·신호 핸들러·`when` 반응)의 정의 id마다 카운터, 이어 가는 Flow는 키를 이음, 사전 조건 거절은 소비 안 함, 본문 오류는 되감음, 저장은 `"rand"`와 Flow마다 (횟수, n). | 확인 |
+| [G183](gaps/S2-logic.md#g183) | S2 `choose`가 하는 일 | `choose`는 매개변수의 후보를 정하고(`where=`는 그 타입의 살아 있는 엔티티를 거름, `from_=`는 목록) 제출 때 후보가 아니면 `require` 실패처럼 거절, 나열은 호스트 API. | 확인 |
+| [G184](gaps/S2-logic.md#g184) | S2·S6 후보와 합법 수를 호스트에 주는 API, `choose` 후보가 큰 경우(S6 열린 질문) | 호스트 API `Candidates`(그 `choose`의 후보, 먼저 정할 매개변수 안내)와 `LegalMoves`(블록 순서대로 펼쳐 사전 검사를 통과한 조합, 최대 개수에서 잘림 표시). | 확인 |
+| [G185](gaps/S2-logic.md#g185) | S2·S6 `cost`가 하는 일 (G120은 누가 내는지만 정함) | `cost`는 사전 검사에서 확인하고 본문 시작 직전에 엔진이 뺌(본문 실패면 함께 되감김), 같은 칸은 합해서 확인, 음수 금액은 오류. | 확인 |
+| [G186](gaps/S2-logic.md#g186) | S2 `cost`의 첫 인자 (G185에서 이어짐) | `cost`의 첫 자리는 칸 자체(`엔티티.컴포넌트.멤버`)로 엔진이 그 칸을 확인하고 뺌, 칸이 아니면 로드 오류, `int`·`fixed` `field`가 아니면 실행 오류. | 확인 |
+| [G187](gaps/S2-logic.md#g187) | S2 본문 중간의 `pay()`와 취소 때 돌려주기 | `pay(칸, 금액)`은 모자라면 바꾸지 않고 `False`, 쓰기 규칙대로 한 줄이나 이름 대입 오른쪽에만, 사전 조건 블록에서는 못 씀, 취소 때 돌려주기는 게임이 함. | 확인 |
+| [G188](gaps/S2-logic.md#g188) | S2·S6 `choose` 후보 식이 다른 매개변수를 읽을 때 (G184에서 이어짐) | 블록에 적힌 순서가 고르는 순서: `choose` 식이 자기나 아래쪽 `choose`의 매개변수를 읽으면 로드 오류(블록 변수 대입도 따라가 보수적으로 봄). | 확인 |
+| [G189](gaps/S2-logic.md#g189) | S2 컴프리헨션과 제너레이터 식 (G102가 미룸, schema-design 3.3.1의 🟡) | 리스트·딕트 컴프리헨션과 제너레이터 식(호출 인자 자리만)을 받음, `any`·`all`은 일찍 멈추고 나머지는 리스트로 펼침, 반복 변수는 새지 않음, 금지는 `yield`와 제너레이터 값. | 확인 |
+| [G191](gaps/S2-logic.md#g191) | S2 최상위 콘텐츠 파일의 컴프리헨션 (G189에서 이어짐) | Def 파일 최상위의 컴프리헨션은 로드 오류(`EVL002`). | 확인 |
+| [G195](gaps/S2-logic.md#g195) | S2 `while`과 `limit` (G102가 미룸, 검증 시나리오 ①에서 드러남) | `while 조건:`을 파이썬 그대로 열고 `limit`은 두지 않음(상한은 단계 예산), `else` 절은 미지원, 멈춘 `while`도 저장·재개, 최상위에서는 로드 오류. | 확인 |
+| [G223](gaps/S2-logic.md#g223) | spec 9절 규모 벤치의 방식과 범위 | 규모 벤치는 `bench/`의 콘솔 프로그램(예열 뒤 중앙값과 할당), 장면 다섯, 합격 기준 없이 결과를 handoff에, `dotnet test`에는 넣지 않음. | 확인 |
+| [G224](gaps/S2-logic.md#g224) | 읽기와 행동의 단계 예산 (G101 보강, 규모 벤치에서 드러남) | 예산을 둘로: 읽기(`derived`·입구·정책·`choose` 후보)는 `stepBudget` 10만, 행동(커맨드 본문·사전 조건·핸들러·이어 가는 Flow)은 `actionStepBudget` 1천만, 둘 다 `World` 옵션. | 확인 |
+| [G225](gaps/S2-logic.md#g225) | 무거운 행동의 경고 (G224와 함께 고름) | 행동 실행 하나가 읽기 예산을 넘으면 실패 없이 `RUN021` 경고를 `SubmitResult`·`AnswerResult`·`Reaction`의 `Warnings`에 넘을 때마다 붙임, 결과 없는 실행의 경고는 버림, 거른 결과에서는 빠짐. | 확인 |
+| [G226](gaps/S2-logic.md#g226) | S2 실행기의 구조 (속도, G223 벤치에서 드러남) | 실행기는 층을 나눈 A: 함수마다 칸 배치·연산자 번호를 한 번 풀고, 식은 노드 객체가 계산, 문장은 블록 자료로 한 문장씩(멈춤·저장 형식 그대로), 단계 세기 단위 그대로, 값 구조체화는 백본 ECS화와 함께 맨 끝. | 확인 |
+| [G227](gaps/S2-logic.md#g227) | P6 스크립트 경로의 바인딩 시점 (G226 뒤 spec 대조) | P6 문구를 "실행 전에 한 번 슬롯 핸들로 묶는다"로: 로드 때 알면 로드 때, 아니면 그 자리를 처음 실행할 때 풀어 기억(객체 확인), 로드 때 타입 추론 바인딩은 목표가 아님. | 확인 |
 
 ## S3·S4 데이터
 
-| # | 위치 | 상태 |
-|---|---|---|
-| [G23](gaps/S3-S4-data.md#g23) | S4·schema-design 4.2 이름 충돌 | 잠정 |
-| [G27](gaps/S3-S4-data.md#g27) | S3·S4 같은 컴포넌트 참조 | 잠정 |
-| [G31](gaps/S3-S4-data.md#g31) | S4 키 컴포넌트의 키 | 확인 |
-| [G86](gaps/S3-S4-data.md#g86) | S4 런타임 첫 슬라이스의 범위와 입구 | 확인 |
-| [G87](gaps/S3-S4-data.md#g87) | S3·S4·S8 엔티티 id 할당과 세대 | 확인 |
-| [G88](gaps/S3-S4-data.md#g88) | S4 구조 변경의 반영 시점 (S4 ✅ “지연(command buffer)”을 바꿈) | 확인 |
-| [G89](gaps/S3-S4-data.md#g89) | S4 `field` 초기값을 저장하는 시점 (schema-design 3.3.1 9항 보강) | 확인 |
-| [G91](gaps/S3-S4-data.md#g91) | S3·S4 Ref 칼럼의 처음 값과 죽은 대상 | 확인 |
-| [G92](gaps/S3-S4-data.md#g92) | S4·P2 런타임 쓰기와 `min`·`max` | 확인 |
-| [G93](gaps/S3-S4-data.md#g93) | S4 기본값이 없는 칸의 런타임 값 (G67·G69·G91 보강) | 확인 |
-| [G98](gaps/S3-S4-data.md#g98) | S4 기여 행의 모양·수명과 `contribs` (G90 보강) | 확인 |
-| [G99](gaps/S3-S4-data.md#g99) | S4 `field`가 `derived` 상한을 넘는 경우 (schema-design 3.3.1 🟡) | 확인 |
-| [G100](gaps/S3-S4-data.md#g100) | S4·S2 `derived` 순환 검사 (schema-design 3.3.1 5항) | 확인 |
-| [G103](gaps/S3-S4-data.md#g103) | S4·schema-design 3.3.1 2항 `derived` 함수 안에서 형제 컴포넌트와 엔티티에 닿는 길 | 확인 |
-| [G105](gaps/S3-S4-data.md#g105) | S4 `derived`의 월드 연결과 읽은 값 근거(trace) (G90·G100·G103 보강) | 확인 |
-| [G106](gaps/S3-S4-data.md#g106) | S4 생성 순간에 계산하는 기본값의 순서와 실패 (G89·G90 보강) | 확인 |
-| [G129](gaps/S3-S4-data.md#g129) | S4 상태에 담는 “이름 없는 값의 순서 있는 목록” (G128에서 이어짐) | 확인 |
-| [G134](gaps/S3-S4-data.md#g134) | S4·S6 스크립트에서 엔티티 생성·삭제, 런타임 컴포넌트 부착·분리, 키 줄 붙이기·떼기의 표기 | 확인 |
-| [G190](gaps/S3-S4-data.md#g190) | S3 전역 순회 `all(Type)`과 파이썬 `all(xs)`의 이름 충돌 (G189에서 이어짐) | 확인 |
-| [G192](gaps/S3-S4-data.md#g192) | S3 스크립트의 전역 순회 (G190에서 이어짐) | 확인 |
-| [G193](gaps/S3-S4-data.md#g193) | S3·S5 `query`를 쓸 수 있는 자리와 반응이 목록 변화를 아는 법 (G192에서 이어짐) | 확인 |
-| [G194](gaps/S3-S4-data.md#g194) | S4 스크립트 순회에서 G88의 "죽은 것은 건너뛴다" (G88 구현 누락, 재현함) | 확인 |
+| # | 위치 | 무엇을 정했나 | 상태 |
+|---|---|---|---|
+| [G23](gaps/S3-S4-data.md#g23) | S4·schema-design 4.2 이름 충돌 | Def 타입과 컴포넌트는 한 이름 공간, 여러 모드가 같은 이름이면 모두 `SCH001`, `extend` 이름 충돌은 `SCH005`, Def 타입 안의 const·컴포넌트·`inverse`도 한 이름 공간. | 잠정 |
+| [G27](gaps/S3-S4-data.md#g27) | S3·S4 같은 컴포넌트 참조 | `order_by`와 `default_from`은 같은 컴포넌트의 다른 값을 가리키고 `order_by`는 `field`여야 함. | 잠정 |
+| [G31](gaps/S3-S4-data.md#g31) | S4 키 컴포넌트의 키 | 키 표기로 가름: `key="SkillDef"`는 Def 키, `key=Ref["Faction"]`은 엔티티 키(항상 `listed`, 대상은 컴포넌트를 가진 보이는 타입, Def 리터럴에 줄을 못 적음). | 확인 |
+| [G86](gaps/S3-S4-data.md#g86) | S4 런타임 첫 슬라이스의 범위와 입구 | 런타임은 호스트용 C# API `World`부터(동결 `DefSet`으로 생성, Def id로 엔티티 생성·삭제, 핸들로 읽기·쓰기, 순회, 키 줄, Ref·`inverse`), 경계는 핸들과 닫힌 값 타입, 정적 기본 월드 없음. | 확인 |
+| [G87](gaps/S3-S4-data.md#g87) | S3·S4·S8 엔티티 id 할당과 세대 | 엔티티 id는 재사용하지 않는 64비트 카운터(1부터, 저장에 다음 id), id 순 = 생성 순, 오래된 Ref는 생존 여부로 감지하고 세대 칸은 없음. | 확인 |
+| [G88](gaps/S3-S4-data.md#g88) | S4 구조 변경의 반영 시점 (S4 ✅ “지연(command buffer)”을 바꿈) | 구조 변경(생성·삭제·부착·분리·줄)은 즉시 보임, 순회는 시작 시점의 목록을 돌며 죽은 것·뗀 줄은 건너뛰고 새로 생긴 것은 안 나옴. | 확인 |
+| [G89](gaps/S3-S4-data.md#g89) | S4 `field` 초기값을 저장하는 시점 (schema-design 3.3.1 9항 보강) | 생성 순간에 Def가 값을 안 줬고 `default_from`이나 `default=함수`가 있는 `field`만 계산해 엔티티 값으로 저장, 나머지는 Def·스키마를 읽음, `keys="all"` 줄의 `field`에는 이 둘을 못 씀. | 확인 |
+| [G91](gaps/S3-S4-data.md#g91) | S3·S4 Ref 칼럼의 처음 값과 죽은 대상 | 필수 Ref는 생성 때 반드시 줌, 삭제해도 남의 Ref 칸은 그대로이고 읽을 때 대상이 죽었으면 `optional`은 `None`·필수는 오류, 역방향은 살아 있는 출처만, 엔티티 키 줄은 키가 죽으면 지움. | 확인 |
+| [G92](gaps/S3-S4-data.md#g92) | S4·P2 런타임 쓰기와 `min`·`max` | 런타임에 `field`의 범위 밖 값이나 타입이 다른 값을 쓰면 오류(커맨드면 롤백, 자르려면 `clamp()`), 초기값과 불러온 저장 값도 같은 검사(`SAV002`). | 확인 |
+| [G93](gaps/S3-S4-data.md#g93) | S4 기본값이 없는 칸의 런타임 값 (G67·G69·G91 보강) | `Create`·`Add`·`AddRow`는 값이 정해지지 않는 칸이 남으면 실패, 런타임에 붙이는 컴포넌트의 `const`와 `keys="all"` 줄의 `field`는 기본값 필수, `keys="all"` 줄의 Ref는 `optional`. | 확인 |
+| [G98](gaps/S3-S4-data.md#g98) | S4 기여 행의 모양·수명과 `contribs` (G90 보강) | 기여 행은 커널 저장(target·`op`·`value`(fixed)·`source`), API는 `AddContribution`·`RemoveContribution`·`RemoveBySource`, 커널의 수명은 출처·대상 소멸뿐, 대상은 `derived`만. | 확인 |
+| [G99](gaps/S3-S4-data.md#g99) | S4 `field`가 `derived` 상한을 넘는 경우 (schema-design 3.3.1 🟡) | `field`가 `derived` 상한을 넘는 경우 커널은 자동 규칙을 두지 않음(`min`·`max`는 숫자 리터럴만), 표준 패턴은 `damage` 저장 + `current` `derived` 또는 반응으로 자르기. | 확인 |
+| [G100](gaps/S3-S4-data.md#g100) | S4·S2 `derived` 순환 검사 (schema-design 3.3.1 5항) | `derived` 순환은 실행 중 재진입 감지만(호출 체인을 보여 주는 실행 오류), 로드 시점 정적 추적은 로직용 타입 정보로 나중에. | 확인 |
+| [G103](gaps/S3-S4-data.md#g103) | S4·schema-design 3.3.1 2항 `derived` 함수 안에서 형제 컴포넌트와 엔티티에 닿는 길 | `derived` 함수는 컴포넌트 인자를 받고 형제를 바로 읽음(`h.Location.city`, `h.entity`), 줄은 `s.key`·`s.entity`, `entity`·`key`는 예약 이름, read-set은 (엔티티, 컴포넌트 줄, 멤버). | 확인 |
+| [G105](gaps/S3-S4-data.md#g105) | S4 `derived`의 월드 연결과 읽은 값 근거(trace) (G90·G100·G103 보강) | 월드는 모드 이름 공간을 받아 함수가 같은 모드의 이름을 부르게 함, `derived`는 캐시 없이 매번 계산, 근거는 `World.Explain`의 읽은 값 트리로만, 반환 타입 검사, 연쇄 깊이 상한 64. | 확인 |
+| [G106](gaps/S3-S4-data.md#g106) | S4 생성 순간에 계산하는 기본값의 순서와 실패 (G89·G90 보강) | 함수 기본값과 `derived` 원천 `default_from` 칸은 엔티티를 만든 뒤 선언 순서대로 계산(뒤 칸을 읽으면 `RUN007`), 하나라도 실패하면 생성 전체를 되돌림. | 확인 |
+| [G129](gaps/S3-S4-data.md#g129) | S4 상태에 담는 “이름 없는 값의 순서 있는 목록” (G128에서 이어짐) | 키 컴포넌트의 키로 `int`를 허용(항상 `listed`, `[i]`로 접근), 헬퍼 `replace_rows`·`append_row`, 상태 안의 스칼라 리스트 칼럼·자유 리스트·맵은 열지 않음. | 확인 |
+| [G134](gaps/S3-S4-data.md#g134) | S4·S6 스크립트에서 엔티티 생성·삭제, 런타임 컴포넌트 부착·분리, 키 줄 붙이기·떼기의 표기 | 스크립트 구조 변경은 커널 내장 여섯(`spawn`·`destroy`·`attach`·`detach`·`add_row`·`remove_row`), 처음 값은 컴포넌트 값 모양, 리터럴 Def id는 로드 때 검사, Def에서 온 컴포넌트·줄은 뗄 수 없음. | 확인 |
+| [G190](gaps/S3-S4-data.md#g190) | S3 전역 순회 `all(Type)`과 파이썬 `all(xs)`의 이름 충돌 (G189에서 이어짐) | `all`은 파이썬 뜻으로 두고 엔티티 전역 순회는 다른 이름으로(spec의 `all(Type)`은 "전역 순회는 명시적 호출로만"이라는 규칙으로 읽음). | 확인 |
+| [G192](gaps/S3-S4-data.md#g192) | S3 스크립트의 전역 순회 (G190에서 이어짐) | 전역 순회 `query(이름, ...)`: Def 타입 하나 그리고/또는 컴포넌트들을 모두 만족하는 엔티티를 id 순으로, 리터럴 이름은 ⑤가 검사(`LNK001`~`LNK003`), 호스트 API는 `World.Query`. | 확인 |
+| [G193](gaps/S3-S4-data.md#g193) | S3·S5 `query`를 쓸 수 있는 자리와 반응이 목록 변화를 아는 법 (G192에서 이어짐) | `query`는 어디서나 쓸 수 있고 읽으면 그 출처의 목록을 읽은 것으로 기록해, 목록이 바뀌면(생성·소멸·부착·분리) 그것을 읽은 `when` 조건을 다시 봄. | 확인 |
+| [G194](gaps/S3-S4-data.md#g194) | S4 스크립트 순회에서 G88의 "죽은 것은 건너뛴다" (G88 구현 누락, 재현함) | 역방향 컬렉션과 `query()`는 엔티티 묶음 값(약한 참조처럼): `for`는 시작 목록을 돌며 죽은 것을 건너뛰고 `len`·`in`은 산 것만, 인덱스와 리스트 자리는 오류(컴프리헨션으로 사본). | 확인 |
 
 ## S5 반응
 
-| # | 위치 | 상태 |
-|---|---|---|
-| [G145](gaps/S5-reactions.md#g145) | S5 신호의 선언과 이름, `emit` 인자와 핸들러 매개변수 | 확인 |
-| [G146](gaps/S5-reactions.md#g146) | S5 `emit`을 부를 수 있는 자리 | 확인 |
-| [G147](gaps/S5-reactions.md#g147) | S5 `emit` 연쇄의 상한 | 확인 |
-| [G148](gaps/S5-reactions.md#g148) | S5 핸들러 실행 결과를 알리는 자리 | 확인 |
-| [G149](gaps/S5-reactions.md#g149) | S5 핸들러 Flow의 행위자 (`acts_for`, G122·G139에서 이어짐) | 확인 |
-| [G150](gaps/S5-reactions.md#g150) | G147 연쇄 상한을 바꾸는 자리 | 확인 |
-| [G151](gaps/S5-reactions.md#g151) | S5 핸들러가 받을 엔티티가 핸들러 전에 사라짐 | 확인 |
-| [G152](gaps/S5-reactions.md#g152) | S5 단계(stage)의 표기와 선언 위치 (G145에서 미룸) | 확인 |
-| [G153](gaps/S5-reactions.md#g153) | G152 남의 모드 단계를 가리킬 때의 의존 | 확인 |
-| [G163](gaps/S5-reactions.md#g163) | S5 멈춘 Flow의 "대상"이 무엇인가 (G151에서 이어짐) | 확인 |
-| [G164](gaps/S5-reactions.md#g164) | S5 멈춘 Flow의 대상 소멸을 확인하는 때 (G163에서 이어짐) | 확인 |
-| [G165](gaps/S5-reactions.md#g165) | S5 간접 대상 (G163 보강) | 확인 |
-| [G166](gaps/S5-reactions.md#g166) | S5 `on_stale=`의 다른 동작 | 확인 |
-| [G169](gaps/S5-reactions.md#g169) | S5 `when`의 주어: 무엇마다 거짓→참을 보나 | 확인 |
-| [G170](gaps/S5-reactions.md#g170) | S5 `when`의 거짓→참 기록과 처음 상태 (G169에서 이어짐) | 확인 |
-| [G171](gaps/S5-reactions.md#g171) | S5 정착 반복의 상한과 넘었을 때 (G169에서 이어짐) | 확인 |
-| [G172](gaps/S5-reactions.md#g172) | S5 정착 안에서 조건을 다시 보는 시점 (G170·G171에서 이어짐) | 확인 |
-| [G173](gaps/S5-reactions.md#g173) | S5 `repeat=True`가 반복하는 박자 (G172에서 이어짐) | 확인 |
-| [G174](gaps/S5-reactions.md#g174) | S5 `cooldown=N`의 뜻 (G172·G173에서 이어짐) | 확인 |
-| [G175](gaps/S5-reactions.md#g175) | S5 `once=True`의 단위 (G174에서 이어짐) | 확인 |
-| [G176](gaps/S5-reactions.md#g176) | S5 열린 질문 `prevent_default`(막는 훅) | 확인 |
-| [G177](gaps/S5-reactions.md#g177) | S5 열린 질문 "`wait` 중 Flow의 취소 규칙 세부" | 확인 |
+| # | 위치 | 무엇을 정했나 | 상태 |
+|---|---|---|---|
+| [G145](gaps/S5-reactions.md#g145) | S5 신호의 선언과 이름, `emit` 인자와 핸들러 매개변수 | 신호는 스키마 파일에서 `signal("Damaged", target=..., amount=int)`로 선언하는 전역 이름(컴포넌트와 한 이름 공간), `emit(Damaged(...))`·`@on(Damaged)`, 핸들러는 필요한 인자만 이름으로 받고 로직에서 부를 수 없음. | 확인 |
+| [G146](gaps/S5-reactions.md#g146) | S5 `emit`을 부를 수 있는 자리 | `emit`은 쓰는 내장 등급(한 줄이나 이름 대입 오른쪽만, 식 안·순수 자리는 `CMD004`), 인자는 신호 값 하나, 대기열은 커맨드 실패 때 함께 되감김. | 확인 |
+| [G147](gaps/S5-reactions.md#g147) | S5 `emit` 연쇄의 상한 | 신호 연쇄는 세대 상한(기본 64, 게임이 바꿈)을 넘으면 그 신호만 버리고 고리 경로를 진단으로, 시간을 건너면 세대는 1부터, 넓게 퍼지는 것은 세지 않음. | 확인 |
+| [G148](gaps/S5-reactions.md#g148) | S5 핸들러 실행 결과를 알리는 자리 | 제출·답·응답 결과의 `Reactions`에 돈 순서대로 (신호, 핸들러, 결과: 끝남·멈춤·오류·상한으로 버림), 핸들러가 실패해도 커맨드 결과는 그대로. | 확인 |
+| [G149](gaps/S5-reactions.md#g149) | S5 핸들러 Flow의 행위자 (`acts_for`, G122·G139에서 이어짐) | 핸들러(`@on`)에는 `acts_for`가 없음(쓰면 로드 오류), 누구에 관한 것인지는 신호 인자에서 꺼냄. | 확인 |
+| [G150](gaps/S5-reactions.md#g150) | G147 연쇄 상한을 바꾸는 자리 | 신호 세대 상한은 호스트 API `maxSignalDepth`(World 생성·불러오기, 기본 64, 1 미만은 호출자 오류), 모드에서 바꾸는 자리는 없음. | 확인 |
+| [G151](gaps/S5-reactions.md#g151) | S5 핸들러가 받을 엔티티가 핸들러 전에 사라짐 | 핸들러가 받는 매개변수 중 사라진 엔티티가 있으면 시작 직전에 조용히 취소하고 결과에 `Canceled`와 이유. | 확인 |
+| [G152](gaps/S5-reactions.md#g152) | S5 단계(stage)의 표기와 선언 위치 (G145에서 미룸) | 단계는 모드 id 접두사가 붙은 문자열 id로 스키마 파일에서 `stage(...)`로 선언(자기 모드 접두사만), 핸들러는 `@on(Tick, stage=...)`, 정렬은 ②a 끝, 사이클은 경로와 함께 로드 오류. | 확인 |
+| [G153](gaps/S5-reactions.md#g153) | G152 남의 모드 단계를 가리킬 때의 의존 | 다른 모드의 단계를 `after`·`before`·`stage=`로 가리키려면 `dependencies`가 필요, `optional_after`·`optional_before`는 의존 없이(없으면 무시). | 확인 |
+| [G163](gaps/S5-reactions.md#g163) | S5 멈춘 Flow의 "대상"이 무엇인가 (G151에서 이어짐) | Flow의 대상은 입구에서 받은 엔티티(커맨드 인자·핸들러 매개변수)와 질문의 답할 엔티티, 대상 하나가 사라지거나 답할 엔티티가 모두 사라지면 대상 소멸. | 확인 |
+| [G164](gaps/S5-reactions.md#g164) | S5 멈춘 Flow의 대상 소멸을 확인하는 때 (G163에서 이어짐) | 대상 소멸은 실행 하나(제출·답·응답·깨우기·틱)가 끝날 때마다 바로 확인해 그 Flow를 버리고 결과에 `stale`·`Canceled`, 대상이 사라진 Flow가 든 저장은 형식 오류. | 확인 |
+| [G165](gaps/S5-reactions.md#g165) | S5 간접 대상 (G163 보강) | 멈추는 자리에서 대상을 적을 수 있음: `wait(ticks=n, about=[...])`·`ask(..., about=[...])`, 적으면 그것만 보고 안 적으면 입구 인자. | 확인 |
+| [G166](gaps/S5-reactions.md#g166) | S5 `on_stale=`의 다른 동작 | `on_stale=`은 기본 취소만 두고 이름만 예약(쓰면 로드 오류), 상관없는 엔티티는 `about=`에서 뺌. | 확인 |
+| [G169](gaps/S5-reactions.md#g169) | S5 `when`의 주어: 무엇마다 거짓→참을 보나 | `@when`은 전역 조건(매개변수 없음)과 엔티티별 조건(`Ref[Def타입]` 하나, 엔티티마다 평가·기록) 둘 다. | 확인 |
+| [G170](gaps/S5-reactions.md#g170) | S5 `when`의 거짓→참 기록과 처음 상태 (G169에서 이어짐) | 거짓→참 기록은 지금 참인 (반응, 엔티티) 집합을 저장의 별도 구역에, 기록이 없으면 지난번은 거짓으로 보아 첫 정착에서 발동. | 확인 |
+| [G171](gaps/S5-reactions.md#g171) | S5 정착 반복의 상한과 넘었을 때 (G169에서 이어짐) | 정착 회차가 `maxSettleRounds`(기본 64, 호스트 값)를 넘으면 다음 회차 반응을 `Dropped`로 남기고 멈춤, 앞 효과는 남고 버린 반응은 다음 정착에서 다시 시도. | 확인 |
+| [G172](gaps/S5-reactions.md#g172) | S5 정착 안에서 조건을 다시 보는 시점 (G170·G171에서 이어짐) | 본문 하나가 끝날 때마다 모든 조건을 다시 보고, 회차(세대)가 가장 이른 것을 단계 → 정의 → 엔티티 id 순으로 하나씩 돌림. | 확인 |
+| [G173](gaps/S5-reactions.md#g173) | S5 `repeat=True`가 반복하는 박자 (G172에서 이어짐) | `repeat=True`는 틱 끝 정착에서만 틱마다 한 번(커맨드 뒤 정착에서는 안 봄), 거짓→참 기록을 쓰지 않음. | 확인 |
+| [G174](gaps/S5-reactions.md#g174) | S5 `cooldown=N`의 뜻 (G172·G173에서 이어짐) | `cooldown=N`은 발동 뒤 N틱 동안 그 (반응, 대상)의 조건을 거짓으로 봄(끝나는 정착에서 참이면 발동), 본문이 실패해도 시작, 저장 `"when_cooldown"`. | 확인 |
+| [G175](gaps/S5-reactions.md#g175) | S5 `once=True`의 단위 (G174에서 이어짐) | `once=True`는 (반응, 엔티티)마다 한 번, `once="game"`은 반응 전체에 한 번, 본문이 실패해도 쓴 것, `repeat`·`cooldown`과 함께면 로드 오류, 저장 `"when_once"`. | 확인 |
+| [G176](gaps/S5-reactions.md#g176) | S5 열린 질문 `prevent_default`(막는 훅) | 남의 규칙 전에 끼어드는 동기 필터는 커널에 두지 않음: 확장 지점은 `derived` + 기여 행과 Def의 `Cond` 자리·패치, 안 되는 사례가 나오면 다시 봄. | 확인 |
+| [G177](gaps/S5-reactions.md#g177) | S5 열린 질문 "`wait` 중 Flow의 취소 규칙 세부" | 자는 Flow의 취소 전용 기능은 두지 않고 상태로 표현(일을 엔티티로 두고 `about=`으로 잡아 지우기, 또는 값을 세우고 깨어나서 보기). | 확인 |
 
 ## S6 커맨드 (C8 롤백, S10 UI의 나 포함)
 
-| # | 위치 | 상태 |
-|---|---|---|
-| [G109](gaps/S6-commands.md#g109) | S6 커맨드의 이름(id) | 확인 |
-| [G110](gaps/S6-commands.md#g110) | S6·C7 여러 `require`의 평가와 서로 기대는 조건 | 확인 |
-| [G114](gaps/S6-commands.md#g114) | S6 커맨드 매개변수의 타입 (S6 열린 질문 “매개변수 타입의 표현 범위”) | 확인 |
-| [G115](gaps/S6-commands.md#g115) | S6·C7 제출된 인자가 매개변수 타입에 맞지 않을 때 | 확인 |
-| [G116](gaps/S6-commands.md#g116) | S6 커맨드 매개변수의 기본값 (spec “타입 있는 매개변수(기본값 포함)”) | 확인 |
-| [G118](gaps/S6-commands.md#g118) | S6 커맨드를 로직에서 일반 함수처럼 쓰기 (handoff 남은 일 14) | 확인 |
-| [G119](gaps/S6-commands.md#g119) | S6 제출자(issuer)와 S2 `me`의 관계 (S2 `me` ❓의 일부) | 확인 |
-| [G121](gaps/S6-commands.md#g121) | S6 입구(②): “연결 A가 진영 P를 조종해도 되는가”의 자료와 검사는 어디에 있는가 | 확인 |
-| [G122](gaps/S6-commands.md#g122) | S6 입구(②)에서 모드가 정한 검사를 부르는 자리의 모양 (G121) | 확인 |
-| [G123](gaps/S6-commands.md#g123) | G122의 `acts_for`가 없는 자유 커맨드 | 확인 |
-| [G124](gaps/S6-commands.md#g124) | G122의 정책 함수가 없거나 둘 이상일 때 | 확인 |
-| [G127](gaps/S6-commands.md#g127) | S10 UI의 “나”(이전 `^Self`의 다섯째 역할) | 확인 |
-| [G130](gaps/S6-commands.md#g130) | G122의 표기: `acts_for` 람다가 인자를 받는 방식, 정책 데코레이터 이름 | 확인 |
-| [G131](gaps/S6-commands.md#g131) | S6 제출 API(`Submit`)가 돌려주는 결과의 모양 | 확인 |
-| [G132](gaps/S6-commands.md#g132) | S6 커맨드 본문 실행: 쓰기가 닿는 곳과 실행 모양 (G117 2단계) | 확인 |
-| [G133](gaps/S6-commands.md#g133) | C8 커맨드 단위 롤백의 방식 | 확인 |
+| # | 위치 | 무엇을 정했나 | 상태 |
+|---|---|---|---|
+| [G109](gaps/S6-commands.md#g109) | S6 커맨드의 이름(id) | 커맨드 id는 자동으로 `모드id.함수이름`, 데코레이터는 `@command`와 `@command(free=True)`(Request 없이 낸 커맨드는 `free=True`만 받음). | 확인 |
+| [G110](gaps/S6-commands.md#g110) | S6·C7 여러 `require`의 평가와 서로 기대는 조건 | `require`는 모두 위에서부터 평가하고, 앞에 실패가 있으면 뒤의 실행 오류는 "평가 안 됨"(예산 초과·순환은 언제나 스크립트 오류), 결과는 `require`마다 통과·실패·평가 안 됨, 실패가 있으면 본문은 안 돎. | 확인 |
+| [G114](gaps/S6-commands.md#g114) | S6 커맨드 매개변수의 타입 (S6 열린 질문 “매개변수 타입의 표현 범위”) | 커맨드 매개변수는 어노테이션 필수, 허용 타입은 `int`·`fixed`·`bool`·`str`·`Ref[X]`·`DefId[X]`·`list[T]`·`dict[K, V]`와 "T 또는 None"(따옴표 있든 없든). | 확인 |
+| [G115](gaps/S6-commands.md#g115) | S6·C7 제출된 인자가 매개변수 타입에 맞지 않을 때 | 인자 문제는 예외가 아니라 구조화된 거절(매개변수 이름·위치·사유 종류·기대 타입), 하나라도 있으면 사전 조건은 평가 안 함, `fixed` 자리의 `int`는 올려 받음, 없는 커맨드 id만 예외. | 확인 |
+| [G116](gaps/S6-commands.md#g116) | S6 커맨드 매개변수의 기본값 (spec “타입 있는 매개변수(기본값 포함)”) | 커맨드 매개변수 기본값은 리터럴만(로드 때 타입 대조, `Ref`는 None만, `DefId`는 ⑤ 규칙), 제출 때 빠진 인자를 채우고 로그에는 채운 전체 인자. | 확인 |
+| [G118](gaps/S6-commands.md#g118) | S6 커맨드를 로직에서 일반 함수처럼 쓰기 (handoff 남은 일 14) | 로직에서 커맨드 이름을 부르거나 값으로 쓰면 로드 오류(`CMD004`), 함수 자리에도 못 둠, 커맨드는 제출로만 실행. | 확인 |
+| [G119](gaps/S6-commands.md#g119) | S6 제출자(issuer)와 S2 `me`의 관계 (S2 `me` ❓의 일부) | issuer는 "어느 연결에서 왔나"이고 행동하는 진영이 아님(`me.Points` 같은 표기는 틀림), 나머지는 이어서 정함. | 확인 |
+| [G121](gaps/S6-commands.md#g121) | S6 입구(②): “연결 A가 진영 P를 조종해도 되는가”의 자료와 검사는 어디에 있는가 | 담당 정보는 게임 상태 안의 모드 데이터(커널 개념 아님), 커널은 issuer를 불투명한 꼬리표로 받고 입구에서 모드의 검사를 부를 자리만 엶. | 확인 |
+| [G122](gaps/S6-commands.md#g122) | S6 입구(②)에서 모드가 정한 검사를 부르는 자리의 모양 (G121) | 커맨드는 "누구로서"를 `acts_for`(순수 함수)로 선언하고 담당 모드는 정책 함수 `may_act(issuer, target)`을 선언, 입구가 전제 조건보다 먼저 검사, 소유 검사는 전제 조건의 `require`. | 확인 |
+| [G123](gaps/S6-commands.md#g123) | G122의 `acts_for`가 없는 자유 커맨드 | 자유 커맨드는 `acts_for`를 반드시 적음(누구로서도 아니면 `acts_for=None`, 그래도 정책 함수는 불림), 빠지면 로드 오류. | 확인 |
+| [G124](gaps/S6-commands.md#g124) | G122의 정책 함수가 없거나 둘 이상일 때 | 정책 함수가 없으면 모든 issuer 허용(호스트가 "정책 필수"를 켤 수 있음), 정책 함수는 활성 모드 전체에서 최대 하나(교체는 `override=True`). | 확인 |
+| [G127](gaps/S6-commands.md#g127) | S10 UI의 “나”(이전 `^Self`의 다섯째 역할) | UI의 "나"는 그 클라이언트가 지금 보는 엔티티로 UI 로컬(저장·네트워크 대상 아님), 호스트나 UI가 설정, 후보는 정책 함수로 구함, 커널이 할 일은 없음. | 확인 |
+| [G130](gaps/S6-commands.md#g130) | G122의 표기: `acts_for` 람다가 인자를 받는 방식, 정책 데코레이터 이름 | `acts_for` 람다는 커맨드 매개변수를 이름으로 골라 받음(없는 이름은 `CMD001`), 정책 함수는 `@submit_policy`(교체는 `override=True`, 매개변수 둘, 쓰기 함수면 `CMD004`, 모양 오류는 `CMD005`). | 확인 |
+| [G131](gaps/S6-commands.md#g131) | S6 제출 API(`Submit`)가 돌려주는 결과의 모양 | 제출 결과는 값 하나 `SubmitResult`(`Outcome`: 성공·Request 필요·인자 거절·입구 거부·전제 조건 실패·스크립트 오류 + 세부), 순서는 자유 커맨드 확인 → 인자 → 입구 → 전제 조건, 예외는 호스트 실수뿐. | 확인 |
+| [G132](gaps/S6-commands.md#g132) | S6 커맨드 본문 실행: 쓰기가 닿는 곳과 실행 모양 (G117 2단계) | 본문의 속성 대입은 `World.Set`과 같은 검사를 거친 상태 쓰기(`field`·Ref만, 키 줄은 있는 줄에만), 사전 조건과 본문은 한 실행(블록 변수를 이어 받음), 본문이 읽는 `derived`는 앞의 쓰기를 봄. | 확인 |
+| [G133](gaps/S6-commands.md#g133) | C8 커맨드 단위 롤백의 방식 | 커맨드 롤백은 되돌리기 기록(undo 로그): 실행 중 상태를 바꾸는 기본 연산을 기록하고 어떤 예외로 끝나든 거꾸로 되감음, 커맨드 밖(호스트 API)은 기록 안 함. | 확인 |
 
 ## S7 호스트 함수
 
-| # | 위치 | 상태 |
-|---|---|---|
-| [G215](gaps/S7-host.md#g215) | S7 호스트 함수의 서명 선언 방식 (S7 열린 질문) | 확인 |
-| [G216](gaps/S7-host.md#g216) | S7 효과 등급과 부를 수 있는 곳 | 확인 |
-| [G217](gaps/S7-host.md#g217) | S7 호스트 함수에 건네는 접근기 | 확인 |
-| [G218](gaps/S7-host.md#g218) | S7 호스트 함수의 호출 모양과 이름 공간 | 확인 |
-| [G219](gaps/S7-host.md#g219) | S7 호스트 함수 경계의 오류와 실행 예산 | 확인 |
-| [G220](gaps/S7-host.md#g220) | S7 결정론 위반 방어 (S7 열린 질문, S9) | 확인 |
-| [G221](gaps/S7-host.md#g221) | S7 호스트 함수의 저장, 바뀜 알림, 게임 없이 도는 도구 | 확인 |
-| [G222](gaps/S7-host.md#g222) | S7 호스트 함수의 스크립트 타입과 C# 타입 대응 | 확인 |
+| # | 위치 | 무엇을 정했나 | 상태 |
+|---|---|---|---|
+| [G215](gaps/S7-host.md#g215) | S7 호스트 함수의 서명 선언 방식 (S7 열린 질문) | 호스트 함수는 서명을 스크립트 `def` 한 줄 문자열로, 구현은 타입 있는 C# 람다로 등록(`host.For("core").Pure(...)`·`Writes(...)`), 등록 때 인자 개수·타입·이름·반환을 대조해 어긋나면 등록 오류. | 확인 |
+| [G216](gaps/S7-host.md#g216) | S7 효과 등급과 부를 수 있는 곳 | 호스트 함수 등급 둘: `Pure`는 어디서나(읽은 칸은 읽기 집합에 기록), `Writes`는 쓰기 자리에서 문장이나 이름 대입 오른쪽으로만(로드 때 판정), 셋째 등급 없음. | 확인 |
+| [G217](gaps/S7-host.md#g217) | S7 호스트 함수에 건네는 접근기 | 호스트 함수는 호출마다 새 창구를 받음(순수는 읽기만, 쓰기는 쓰기와 그 Flow의 난수까지), 창구는 월드 공개 API를 그대로 부르고 `Submit` 등 재진입은 없음, 끝나면 무효, 실행 중 월드 직접 쓰기는 예외. | 확인 |
+| [G218](gaps/S7-host.md#g218) | S7 호스트 함수의 호출 모양과 이름 공간 | 호스트 함수 이름은 `소유모드id.점.경로`, 소유 모드 자신과 그것에 필수 의존한 모드에서만 보임, `import` 없이 전체 경로로 부르고 함수 값으로 담을 수 있음, 같은 모드 안 중복 경로는 등록 오류. | 확인 |
+| [G219](gaps/S7-host.md#g219) | S7 호스트 함수 경계의 오류와 실행 예산 | 호스트 구현이 던진 예외는 `RUN019`, 서명과 다른 반환은 `RUN020`(둘 다 스크립트 오류처럼 롤백), 호출 한 번은 한 걸음으로 셈, 호스트 코드의 무한 반복은 엔진이 막지 못함. | 확인 |
+| [G220](gaps/S7-host.md#g220) | S7 결정론 위반 방어 (S7 열린 질문, S9) | 커널의 결정론 검사(금지 목록·분석기)를 호스트도 켤 수 있게 내놓고 문서화, 상태 체크섬은 리플레이·멀티를 만들 때, 실행 중 이중 호출 검증은 안 함. | 확인 |
+| [G221](gaps/S7-host.md#g221) | S7 호스트 함수의 저장, 바뀜 알림, 게임 없이 도는 도구 | 멈춘 Flow의 호스트 함수 값은 `{"host": "core.find_path"}`(없으면 `SAV002`), 저장 메타에 등록 목록을 싣고 다르면 `SAV003`, 선언 파일로 내보내 CLI `--host`가 구현 없이 검사·스텁, 로드 중에는 부를 수 없고 참조만. | 확인 |
+| [G222](gaps/S7-host.md#g222) | S7 호스트 함수의 스크립트 타입과 C# 타입 대응 | C# 타입 대응: `int`는 `long`만, `fixed`는 `Fixed`, `Ref[X]`는 `EntityId`, `DefId[X]`는 `string`, None 허용은 nullable, `list[T]`는 `IReadOnlyList<T>`, `dict`는 엔진 값 `Value`로만. | 확인 |
 
 ## S8 저장
 
-| # | 위치 | 상태 |
-|---|---|---|
-| [G140](gaps/S8-save.md#g140) | S8 저장 형식 | 확인 |
-| [G144](gaps/S8-save.md#g144) | S8·C5 멈춘 Flow의 함수 본문 해시가 덮는 것 | 확인 |
-| [G210](gaps/S8-save.md#g210) | S8 칼럼 삭제의 고아 데이터 영역 | 확인 |
-| [G211](gaps/S8-save.md#g211) | S8 Def가 없어진 엔티티 (G210에서 이어짐) | 확인 |
-| [G212](gaps/S8-save.md#g212) | S8 세이브 메타의 모드 내용 해시 | 확인 |
-| [G214](gaps/S8-save.md#g214) | S8 "해당 Flow 취소 후 로드" | 확인 |
+| # | 위치 | 무엇을 정했나 | 상태 |
+|---|---|---|---|
+| [G140](gaps/S8-save.md#g140) | S8 저장 형식 | 저장은 엔진이 직접 쓰는 정규형 JSON(엔진 데이터 모델 기준, 스키마 이름은 문자열, 키 순서·공백·수 표기 고정, 닫힌 태그, C# 타입 이름 없음), 압축은 호스트. | 확인 |
+| [G144](gaps/S8-save.md#g144) | S8·C5 멈춘 Flow의 함수 본문 해시가 덮는 것 | 본문 해시는 위치 정보를 뺀 구조(매개변수·반환 표기·문장·식·이름·연산자·상수)의 SHA-256 앞 16바이트, 멈춘 프레임의 함수와 Flow가 든 람다의 함수만 덮음, 다르면 `SAV004`로 거부. | 확인 |
+| [G210](gaps/S8-save.md#g210) | S8 칼럼 삭제의 고아 데이터 영역 | 지워진 칼럼은 기본 거부, 호스트가 `dropRemoved: true`면 지워진 컴포넌트·멤버·줄·기여 행을 버리고 곳마다 `SAV005` 경고, 타입 변경 등은 여전히 거부, 고아 영역은 없음. | 확인 |
+| [G211](gaps/S8-save.md#g211) | S8 Def가 없어진 엔티티 (G210에서 이어짐) | `dropRemoved`면 Def가 없어진 엔티티도 불러올 때 파괴된 것처럼 다룸(줄·기여 행 버림, 관련 Flow 취소, `SAV005`), 살아 있는 엔티티의 필수 Ref가 가리키면 거부(`SAV002`), 격리 영역 없음. | 확인 |
+| [G212](gaps/S8-save.md#g212) | S8 세이브 메타의 모드 내용 해시 | 모드 내용 해시: 엔진이 읽은 파일마다 경로(NFC)·종류·파일 해시(BOM 빼고 줄바꿈 정규화한 SHA-256 앞 128비트)를 두고 모드 해시를 만들어 로드 결과와 저장에 실음, 다르면 `SAV003` 경고(무시할지는 사용처). | 확인 |
+| [G214](gaps/S8-save.md#g214) | S8 "해당 Flow 취소 후 로드" | 호스트 옵션 `cancelBrokenFlows: true`면 어긋난 Flow(`SAV004`·없어진 함수 등·`SAV002`)를 질문과 함께 취소하고 Flow마다 `SAV006`, 멈추기 전 한 일은 남고 반응은 안 부름. | 확인 |
 
 ## S9 진단·CLI
 
-| # | 위치 | 상태 |
-|---|---|---|
-| [G5](gaps/S9-diagnostics.md#g5) | S9 진단 | 잠정 |
-| [G6](gaps/S9-diagnostics.md#g6) | S9 진단 코드 | 잠정 |
-| [G75](gaps/S9-diagnostics.md#g75) | S9 `check` 출력 스키마 | 확인 |
-| [G76](gaps/S9-diagnostics.md#g76) | S9 최종 Def 덤프 (“왜?” 도구 1) | 확인 |
-| [G78](gaps/S9-diagnostics.md#g78) | S9 `engine check`의 종료 코드 | 확인 |
-| [G79](gaps/S9-diagnostics.md#g79) | S9 `engine check`의 출력 형식 | 확인 |
-| [G80](gaps/S9-diagnostics.md#g80) | S9 최종 Def 덤프의 CLI 진입점 (G76 보강) | 확인 |
-| [G84](gaps/S9-diagnostics.md#g84) | S9 경고를 오류로 올리는 옵션 (S9 열린 질문, G78 보강) | 확인 |
-| [G85](gaps/S9-diagnostics.md#g85) | S9 `check`와 `optional` 모드 (G38의 열린 점) | 확인 |
+| # | 위치 | 무엇을 정했나 | 상태 |
+|---|---|---|---|
+| [G5](gaps/S9-diagnostics.md#g5) | S9 진단 | 진단 위치: 줄·열은 1부터(열은 UTF-16 코드 단위), 줄 0·열 0은 파일 전체, 경로는 모드 루트 기준 `/`, BOM 무시, 진단은 (파일, 줄, 열, 코드, 메시지) 순 정렬. | 잠정 |
+| [G6](gaps/S9-diagnostics.md#g6) | S9 진단 코드 | 진단 코드는 영역 접두사 + 세 자리(`LEX`·`PAR`·`MOD` …), 영역은 단계가 늘 때 추가(잠정). | 잠정 |
+| [G75](gaps/S9-diagnostics.md#g75) | S9 `check` 출력 스키마 | `check` JSON은 한 객체(`version`·`ok`·`counts`·`mods`·`diagnostics`), 진단 키는 항상 있고 키 순서·들여쓰기 고정, 라이브러리 없이 `CheckReport.ToJson`으로. | 확인 |
+| [G76](gaps/S9-diagnostics.md#g76) | S9 최종 Def 덤프 (“왜?” 도구 1) | 최종 Def 덤프는 `check`와 같은 JSON으로 `abstract` 포함 모든 Def를 등록 순서로, 값마다 `value`·`origin`·`source`·`patches`, `fixed`는 문자열, 실패한 패치는 넣지 않음. | 확인 |
+| [G78](gaps/S9-diagnostics.md#g78) | S9 `engine check`의 종료 코드 | 종료 코드: 0 오류 없음(경고만 있어도), 1 콘텐츠 오류, 2 사용법·환경 문제, 3 엔진 내부 예외, 0과 `ok`=true는 늘 같이. | 확인 |
+| [G79](gaps/S9-diagnostics.md#g79) | S9 `engine check`의 출력 형식 | `check` 기본 출력은 사람용 텍스트(`파일:줄:열: 심각도 코드: 메시지` + 들여쓴 힌트, 끝에 요약), 텍스트 경로는 현재 폴더 기준, `--json`이면 JSON만, 사용법·내부 오류는 stderr. | 확인 |
+| [G80](gaps/S9-diagnostics.md#g80) | S9 최종 Def 덤프의 CLI 진입점 (G76 보강) | 덤프는 별도 명령 `engine dump <mods-dir>`: stdout에 덤프 JSON, 로드 진단은 텍스트로 stderr, 오류가 있어도 살아남은 모드로 냄, Def 고르기 옵션은 미룸. | 확인 |
+| [G84](gaps/S9-diagnostics.md#g84) | S9 경고를 오류로 올리는 옵션 (S9 열린 질문, G78 보강) | `engine check --warnings-as-errors` 하나로 모든 경고를 `error`로 올려 출력·`ok`·종료 코드에 반영(정보는 그대로), `dump`·`stubs`는 이 옵션을 안 받음. | 확인 |
+| [G85](gaps/S9-diagnostics.md#g85) | S9 `check`와 `optional` 모드 (G38의 열린 점) | `check`는 옵션 없이 폴더에 있는 모드 집합만 검사(호환 패치를 검사하려면 선택 모드를 함께 둠). | 확인 |
 
 ## X1 질문·X2 시간·X3 스택
 
-| # | 위치 | 상태 |
-|---|---|---|
-| [G125](gaps/X-flow-time.md#g125) | X1 Request `accepts`와 `ask`의 반환값: 누구에게 묻는가 | 확인 |
-| [G126](gaps/X-flow-time.md#g126) | G125의 남은 둘: 응답이 어느 엔티티로서인지, 시간 초과 주입값 | 확인 |
-| [G128](gaps/X-flow-time.md#g128) | X3 `std.stack`: 대기 중인 행동(“나중에 해소할 것”)의 표현과 커널의 몫 | 확인 |
-| [G137](gaps/X-flow-time.md#g137) | X1 질문의 선택 방법(창·지도 강조 클릭 등)을 누가 정하나, 질문에 실을 추가 정보 | 확인 |
-| [G138](gaps/X-flow-time.md#g138) | X1 `ask`의 호출 모양과 돌려주는 값 (G126이 미룬 필드 이름) | 확인 |
-| [G139](gaps/X-flow-time.md#g139) | X1·S6 응답 커맨드의 본문이 답한 엔티티를 아는 방법 (G126·G130에서 이어짐) | 확인 |
-| [G154](gaps/X-flow-time.md#g154) | X2 엔진의 틱 신호와 지금 틱 읽기 (G145에서 미룸) | 확인 |
-| [G155](gaps/X-flow-time.md#g155) | G154 `now()`를 쓸 수 있는 자리 | 확인 |
-| [G156](gaps/X-flow-time.md#g156) | G154 스크립트가 `Tick`을 내는 것 | 확인 |
-| [G157](gaps/X-flow-time.md#g157) | X2 `wait`에서 깨어난 Flow의 오류 | 확인 |
-| [G158](gaps/X-flow-time.md#g158) | X2 `wait`로 잠든 것을 호스트가 아는 방법 | 확인 |
-| [G159](gaps/X-flow-time.md#g159) | X2 `ask`가 시간을 막는지의 기본값 | 확인 |
-| [G160](gaps/X-flow-time.md#g160) | X1·X2 `deadline=`의 표기 | 확인 |
-| [G161](gaps/X-flow-time.md#g161) | X2·G126 `on_timeout=`이 가리키는 것 | 확인 |
-| [G162](gaps/X-flow-time.md#g162) | X2 마감만 있고 `on_timeout=`이 없는 질문 | 확인 |
-| [G167](gaps/X-flow-time.md#g167) | X2 스크립트의 `advance(n)` | 확인 |
-| [G168](gaps/X-flow-time.md#g168) | X2 스크립트 `advance`가 호출 하나를 붙잡는 양 (G167에서 이어짐) | 확인 |
+| # | 위치 | 무엇을 정했나 | 상태 |
+|---|---|---|---|
+| [G125](gaps/X-flow-time.md#g125) | X1 Request `accepts`와 `ask`의 반환값: 누구에게 묻는가 | 질문은 엔티티에게 함(`ask(party, ...)`), 질의에 굳는 것은 응답별 엔티티 목록, 담당 확인(`may_act`)은 응답이 올 때, `ask`는 답한 엔티티를 돌려줌. | 확인 |
+| [G126](gaps/X-flow-time.md#g126) | G125의 남은 둘: 응답이 어느 엔티티로서인지, 시간 초과 주입값 | 응답 커맨드는 어느 엔티티로서 답하는지 늘 명시(목록에 있고 `may_act`가 참이어야 함), 시간 초과 주입은 엔티티가 `None`이고 응답 이름은 `on_timeout`이 정함. | 확인 |
+| [G128](gaps/X-flow-time.md#g128) | X3 `std.stack`: 대기 중인 행동(“나중에 해소할 것”)의 표현과 커널의 몫 | 대기 중인 행동의 표현은 `std.stack` 모드 몫(방향은 노드 엔티티에 행동 Def id와 인자를 두는 데이터 방식), 커널은 이것이 커널 기능만으로 되게 함, Flow끼리 신호 기다리기는 추가 안 함. | 확인 |
+| [G137](gaps/X-flow-time.md#g137) | X1 질문의 선택 방법(창·지도 강조 클릭 등)을 누가 정하나, 질문에 실을 추가 정보 | 질문의 선택 방법은 스크립트가 `hint=`로 제안만 하고 UI가 결정(커널은 해석 안 함), 질문에 자유 데이터 `data=`, 응답은 어떻게 골랐든 같은 데이터, 여러 단계 고르기는 UI 로컬. | 확인 |
+| [G138](gaps/X-flow-time.md#g138) | X1 `ask`의 호출 모양과 돌려주는 값 (G126이 미룬 필드 이름) | `ask(who, title, choices=[...], responses=[...], hint=, data=)`, 돌려받는 `r`은 `r.response`·`r.index`·`r.choice`·`r.by`(시간 초과면 `None`) 한 모양. | 확인 |
+| [G139](gaps/X-flow-time.md#g139) | X1·S6 응답 커맨드의 본문이 답한 엔티티를 아는 방법 (G126·G130에서 이어짐) | `acts_for`는 모든 커맨드에 필수(응답 커맨드도, `None`은 못 씀), 답하는 순서는 질문 확인 → 받는 커맨드인가 → 인자 → `acts_for` → 목록에 있나 → `may_act` → 사전 조건 → 본문(기다리던 Flow와 같은 트랜잭션). | 확인 |
+| [G154](gaps/X-flow-time.md#g154) | X2 엔진의 틱 신호와 지금 틱 읽기 (G145에서 미룸) | 엔진이 신호 `Tick`을 값 없이 미리 선언(모든 모드에 보임), 지금 틱은 내장 `now()`. | 확인 |
+| [G155](gaps/X-flow-time.md#g155) | G154 `now()`를 쓸 수 있는 자리 | `now()`는 어디서나 읽을 수 있고 읽으면 "틱" 칸을 읽은 것으로 기록(`Explain`·`when` 읽은 목록). | 확인 |
+| [G156](gaps/X-flow-time.md#g156) | G154 스크립트가 `Tick`을 내는 것 | 엔진 신호의 값은 스크립트가 만들 수 없음(`Tick(...)`은 로드 오류, 우회는 실행 오류), 시간은 `advance`로. | 확인 |
+| [G157](gaps/X-flow-time.md#g157) | X2 `wait`에서 깨어난 Flow의 오류 | `wait`에서 깨어난 구간이 실패하면 그 구간을 되감고 Flow를 버림, 오류는 `Advance` 결과의 반응 목록에. | 확인 |
+| [G158](gaps/X-flow-time.md#g158) | X2 `wait`로 잠든 것을 호스트가 아는 방법 | 제출·답·반응 결과에 깨울 틱 `SleepsUntil`(잠들지 않았으면 null). | 확인 |
+| [G159](gaps/X-flow-time.md#g159) | X2 `ask`가 시간을 막는지의 기본값 | 질문이 시간을 막는지는 마감 유무로: `deadline=`이 없으면 막고 있으면 안 막음, `blocks_time=`을 적으면 그것을 따름, 막는 질문에 마감을 두는 오류는 둘을 직접 함께 적었을 때만. | 확인 |
+| [G160](gaps/X-flow-time.md#g160) | X1·X2 `deadline=`의 표기 | `deadline=n`은 몇 틱 뒤(1 이상), 질문이 열릴 때 지금 틱 + n으로 굳혀 저장(`Request.Deadline`). | 확인 |
+| [G161](gaps/X-flow-time.md#g161) | X2·G126 `on_timeout=`이 가리키는 것 | `on_timeout=`은 선택지 값이나 응답 이름으로 가리킴, 마감이 지나면 그 선택지와 `r.by = None`(응답 이름이면 본문은 안 돎), 둘 다 맞거나 없으면 실행 오류. | 확인 |
+| [G162](gaps/X-flow-time.md#g162) | X2 마감만 있고 `on_timeout=`이 없는 질문 | `deadline=`을 쓰면 `on_timeout=`도 적어야 함(없으면 실행 오류). | 확인 |
+| [G167](gaps/X-flow-time.md#g167) | X2 스크립트의 `advance(n)` | 스크립트의 `advance(n)`은 `wait`처럼 멈추는 내장: 거기까지 확정하고 같은 호출 안에서 n틱 진행 뒤 이어 감, 실제로 간 틱 수를 돌려줌, 시간이 흐르는 중이나 신호 핸들러 안에서는 실행 오류. | 확인 |
+| [G168](gaps/X-flow-time.md#g168) | X2 스크립트 `advance`가 호출 하나를 붙잡는 양 (G167에서 이어짐) | 제출·답·응답 한 번 안의 스크립트 `advance` 요청 합이 `maxAdvancePerCall`(기본 10000, 호스트 값)을 넘으면 그 Flow를 실행 오류로 버림(간 틱과 효과는 남음). | 확인 |
 
 ## 숨긴 정보 (9절 미결 2, G196~G206)
 
-| # | 위치 | 상태 |
-|---|---|---|
-| [G196](gaps/hidden-info.md#g196) | 9절 미결 2 공개/비공개 정보 표현 (검증 시나리오 ②에서 이어짐) | 확인 |
-| [G197](gaps/hidden-info.md#g197) | G196 읽기 정책의 서명과 단위 | 확인 |
-| [G198](gaps/hidden-info.md#g198) | G196 거른 읽기에서 숨긴 것의 모습 | 확인 |
-| [G199](gaps/hidden-info.md#g199) | G196 거른 읽기의 모양과 상태 읽기의 범위 | 확인 |
-| [G200](gaps/hidden-info.md#g200) | G199 거른 읽기에서 열린 질문 | 확인 |
-| [G201](gaps/hidden-info.md#g201) | G199 거른 읽기에서 제출·답의 결과 | 확인 |
-| [G202](gaps/hidden-info.md#g202) | G199 거른 읽기에서 합법 수와 후보 | 확인 |
-| [G203](gaps/hidden-info.md#g203) | G197 보기 정책이 없거나 둘이거나 실패할 때 | 확인 |
-| [G204](gaps/hidden-info.md#g204) | G201 거른 결과에서 `cost`의 칸과 가진 양 | 확인 |
-| [G205](gaps/hidden-info.md#g205) | G199 거른 `Explain`에서 못 보는 근거를 보이는 방법 | 확인 |
-| [G206](gaps/hidden-info.md#g206) | G201 거른 읽기에서 `Advance` 결과의 `BlockedBy` | 확인 |
+| # | 위치 | 무엇을 정했나 | 상태 |
+|---|---|---|---|
+| [G196](gaps/hidden-info.md#g196) | 9절 미결 2 공개/비공개 정보 표현 (검증 시나리오 ②에서 이어짐) | 숨긴 정보는 모드가 순수 정책 함수 하나로 "누가 무엇을 보는가"를 선언하고 호스트가 보는 사람을 지정한 거른 읽기를 받음, 스크립트·전체 저장은 전부 봄, 보안에 쓸지는 호스트의 네트워크 방식. | 확인 |
+| [G197](gaps/hidden-info.md#g197) | G196 읽기 정책의 서명과 단위 | `@view_policy def may_see(issuer, entity, component)`(순수), 보는 사람은 issuer, 단위는 엔티티(`component=None`)와 컴포넌트 두 층, Def와 Def 상수는 엔티티 층을 따름. | 확인 |
+| [G198](gaps/hidden-info.md#g198) | G196 거른 읽기에서 숨긴 것의 모습 | 숨긴 엔티티는 목록·질의에 없고 숨긴 컴포넌트는 안 붙은 것처럼, 보이는 칸의 Ref가 숨긴 엔티티면 id 없는 "가려짐", Ref 목록·역방향에서는 빠짐, 숨긴 id로 읽으면 죽은 id와 똑같이 응답. | 확인 |
+| [G199](gaps/hidden-info.md#g199) | G196 거른 읽기의 모양과 상태 읽기의 범위 | 거른 읽기 전용 객체 `World.ViewAs(issuer)`(상태 읽기·목록·`Explain`을 거름), `World`의 기존 읽기는 전부 봄, 보이는 `derived` 값은 숨긴 칸으로 계산돼도 보임, 정책은 읽을 때마다 부름. | 확인 |
+| [G200](gaps/hidden-info.md#g200) | G199 거른 읽기에서 열린 질문 | `ViewAs(issuer).OpenRequests`는 그 연결이 답할 수 있는 질문만(`Who` 중 `may_act`가 참인 엔티티가 있으면), 질문 안의 값도 `may_see`로 거름. | 확인 |
+| [G201](gaps/hidden-info.md#g201) | G199 거른 읽기에서 제출·답의 결과 | 거른 결과는 `ViewAs(issuer).Show(result)`: 문구 인자의 숨긴 Ref는 "가려짐"(그 밖의 값은 모드가 쓴 대로), 반응 목록은 빠지고, 스크립트 오류·인자 거부는 코드·종류만 남기고 메시지 본문은 뺌. | 확인 |
+| [G202](gaps/hidden-info.md#g202) | G199 거른 읽기에서 합법 수와 후보 | `ViewAs(issuer).LegalMoves`·`Candidates`는 실제 상태로 평가한 뒤 못 보는 엔티티가 든 수·후보를 뺌(개수 상한과 `Truncated`는 거른 뒤), `Submit` 등은 거르지 않음. | 확인 |
+| [G203](gaps/hidden-info.md#g203) | G197 보기 정책이 없거나 둘이거나 실패할 때 | 보기 정책은 G124처럼(없으면 모두 보임, `requireViewPolicy`, 최대 하나, 교체는 `override=True`), `requireViewPolicy`를 켜면 입구 정책도 필수, 정책 오류나 bool 아닌 값은 "안 보임". | 확인 |
+| [G204](gaps/hidden-info.md#g204) | G201 거른 결과에서 `cost`의 칸과 가진 양 | `Show`에서 못 보는 칸의 `cost` 결과는 칸 이름 null·가진 양 `HiddenValue`, 필요한 양과 통과 여부는 그대로. | 확인 |
+| [G205](gaps/hidden-info.md#g205) | G199 거른 `Explain`에서 못 보는 근거를 보이는 방법 | 거른 `Explain`은 한 단계 안의 못 보는 읽기를 모두 빼고 그런 것이 있었으면 끝에 `Hidden` 근거 하나만, `query` 근거에서는 못 보는 엔티티가 빠짐, 값 자체는 보임. | 확인 |
+| [G206](gaps/hidden-info.md#g206) | G201 거른 읽기에서 `Advance` 결과의 `BlockedBy` | `ViewAs(issuer).Show(advanceResult)`는 틱·`Blocked`를 그대로 두고 `BlockedBy`는 답할 수 있는 질문만 거른 모양으로, 반응 목록은 빠짐. | 확인 |
