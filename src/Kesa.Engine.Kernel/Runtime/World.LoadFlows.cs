@@ -66,7 +66,7 @@ namespace Kesa.Engine.Runtime
                 var frameNodes = new List<JsonObject>();
                 foreach (var f in AsArray(Field(obj, "frames"), "frames").Items) frameNodes.Add(AsObject(f, "a frame"));
                 if (frameNodes.Count == 0) throw new JsonFormatException(where + " has no frames");
-                var frames = new List<PureEvaluator.Frame>();
+                var frames = new List<Frame>();
                 foreach (var f in frameNodes)
                 {
                     var fn = PausedFunction(f, where, problems);
@@ -220,7 +220,7 @@ namespace Kesa.Engine.Runtime
         /// 람다 목록. 람다 식은 (든 함수, 순서 번호)로 다시 찾고 잡은 사전은 프레임이나 묶음의 것을 잇는다.
         /// 람다를 찾을 수 없으면 문제로 적고 null.
         /// </summary>
-        private List<ClosureValue>? RestoreClosures(JsonArray saved, List<PureEvaluator.Frame> frames,
+        private List<ClosureValue>? RestoreClosures(JsonArray saved, List<Frame> frames,
             List<LocalTable> envs, string where, LoadProblems problems)
         {
             var closures = new List<ClosureValue>();
@@ -299,7 +299,7 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>빈 프레임에 지역 변수와 블록을 채운다. 멈춘 자리가 본문에 없으면 문제로 적고 null.</summary>
-        private PureEvaluator.Frame? RestoreFrame(PureEvaluator.Frame frame, JsonObject obj, string where, LoadProblems problems)
+        private Frame? RestoreFrame(Frame frame, JsonObject obj, string where, LoadProblems problems)
         {
             var fn = frame.Function;
             string mod = fn.Mod;
@@ -317,8 +317,8 @@ namespace Kesa.Engine.Runtime
             {
                 var b = AsObject(blocks[i], "a block");
                 long next = Long(Field(b, "next"), "a block position");
-                PureEvaluator.Block block;
-                if (i == 0) block = new PureEvaluator.Block(fn.Definition!.Body);
+                Block block;
+                if (i == 0) block = new Block(fn.Definition!.Body);
                 else
                 {
                     switch (Opener(frame.Blocks[i - 1]))
@@ -330,10 +330,10 @@ namespace Kesa.Engine.Runtime
                                 problems.Add(changed);
                                 return null;
                             }
-                            block = new PureEvaluator.Block(branch == ifs.Branches.Count ? ifs.OrElse! : ifs.Branches[(int)branch].Body);
+                            block = new Block(branch == ifs.Branches.Count ? ifs.OrElse! : ifs.Branches[(int)branch].Body);
                             break;
                         case ForStmt loop:
-                            block = new PureEvaluator.Block(loop.Body) { Loop = loop };
+                            block = new Block(loop.Body) { Loop = loop };
                             block.Index = Long(Field(b, "index"), "a loop index");
                             var range = b.Get("range");
                             if (range != null) block.Range = LoadRange(range);
@@ -351,7 +351,7 @@ namespace Kesa.Engine.Runtime
                                 throw new JsonFormatException("a loop index is out of range");
                             break;
                         case WhileStmt loop:
-                            block = new PureEvaluator.Block(loop.Body) { While = loop };
+                            block = new Block(loop.Body) { While = loop };
                             break;
                         default:
                             problems.Add(changed);

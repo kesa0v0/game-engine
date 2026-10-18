@@ -10,7 +10,11 @@ using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Runtime
 {
-    /// <summary>월드의 내부 저장 구조: 엔티티·줄 기록, 줄 키, Def별 컴포넌트 배치. 저장 방식은 약속이 아니다(S4).</summary>
+    /// <summary>
+    /// 월드의 내부 저장 구조: 엔티티·줄 기록, 줄 키, Def별 컴포넌트 배치. 저장 방식은 약속이 아니다(S4).
+    /// 이 타입들은 일부러 <see cref="World"/>의 private 안쪽 타입으로 둔다: 바깥으로 빼면 커널 어디서나 저장 구조를 만질 수 있게 되고,
+    /// 저장 구조는 백본 ECS화 때 저장 인터페이스와 함께 다시 짠다(G226, 2026-10-18 파일 정리에서 정함).
+    /// </summary>
     public sealed partial class World
     {
         // ---- 저장 구조 ----

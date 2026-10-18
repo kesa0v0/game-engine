@@ -36,6 +36,14 @@ namespace Kesa.Engine.Script
             public ExprNode Node { get; }
         }
 
+        /// <summary><see cref="Session"/>이 식을 실행할 때 쓰는 그 식의 실행 노드 (노드 타입은 이 클래스 안에 둔다).</summary>
+        internal static ExprNode NodeFor(Expr expr, FrameLayout layout) => NodeBuilder.For(expr, layout);
+
+        /// <summary>문장 수준 호출의 부를 것과 인자 (식 안의 호출과 같은 실행 노드로 계산한다).</summary>
+        internal static Value CallParts(CallExpr call, Session s, Frame f,
+            out Value[] positional, out IReadOnlyDictionary<string, Value> keywords) =>
+            ((CallNode)NodeBuilder.For(call, f.Layout)).Parts(s, f, out positional, out keywords);
+
         /// <summary>식을 칸 배치에서 실행 노드로 만든다 (풀기 결과 → 실행 노드).</summary>
         private static class NodeBuilder
         {

@@ -64,9 +64,9 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         private sealed class FlowWriter
         {
-            public FlowWriter(List<PureEvaluator.Frame> frames) => Frames = frames;
+            public FlowWriter(List<Frame> frames) => Frames = frames;
 
-            public List<PureEvaluator.Frame> Frames { get; }
+            public List<Frame> Frames { get; }
             public Dictionary<ClosureValue, int> ClosureIds { get; } = new Dictionary<ClosureValue, int>();
             public JsonArray Closures { get; } = new JsonArray();
             public Dictionary<IReadOnlyDictionary<string, Value>, int> EnvIds { get; } =
@@ -191,7 +191,7 @@ namespace Kesa.Engine.Runtime
                     : (JsonNode)JsonNull.Instance);
         }
 
-        private JsonObject SaveFrame(PureEvaluator.Frame frame, FlowWriter writer)
+        private JsonObject SaveFrame(Frame frame, FlowWriter writer)
         {
             var fn = frame.Function;
             if (fn.Definition == null)
@@ -257,7 +257,7 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>블록을 연 문장 (블록이 방금 실행한 문장). 아직 아무것도 실행하지 않았으면 null.</summary>
-        private static Stmt? Opener(PureEvaluator.Block block) => block.Next >= 1 ? block.Body[block.Next - 1] : null;
+        private static Stmt? Opener(Block block) => block.Next >= 1 ? block.Body[block.Next - 1] : null;
 
         /// <summary><c>if</c>의 몇 번째 갈래인가. <c>else</c>는 갈래 수와 같은 번호다. 아니면 -1.</summary>
         private static int BranchOf(IfStmt ifs, IReadOnlyList<Stmt> body)
@@ -292,14 +292,14 @@ namespace Kesa.Engine.Runtime
         /// <summary>Flow를 만든 입구(커맨드나 핸들러)의 위치: 맨 아래 프레임의 부른 위치다.</summary>
         private SourceSpan EntrySpan(string id, bool handler) => handler ? _handlerById[id].Span : _commands[id].Span;
 
-        private bool Relink(SourceSpan entry, List<PureEvaluator.Frame> frames, out string? answerTo, bool check)
+        private bool Relink(SourceSpan entry, List<Frame> frames, out string? answerTo, bool check)
         {
             answerTo = null;
             for (int i = 0; i < frames.Count; i++)
             {
                 var frame = frames[i];
                 SourceSpan site;
-                var result = PureEvaluator.ResultTo.Discard;
+                var result = ResultTo.Discard;
                 string? resultName = null;
                 bool writable;
                 if (i == 0)
@@ -317,7 +317,7 @@ namespace Kesa.Engine.Runtime
                         return false;
                     }
                     site = call.Span;
-                    if (resultName != null) result = PureEvaluator.ResultTo.Local;
+                    if (resultName != null) result = ResultTo.Local;
                     writable = caller.Writable && frame.Function.Writes;
                 }
 
