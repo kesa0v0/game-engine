@@ -479,3 +479,14 @@ spine-spec 7절의 적합성 기준 C1~C10과 검증 시나리오 ①~④는 거
 - 저장 접근이 `World.cs`·`World.Derived.cs`·`World.Save.cs`·`World.Commands.cs`·`World.Explain.cs` 다섯 파일에 있다. 저장소 인터페이스는 아직 없다(spec P6은 "인터페이스 뒤 격리"). 단순 맵 교체는 쉽지만 컴포넌트별 배열로 가려면 값 표현·undo·역방향 색인·저장 불러오기를 함께 건드려야 한다.
 - 벤치가 아직 없어 병목이 저장인지 인터프리터인지 모른다. 저장을 바꾸기 전에 임시 벤치(엔티티 N개를 `tick`에서 갱신)로 먼저 재고, 저장이 병목이면 인터페이스 추출 → 교체 순으로 한다.
 - (2026-10-18 덧붙임) 벤치(G223)가 생겼고 병목은 인터프리터였다(`--shapes`에서 70~100%). G226으로 줄인 뒤에도 남은 큰 몫은 실행기다. 저장(열 저장)은 값 구조체화와 함께 맨 끝에 하기로 했다(G226).
+
+## 문서와 큰 파일 정리 (2026-10-18~19)
+
+문서가 너무 길어졌다(2026-10-18 기준 `spec-gaps.md` 300KB·234줄로 표 한 행이 수천 자, `handoff.md` 120KB). 큰 소스 파일은 `Script/Execution/PureEvaluator.cs` 1506줄, `Script/Parser.cs` 1214줄, `Runtime/World.cs` 1199줄, `Runtime/World.SaveFlows.cs` 1067줄, `Script/Interpreter.cs` 985줄, `Runtime/World.Flows.cs` 937줄, `Loading/ContentLoader.cs` 921줄, 테스트 `Runtime/TimeTests.cs` 1016줄이었다. 동작은 바꾸지 않았으므로 테스트 전체 통과(1919개)로 확인했다.
+
+- **문서:** handoff를 현재 상태(`handoff.md`, 약 12KB)와 지난 기록(이 문서)으로 나눴다. spec-gaps는 색인(`docs/spec-gaps.md`)과 영역 파일(`docs/gaps/`, 내용 그대로 옮김, 칸마다 대조함)로 나눴고, 색인 영역 표에 "무엇을 정했나" 요약 칸을 226행 모두 채웠다(요약은 "어떻게 정했나"를 줄이기만).
+- **큰 소스 파일, 두 단계:** 1단계는 partial 파일로 크게 나누기(코드는 옮기기만, 줄 대조와 테스트로 확인), 2단계는 나눈 파일 안의 논리적 덩어리를 제자리 타입으로 구조화. 저장 구조를 인터페이스 뒤로 옮기는 일은 G226대로 맨 끝이라 앞당기지 않았다.
+- **1단계(커밋 `d799448`):** World.cs → +Rows·Values·Records, PureEvaluator.cs의 `Session` → +Calls·Preconditions·Stepping, Parser.cs → +Compound·Expressions, World.SaveFlows.cs → +LoadFlows, Interpreter.cs → +Declarations, World.Flows.cs → +Ask, ContentLoader.cs → +Mods·Build, 테스트 TimeTests → +Stale, ContentLoaderTests → +Registration. 바뀐 코드는 `partial` 수식어뿐이다.
+- **2단계 ①(커밋 `b080041`):** 동작 클래스 파일에 얹힌 공개 타입 21개(`Request`·`AnswerResult`·`SubmitResult`·`Reaction`·`ExplainNode`·`WorldView`·`ScriptError`·`ModScope`·`ContentLoadResult`·`ScopeGlobals` 등)를 제 파일로 옮겼다. 규칙은 CLAUDE.md "파일 배치".
+- **2단계 ②(커밋 `7301b1b`):** PureEvaluator의 안쪽 `Session`(Session.cs·.Calls·.Preconditions·.Stepping)·`Frame`(`ResultTo` 포함)·`Block`·`NameSite`를 같은 이름 공간의 제 파일로 뺐다. 넓힌 것은 `PureEvaluator.Globals`(새 internal 속성)·`LayoutOf`·`BareLambdaLayout`·`NameSite`의 접근과 노드 창구 `NodeFor`·`CallParts`(노드 타입은 private 그대로). `CallNode`를 internal로 넓히는 길은 접근성 불일치가 노드 타입 전체로 번져 되돌렸다. `PureEvaluator.Suspended`는 이름이 뜻을 전하므로 안쪽에 남겼다. World의 기록 타입과 ContentLoader의 `ModUnit`은 private 구현이라 안쪽에 두기로 했다(이유는 World.Records.cs 머리 주석).
+- **handoff "남은 일" 점검(2026-10-19):** 16개 항목을 코드와 문서에 대조해 끝난 것(로직용 `.pyi`, G32 spec 반영, `derived` 안의 `query`, `require` 뒤 좁히기, 커맨드를 함수로 부르기, 이 정리)을 지우고 번호를 새로 매겼다. 스텁 이름 충돌은 재현했다(멤버 `self`·`id`, 타입 이름 `Mod`가 겹쳐도 `engine check`는 오류 0개). 옛 번호를 가리키던 spec-gaps의 G207·G118·G117·G100 글도 고쳤다(이 문서의 옛 기록은 그대로 둠). 진단 코드 체계 G6은 코드 전체가 이미 따르므로 사용자 동의로 `확인`으로 올렸다.

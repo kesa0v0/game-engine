@@ -71,7 +71,7 @@
 | [G82](gaps/S1-loading.md#g82) | S1 `.pyi` 스텁: 매니페스트와 스키마 파일 (G72·G81 보강) | `schema/` 폴더가 있으면 `<모드>/schema/__builtins__.pyi`에 스키마 스텁(`deftype`·`const` 등의 느슨한 선언)을 더 씀(pyright는 가장 가까운 상위 폴더의 것을 씀). | 확인 |
 | [G83](gaps/S1-loading.md#g83) | S1 비활성화된 모드의 `.pyi` 스텁 (G81의 열린 점, G49 보강) | 스텁은 로드된 모드는 최종 결과로, ③~⑥에서 비활성화된 모드는 첫 회차 결과(`FirstRound`)로 만들어 머리에 실패 줄을 붙이고, ②에서 실패한 모드는 기존 스텁을 두거나 최소 스텁, 매니페스트를 읽은 모든 모드에 씀. | 확인 |
 | [G94](gaps/S1-loading.md#g94) | S1 ⑥·S4 Def가 적은 `keys="listed"` 줄의 필수 칸 (G93 보강) | Def가 적은 `keys="listed"` 줄에 필수 Ref가 있거나 기본값 없는 `field`를 안 적었으면 ⑥의 `VAL001`(`optional=True`·`AddRow`·기본값 안내), 책임은 줄을 적은 모드. | 확인 |
-| [G207](gaps/S1-loading.md#g207) | 로직용 `.pyi`(handoff 남은 일 2)에서 `Ref[T]`와 엔티티 타입 | 로직용 스텁: 같은 클래스가 생성자와 엔티티 읽기 속성을 겸함(`type Ref[T] = T`, 늘 붙은 컴포넌트는 그대로, 그 밖은 None 가능, `derived`는 읽기 전용), 기준은 엔진이 받는 파일에서 pyright 오류 0개. | 확인 |
+| [G207](gaps/S1-loading.md#g207) | 로직용 `.pyi`에서 `Ref[T]`와 엔티티 타입 | 로직용 스텁: 같은 클래스가 생성자와 엔티티 읽기 속성을 겸함(`type Ref[T] = T`, 늘 붙은 컴포넌트는 그대로, 그 밖은 None 가능, `derived`는 읽기 전용), 기준은 엔진이 받는 파일에서 pyright 오류 0개. | 확인 |
 | [G208](gaps/S1-loading.md#g208) | G207 로직용 스텁에서 None일 수 있는 값을 확인 없이 읽을 때 | `engine stubs`가 만드는 `pyrightconfig.json`에서 "None일 수 있음" 계열을 경고로 낮춤(설정 파일이 이미 있으면 그대로). | 확인 |
 | [G209](gaps/S1-loading.md#g209) | G82 스키마 스텁에 컴포넌트·Def 타입 이름이 없음 | 스키마 스텁도 모드마다 `GenerateSchema(모드 id, 로드 결과)`로, 그 모드가 보는 컴포넌트·Def 타입 클래스를 더함(타입 자리의 `fixed`·`TextKey`는 `int`·`float` 합과 `str`). | 확인 |
 | [G213](gaps/S1-loading.md#g213) | S1 ① 파일 이름의 유니코드 정규화 (G7 보강) | 파일 경로는 NFC로 다루고 디스크의 실제 이름은 열 때만 씀, 한 폴더에 NFC로 같은 이름이 둘이면 `use`는 `MOD002`·`use_all`은 `LOD001`, 모드 폴더 이름은 그대로. | 확인 |
@@ -194,7 +194,7 @@
 | [G114](gaps/S6-commands.md#g114) | S6 커맨드 매개변수의 타입 (S6 열린 질문 “매개변수 타입의 표현 범위”) | 커맨드 매개변수는 어노테이션 필수, 허용 타입은 `int`·`fixed`·`bool`·`str`·`Ref[X]`·`DefId[X]`·`list[T]`·`dict[K, V]`와 "T 또는 None"(따옴표 있든 없든). | 확인 |
 | [G115](gaps/S6-commands.md#g115) | S6·C7 제출된 인자가 매개변수 타입에 맞지 않을 때 | 인자 문제는 예외가 아니라 구조화된 거절(매개변수 이름·위치·사유 종류·기대 타입), 하나라도 있으면 사전 조건은 평가 안 함, `fixed` 자리의 `int`는 올려 받음, 없는 커맨드 id만 예외. | 확인 |
 | [G116](gaps/S6-commands.md#g116) | S6 커맨드 매개변수의 기본값 (spec “타입 있는 매개변수(기본값 포함)”) | 커맨드 매개변수 기본값은 리터럴만(로드 때 타입 대조, `Ref`는 None만, `DefId`는 ⑤ 규칙), 제출 때 빠진 인자를 채우고 로그에는 채운 전체 인자. | 확인 |
-| [G118](gaps/S6-commands.md#g118) | S6 커맨드를 로직에서 일반 함수처럼 쓰기 (handoff 남은 일 14) | 로직에서 커맨드 이름을 부르거나 값으로 쓰면 로드 오류(`CMD004`), 함수 자리에도 못 둠, 커맨드는 제출로만 실행. | 확인 |
+| [G118](gaps/S6-commands.md#g118) | S6 커맨드를 로직에서 일반 함수처럼 쓰기 | 로직에서 커맨드 이름을 부르거나 값으로 쓰면 로드 오류(`CMD004`), 함수 자리에도 못 둠, 커맨드는 제출로만 실행. | 확인 |
 | [G119](gaps/S6-commands.md#g119) | S6 제출자(issuer)와 S2 `me`의 관계 (S2 `me` ❓의 일부) | issuer는 "어느 연결에서 왔나"이고 행동하는 진영이 아님(`me.Points` 같은 표기는 틀림), 나머지는 이어서 정함. | 확인 |
 | [G121](gaps/S6-commands.md#g121) | S6 입구(②): “연결 A가 진영 P를 조종해도 되는가”의 자료와 검사는 어디에 있는가 | 담당 정보는 게임 상태 안의 모드 데이터(커널 개념 아님), 커널은 issuer를 불투명한 꼬리표로 받고 입구에서 모드의 검사를 부를 자리만 엶. | 확인 |
 | [G122](gaps/S6-commands.md#g122) | S6 입구(②)에서 모드가 정한 검사를 부르는 자리의 모양 (G121) | 커맨드는 "누구로서"를 `acts_for`(순수 함수)로 선언하고 담당 모드는 정책 함수 `may_act(issuer, target)`을 선언, 입구가 전제 조건보다 먼저 검사, 소유 검사는 전제 조건의 `require`. | 확인 |
@@ -235,7 +235,7 @@
 | # | 위치 | 무엇을 정했나 | 상태 |
 |---|---|---|---|
 | [G5](gaps/S9-diagnostics.md#g5) | S9 진단 | 진단 위치: 줄·열은 1부터(열은 UTF-16 코드 단위), 줄 0·열 0은 파일 전체, 경로는 모드 루트 기준 `/`, BOM 무시, 진단은 (파일, 줄, 열, 코드, 메시지) 순 정렬. | 잠정 |
-| [G6](gaps/S9-diagnostics.md#g6) | S9 진단 코드 | 진단 코드는 영역 접두사 + 세 자리(`LEX`·`PAR`·`MOD` …), 영역은 단계가 늘 때 추가(잠정). | 잠정 |
+| [G6](gaps/S9-diagnostics.md#g6) | S9 진단 코드 | 진단 코드는 영역 접두사 + 세 자리(`LEX`·`PAR`·`MOD` …), 영역은 단계가 늘 때 추가. | 확인 |
 | [G75](gaps/S9-diagnostics.md#g75) | S9 `check` 출력 스키마 | `check` JSON은 한 객체(`version`·`ok`·`counts`·`mods`·`diagnostics`), 진단 키는 항상 있고 키 순서·들여쓰기 고정, 라이브러리 없이 `CheckReport.ToJson`으로. | 확인 |
 | [G76](gaps/S9-diagnostics.md#g76) | S9 최종 Def 덤프 (“왜?” 도구 1) | 최종 Def 덤프는 `check`와 같은 JSON으로 `abstract` 포함 모든 Def를 등록 순서로, 값마다 `value`·`origin`·`source`·`patches`, `fixed`는 문자열, 실패한 패치는 넣지 않음. | 확인 |
 | [G78](gaps/S9-diagnostics.md#g78) | S9 `engine check`의 종료 코드 | 종료 코드: 0 오류 없음(경고만 있어도), 1 콘텐츠 오류, 2 사용법·환경 문제, 3 엔진 내부 예외, 0과 `ok`=true는 늘 같이. | 확인 |
