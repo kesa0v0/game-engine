@@ -1,0 +1,5 @@
+Party("Red")
+Party("Blue")
+Unit("Soldier", max_hp=10, attack=4, reach=1)
+Unit("Archer", max_hp=6, attack=3, reach=2)
+Game("Battle")

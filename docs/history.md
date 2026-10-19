@@ -539,3 +539,12 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **구현:** `ResolvedValue.Patches`(적용 순서). 물려받으면 그대로(`AsInherited`), 자식이 직접 적은 값은 빈 목록, `PatchApplier`의 통째 `set`은 그 패치 하나, `add`·`append`·`remove`·맵 항목 `set`은 그 전 값의 목록 뒤에, 패치로 붙인 컴포넌트·줄의 값은 그 패치. `InheritanceExpander`는 `merge="append"` 리스트면 부모 값의 목록을, `inherit` 식이면 `DeferredEvaluator.ReadPatches`(식이 읽은 부모 값들의 목록, 값마다 `ResetReads`)를 쓴다. `DefDump.ValueEntry`는 이 목록만 낸다. `PatchLog.ForField`(그 칸을 건드린 모든 패치)는 공개 API로 그대로 둔다.
 - **새 테스트:** `DefDumpTests` 3개(자식이 직접 적거나 통째 set한 값에는 부모 패치가 없음, 물려받은 값·`inherit` 식 위의 `add`는 부모 쪽 먼저 적용 순서로, `merge="append"` 리스트는 부모의 패치를 이음).
 - **확인:** 테스트 1958개 통과(커널 1922, CLI 36).
+
+## 텍스트 콘솔 호스트와 예시 게임 (2026-10-19)
+
+- **왜:** 남은 일보다 외부 연결이 급하다고 보고(handoff의 S10 논의 메모), 호스트 엔진이 미정이라 엔진 무관한 시험대부터 만들었다. 커널 API를 테스트 코드가 아니라 사람이 실제로 플레이하는 루프에서 써 보고 구멍을 찾는 것이 목적이다. 같은 레포에 둔다: 커널이 아직 배포되지 않고, 구멍을 고칠 때 커널과 호스트가 한 커밋으로 바뀐다. 실제 게임은 나중에 따로 레포를 둔다.
+- **예시 게임 `samples/skirmish`(모드 id `skirmish`):** 5×5 판, 빨강·파랑, 진영마다 병사 둘(체력 10, 공격 4, 사거리 1)과 궁수 하나(6, 3, 2). 자유 커맨드 `Start`가 판을 깔고 `while` 루프로 지금 진영에 `ask(p, "turn", responses=["Move", "Attack", "EndTurn"])`를 계속 묻는다(차례는 모드의 것, X2·U2). `Attack`은 공격을 `Combat`에 기록만 하고, 루프가 주사위(4 이상 명중)를 굴려 맞은 쪽 진영에 `ask(..., "hit", choices=["hold", "retreat"])`로 묻는다(후퇴하면 피해 절반, 공격자 반대쪽으로 한 칸). 입구 정책은 `Seat.conn == issuer`. 한 진영이 다 없어지면 `Match.winner`가 정해지고 Flow가 끝난다.
+- **콘솔 호스트 `src/Kesa.Engine.ConsoleHost`(실행 파일 `kesa-play`):** `kesa-play <mods-dir> --seat <conn>... [--seed N]`. 핫시트. 게임 지식 없이 공개 API만 쓴다: 상태는 스키마의 Def 타입·컴포넌트를 따라 모든 엔티티를 늘어놓고(`All`·`Has`·`Get`), 할 수 있는 것은 열린 질문의 선택지(`Answer`)와 응답 커맨드의 합법 수(`LegalMoves` → `Respond`), 자유 커맨드의 합법 수(`Submit`)를 번호로 보여 준다. 낼 수 있는 것이 없으면 끝난다. 종료 코드는 CLI처럼 0·1(콘텐츠 오류)·2(사용법). 월드는 `requireSubmitPolicy: true`.
+- **드러난 구멍(우회함, 결정 아님):** 응답 커맨드의 합법 수를 질문에 대해 물을 수 없음(호스트가 `acts_for` 람다 AST를 엶), 엔티티로 행동할 연결을 물을 수 없음(자리마다 내 보고 `GateDenied`면 넘김), 변경 구독 없음, 번역 없음, 자리 배정을 모드가 박아 둠, 응답 커맨드 안의 `ask`는 G139 제한으로 피함. handoff의 "콘솔 호스트에서 드러난 구멍".
+- **테스트:** `tests/Kesa.Engine.ConsoleHost.Tests`의 5개. 화면을 읽고 고르는 봇(맞으면 버팀, 공격 가능하면 공격, 아니면 가장 가까운 적 쪽으로 이동, 그다음 차례 넘김)이 한 판을 끝까지(시드 1: 21턴, 빨강 승) 돌림, 명중 질문을 파랑 자리가 답함, 같은 시드면 같은 화면·다른 시드면 다른 화면, 잘못된 번호는 다시 물음, 자리·폴더 없음은 사용법 오류.
+- **확인:** `engine check samples/skirmish` 오류 없음. 테스트 1963개 통과(커널 1922, CLI 36, 콘솔 호스트 5).
