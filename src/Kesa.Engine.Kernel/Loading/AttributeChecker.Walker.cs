@@ -19,8 +19,11 @@ namespace Kesa.Engine.Loading
             private readonly SchemaSet _schema;
             private readonly DefRegistry _defs;
             private readonly HashSet<string> _globals;
-            private readonly StageDiagnostics _stage;
+            private readonly StageDiagnostics? _stage;
             private readonly string _mod;
+
+            /// <summary>순환 검사(G229)면 자기 엔티티의 <c>derived</c> 읽기를 모으는 곳. 이때는 이름 오류를 내지 않는다(본 검사가 낸다).</summary>
+            private readonly DerivedReads? _reads;
 
             /// <summary>이번 바퀴에 지역 변수마다 대입한 값의 타입 (합친 것).</summary>
             private Dictionary<string, StaticType?> _assigned = new Dictionary<string, StaticType?>(StringComparer.Ordinal);
@@ -28,14 +31,19 @@ namespace Kesa.Engine.Loading
             /// <summary>마지막 바퀴인가: 이때만 오류를 낸다.</summary>
             private bool _report;
 
-            public Walker(SchemaSet schema, DefRegistry defs, HashSet<string> globals, StageDiagnostics stage, string mod)
+            public Walker(SchemaSet schema, DefRegistry defs, HashSet<string> globals, StageDiagnostics? stage, string mod,
+                DerivedReads? reads = null)
             {
                 _schema = schema;
                 _defs = defs;
                 _globals = globals;
                 _stage = stage;
                 _mod = mod;
+                _reads = reads;
             }
+
+            /// <summary>마지막 바퀴이고 이름 오류를 내는 검사인가.</summary>
+            private bool Reporting => _report && _reads == null;
 
             public void Function(FunctionValue function, IReadOnlyList<KeyValuePair<string, StaticType?>> parameters)
             {
@@ -213,14 +221,19 @@ namespace Kesa.Engine.Loading
                     candidate = Type(call.Arguments[0].Value, scope) as EntityType;
                 else
                     Type(call.Callee, scope);
+                var argTypes = new List<StaticType?>();
                 for (int i = candidate != null ? 1 : 0; i < call.Arguments.Count; i++)
                 {
                     var arg = call.Arguments[i];
                     if (candidate != null && arg.Name == FunctionChecker.WhereName && arg.Value is LambdaExpr where)
                         Lambda(where, scope, candidate);
                     else
-                        Type(arg.Value, scope);
+                        argTypes.Add(Type(arg.Value, scope));
                 }
+
+                // 순환 검사: 자기 엔티티를 넘겨받은 모드 함수도 읽는다 (helper(h))
+                if (_reads != null && _report && candidate == null && call.Callee is NameExpr fn && !scope.ContainsKey(fn.Name))
+                    _reads.Follow(_mod, fn.Name, call.Arguments, argTypes, call.Span);
 
                 if (builtin == PureBuiltins.QueryName) return new GroupType(new EntityType(QueriedType(call)));
                 if (builtin == PureBuiltins.SpawnName)
@@ -269,14 +282,14 @@ namespace Kesa.Engine.Loading
             private StaticType? EntityAttribute(EntityType entity, AttributeExpr attr)
             {
                 string name = attr.Name;
-                if (_schema.TryGetComponent(name, out var component)) return View(component, entity.Type);
+                if (_schema.TryGetComponent(name, out var component)) return View(component, entity.Type, entity.Self);
                 if (_schema.TryGetType(name, out var defType)) return new DefConstsType(defType);
                 foreach (var type in Owners(entity.Type))
                 foreach (var inverse in type.Inverses)
                     if (inverse.Name == name)
                         return new GroupType(new EntityType(null));
 
-                if (!_report) return StaticType.Unknown;
+                if (!Reporting) return StaticType.Unknown;
                 var candidates = new List<string>();
                 foreach (var type in Owners(entity.Type))
                 {
@@ -298,14 +311,19 @@ namespace Kesa.Engine.Loading
             {
                 string name = attr.Name;
                 var component = view.Component;
-                if (component.TryGetMember(name, out var member)) return FromType(member.Spec.Type, _schema);
-                if (name == "entity") return new EntityType(view.Owner);
+                if (component.TryGetMember(name, out var member))
+                {
+                    if (_reads != null && _report && view.Self && member.Kind == MemberKind.Derived)
+                        _reads.Add(component, member, attr.Span);
+                    return FromType(member.Spec.Type, _schema);
+                }
+                if (name == "entity") return new EntityType(view.Owner, view.Self);
                 if (name == "key" && view.Row)
                     return component.KeyKind == KeyKind.Entity ? new EntityType(component.Key) : StaticType.Unknown;
-                if (_schema.TryGetComponent(name, out var sibling)) return View(sibling, view.Owner);
+                if (_schema.TryGetComponent(name, out var sibling)) return View(sibling, view.Owner, view.Self);
                 if (_schema.TryGetType(name, out var defType)) return new DefConstsType(defType);
 
-                if (!_report) return StaticType.Unknown;
+                if (!Reporting) return StaticType.Unknown;
                 var candidates = new List<string> { "entity" };
                 if (view.Row) candidates.Add("key");
                 foreach (var m in component.Members) candidates.Add(m.Name);
@@ -326,15 +344,18 @@ namespace Kesa.Engine.Loading
                     if (decl.Name == attr.Name)
                         return FromType(decl.Spec.Type, _schema);
 
-                if (!_report) return StaticType.Unknown;
+                if (!Reporting) return StaticType.Unknown;
                 var names = new List<string>();
                 foreach (var decl in consts.Type.Consts) names.Add(decl.Name);
                 Error("Def type '" + consts.Type.Name + "' has no const '" + attr.Name + "'", attr, names, schemaNames: false);
                 return StaticType.Unknown;
             }
 
-            private static StaticType View(ComponentType component, DefType? owner) =>
-                component.IsKeyed ? new RowsType(component, owner) : (StaticType)new ComponentStatic(component, owner, false);
+            /// <summary>
+            /// 엔티티의 컴포넌트. 키 컴포넌트는 줄 묶음이고, 그 줄은 계산 중인 줄과 다를 수 있어 자기 것으로 치지 않는다(G229).
+            /// </summary>
+            private static StaticType View(ComponentType component, DefType? owner, bool self) =>
+                component.IsKeyed ? new RowsType(component, owner) : (StaticType)new ComponentStatic(component, owner, false, self);
 
             /// <summary>그 Def 타입 하나, 모르면 스키마의 모든 Def 타입.</summary>
             private IEnumerable<DefType> Owners(DefType? type) => type != null ? new[] { type } : (IEnumerable<DefType>)_schema.Types;
@@ -353,7 +374,7 @@ namespace Kesa.Engine.Loading
                     foreach (var t in _schema.Types) all.Add(t.Name);
                     hint = Suggest.Hint(attr.Name, all);
                 }
-                _stage.Error(_mod, Codes.EvlUnknownName, message, attr.Span, hint);
+                _stage!.Error(_mod, Codes.EvlUnknownName, message, attr.Span, hint);
             }
         }
     }

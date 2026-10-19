@@ -538,7 +538,16 @@ namespace Kesa.Engine.Runtime
                         {
                             string name = Text(tag.Value, "a builtin name");
                             if (Evaluator.Builtins.TryGetValue(name, out var builtin)) return builtin;
+                            // G230 전의 저장은 컴포넌트·신호 생성자도 builtin으로 적었다
+                            if (((WorldGlobals)Evaluator.Globals).SchemaValue(name) is { } old) return old;
                             problems.Add(where + ": the builtin '" + name + "' no longer exists");
+                            return NoneValue.Instance;
+                        }
+                        case "schema":
+                        {
+                            string name = Text(tag.Value, "a component or signal name");
+                            if (((WorldGlobals)Evaluator.Globals).SchemaValue(name) is { } constructor) return constructor;
+                            problems.Add(where + ": the component or signal '" + name + "' no longer exists");
                             return NoneValue.Instance;
                         }
                         case "host":

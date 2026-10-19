@@ -141,7 +141,39 @@ namespace Kesa.Engine.Runtime
         private StepMeter _derivedMeter => _derivedMeterStore ??= new StepMeter(_stepBudget);
 
         private PureEvaluator Evaluator =>
-            _evaluator ??= new PureEvaluator(new ScopeGlobals(_scopes), RuntimeBuiltins(), _stepBudget);
+            _evaluator ??= new PureEvaluator(new WorldGlobals(this), RuntimeBuiltins(), _stepBudget);
+
+        /// <summary>
+        /// 함수 본문의 전역 이름: 모드가 묶은 이름, 그다음 그 모드에 보이는 컴포넌트·신호 생성자 (G230). 내장은 그 뒤다
+        /// (<see cref="PureEvaluator"/>가 본다). 로드 때의 이름 검사(<c>ModScope.TryLookup</c>)와 같은 차례다.
+        /// </summary>
+        private sealed class WorldGlobals : IScriptGlobals
+        {
+            private readonly World _world;
+            private readonly SortedDictionary<string, KeyValuePair<string, Value>> _schemaNames =
+                new SortedDictionary<string, KeyValuePair<string, Value>>(StringComparer.Ordinal);
+
+            /// <summary>모드 정보가 없는 월드(테스트용 생성자)는 모든 스키마 이름이 보인다.</summary>
+            private readonly ModVisibility? _visibility;
+
+            public WorldGlobals(World world)
+            {
+                _world = world;
+                world.AddComponentConstructors(_schemaNames);
+                world.AddSignalConstructors(_schemaNames);
+                if (world._mods != null) _visibility = new ModVisibility(world._mods);
+            }
+
+            /// <summary>그 이름의 컴포넌트·신호 생성자 (보이는 범위를 따지지 않는다: 저장된 값을 되살릴 때).</summary>
+            public Value? SchemaValue(string name) => _schemaNames.TryGetValue(name, out var owned) ? owned.Value : null;
+
+            public Value? Lookup(string mod, string name)
+            {
+                if (_world._scopes.TryGetValue(mod, out var scope) && scope.TryGet(name, out var bound, out _)) return bound;
+                if (!_schemaNames.TryGetValue(name, out var owned)) return null;
+                return _visibility == null || _visibility.CanSee(mod, owned.Key) ? owned.Value : null;
+            }
+        }
 
         /// <summary>
         /// 함수를 실행한다. 가장 바깥 실행(<c>derived</c> 읽기나 생성 순간의 기본값 하나)이 예산 하나를 열고,

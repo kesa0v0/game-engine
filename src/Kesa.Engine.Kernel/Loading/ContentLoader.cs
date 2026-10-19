@@ -168,6 +168,7 @@ namespace Kesa.Engine.Loading
                 // mod_loaded: 설치되어 있고 지금까지 실패하지 않은 모드 (spec-gaps G8, G46)
                 var builtins = new DefBuiltins(schema, visibility, u.Manifest,
                     id => units.Exists(o => o.Manifest.Id == id && !o.Failed), u.Defs, u.Patches);
+                u.Scope.SetSchemaNames(builtins.SchemaName);
                 foreach (var file in u.DefFiles) Execute(u, file, builtins);
                 var hostNames = HostNamesFor(u, units, visibility, host);
                 CheckHostShadowing(u, hostNames);
@@ -224,6 +225,7 @@ namespace Kesa.Engine.Loading
                 var unit = u;
                 var builtins = new DefBuiltins(run.Schema, run.Visibility, u.Manifest,
                     id => units.Exists(o => o.Manifest.Id == id && !o.Failed), new List<DefRecord>(), new List<PatchCall>());
+                unit.Scope.SetSchemaNames(builtins.SchemaName);
                 environments[u.Manifest.Id] = new ModEnvironment(unit.Scope, builtins);
             }
             run.Expanded = InheritanceExpander.Expand(run.Defs, run.Schema, run.Visibility, mod => environments[mod], stage, run.Log, conflicted);

@@ -435,6 +435,9 @@ namespace Kesa.Engine.Runtime
                 case PureBuiltin b:
                     if (Evaluator.Builtins.TryGetValue(b.Name, out var builtin) && ReferenceEquals(builtin, b))
                         return Tag("builtin", new JsonString(b.Name));
+                    // 컴포넌트·신호 생성자는 내장과 이름이 같을 수 있어 따로 적는다 (G230)
+                    if (ReferenceEquals(((WorldGlobals)Evaluator.Globals).SchemaValue(b.Name), b))
+                        return Tag("schema", new JsonString(b.Name));
                     break;
                 case HostCallable host:
                     // 이름 문자열만 남긴다: C# 이름은 저장에 들어가지 않는다 (S7, G221)

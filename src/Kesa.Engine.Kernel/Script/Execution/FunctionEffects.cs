@@ -273,12 +273,12 @@ namespace Kesa.Engine.Script
             {
                 // 엔티티를 쓰는 호스트 함수도 같은 자리 규칙이다 (G216)
                 if (callee is AttributeExpr && HostNames.TryChain(callee, out var root, out var attributes) &&
-                    !locals.Contains(root.Name) && !_scope.TryGet(root.Name, out _, out _) && _hosts.IsRoot(root.Name))
+                    !locals.Contains(root.Name) && !_scope.TryLookup(root.Name, out _) && _hosts.IsRoot(root.Name))
                 {
                     var r = _hosts.Resolve(root.Name, attributes);
                     return r.Function != null && r.Used == attributes.Count && _hosts.IsWriting(r.Function) ? r.Function : null;
                 }
-                if (!(callee is NameExpr name) || locals.Contains(name.Name) || _scope.TryGet(name.Name, out _, out _))
+                if (!(callee is NameExpr name) || locals.Contains(name.Name) || _scope.TryLookup(name.Name, out _))
                     return null;
                 return PureBuiltins.IsWritingName(name.Name) ? name.Name : null;
             }
@@ -370,7 +370,7 @@ namespace Kesa.Engine.Script
                     case NameExpr name:
                         Resolve(name, locals); // 값으로 쓴 커맨드 이름을 기록한다 (G118)
                         // 덮어쓰지 않은 random을 쓰면 난수 함수다 (호출이든 값이든, G178)
-                        if (name.Name == PureBuiltins.RandomName && !locals.Contains(name.Name) && !_scope.TryGet(name.Name, out _, out _))
+                        if (name.Name == PureBuiltins.RandomName && !locals.Contains(name.Name) && !_scope.TryLookup(name.Name, out _))
                         {
                             if (_body.FirstRandom == null) _body.FirstRandom = name.Span;
                             if (_inPreconditions) _body.PreconditionRandom.Add(name.Span);

@@ -197,6 +197,14 @@ namespace Kesa.Engine.Loading
             }
         }
 
+        /// <summary>이 모드에 보이는 컴포넌트·신호 이름의 값 (모드 이름 공간의 스키마 칸, G230). 아니면 null.</summary>
+        public Value? SchemaName(string name)
+        {
+            if (_schema.TryGetComponent(name, out var c) && _visibility.CanSee(_mod, c.Mod)) return new ComponentConstructor(c);
+            if (_schema.TryGetSignal(name, out var s) && _visibility.CanSee(_mod, s.Mod)) return new SignalName(s);
+            return null;
+        }
+
         public bool IsVisibleRuntimeSchemaName(string name) =>
             (_schema.TryGetComponent(name, out var c) && _visibility.CanSee(_mod, c.Mod)) ||
             (_schema.TryGetSignal(name, out var s) && _visibility.CanSee(_mod, s.Mod));

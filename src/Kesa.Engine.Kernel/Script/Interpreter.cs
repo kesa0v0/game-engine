@@ -230,7 +230,7 @@ namespace Kesa.Engine.Script
         /// 이 이름이 아직 내장의 뜻인가. 엔진이 주는 이름은 덮어쓸 수 있는 내장이라 (spec-gaps G112), 모드가 그 이름을
         /// 묶은 뒤로는 그 모드 안에서 모드의 값이다 (파이썬의 builtins와 같다).
         /// </summary>
-        private bool IsBuiltin(string name) => !_scope.TryGet(name, out _, out _);
+        private bool IsBuiltin(string name) => !_scope.TryLookup(name, out _);
 
         /// <summary>식 안의 <c>inherit</c>가 내장의 뜻인가 (모드가 <c>inherit</c>를 묶었으면 평범한 이름이다, G112).</summary>
         private bool UsesInherit(Expr expr) => IsBuiltin(InheritName) && ContainsInherit(expr);
@@ -329,7 +329,7 @@ namespace Kesa.Engine.Script
 
         private Value Lookup(NameExpr name)
         {
-            if (_scope.TryGet(name.Name, out var value, out _)) return value;
+            if (_scope.TryLookup(name.Name, out var value)) return value;
             var builtin = _builtins.Lookup(name.Name);
             if (builtin != null) return builtin;
 

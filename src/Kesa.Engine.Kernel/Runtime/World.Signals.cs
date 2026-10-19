@@ -25,20 +25,20 @@ namespace Kesa.Engine.Runtime
             // emit(Damaged(...)): 쓰는 내장이라 쓰기 모드 프레임의 문장으로만 불린다 (G146)
             table.Add(PureBuiltins.EmitName,
                 new PureBuiltin(PureBuiltins.EmitName, (p, k) => Guard(() => Emit(p, k))) { Writes = true });
+        }
 
-            // 이름 검사(G108)가 그 모드에 보이는 신호만 통과시킨다
+        /// <summary>신호 값 생성자: 컴포넌트 생성자와 같은 스키마 이름 칸이다 (G230).</summary>
+        private void AddSignalConstructors(SortedDictionary<string, KeyValuePair<string, Value>> names)
+        {
             foreach (var signal in _schema.Signals)
             {
                 var s = signal;
-                if (table.ContainsKey(s.Name)) continue; // 내장과 같은 이름의 신호는 생성자로 쓸 수 없다
-                if (EngineSignals.IsEngine(s.Name))
-                {
+                Value constructor = EngineSignals.IsEngine(s.Name)
                     // 엔진 신호의 값은 엔진만 만든다. 이름이 적힌 호출은 로드 때 잡히고, 함수 값을 거친 길은 여기서 막는다 (G156)
-                    table.Add(s.Name, new PureBuiltin(s.Name, (p, k) =>
-                        throw new ScriptRuntimeException(Codes.RunScript, EngineSignals.Why(s.Name))));
-                    continue;
-                }
-                table.Add(s.Name, new PureBuiltin(s.Name, (p, k) => ConstructSignal(s, p, k)));
+                    ? new PureBuiltin(s.Name, (p, k) => throw new ScriptRuntimeException(Codes.RunScript, EngineSignals.Why(s.Name)))
+                    : new PureBuiltin(s.Name, (p, k) => ConstructSignal(s, p, k));
+                // 컴포넌트와 신호는 이름을 함께 쓴다 (스키마의 이름 겹침 검사)
+                if (!names.ContainsKey(s.Name)) names.Add(s.Name, new KeyValuePair<string, Value>(s.Mod, constructor));
             }
         }
 

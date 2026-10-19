@@ -706,7 +706,7 @@
 
 **어떻게 정했나:** pyright는 파일에서 가장 가까운 상위 폴더의 `__builtins__.pyi`를 쓴다(실험). 그래서 `engine stubs`는 모드에 `schema/` 폴더가 있으면 `<모드>/schema/__builtins__.pyi`에 **스키마 스텁**을 더 쓴다. 스키마 안의 이름은 문자열이라 내용은 모드와 무관하고 생성은 순수 함수 `StubGenerator.GenerateSchema()`다. 모양: `deftype`·`component`·`extend`는 이름을 위치 전용 `str`로, `components`는 `list[str]`, 멤버는 `**members: MemberDecl`로 받는다. `const`·`field`·`derived`·`ref`는 불투명한 `MemberDecl`을 돌려주고 옵션 이름과 `merge`·`keys`의 `Literal` 값을 낸다. 타입 자리는 `Any`이고 `fixed`·`TextKey`·`Ref`·`DefId`·`Cond`·`Action`도 `Any`다(`int`·`str`·`bool`·`list`·`dict`는 파이썬 것). 모드 루트의 스텁에는 매니페스트 이름 `Mod`(키워드 전용, `id` 필수)·`use`·`use_all`을 더한다. **알려진 한계:** 매니페스트 이름이 Def 파일에도 보인다(엔진이 오류로 잡음). Def 타입·컴포넌트 이름이 `Mod`·`use` 등과 같으면 스텁 안에서 겹친다(예약 이름 문제와 함께 처리).
 
-**이유:** 거짓 오류는 스텁 전체를 불신하게 만든다. 타입 표기의 세부 검사는 엔진이 하므로 G72처럼 느슨하게 두되, `MemberDecl` 덕분에 `const(...)`를 빠뜨린 멤버와 옵션 오타를 편집기가 잡는다. `mod.py`는 모드 폴더 바로 아래라 Def 파일과 같은 스텁을 쓸 수밖에 없다.
+**이유:** 거짓 오류는 스텁 전체를 불신하게 만든다. 타입 표기의 세부 검사는 엔진이 하므로 G72처럼 느슨하게 두되, `MemberDecl` 덕분에 `const(...)`를 빠뜨린 멤버와 옵션 오타를 편집기가 잡는다. `mod.py`는 모드 폴더 바로 아래라 Def 파일과 같은 스텁을 쓸 수밖에 없다. (G230, 알려진 한계) 그래서 모드가 보는 컴포넌트·신호 이름이 `Mod`·`use`·`use_all`이면 스텁에서는 컴포넌트가 이기고 `mod.py`의 그 호출은 편집기에서 거짓 오류다(엔진의 매니페스트 읽기는 따로라 영향 없음).
 
 **상태:** 확인
 

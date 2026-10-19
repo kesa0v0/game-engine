@@ -296,9 +296,13 @@ namespace Kesa.Engine.Script
             if ((name == CommandName || name == SubmitPolicyName || name == ViewPolicyName || name == OnName || name == WhenName) &&
                 !IsBuiltin(name))
             {
+                bool schema = _scope.IsSchemaName(name);
                 _context.Error(Codes.CmdBadDecorator,
-                    "this mod defines its own '" + name + "', so the built-in @" + name + " cannot be used here",
-                    decorator.Span, hint: "rename this mod's '" + name + "' (spec-gaps G112)");
+                    (schema ? "this mod sees a component or signal named '" : "this mod defines its own '") + name +
+                    "', so the built-in @" + name + " cannot be used here",
+                    decorator.Span, hint: schema
+                        ? "rename that component or signal (spec-gaps G230)"
+                        : "rename this mod's '" + name + "' (spec-gaps G112)");
                 return;
             }
 

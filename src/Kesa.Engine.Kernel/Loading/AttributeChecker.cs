@@ -40,8 +40,7 @@ namespace Kesa.Engine.Loading
 
             foreach (var mod in mods)
             {
-                var globals = new HashSet<string>(mod.Scope.Names, StringComparer.Ordinal);
-                globals.UnionWith(mod.Functions.TopLevelNames);
+                var globals = Globals(mod, schema);
                 foreach (var function in mod.Functions.Functions)
                 {
                     var parameters = new List<KeyValuePair<string, StaticType?>>();
@@ -55,9 +54,23 @@ namespace Kesa.Engine.Loading
                     new Walker(schema, defs, globals, stage, function.Mod).Function(function, parameters);
                 }
             }
+
+            CheckDerivedCycles(mods, defs, schema, stage);
         }
 
         private static object Node(FunctionValue function) => (object?)function.Definition ?? function.Lambda!;
+
+        /// <summary>같은 이름의 내장을 가리는 이름: 모드가 묶은 이름과 이 모드에 보이는 컴포넌트·신호 이름 (G112·G230).</summary>
+        private static HashSet<string> Globals(ModCode mod, SchemaSet schema)
+        {
+            var globals = new HashSet<string>(mod.Scope.Names, StringComparer.Ordinal);
+            globals.UnionWith(mod.Functions.TopLevelNames);
+            foreach (var c in schema.Components)
+                if (mod.Scope.IsSchemaName(c.Name)) globals.Add(c.Name);
+            foreach (var s in schema.Signals)
+                if (!EngineSignals.IsEngine(s.Name) && mod.Scope.IsSchemaName(s.Name)) globals.Add(s.Name);
+            return globals;
+        }
 
         // ---- 문맥: 매개변수 타입을 정해 주는 자리 ----
 

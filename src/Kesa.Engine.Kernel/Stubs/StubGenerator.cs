@@ -315,8 +315,16 @@ namespace Kesa.Engine.Stubs
                 Line();
 
                 WriteClasses();
+                var schemaNames = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var c in _schema.Components)
+                    if (Sees(c.Mod)) schemaNames.Add(c.Name);
                 foreach (var s in _schema.Signals)
-                    if (Sees(s.Mod)) WriteSignal(s);
+                {
+                    if (!Sees(s.Mod)) continue;
+                    WriteSignal(s);
+                    schemaNames.Add(s.Name);
+                }
+                int builtins = _out.Length;
 
                 WritePatch();
                 WriteModLoaded();
@@ -327,7 +335,58 @@ namespace Kesa.Engine.Stubs
                 WriteEntityLookups();
                 // mod.py는 모드 폴더 바로 아래라 이 스텁을 같이 쓴다 (spec-gaps G82)
                 _out.Append(ManifestNames);
-                return _out.ToString();
+                // 보이는 컴포넌트·신호 이름은 엔진 내장을 이긴다 (G230): 같은 이름의 내장 선언은 뺀다.
+                // 컴포넌트 Mod면 mod.py의 Mod(...)는 그 컴포넌트로 검사된다 (G82의 한계)
+                string tail = _out.ToString(builtins, _out.Length - builtins);
+                return _out.ToString(0, builtins) + WithoutNames(tail, schemaNames);
+            }
+
+            /// <summary>
+            /// 맨 위 선언 중 이름이 <paramref name="names"/>에 있는 것을 뺀다: 그 앞의 데코레이터 줄과 뒤의 들여 쓴 줄까지.
+            /// 맨 위 선언은 <c>def 이름</c>, <c>class 이름</c>, <c>type 이름</c>, <c>이름: 타입</c>이다.
+            /// </summary>
+            private static string WithoutNames(string text, HashSet<string> names)
+            {
+                if (names.Count == 0) return text;
+                var kept = new StringBuilder();
+                var decorators = new List<string>();
+                bool skipping = false;
+                var lines = text.Split('\n');
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    string line = lines[i];
+                    string end = i == lines.Length - 1 ? "" : "\n";
+                    if (line.StartsWith("@", StringComparison.Ordinal))
+                    {
+                        decorators.Add(line + end);
+                        continue;
+                    }
+                    if (line.Length > 0 && line[0] != ' ')
+                    {
+                        skipping = names.Contains(DeclaredName(line));
+                        if (!skipping)
+                            foreach (var d in decorators) kept.Append(d);
+                        decorators.Clear();
+                        if (!skipping) kept.Append(line).Append(end);
+                        continue;
+                    }
+                    if (line.Length == 0) skipping = false;
+                    if (!skipping) kept.Append(line).Append(end);
+                }
+                return kept.ToString();
+            }
+
+            private static string DeclaredName(string line)
+            {
+                foreach (var keyword in new[] { "def ", "class ", "type " })
+                    if (line.StartsWith(keyword, StringComparison.Ordinal))
+                    {
+                        line = line.Substring(keyword.Length);
+                        break;
+                    }
+                int n = 0;
+                while (n < line.Length && (char.IsLetterOrDigit(line[n]) || line[n] == '_')) n++;
+                return line.Substring(0, n);
             }
 
             // ---- 컴포넌트와 Def 타입 ----
@@ -353,7 +412,7 @@ namespace Kesa.Engine.Stubs
                     if (member.Kind == MemberKind.Ref && member.Spec.Optional) type += " | None";
                     parameters.Add(member.Name + ": " + type + " = ...");
                 }
-                WriteInit(parameters, keywordOnly: true);
+                WriteInit(parameters);
                 Line();
                 if (component.IsKeyed) WriteRows(component);
             }
@@ -404,7 +463,7 @@ namespace Kesa.Engine.Stubs
                     Line("    " + field.Name + ": " + TypeText(field.Type));
                     parameters.Add(field.Name + ": " + TypeText(field.Type));
                 }
-                WriteInit(parameters, keywordOnly: true);
+                WriteInit(parameters);
                 Line();
             }
 
@@ -438,8 +497,6 @@ namespace Kesa.Engine.Stubs
                     if (Sees(inverse.Mod)) ReadOnly(inverse.Name, "Sequence[Any]");
                 var parameters = new List<string>
                 {
-                    "id: str",
-                    "*",
                     "parent: " + ParentText(type) + " = None",
                     "abstract: bool = False",
                     "override: bool = False",
@@ -462,16 +519,36 @@ namespace Kesa.Engine.Stubs
                         parameters.Add(component.Name + ": " + component.Name + " = ...");
                     }
                 }
-                WriteInit(parameters, keywordOnly: false);
+                // Def id는 엔진도 위치로만 받는다: const id와 이름이 부딪히지 않는다 (G230)
+                WriteInit(parameters, "id: str");
                 Line();
             }
 
-            private void WriteInit(List<string> parameters, bool keywordOnly)
+            /// <summary>
+            /// <c>__init__(self, [위치 전용 하나, /,] *, 키워드...)</c>. 위치 자리의 이름은 키워드 이름(멤버 <c>self</c>, const <c>id</c>)과
+            /// 겹치면 앞에 <c>_</c>를 붙여 피한다 (G230): 파이썬은 위치 전용이라도 이름이 같은 매개변수를 허락하지 않는다.
+            /// </summary>
+            private void WriteInit(List<string> keywords, string? positional = null)
             {
-                var all = new List<string> { "self" };
-                if (keywordOnly && parameters.Count > 0) all.Add("*");
-                all.AddRange(parameters);
+                var taken = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var p in keywords) taken.Add(p.Substring(0, p.IndexOf(':')));
+                var all = new List<string> { Free("self", taken) };
+                if (positional != null)
+                {
+                    int colon = positional.IndexOf(':');
+                    all.Add(Free(positional.Substring(0, colon), taken) + positional.Substring(colon));
+                }
+                all.Add("/");
+                if (keywords.Count > 0) all.Add("*");
+                all.AddRange(keywords);
                 Line("    def __init__(" + string.Join(", ", all) + ") -> None: ...");
+            }
+
+            private static string Free(string name, HashSet<string> taken)
+            {
+                while (taken.Contains(name)) name = "_" + name;
+                taken.Add(name);
+                return name;
             }
 
             private string ParentText(DefType type)

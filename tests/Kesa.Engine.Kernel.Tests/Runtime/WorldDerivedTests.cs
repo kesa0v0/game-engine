@@ -29,7 +29,8 @@ namespace Kesa.Engine.Tests.Runtime
             "        total = total + t.Skill[k].level\n" +
             "    return total\n" +
             "component(\"Total\", value=derived(int, total_levels))\n" +
-            "component(\"Loop\", a=derived(int, lambda l: l.b), b=derived(int, lambda l: l.a))\n" +
+            // Loop의 b는 리스트로 감싸 엔티티 자신인 줄 모르게 한다: 실행 중 재진입 감지를 본다 (아니면 G229의 로드 오류)
+            "component(\"Loop\", a=derived(int, lambda l: l.b), b=derived(int, lambda l: [l][0].a))\n" +
             // oops는 리스트로 감싸 타입을 모르게 한다: 실행 중 안전망을 본다 (아니면 G228의 로드 오류)
             "component(\"Bad\", ratio=derived(int, lambda b: 1 / 2), oops=derived(int, lambda b: [b][0].nope),\n" +
             "    text=derived(int, lambda b: \"x\"), whole=derived(fixed, lambda b: 3))\n" +

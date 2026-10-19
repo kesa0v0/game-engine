@@ -180,7 +180,7 @@ namespace Kesa.Engine.Script
                     if (IsShadowed(name, locals))
                     {
                         _context.Error(Codes.CmdPreconditions,
-                            "'" + name + "' here is " + (locals.Contains(name) ? "a local variable" : "this mod's own name") +
+                            "'" + name + "' here is " + ShadowKind(name, locals) +
                             ", so the built-in " + name + "() cannot be used", call.Callee.Span,
                             hint: "rename it (spec-gaps G112)");
                     }
@@ -236,7 +236,17 @@ namespace Kesa.Engine.Script
 
             private int _quietPreconditionNames;
 
-            private bool IsShadowed(string name, SortedSet<string> locals) => locals.Contains(name) || _globals.Contains(name);
+            /// <summary>
+            /// 지역 변수, 모드가 묶은 이름, 이 모드에 보이는 컴포넌트·신호 이름(G230)이면 같은 이름의 내장을 가린다.
+            /// 엔진 신호(<c>Tick</c>)는 스키마 이름이지만 엔진의 것이라 가리지 않는다.
+            /// </summary>
+            private bool IsShadowed(string name, SortedSet<string> locals) =>
+                locals.Contains(name) || _globals.Contains(name) || IsSchemaName(name);
+
+            private bool IsSchemaName(string name) => !_globals.Contains(name) && !Schema.EngineSignals.IsEngine(name) && _isSchemaRuntimeName(name);
+
+            private string ShadowKind(string name, SortedSet<string> locals) =>
+                locals.Contains(name) ? "a local variable" : IsSchemaName(name) ? "a component or signal this mod sees" : "this mod's own name";
 
             public void Expr(Expr expr, SortedSet<string> locals)
             {

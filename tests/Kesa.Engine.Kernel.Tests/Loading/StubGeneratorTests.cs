@@ -48,11 +48,11 @@ namespace Kesa.Engine.Tests.Loading
                 "    @property\n    def base_max(self) -> int: ...\n" +
                 "    @property\n    def max(self) -> int: ...\n" +
                 "    current: int\n" +
-                "    def __init__(self, *, base_max: int = ..., current: int = ...) -> None: ...\n" +
+                "    def __init__(self, /, *, base_max: int = ..., current: int = ...) -> None: ...\n" +
                 "\n" +
                 "class Skill:\n" +
                 "    @property\n    def level(self) -> int: ...\n" +
-                "    def __init__(self, *, level: int = ...) -> None: ...\n" +
+                "    def __init__(self, /, *, level: int = ...) -> None: ...\n" +
                 "\n" +
                 // 키 컴포넌트를 엔티티에서 읽은 줄 묶음 (keys="all"이라 줄은 늘 있다)
                 "class _Skill_rows:\n" +
@@ -71,7 +71,7 @@ namespace Kesa.Engine.Tests.Loading
                 "    Health: Health | None\n" +
                 "    Skill: _Skill_rows | None\n" +
                 "    Resource: _Resource_consts\n" +
-                "    def __init__(self, id: str, *, parent: Literal[\"Wood\", \"Iron\"] | None = None, abstract: bool = False, " +
+                "    def __init__(self, id: str, /, *, parent: Literal[\"Wood\", \"Iron\"] | None = None, abstract: bool = False, " +
                 "override: bool = False) -> None: ...\n" +
                 "\n" +
                 "class _Unit_consts:\n" +
@@ -85,7 +85,7 @@ namespace Kesa.Engine.Tests.Loading
                 "    Health: Health\n" +
                 "    Skill: _Skill_rows\n" +
                 "    Unit: _Unit_consts\n" +
-                "    def __init__(self, id: str, *, parent: Literal[\"Base\", \"Scout\"] | None = None, abstract: bool = False, " +
+                "    def __init__(self, id: str, /, *, parent: Literal[\"Base\", \"Scout\"] | None = None, abstract: bool = False, " +
                 "override: bool = False, move: int = ..., ratio: fixed = ..., label: TextKey = ..., tags: list[str] = ..., " +
                 "cost: dict[Literal[\"Wood\", \"Iron\"], int] = ..., Health: Health = ..., " +
                 "Skill: dict[Literal[\"Wood\", \"Iron\"], Skill] = ...) -> None: ...\n" +
@@ -317,6 +317,43 @@ namespace Kesa.Engine.Tests.Loading
             Mod("core", schema: Schema, defs: Defs);
             var result = LoadClean();
             Assert.Throws<ArgumentException>(() => StubFor("nope", result));
+        }
+
+        [Test]
+        public void MembersNamedSelfAndConstsNamedIdDoNotClashWithTheConstructorsOwnParameters()
+        {
+            // 파이썬은 이름이 같은 매개변수를 허락하지 않는다: 위치 자리의 이름을 비킨다 (G230)
+            Mod("core", schema: "component(\"Life\", self=field(int, default=1))\n" +
+                                "deftype(\"Unit\", id=const(int, default=0), components=[\"Life\"])\n",
+                defs: "Unit(\"Grunt\", id=3)\n");
+            var stub = StubFor("core", LoadClean());
+            Assert.That(stub, Does.Contain("    def __init__(_self, /, *, self: int = ...) -> None: ...\n"));
+            Assert.That(stub, Does.Contain("    def __init__(self, _id: str, /, *, parent: Literal[\"Grunt\"] | None = None, " +
+                                           "abstract: bool = False, override: bool = False, id: int = ..., Life: Life = ...) -> None: ...\n"));
+        }
+
+        [Test]
+        public void AVisibleComponentOrSignalReplacesTheBuiltinOfTheSameName()
+        {
+            // 보이는 스키마 이름이 내장을 이긴다 (G230): 내장 선언을 빼서 이름이 두 번 선언되지 않는다
+            Mod("core", schema: "component(\"random\", seed=field(int, default=0))\ncomponent(\"Mod\", level=field(int, default=0))\n" +
+                                "signal(\"floor\", n=int)\n");
+            var stub = StubFor("core", LoadClean());
+            Assert.That(stub, Does.Contain("class random:\n    seed: int\n"));
+            Assert.That(stub, Does.Not.Contain("def randint"));
+            Assert.That(stub, Does.Not.Contain("def floor("));
+            Assert.That(stub, Does.Not.Contain("def Mod("));
+            Assert.That(stub, Does.Contain("def ceil(x: int | float, /) -> int: ...\n"));
+            Assert.That(stub, Does.Contain("def use(path: str, /) -> None: ...\n"));
+        }
+
+        [Test]
+        public void AComponentOfAnUnrelatedModLeavesTheBuiltinInPlace()
+        {
+            Mod("banking", schema: "component(\"random\", seed=field(int, default=0))\n");
+            Mod("scouts", schema: "deftype(\"Walker\")\n");
+            var stub = StubFor("scouts", LoadClean());
+            Assert.That(stub, Does.Contain("    def randint(a: int, b: int, /) -> int: ...\n"));
         }
     }
 }

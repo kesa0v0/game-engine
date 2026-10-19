@@ -499,3 +499,20 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **기존 테스트:** 실행 중 오류를 시험하려 일부러 넣은 오타(`gld`·`lefft`·`nope`·`cosst`)가 로드 오류가 되어 105개가 실패했다. 실행 중 안전망은 타입을 모를 때 여전히 필요하므로 그 자리를 `[unit.Moves][0].nope`처럼 리스트로 감싸 타입을 모르게 했다(8곳, 주석에 G228). 진짜로 틀린 테스트 내용 두 개도 드러났다: 스키마에서 `Score.log`를 지우고도 로직이 쓰던 저장 테스트(감싸서 로드되게 함), 스키마에 없는 `g.Score`를 쓰던 효과 테스트(`Score` 컴포넌트 선언을 더함).
 - **새 테스트:** `Loading/AttributeCheckerTests.cs` 15개(query 반복, 적힌 매개변수, `derived`, `Action` 칸, Def 상수, 쓰기 대상, 지역 변수 합치기와 None, 핸들러·`@when`·`acts_for`, `choose` 후보, `spawn`·컴프리헨션·역방향, 키 줄, 실행이 받는 이름은 통과, 모르는 타입은 넘어감, 적힌 타입이 문맥보다 앞섬, 책임 모드).
 - **확인:** 테스트 1934개 통과(커널 1898, CLI 36). 다섯 예시 모드에 `engine check`를 돌리면 넷을 잡고 `s = top()`만 남는다(2차 몫). 이 컨테이너에는 .NET 9 SDK를 받을 길이 막혀 있어 Ubuntu의 .NET 10 SDK와 `DOTNET_ROLL_FORWARD=Major`로 돌렸다(저장소 루트의 `global.json` 때문에 다른 폴더에서 `dotnet test <경로>`).
+
+## `derived` 순환의 로드 검사 (G229, 2026-10-19)
+
+- **재현:** `a=derived(int, lambda h: h.b + 1), b=derived(int, lambda h: h.a)`가 로드를 오류 없이 통과하고 읽을 때에야 `RUN014`(임시 테스트로 확인 후 지움).
+- **논의:** schema-design 3.3.1 5항은 다른 엔티티를 거친 것까지 넉넉하게 막고 쪼개게 했다. 하위 지역의 합처럼 같은 값을 다른 엔티티에서 읽는 계층 합산은 정적으로 `Region.total → Region.total`로 보이고 쪼갤 수 없어 5항이 너무 엄격했다고 정리했다. Ref에 `acyclic=True`를 선언하게 하는 안도 냈으나 넣지 않기로 했다.
+- **구현:** `Loading/AttributeChecker.Cycles.cs`. `StaticType`의 `EntityType`·`ComponentStatic`에 `Self`(계산 중인 `derived`의 엔티티 자신)를 더하고 합칠 때는 둘 다 자기 것이어야 자기 것이다. 형제 컴포넌트와 `entity`는 `Self`를 물려받고, 멤버 값(Ref)·역방향·`query`·키 컴포넌트의 줄 묶음은 물려받지 않는다. `Walker`가 순환 검사 모드(`DerivedReads`를 받음)면 이름 오류를 내지 않고 마지막 바퀴에 자기 것의 `derived` 읽기를 모으며, 자기 것을 넘겨받은 모드 함수 호출은 그 본문을 따라 들어간다(읽기 자리는 바깥 호출). 그래프를 깊이 우선으로 돌아 순환 하나에 오류 하나(`SCH009`, 새 코드), 책임은 가장 늦게 로드되는 모드, 다른 읽기 자리는 관련 위치. 함수 기본값은 보지 않는다(G106).
+- **기존 테스트:** 실행 중 재진입 감지를 보는 `WorldDerivedTests`의 `Loop`가 로드 오류가 되어 9개가 실패했다. `b`를 `[l][0].a`로 감싸 엔티티 자신인 줄 모르게 했다.
+- **새 테스트:** `Loading/DerivedCycleTests.cs` 6개(둘이 서로, 자기 자신, 형제·`h.entity`·조건식의 다른 갈래, 도우미 함수 따라가기, 다른 엔티티·다른 줄을 거친 것은 통과, 필드·상수 읽기는 순환 아님). 재귀 도우미는 이미 `EVL002`라 시험하지 않았다.
+- **확인:** 테스트 1940개 통과(커널 1904, CLI 36).
+
+## 스키마 이름과 내장의 충돌 (G230, 2026-10-19)
+
+- **재현:** 멤버 `self`, const `id`, 컴포넌트 `Mod`·`random`이 든 모드가 `engine check` 오류 0개인데 pyright는 스텁에서 13개를 냈다(중복 매개변수, `Mod`·`random`의 다시 선언). 엔진 쪽: 컴포넌트 이름이 `random`·`ask`·`wait`·`advance`·`emit`·호스트 루트면 첫 제출에서 `ArgumentException`(내장 표의 같은 키)으로 죽었고, `floor`·`text`처럼 먼저 들어가는 내장이면 생성자가 조용히 가려졌다.
+- **논의:** 예약 이름으로 막는 안을 냈다가 사용자가 G112(엔진 이름은 덮어쓸 수 있는 내장)와 어긋난다고 짚어 거뒀다. 스키마 이름도 G112처럼 내장을 이기되 그것이 보이는 모드 안에서만으로 정했다(G230). 스텁은 같은 규칙에 맞추는 수정이라 따로 묻지 않았다.
+- **구현:** 이름 층은 지역 → 모드 이름 → 보이는 스키마 이름 → 내장. `ModScope.SetSchemaNames`·`TryLookup`·`IsSchemaName`(로더가 `DefBuiltins.SchemaName`을 넣는다), `Interpreter`·`DeferredEvaluator`·`FunctionEffects`·`FunctionNameChecker`·`AttributeChecker.Globals`가 층을 본다. `@command`·`require`가 스키마 이름에 가려지면 `CMD001`·`CMD002`의 메시지가 "a component or signal this mod sees"라고 말한다. 런타임은 생성자를 내장 표에서 빼고 `World.Derived`의 `WorldGlobals`가 모드의 가시성으로 찾는다(`AddComponentConstructors`·`AddSignalConstructors`). 저장된 Flow의 생성자 값은 `schema` 태그(옛 `builtin` 태그도 읽음). 스텁: `__init__`의 위치 자리(`self`, Def의 `id`)를 위치 전용으로 적고 키워드 이름과 겹치면 앞에 `_`를 붙인다. 보이는 컴포넌트·신호와 같은 이름의 내장 선언은 뺀다(`WithoutNames`). 컴포넌트 `Mod`면 `mod.py`의 `Mod(...)`가 편집기에서 거짓 오류인 것은 G82의 한계로 적었다.
+- **새 테스트:** `Loading/SchemaNameShadowingTests.cs` 5개(`random` 컴포넌트가 선언한 모드에서는 생성자·무관한 모드에서는 엔진 `random`, `floor` 생성자가 `derived`에서, `require`·`command`가 가려진 메시지, 무관한 모드의 `command` 컴포넌트는 데코레이터를 가리지 않음), `StubGeneratorTests` 3개. 기존 스텁 테스트의 `__init__` 문자열에 `/`가 붙었다. `WorldSaveFlowTests`는 멈춘 Flow가 생성자 값을 들고 저장되는 경우를 더했다.
+- **확인:** 재현 모드에서 pyright 13개 → 2개. 남은 둘은 맞는 지적이다: `random.randint`(그 모드에서는 컴포넌트, 실행하면 실패, 엔진 `check`는 못 잡음, handoff 남은 일 2번)와 `mod.py`의 `Mod(id=...)`(G82 한계). 테스트 1948개 통과(커널 1912, CLI 36).

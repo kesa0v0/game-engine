@@ -61,6 +61,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    w = Wounded(turns=2)\n" +
             "    f = double\n" +
             "    g = len\n" +
+            "    wc = Wounded\n" + // 컴포넌트 생성자 값 (G230: builtin이 아니라 schema로 적힌다)
             "    rg = range(2)\n" +
             "    mixed = {\"a\": [p, hv], \"b\": rg}\n" +
             "    bonus = 0\n" +
@@ -90,7 +91,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    hv.v = hv.v + f(len(picked)) + g([1, 2]) + tier.tier + row.level + r0.index * 100\n" +
             "    hv.log = hv.log + (\"S\" if sk == p.Skill else \"-\") + (\"H\" if hv == p.Score else \"-\")\n" +
             "    hv.log = hv.log + (\"M\" if mixed[\"a\"][1] == p.Score and mixed[\"b\"] == range(2) else \"-\")\n" +
-            "    hv.log = hv.log + (\"W\" if w == Wounded(turns=2) else \"-\")\n" +
+            "    hv.log = hv.log + (\"W\" if w == wc(turns=2) else \"-\")\n" +
             "    hv.v = hv.v + lam(1) + mk() + pg()\n" +
             "    hv.log = hv.log + (\"L\" if lam == same else \"-\") + (\"N\" if lam != mk else \"-\")\n" +
             "    hv.log = hv.log + (\"C\" if cv == Score(v=lam) else \"-\") + (\"T\" if tv == text(\"k\", f=lam) else \"-\")\n" +
@@ -175,7 +176,7 @@ namespace Kesa.Engine.Tests.Runtime
             // 저장들이 실제로 모든 종류의 값을 거쳤다
             var text = all.ToString();
             foreach (var tag in new[] { "entity_view", "component", "rows", "def_view", "answer", "component_value", "range",
-                         "function", "builtin", "branch", "items", "closure", "lambda", "frame", "env", "signal" })
+                         "function", "builtin", "schema", "branch", "items", "closure", "lambda", "frame", "env", "signal" })
                 Assert.That(text, Does.Contain("\"" + tag + "\""), tag);
         }
 

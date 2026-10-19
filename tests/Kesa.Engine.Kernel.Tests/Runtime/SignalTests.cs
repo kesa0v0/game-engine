@@ -130,7 +130,7 @@ namespace Kesa.Engine.Tests.Runtime
             string stub = Kesa.Engine.Stubs.StubGenerator.Generate("combat", result);
             // 엔티티는 그 Def 타입의 클래스로 적는다 (G207)
             Assert.That(stub, Does.Contain("class Damaged:\n    target: Unit\n    amount: int\n" +
-                                           "    def __init__(self, *, target: Unit, amount: int) -> None: ...\n"));
+                                           "    def __init__(self, /, *, target: Unit, amount: int) -> None: ...\n"));
         }
 
         // ---- 신호 값 ----

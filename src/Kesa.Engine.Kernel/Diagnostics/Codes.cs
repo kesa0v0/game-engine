@@ -56,6 +56,7 @@ namespace Kesa.Engine.Diagnostics
         public const string SchDefInSchemaFile = "SCH006";
         public const string SchSchemaInDefFile = "SCH007";
         public const string SchModLoadedInSchemaFile = "SCH008";
+        public const string SchDerivedCycle = "SCH009";
 
         public const string DefDuplicateId = "DEF001";
         public const string DefUnknownField = "DEF002";

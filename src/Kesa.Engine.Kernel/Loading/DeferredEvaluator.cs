@@ -143,7 +143,7 @@ namespace Kesa.Engine.Loading
                 throw _context.Fail(Codes.EvlUnsupported, "'inherit' must be followed by a field name", name.Span,
                     hint: "write inherit.name or inherit.Component.value");
             }
-            if (_env.Scope.TryGet(name.Name, out var value, out _)) return value;
+            if (_env.Scope.TryLookup(name.Name, out var value)) return value;
             var builtin = _env.Builtins.Lookup(name.Name);
             if (builtin != null) return builtin;
 

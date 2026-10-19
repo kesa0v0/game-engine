@@ -50,12 +50,18 @@ namespace Kesa.Engine.Runtime
                 return NoneValue.Instance;
             });
 
-            // 컴포넌트 값 생성자: 이름 검사(G108)가 그 모드에 보이는 컴포넌트만 통과시킨다
+        }
+
+        /// <summary>
+        /// 컴포넌트 값 생성자. 내장 표가 아니라 스키마 이름 칸에 둔다: 보이는 모드 안에서는 같은 이름의 내장보다 강하다 (G230).
+        /// </summary>
+        private void AddComponentConstructors(SortedDictionary<string, KeyValuePair<string, Value>> names)
+        {
             foreach (var component in _schema.Components)
             {
                 var c = component;
-                if (table.ContainsKey(c.Name)) continue; // 내장과 같은 이름의 컴포넌트는 생성자로 쓸 수 없다
-                table.Add(c.Name, new PureBuiltin(c.Name, (p, k) => ConstructComponent(c, p, k)));
+                names.Add(c.Name, new KeyValuePair<string, Value>(c.Mod,
+                    new PureBuiltin(c.Name, (p, k) => ConstructComponent(c, p, k))));
             }
         }
 

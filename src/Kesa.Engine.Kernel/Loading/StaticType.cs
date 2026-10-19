@@ -25,7 +25,11 @@ namespace Kesa.Engine.Loading
             if (a == None) return b;
             if (b == None) return a;
             if (a.Same(b)) return a;
-            if (a is EntityType && b is EntityType) return new EntityType(null);
+            if (a is EntityType ea && b is EntityType eb)
+                return new EntityType(ea.Type == eb.Type ? ea.Type : null, ea.Self && eb.Self);
+            if (a is ComponentStatic ca && b is ComponentStatic cb && ca.Component == cb.Component && ca.Owner == cb.Owner &&
+                ca.Row == cb.Row)
+                return new ComponentStatic(ca.Component, ca.Owner, ca.Row, ca.Self && cb.Self);
             return Unknown;
         }
 
@@ -43,9 +47,18 @@ namespace Kesa.Engine.Loading
     /// <summary>엔티티. Def 타입을 모르면(<c>query("Wounded")</c>, 역방향 컬렉션의 원소) <see cref="Type"/>이 null이다.</summary>
     internal sealed class EntityType : StaticType
     {
-        public EntityType(DefType? type) => Type = type;
+        public EntityType(DefType? type, bool self = false)
+        {
+            Type = type;
+            Self = self;
+        }
+
         public DefType? Type { get; }
-        public override bool Same(StaticType other) => other is EntityType e && e.Type == Type;
+
+        /// <summary>계산 중인 <c>derived</c>의 엔티티 자신인가 (<c>h.entity</c>, 순환 검사 G229).</summary>
+        public bool Self { get; }
+
+        public override bool Same(StaticType other) => other is EntityType e && e.Type == Type && e.Self == Self;
     }
 
     /// <summary>
@@ -54,11 +67,12 @@ namespace Kesa.Engine.Loading
     /// </summary>
     internal sealed class ComponentStatic : StaticType
     {
-        public ComponentStatic(ComponentType component, DefType? owner, bool row)
+        public ComponentStatic(ComponentType component, DefType? owner, bool row, bool self = false)
         {
             Component = component;
             Owner = owner;
             Row = row;
+            Self = self;
         }
 
         public ComponentType Component { get; }
@@ -67,8 +81,13 @@ namespace Kesa.Engine.Loading
         /// <summary>키 컴포넌트의 줄 하나인가 (<c>key</c>를 읽을 수 있다).</summary>
         public bool Row { get; }
 
+        /// <summary>
+        /// 계산 중인 <c>derived</c>의 엔티티 자신의 것인가 (인자 <c>h</c>와 그 형제, 줄이면 같은 줄). 순환 검사(G229)가 이것만 따라간다.
+        /// </summary>
+        public bool Self { get; }
+
         public override bool Same(StaticType other) =>
-            other is ComponentStatic c && c.Component == Component && c.Owner == Owner && c.Row == Row;
+            other is ComponentStatic c && c.Component == Component && c.Owner == Owner && c.Row == Row && c.Self == Self;
     }
 
     /// <summary>키 컴포넌트의 줄 묶음 (<c>u.Skill</c>). 속성은 줄 키라 이름을 보지 않는다.</summary>
