@@ -602,3 +602,17 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **구현하며 바로잡은 것:** G239 초안의 "모드는 `extend`로 필드를 더한다"는 틀렸다. `extend`는 타입에 컴포넌트·`const`를 더할 뿐 남의 컴포넌트에 칼럼을 더하지 못한다(S1). 게임 데이터는 같은 엔티티에 모드 컴포넌트를 붙인다로 고침. 또 Def에 적은 컴포넌트는 뗄 수 없으므로(S4) 후보에서 빠질 수 있는 엔티티는 Def에 적지 않고 붙인다를 G239에 적음.
 - **테스트:** 새 `SeatChoicesTests` 9개(id 순 목록, 규칙의 `attach`·`detach`, 죽으면 빠짐, 호스트 `Add`·`Remove`, Def 것은 못 뗌, `Seat`를 막지 않음, 저장, 의존 없이 보임, 같은 이름 선언은 오류). `StubGeneratorTests` 기대값에 `Seatable`.
 - **확인:** 테스트 1988개 통과(커널 1946, CLI 36, 콘솔 호스트 6). `spec-gaps` 표 확인 `239 6`.
+
+## 2026-10-19: 콘솔 호스트의 작은 로비
+
+- **정한 것:** 사용자가 고름(세 안 중 나). 콘솔 호스트가 `World.SeatChoices()`(G239)를 쓰는 첫 사례. 엔진 결정이 아니라 예시 호스트의 사용법이라 G 번호는 붙이지 않음.
+- **구현:** `--seat red`(`=Def` 없음)는 빈 앉을 후보가 생기면 "앉을 자리: 1) #1 Red  2) #2 Blue / red는 어디에? >"로 묻고 번호로 앉힌다(`ConsoleGame.AskSeats`). 남이 앉은 후보는 빠지고, 잘못된 번호는 다시 묻고, `:q`나 입력 끝이면 끝난다. 연결마다 한 번만 묻는다(앉은 진영이 죽어도 다시 묻지 않음). `--seat red=Red`는 그대로 묻지 않고 그 Def의 엔티티에 앉힌다(테스트·자동 실행용). 둘을 섞으면 Def로 정한 연결이 먼저 앉는다.
+- **테스트:** `SkirmishTests.ASeatWithoutADefIsPickedFromTheChoices`(red가 Blue를 고르면 Red 차례의 수는 `[blue]`로 감). 사용법 오류 테스트의 `--seat red`는 이제 맞는 입력이라 `--seat`(값 없음)과 `--seat =A`로 바꿈.
+- **확인:** 테스트 1989개 통과(커널 1946, CLI 36, 콘솔 호스트 7). 손으로 `printf '1\n9\n2\n1\n:q\n' | kesa-play samples/skirmish --seat red --seat blue`를 돌려 화면 확인.
+
+## 2026-10-19: 스크립트가 배정을 읽는 길 `controller(e)` (G241)
+
+- **정한 것:** G236에서 이어서 정할 것의 둘째. 가(읽지 않음)·나(`seated`만)·다(종류) 중 다. 꼬리표는 계속 숨기고 사람·AI·빈자리만 읽는다.
+- **구현:** 새 `Runtime/SeatKind.cs`(`Human`·`Ai`). 배정 표는 엔티티 → (꼬리표, 종류). `World.Seat(e, issuer, kind = Human)`, `SeatKindOf(e)`. 내장 `controller(e)`(`World.Seats.cs`의 `ControllerBuiltin`, `PureBuiltins.ControllerName`, 런타임 이름 목록): `"human"`·`"ai"`·`None`, 엔티티가 아니면 RUN005(타입 오류). when 조건이 읽으면 그 엔티티를 읽은 것으로 기록하고, `Seat`·`Unseat`가 `Touch`해 다음 정착에서 다시 본다. 저장의 `seats` 줄에 `"kind"`(필수, `human`·`ai` 밖이면 형식 오류). 저장 형식 버전은 그대로 1(G236 때처럼 출시 전). 스텁에 `def controller(entity: Any, /) -> Literal["human", "ai"] | None`.
+- **테스트:** 새 `ControllerTests` 4개(사람·AI·빈자리 읽기, AI가 되면 when이 발동하고 사람으로 돌아갔다 다시 AI면 또 발동, 종류 저장, 엔티티가 아닌 인자). `WorldSaveTests.ABrokenSeatIsCorrupt`에 `kind` 칸과 잘못된 종류 사례. `Seat`의 `Touch`를 지우면 when 테스트가 실패하는 것을 임시로 확인하고 되돌림.
+- **확인:** 테스트 1994개 통과(커널 1951, CLI 36, 콘솔 호스트 7). `spec-gaps` 표 확인 `240 6`.

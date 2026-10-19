@@ -21,8 +21,11 @@ namespace Kesa.Engine.ConsoleHost
 
         private readonly ContentLoadResult _content;
         private readonly World _world;
-        /// <summary>연결마다 앉힐 Def. 그 Def의 엔티티가 생기면 앉힌다.</summary>
-        private readonly IReadOnlyList<(string Connection, string Def)> _wanted;
+        /// <summary>연결마다 앉힐 Def. 그 Def의 엔티티가 생기면 앉힌다. Def가 null이면 후보가 생길 때 고르게 묻는다.</summary>
+        private readonly IReadOnlyList<(string Connection, string? Def)> _wanted;
+
+        /// <summary>이미 자리를 물은 연결. 한 번만 묻는다(앉은 진영이 죽어도 다시 묻지 않는다).</summary>
+        private readonly HashSet<string> _asked = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>연결 꼬리표, 처음 나온 순서.</summary>
         private readonly IReadOnlyList<string> _seats;
@@ -31,7 +34,7 @@ namespace Kesa.Engine.ConsoleHost
         private readonly TextWriter _out;
         private readonly ValueText _text;
 
-        public ConsoleGame(ContentLoadResult content, World world, IReadOnlyList<(string Connection, string Def)> seats,
+        public ConsoleGame(ContentLoadResult content, World world, IReadOnlyList<(string Connection, string? Def)> seats,
             TextReader input, TextWriter output)
         {
             _content = content;
@@ -67,6 +70,7 @@ namespace Kesa.Engine.ConsoleHost
             while (true)
             {
                 SeatArrivals();
+                if (!AskSeats()) return;
                 WriteState();
                 var options = Options();
                 if (options.Count == 0)
@@ -96,13 +100,14 @@ namespace Kesa.Engine.ConsoleHost
         // ---- 자리 ----
 
         /// <summary>
-        /// 원하는 Def의 엔티티가 생겼고 아무도 앉지 않았으면 그 연결을 앉힌다 (G236의 호스트 쓰기 경로). 진짜 로비라면 모드가 고를 수 있는
-        /// 엔티티 목록을 내놓아야 하는데 그 길은 아직 없다.
+        /// 원하는 Def의 엔티티가 생겼고 아무도 앉지 않았으면 그 연결을 앉힌다 (G236의 호스트 쓰기 경로). 테스트·자동 실행용이고 모드의
+        /// Def 이름을 알아야 한다. 이름 없이 고르는 길은 <see cref="AskSeats"/>.
         /// </summary>
         private void SeatArrivals()
         {
             foreach (var (connection, def) in _wanted)
             {
+                if (def == null) continue;
                 foreach (var type in _content.Schema.Types)
                 {
                     foreach (var id in _world.All(type.Name))
@@ -115,6 +120,38 @@ namespace Kesa.Engine.ConsoleHost
                 }
                 next: ;
             }
+        }
+
+        /// <summary>
+        /// 작은 로비: Def 없이 적은 연결마다, 빈 앉을 후보(<c>World.SeatChoices</c>, G239)가 생기면 그중 하나를 고르게 묻는다. 입력이
+        /// 끝나거나 <c>:q</c>면 false.
+        /// </summary>
+        private bool AskSeats()
+        {
+            foreach (var (connection, def) in _wanted)
+            {
+                if (def != null || _asked.Contains(connection) || _world.SeatsOf(connection).Count > 0) continue;
+                var free = _world.SeatChoices().Where(id => _world.SeatOf(id) == null).ToList();
+                if (free.Count == 0) continue; // 후보가 아직 없다: 생기면 묻는다
+                _asked.Add(connection);
+                _out.WriteLine("앉을 자리: " + string.Join("  ",
+                    free.Select((id, i) => (i + 1).ToString(CultureInfo.InvariantCulture) + ") " + _text.Entity(id))));
+                while (true)
+                {
+                    _out.Write(connection + "는 어디에? > ");
+                    string? line = _in.ReadLine();
+                    if (line == null || line.Trim() == ":q") return false;
+                    if (int.TryParse(line.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int n) &&
+                        n >= 1 && n <= free.Count)
+                    {
+                        _world.Seat(free[n - 1], connection);
+                        _out.WriteLine("[" + connection + "] " + _text.Entity(free[n - 1]) + "에 앉음");
+                        break;
+                    }
+                    _out.WriteLine("1부터 " + free.Count.ToString(CultureInfo.InvariantCulture) + " 사이의 번호, 끝내려면 :q");
+                }
+            }
+            return true;
         }
 
         // ---- 상태 ----

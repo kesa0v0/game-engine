@@ -23,6 +23,9 @@ namespace Kesa.Engine.Script
         /// <summary>Def 타입·컴포넌트로 엔티티 목록을 읽는 전역 순회 (spec S3, spec-gaps G192·G193). 런타임이 더한다.</summary>
         public const string QueryName = "query";
 
+        /// <summary>엔티티에 앉은 연결의 종류를 읽는 내장 (spec S6, spec-gaps G241): <c>"human"</c>·<c>"ai"</c>·<c>None</c>. 런타임이 더한다.</summary>
+        public const string ControllerName = "controller";
+
         /// <summary>월드의 구조를 바꾸는 내장 (spec-gaps G134, int 키 줄 헬퍼는 G129). 몸체는 월드가 준다.</summary>
         public const string SpawnName = "spawn";
         public const string DestroyName = "destroy";
@@ -83,7 +86,7 @@ namespace Kesa.Engine.Script
 
         private static SortedSet<string> NameSet()
         {
-            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, RandomName };
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName };
             set.UnionWith(WritingNameArray);
             return set;
         }

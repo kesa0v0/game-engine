@@ -79,6 +79,23 @@ namespace Kesa.Engine.ConsoleHost.Tests
         }
 
         [Test]
+        public void ASeatWithoutADefIsPickedFromTheChoices()
+        {
+            // --seat red: 앉을 후보(Seatable, G239)가 생기면 묻는다. 잘못된 번호는 다시 묻고, 남이 앉은 자리는 빠진다
+            var screen = new StringWriter();
+            var errors = new StringWriter();
+            int code = Play.Run(new[] { Samples(), "--seat", "red", "--seat", "blue" },
+                new StringReader("1\n9\n2\n1\n:q\n"), screen, errors);
+            Assert.That(code, Is.EqualTo(0), errors.ToString());
+            string text = screen.ToString();
+            Assert.That(text, Does.Contain("앉을 자리: 1) #1 Red  2) #2 Blue"));
+            Assert.That(text, Does.Contain("[red] #2 Blue에 앉음"));
+            Assert.That(text, Does.Contain("앉을 자리: 1) #1 Red\n").Or.Contain("앉을 자리: 1) #1 Red\r\n"));
+            Assert.That(text, Does.Contain("[blue] #1 Red에 앉음"));
+            Assert.That(text, Does.Contain("[blue] skirmish.EndTurn(party=#1 Red)"));
+        }
+
+        [Test]
         public void TheBotsPlayAGameToTheEnd()
         {
             string screen = PlayOut(seed: 1);
@@ -131,7 +148,9 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             var errors = new StringWriter();
             Assert.That(Play.Run(new[] { Samples() }, new StringReader(""), new StringWriter(), errors), Is.EqualTo(2));
-            Assert.That(Play.Run(new[] { Samples(), "--seat", "red" }, new StringReader(""), new StringWriter(), errors), Is.EqualTo(2));
+            Assert.That(Play.Run(new[] { Samples(), "--seat" }, new StringReader(""), new StringWriter(), errors), Is.EqualTo(2));
+            Assert.That(Play.Run(new[] { Samples(), "--seat", "=A" }, new StringReader(""), new StringWriter(), errors),
+                Is.EqualTo(2));
             Assert.That(Play.Run(new[] { "no/such/dir", "--seat", "a=A" }, new StringReader(""), new StringWriter(), errors),
                 Is.EqualTo(2));
         }

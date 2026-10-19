@@ -64,10 +64,11 @@ namespace Kesa.Engine.Runtime
             var contributions = new JsonArray();
             foreach (var c in _contributions.Values) contributions.Add(SaveContribution(c));
 
-            // 배정 표 (G236): 엔티티 id 순
+            // 배정 표 (G236·G241): 엔티티 id 순
             var seats = new JsonArray();
             foreach (var pair in _seats)
-                seats.Add(new JsonObject().Add("entity", new JsonNumber(pair.Key)).Add("issuer", new JsonString(pair.Value)));
+                seats.Add(new JsonObject().Add("entity", new JsonNumber(pair.Key)).Add("issuer", new JsonString(pair.Value.Issuer))
+                    .Add("kind", new JsonString(pair.Value.Kind == SeatKind.Ai ? ControllerAi : ControllerHuman)));
 
             var root = new JsonObject()
                 .Add("format", new JsonNumber(SaveFormatVersion))
@@ -664,6 +665,10 @@ namespace Kesa.Engine.Runtime
                 var obj = AsObject(node, "a seat");
                 long id = Long(Field(obj, "entity"), "a seat entity");
                 string issuer = Text(Field(obj, "issuer"), "a seat issuer");
+                string kindText = Text(Field(obj, "kind"), "a seat kind");
+                if (kindText != ControllerHuman && kindText != ControllerAi)
+                    throw new JsonFormatException("a seat kind must be \"human\" or \"ai\" (found \"" + kindText + "\")");
+                var kind = kindText == ControllerAi ? SeatKind.Ai : SeatKind.Human;
                 if (problems.Skipped.Contains(id))
                 {
                     problems.DroppedWith("the seat of '" + issuer + "' at " + new EntityId(id) + " went with its entity");
@@ -672,7 +677,7 @@ namespace Kesa.Engine.Runtime
                 if (!_entities.ContainsKey(id) || _seats.ContainsKey(id) || issuer.Length == 0)
                     throw new JsonFormatException("seats must name entities in the save once each, with a non-empty issuer (found #" +
                                                   id.ToString(CultureInfo.InvariantCulture) + ")");
-                _seats.Add(id, issuer);
+                _seats.Add(id, (issuer, kind));
             }
         }
 

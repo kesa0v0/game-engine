@@ -1,6 +1,6 @@
 # 인계 메모: 현재 상태와 다음 할 일
 
-마지막 갱신: 2026-10-19. 브랜치 `spec-v0.5-scaffold`, 테스트 1988개 통과(커널 1946, CLI 36, 콘솔 호스트 6). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
+마지막 갱신: 2026-10-19. 브랜치 `spec-v0.5-scaffold`, 테스트 1994개 통과(커널 1951, CLI 36, 콘솔 호스트 7). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
 
 ## 한 줄 요약
 
@@ -46,7 +46,7 @@
 3. ~~무엇이 바뀌었나 구독이 없다.~~ **해결(G235):** 바뀜 도장 `Version()`·`Version(id)`·`Version(id, 이름)`. 콘솔 호스트는 도장이 그대로인 엔티티 줄을 다시 읽지 않는다. 남은 몫: 거른 읽기(`ViewAs`)의 도장, 남의 엔티티를 읽는 `derived`(읽기 집합 필요).
    - **다음 후보(3에서 이어짐): 호스트용 경로 읽기.** 이전 엔진(`kesa0v0/unity-kesa-engine`)은 UXML `binding-path="Self.X.Y"`를 `DataPathResolver`가 풀어 R3로 갱신했다. 잘한 점(UI 파일은 경로만, 참조가 바뀌면 다시 붙음)은 잇고, 문제(필드마다 모더가 `TryResolveBinding`을 손으로, 로드 때 검사 없음, 커맨드 한가운데서 즉시 알림, 조용히 멈추는 바인딩·구독 누수, 숨긴 정보 거름 없음)는 피한다. 지금 호스트는 핸들(`Member`·`Get`)로 한 단계씩 따라가야 하고, 경로는 모드 스크립트 안에서만 된다. 방향: 경로를 로드 때 스키마로 컴파일해 (엔티티, 칸) 읽기 집합을 얻고 G235 도장으로 다시 읽을지 정한다(S3·S10 4항). 2026-10-19 분석, 결정 아님.
 4. **번역이 없다(X4).** 질문 제목·선택지·`require` 메시지가 키 그대로(`turn`, `hold`, `skirmish.already_started`) 나온다. 엔티티는 번호와 Def id.
-5. ~~연결 이름을 모드가 박아 둔다.~~ **해결(G236·G237·G238):** 커널의 배정 표(`World.Seat`·`Unseat`·`SeatOf`·`SeatsOf`, 저장됨), 입구는 표만 봄(`may_act`·`@submit_policy` 없앰), 보기 정책은 `may_see(viewer, entity, component)`. 콘솔 호스트는 `--seat red=Red`로 그 Def의 엔티티가 생기면 앉힌다. 로비 후보는 엔진 컴포넌트 `Seatable`과 `World.SeatChoices()`(G239·G240, 콘솔 호스트는 아직 Def 이름으로 고름). **G236에서 이어서 정할 것:** 스크립트가 배정을 읽는 길(예: 사람이 빠진 자리를 AI 규칙이 알아야 할 때), 한 엔티티에 연결 여럿(공동 조종). API 이름(`Seat` 등)은 구현하며 붙인 것이고 사용자가 고른 적 없음.
+5. ~~연결 이름을 모드가 박아 둔다.~~ **해결(G236·G237·G238):** 커널의 배정 표(`World.Seat`·`Unseat`·`SeatOf`·`SeatsOf`, 저장됨), 입구는 표만 봄(`may_act`·`@submit_policy` 없앰), 보기 정책은 `may_see(viewer, entity, component)`. 로비 후보는 엔진 컴포넌트 `Seatable`과 `World.SeatChoices()`(G239·G240). 콘솔 호스트는 `--seat red`면 후보가 생길 때 화면에서 고르게 묻고(작은 로비), `--seat red=Red`면 묻지 않고 그 Def의 엔티티에 앉힌다(테스트·자동 실행용). 스크립트는 `controller(e)`로 사람·AI·빈자리만 읽는다(G241, 호스트는 `Seat(e, issuer, kind)`). **G236에서 이어서 정할 것:** 한 엔티티에 연결 여럿(공동 조종). API 이름(`Seat` 등)은 구현하며 붙인 것이고 사용자가 고른 적 없음.
 6. (알려진 제한, 이번엔 피함) 응답 커맨드 본문에서 `ask`를 하면 "not supported yet" 실행 오류다(G139). 모더가 처음 쓸 자연스러운 모양(공격 커맨드 안에서 맞은 쪽에 묻기)이라, 예시는 공격을 기록만 하고 차례 루프가 묻게 짰다.
 
 큰 후보:
@@ -82,6 +82,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1988개 통과(커널 1946, CLI 36, 콘솔 호스트 6)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
+1. `git pull` 후 `dotnet test`로 1994개 통과(커널 1951, CLI 36, 콘솔 호스트 7)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(색인, 고를 항목의 영역은 `docs/gaps/`의 그 파일), 고를 항목에 맞는 `docs/spine-spec.md` 절을 읽는다. 실행기 구조는 `Script/Execution/PureEvaluator.cs`(입구)·`Session.cs`(+`.Calls`·`.Preconditions`·`.Stepping`)·`Frame.cs`·`Block.cs`·`PureEvaluator.Nodes.cs`(식 노드)·`PureEvaluator.Statements.cs`(문장 노드)·`FrameLayout.cs`·`LocalTable.cs`다. 고른 영역의 지난 기록이 필요하면 `docs/history.md`에서 그 절만 찾아 읽는다(전부 읽을 필요 없음). 옛 커맨드 첫 슬라이스의 읽을 곳: 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`)·`Frame.cs`(`Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.

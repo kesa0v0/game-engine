@@ -592,22 +592,26 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(d.Message, Does.Contain(expected));
         }
 
-        /// <summary>배정 표의 줄은 저장 안의 엔티티를 한 번씩, 빈 꼬리표 없이 가리켜야 한다 (G236).</summary>
-        [TestCase("{\n      \"entity\": 99,\n      \"issuer\": \"bob\"\n    }")]
-        [TestCase("{\n      \"entity\": 1,\n      \"issuer\": \"bob\"\n    },\n    {\n      \"entity\": 1,\n      \"issuer\": \"carol\"\n    }")]
-        [TestCase("{\n      \"entity\": 1,\n      \"issuer\": \"\"\n    }")]
-        public void ABrokenSeatIsCorrupt(string seats)
+        private const string Human = ",\n      \"kind\": \"human\"\n    }";
+
+        /// <summary>배정 표의 줄은 저장 안의 엔티티를 한 번씩, 빈 꼬리표 없이, 사람·AI 종류와 함께 가리켜야 한다 (G236·G241).</summary>
+        [TestCase("{\n      \"entity\": 99,\n      \"issuer\": \"bob\"" + Human, "seats must name entities in the save once each")]
+        [TestCase("{\n      \"entity\": 1,\n      \"issuer\": \"bob\"" + Human + ",\n    {\n      \"entity\": 1,\n      \"issuer\": \"carol\"" + Human,
+            "seats must name entities in the save once each")]
+        [TestCase("{\n      \"entity\": 1,\n      \"issuer\": \"\"" + Human, "seats must name entities in the save once each")]
+        [TestCase("{\n      \"entity\": 1,\n      \"issuer\": \"bob\",\n      \"kind\": \"robot\"\n    }", "a seat kind must be \"human\" or \"ai\"")]
+        public void ABrokenSeatIsCorrupt(string seats, string expected)
         {
             var town = _world.Create("Town");
             _world.Seat(town, "bob");
             string save = Encoding.UTF8.GetString(_world.Save());
-            string seated = "{\n      \"entity\": " + town.Value + ",\n      \"issuer\": \"bob\"\n    }";
+            string seated = "{\n      \"entity\": " + town.Value + ",\n      \"issuer\": \"bob\"" + Human;
             Assert.That(save, Does.Contain(seated));
             var result = World.Load(LoadClean(), Encoding.UTF8.GetBytes(save.Replace(seated, seats)));
             Assert.That(result.Succeeded, Is.False);
             var d = result.Diagnostics.Single(x => x.Code != Codes.SaveModsChanged);
             Assert.That(d.Code, Is.EqualTo(Codes.SaveCorrupt));
-            Assert.That(d.Message, Does.Contain("seats must name entities in the save once each"));
+            Assert.That(d.Message, Does.Contain(expected));
         }
 
         [Test]

@@ -77,7 +77,8 @@ namespace Kesa.Engine.Stubs
             "    value: Any\n" +
             "    source: Any\n" +
             "def contribs(component: Any, member: str, /) -> list[Contribution]: ...\n" +
-            "def now() -> int: ...\n";
+            "def now() -> int: ...\n" +
+            "def controller(entity: Any, /) -> Literal[\"human\", \"ai\"] | None: ...\n";
 
         /// <summary>
         /// 로직 파일의 이름 (spec-gaps G207): 데코레이터(함수를 그대로 돌려줌), 사전 조건 블록, 쓰는 내장, <c>ask</c>의 답, 난수.
