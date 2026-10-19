@@ -574,3 +574,13 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **구현:** `WorldView.ForMe`가 답할 수 있는 살아 있는 대상을 모아 `Filtered`에 넘기고, `Filtered`는 그중 보이는 것만 `Who`에 둔다. `OpenRequests`도 `ForMe`를 쓴다. `Show`의 열린 질문과 `BlockedBy`도 같은 길이라 함께 바뀐다.
 - **새 테스트:** `WorldViewTests.AQuestionToSeveralListsOnlyTheTargetsThisConnectionMayAnswerFor`(월드는 둘, A·B는 자기 것만, `Show` 결과도, C에게는 질문 없음).
 - **확인:** 테스트 1974개 통과(커널 1933, CLI 36, 콘솔 호스트 5). `spec-gaps` 표 확인 `233 6`.
+
+## 바뀜 도장 (2026-10-19, G235)
+
+- **왜:** 콘솔 호스트 구멍 3번. 커널에 바뀐 것을 세는 장치가 없어 호스트는 입력마다 모든 엔티티의 모든 컴포넌트를 다시 읽었다. spec S10 4항은 "읽기 집합 + 칼럼 버전"의 방향만 정해 두었다.
+- **논의:** 이전 엔진(`kesa0v0/unity-kesa-engine`, 이번에 받아 읽음)은 UXML `binding-path`를 `DataPathResolver`가 풀어 R3 `Observable`을 구독했다. 잘한 점(UI 파일은 경로만, 경로 언어 하나, 참조가 바뀌면 `Switch`로 다시 붙음)과 문제(필드마다 모더가 `TryResolveBinding`을 손으로 씀, 로드 때 경로 검사 없음, 쓰는 순간 동기 알림이라 커맨드 한가운데서 효과·UI가 끼어듦, 롤백 없음, `Observable.Never` 중간 조각이면 끝 값이 안 갱신, 구독 해제 누락, 숨긴 정보 거름 없음)를 코드로 확인했다. 다른 사례(Bevy `Changed<T>`, Unity ECS 청크 버전, Unity UI Toolkit 버전 숫자, WPF·Godot의 밀어주기, RimWorld·패러독스의 다시 그리기, Salsa 리비전; 일반 지식)를 보고 도장 방식, 엔티티와 컴포넌트 단위, 지금 넣기를 골랐다. R3 같은 밀어주기는 필요하면 호스트 어댑터가 도장 위에 얹는다(지금은 필요 없음).
+- **구현:** `World.Stamps.cs`. 전역 시계 `_clock`, 엔티티마다 `Stamps`(만든 때, 아무 칸, 칸 이름별). `Assign`이 컴포넌트를 받아 찍고, 붙이기·떼기·줄 붙이기·떼기·키 엔티티 삭제로 지워진 줄·기여 행·역방향 컬렉션(`AddInverse`·`RemoveInverse`)·생성·삭제·불러오기가 찍는다. `Atomically`가 시작 시계를 `_stampFloor`로 두고, 칸마다 처음 찍을 때만 옛 도장을 되돌리기 기록에 넣으며, 실패하면 되감은 뒤 시계를 돌려놓는다. 되감는 동안(`_rewinding`)은 기본 연산이 도장을 찍지 않는다.
+- **콘솔 호스트:** 엔티티마다 그린 줄과 도장을 기억해 도장이 그대로면 다시 읽지 않는다. 테스트용 `AlwaysRedraw`로 다시 그린 화면과 같은지 견준다.
+- **새 테스트:** `WorldStampTests` 6개(쓴 칸만 바뀜, 역방향 컬렉션과 기여 행, 붙이기·줄·삭제와 키 엔티티 삭제로 지워진 줄, 성공한 커맨드는 찍고 실패한 커맨드는 쓰기·만들기·붙이기·삭제를 모두 되감음, 없는 이름은 오류, 불러온 월드). `SkirmishTests`에 도장으로 건너뛴 화면과 매번 다시 그린 화면이 같은지 1개.
+- **남은 몫:** `ViewAs`의 도장(숨긴 정보), 남의 엔티티를 읽는 `derived`(읽기 집합), 호스트용 경로 읽기(handoff 구멍 3의 다음 후보).
+- **확인:** 테스트 1981개 통과(커널 1939, CLI 36, 콘솔 호스트 6). `spec-gaps` 표 확인 `234 6`.

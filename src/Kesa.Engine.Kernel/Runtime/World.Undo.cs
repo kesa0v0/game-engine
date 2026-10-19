@@ -69,6 +69,7 @@ namespace Kesa.Engine.Runtime
             var undo = _undoBuffer;
             undo.Clear();
             _undo = undo;
+            long clock = _stampFloor = _clock;
             try
             {
                 return run();
@@ -76,7 +77,16 @@ namespace Kesa.Engine.Runtime
             catch
             {
                 _undo = null; // 되감는 동작은 기록하지 않는다
-                for (int i = undo.Count - 1; i >= 0; i--) undo[i].Run();
+                _rewinding = true;
+                try
+                {
+                    for (int i = undo.Count - 1; i >= 0; i--) undo[i].Run();
+                }
+                finally
+                {
+                    _rewinding = false;
+                }
+                _clock = clock; // 실패한 커맨드는 시계도 올리지 않은 것이 된다 (G235)
                 throw;
             }
             finally
@@ -90,11 +100,12 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>
         /// <paramref name="owner"/> 엔티티의 값 칸 하나에 쓴다. 커맨드 실행 중이면 원래 값(또는 "값 없음")을 기록한다. 그 엔티티를 읽은
-        /// <c>when</c> 조건을 다음 정착에서 다시 보게 표시한다 (S5).
+        /// <c>when</c> 조건을 다음 정착에서 다시 보게 표시하고 그 컴포넌트에 도장을 찍는다 (S5, G235).
         /// </summary>
-        private void Assign(long owner, Dictionary<MemberDecl, Value> values, MemberDecl member, Value value)
+        private void Assign(long owner, ComponentType component, Dictionary<MemberDecl, Value> values, MemberDecl member, Value value)
         {
             Touch(owner);
+            Stamp(owner, component.Name);
             if (_undo != null) _undo.Add(UndoEntry.Slot(values, member, values.TryGetValue(member, out var old) ? old : null));
             values[member] = value;
         }

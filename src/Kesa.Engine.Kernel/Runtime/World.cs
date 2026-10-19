@@ -208,6 +208,7 @@ namespace Kesa.Engine.Runtime
             set.Add(id);
             Touch(id);
             TouchSources(entity); // 그 타입과 컴포넌트의 query 목록이 바뀐다 (G193)
+            StampCreated(id);
             // 되감으면 엔티티도 id도 쓰지 않은 것이 된다 (G133). 색인은 아래에서 따로 기록된다
             Journal(() =>
             {
@@ -231,6 +232,7 @@ namespace Kesa.Engine.Runtime
             {
                 foreach (var component in ComponentsOf(entity)) UnindexRefs(entity, component);
                 _entities.Remove(id);
+                _stamps.Remove(id);
                 _byType[def.Type].Remove(id);
                 _nextId = id;
                 throw;
@@ -250,6 +252,7 @@ namespace Kesa.Engine.Runtime
             _destroyedSinceSweep = true; // 멈춘 Flow의 대상을 다음 확인 때 본다 (G164). 되감겨도 한 번 더 볼 뿐이다
             Touch(id.Value); // 이 엔티티를 읽거나 Ref로 가리킨 조건을 다시 본다
             TouchSources(entity);
+            StampDestroyed(id.Value);
             _entities.Remove(id.Value);
             var set = _byType[entity.Def.Type];
             set.Remove(id.Value);
@@ -264,10 +267,12 @@ namespace Kesa.Engine.Runtime
                 foreach (var holder in holders)
                 {
                     if (!_entities.TryGetValue(holder, out var h)) continue;
-                    foreach (var rows in h.Rows.Values)
+                    foreach (var pair in h.Rows)
                     {
+                        var rows = pair.Value;
                         if (!rows.ByEntity.TryGetValue(id.Value, out var row)) continue;
                         Touch(holder);
+                        Stamp(holder, pair.Key);
                         rows.ByEntity.Remove(id.Value);
                         Journal(() => rows.ByEntity.Add(id.Value, row));
                     }
@@ -312,7 +317,7 @@ namespace Kesa.Engine.Runtime
             Require(entity, component);
             var stored = CheckWrite(member.Display, member.Member, value);
             if (member.Kind == MemberKind.Ref) Reindex(member.Member, id.Value, entity.Values, stored);
-            Assign(id.Value, entity.Values, member.Member, stored);
+            Assign(id.Value, component, entity.Values, member.Member, stored);
         }
 
         // ---- 런타임 컴포넌트 ----
@@ -336,6 +341,7 @@ namespace Kesa.Engine.Runtime
 
             Touch(id.Value);
             TouchSource(component.Name);
+            Stamp(id.Value, component.Name);
             entity.Runtime.Add(component.Name, component);
             values.CopyTo(entity.Values);
             Journal(() =>
@@ -377,6 +383,7 @@ namespace Kesa.Engine.Runtime
             entity.Rows.TryGetValue(componentName, out var oldRows);
             Touch(id.Value);
             TouchSource(componentName);
+            Stamp(id.Value, componentName);
             foreach (var member in component.Members) entity.Values.Remove(member);
             entity.Rows.Remove(componentName);
             entity.Runtime.Remove(componentName);

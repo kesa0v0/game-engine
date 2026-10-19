@@ -113,7 +113,7 @@ namespace Kesa.Engine.Runtime
                 rows.Put(key, record);
                 Journal(() => rows.Remove(key));
             }
-            Assign(id.Value, record.Values, member.Member, stored);
+            Assign(id.Value, component, record.Values, member.Member, stored);
         }
 
         private bool HasRow(EntityId id, string componentName, RowKey key)
@@ -143,6 +143,7 @@ namespace Kesa.Engine.Runtime
             values.CopyTo(record.Values);
             var keyedRows = entity.RowsOf(component);
             Touch(id.Value);
+            Stamp(id.Value, componentName);
             keyedRows.Put(key, record);
             Journal(() => keyedRows.Remove(key));
             if (key.IsEntity)
@@ -183,6 +184,7 @@ namespace Kesa.Engine.Runtime
                     "the '" + componentName + "' row " + key + " of " + id + " comes from its Def and cannot be removed");
             var keyedRows = entity.Rows[componentName];
             Touch(id.Value);
+            Stamp(id.Value, componentName);
             keyedRows.Remove(key);
             Journal(() => keyedRows.Put(key, record));
             DropContributionsTo(id.Value, component, key);

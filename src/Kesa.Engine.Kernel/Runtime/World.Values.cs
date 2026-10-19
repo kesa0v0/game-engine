@@ -255,12 +255,14 @@ namespace Kesa.Engine.Runtime
                 _inverse.Add(member, byTarget = new Dictionary<long, SortedSet<long>>());
             if (!byTarget.TryGetValue(target, out var sources)) byTarget.Add(target, sources = new SortedSet<long>());
             Touch(target); // 대상의 역방향 컬렉션이 바뀐다
+            Stamp(target, member.Spec.Inverse?.Name);
             if (sources.Add(source)) Journal(() => sources.Remove(source));
         }
 
         private void RemoveInverse(MemberDecl member, long target, long source)
         {
             Touch(target);
+            Stamp(target, member.Spec.Inverse?.Name);
             if (_inverse.TryGetValue(member, out var byTarget) && byTarget.TryGetValue(target, out var sources) &&
                 sources.Remove(source))
                 Journal(() => sources.Add(source));

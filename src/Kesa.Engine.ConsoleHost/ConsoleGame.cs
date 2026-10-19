@@ -87,7 +87,13 @@ namespace Kesa.Engine.ConsoleHost
 
         // ---- 상태 ----
 
-        /// <summary>구멍: 무엇이 바뀌었는지 알려 주는 구독이 없어 매번 전부 다시 읽는다.</summary>
+        /// <summary>엔티티마다 마지막으로 그린 줄과 그때의 도장. 도장이 그대로면 값을 다시 읽지 않는다 (G235).</summary>
+        private readonly Dictionary<long, (long Version, string Line)> _lines = new Dictionary<long, (long, string)>();
+
+        /// <summary>테스트용: 도장을 보지 않고 매번 다시 읽는다. 도장으로 건너뛴 화면과 견주는 데 쓴다.</summary>
+        internal static bool AlwaysRedraw { get; set; }
+
+        /// <summary>그 엔티티가 바뀌었을 때만(도장) 다시 읽는다. 다른 엔티티를 읽는 <c>derived</c> 값은 도장이 담지 않는다(G235의 남은 몫).</summary>
         private void WriteState()
         {
             _out.WriteLine();
@@ -96,15 +102,10 @@ namespace Kesa.Engine.ConsoleHost
             {
                 foreach (var id in _world.All(type.Name))
                 {
-                    var parts = new List<string>();
-                    foreach (var component in _content.Schema.Components)
-                    {
-                        if (!_world.Has(id, component.Name)) continue;
-                        var members = component.Members.Select(m =>
-                            m.Name + "=" + _text.Of(_world.Get(id, _world.Member(component.Name, m.Name))));
-                        parts.Add(component.Name + "(" + string.Join(", ", members) + ")");
-                    }
-                    _out.WriteLine(_text.Entity(id) + "  " + string.Join(" ", parts));
+                    long version = _world.Version(id);
+                    if (AlwaysRedraw || !_lines.TryGetValue(id.Value, out var drawn) || drawn.Version != version)
+                        _lines[id.Value] = drawn = (version, Line(id));
+                    _out.WriteLine(drawn.Line);
                 }
             }
             foreach (var request in _world.OpenRequests)
@@ -113,6 +114,19 @@ namespace Kesa.Engine.ConsoleHost
                                " → " + string.Join(", ", request.Who.Select(_text.Entity)) +
                                (request.Data is NoneValue ? "" : "  " + _text.Of(request.Data)));
             }
+        }
+
+        private string Line(EntityId id)
+        {
+            var parts = new List<string>();
+            foreach (var component in _content.Schema.Components)
+            {
+                if (!_world.Has(id, component.Name)) continue;
+                var members = component.Members.Select(m =>
+                    m.Name + "=" + _text.Of(_world.Get(id, _world.Member(component.Name, m.Name))));
+                parts.Add(component.Name + "(" + string.Join(", ", members) + ")");
+            }
+            return _text.Entity(id) + "  " + string.Join(" ", parts);
         }
 
         // ---- 할 수 있는 것 ----

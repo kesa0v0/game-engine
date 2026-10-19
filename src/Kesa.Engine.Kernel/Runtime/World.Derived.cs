@@ -383,11 +383,11 @@ namespace Kesa.Engine.Runtime
                 }
                 if (item.Row != null)
                 {
-                    Assign(entity.Id, entity.RowsOf(item.Component).Find(item.Row.Value)!.Values, member, stored);
+                    Assign(entity.Id, item.Component, entity.RowsOf(item.Component).Find(item.Row.Value)!.Values, member, stored);
                     continue;
                 }
                 if (member.Kind == MemberKind.Ref) Reindex(member, entity.Id, entity.Values, stored);
-                Assign(entity.Id, entity.Values, member, stored);
+                Assign(entity.Id, item.Component, entity.Values, member, stored);
             }
         }
 

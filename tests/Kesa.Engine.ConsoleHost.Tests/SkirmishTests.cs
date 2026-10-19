@@ -97,6 +97,21 @@ namespace Kesa.Engine.ConsoleHost.Tests
         }
 
         [Test]
+        public void SkippingUnchangedEntitiesByStampDrawsTheSameScreens()
+        {
+            string skipped = PlayOut(seed: 2);
+            ConsoleGame.AlwaysRedraw = true;
+            try
+            {
+                Assert.That(PlayOut(seed: 2), Is.EqualTo(skipped));
+            }
+            finally
+            {
+                ConsoleGame.AlwaysRedraw = false;
+            }
+        }
+
+        [Test]
         public void TheSameSeedPlaysTheSameGame()
         {
             Assert.That(PlayOut(seed: 3), Is.EqualTo(PlayOut(seed: 3)));

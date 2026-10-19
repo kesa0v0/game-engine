@@ -274,6 +274,7 @@ namespace Kesa.Engine.Runtime
                 }
                 var entity = new EntityRecord(id, def, LayoutOf(def));
                 _entities.Add(id, entity);
+                StampCreated(id);
                 if (!_byType.TryGetValue(def.Type, out var set)) _byType.Add(def.Type, set = new SortedSet<long>());
                 set.Add(id);
                 records.Add(new KeyValuePair<EntityRecord, JsonObject>(entity, obj));
