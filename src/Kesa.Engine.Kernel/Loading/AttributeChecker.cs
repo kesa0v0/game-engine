@@ -38,9 +38,10 @@ namespace Kesa.Engine.Loading
             CollectSchema(schema, contexts);
             foreach (var def in resolved.Defs) CollectDef(def, contexts, schema);
 
+            var returns = new ReturnTypes(schema, defs, mods);
             foreach (var mod in mods)
             {
-                var globals = Globals(mod, schema);
+                var globals = returns.Globals(mod.Mod);
                 foreach (var function in mod.Functions.Functions)
                 {
                     var parameters = new List<KeyValuePair<string, StaticType?>>();
@@ -51,7 +52,7 @@ namespace Kesa.Engine.Loading
                         var type = p.Annotation != null ? Annotation(p.Annotation, schema) : given != null ? given[i] : null;
                         parameters.Add(new KeyValuePair<string, StaticType?>(p.Name, type ?? StaticType.Unknown));
                     }
-                    new Walker(schema, defs, globals, stage, function.Mod).Function(function, parameters);
+                    new Walker(schema, defs, globals, stage, function.Mod, returns: returns).Function(function, parameters);
                 }
             }
 

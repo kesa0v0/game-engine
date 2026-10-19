@@ -175,7 +175,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void UnknownTypesAreLeftAlone()
         {
-            // 적지 않은 매개변수, 함수의 결과, 리스트 원소, 타입이 다른 문맥 둘에서 쓰인 함수는 모른다
+            // 적지 않은 매개변수, 모르는 값을 돌려주는 함수의 결과(G231), 리스트 원소, 타입이 다른 문맥 둘에서 쓰인 함수는 모른다
             Clean("def f(x):\n    return x.anything\n" +
                   "def g():\n    y = f(1)\n    return y.whatever\n" +
                   Free + "def H(u: Ref[Unit]):\n    return [u.Food][0].nope\n",
@@ -191,6 +191,51 @@ namespace Kesa.Engine.Tests.Loading
             {
                 "EVL001 5: a Unit entity has no component or collection 'Pendng' | did you mean 'Pending'?",
             }));
+        }
+
+        [Test]
+        public void AFunctionsResultHasTheTypeOfItsReturns()
+        {
+            // 적지 않은 반환, 적은 반환, 부른 자리의 인자로 정해지는 반환 (G231)
+            Assert.That(Errors("def first():\n    for u in query(\"Unit\"):\n        return u\n    return None\n" +
+                               "def annotated() -> Ref[Unit]:\n    return query(\"Unit\")[0]\n" +
+                               "def same(u):\n    return u\n" +
+                               Free + "def Feed(x: Ref[Unit]):\n    a = first()\n    a.Fod.amount += 1\n" +
+                               "    annotated().Fod.amount += 1\n    same(x).Fod.amount += 1\n    same(u=x.Food).amout += 1\n"),
+                Is.EqualTo(new[]
+                {
+                    "EVL001 15: a Unit entity has no component or collection 'Fod' | did you mean 'Food'?",
+                    "EVL001 16: a Unit entity has no component or collection 'Fod' | did you mean 'Food'?",
+                    "EVL001 17: a Unit entity has no component or collection 'Fod' | did you mean 'Food'?",
+                    "EVL001 18: 'Food' has no member, sibling component or property 'amout' | did you mean 'amount'?",
+                }));
+        }
+
+        [Test]
+        public void ReturnsFollowCallsAndLambdasBoundToNames()
+        {
+            Assert.That(Errors("pick = lambda u: u.Life\n" +
+                               "def inner(u):\n    return u\n" +
+                               "def outer(u):\n    v = inner(u)\n    return v\n" +
+                               Free + "def Heal(x: Ref[Unit]):\n    pick(x).hpp = 1\n    outer(x).Lfe.hp = 1\n"),
+                Is.EqualTo(new[]
+                {
+                    "EVL001 12: 'Life' has no member, sibling component or property 'hpp' | did you mean 'hp'?",
+                    "EVL001 13: a Unit entity has no component or collection 'Lfe' | did you mean 'Life'?",
+                }));
+        }
+
+        [Test]
+        public void UnknownOrMixedReturnsAreLeftAlone()
+        {
+            // 적은 반환 타입이 본문보다 앞서고(int), 타입이 다른 반환은 모름, 모르는 인자를 넘기면 모름, 반환이 없으면 None
+            Clean("def counted() -> int:\n    return query(\"Unit\")[0]\n" +
+                  "def mixed(u: Ref[Unit], c: Ref[City]):\n    if u.Food.amount > 0:\n        return u.Food\n    return c\n" +
+                  "def same(u):\n    return u\n" +
+                  "def nothing(u):\n    u.Food.amount = 0\n" +
+                  Free + "def Look(x: Ref[Unit], c: Ref[City]):\n" +
+                  "    a = counted().anything\n    b = mixed(x, c).anything\n    d = same(len([1])).anything\n" +
+                  "    e = same([x][0]).anything\n    f = nothing(x)\n    return 0\n");
         }
 
         [Test]

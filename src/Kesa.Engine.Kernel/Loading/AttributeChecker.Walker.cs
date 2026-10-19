@@ -28,11 +28,14 @@ namespace Kesa.Engine.Loading
             /// <summary>이번 바퀴에 지역 변수마다 대입한 값의 타입 (합친 것).</summary>
             private Dictionary<string, StaticType?> _assigned = new Dictionary<string, StaticType?>(StringComparer.Ordinal);
 
+            /// <summary>모드 함수 호출의 반환 타입 (G231). 없으면 호출 결과는 모름이다.</summary>
+            private readonly ReturnTypes? _returns;
+
             /// <summary>마지막 바퀴인가: 이때만 오류를 낸다.</summary>
             private bool _report;
 
             public Walker(SchemaSet schema, DefRegistry defs, ModNames globals, StageDiagnostics? stage, string mod,
-                DerivedReads? reads = null)
+                DerivedReads? reads = null, ReturnTypes? returns = null)
             {
                 _schema = schema;
                 _defs = defs;
@@ -40,10 +43,14 @@ namespace Kesa.Engine.Loading
                 _stage = stage;
                 _mod = mod;
                 _reads = reads;
+                _returns = returns;
             }
 
-            /// <summary>마지막 바퀴이고 이름 오류를 내는 검사인가.</summary>
-            private bool Reporting => _report && _reads == null;
+            /// <summary>마지막 바퀴이고 이름 오류를 내는 검사인가 (순환 검사·반환 타입 훑기는 내지 않는다).</summary>
+            private bool Reporting => _report && _stage != null && _reads == null;
+
+            /// <summary>마지막 바퀴에서 본 <c>return</c> 값들의 타입을 합친 것 (값 없는 <c>return</c>은 None). 람다는 본문의 타입.</summary>
+            public StaticType? Returned { get; private set; }
 
             public void Function(FunctionValue function, IReadOnlyList<KeyValuePair<string, StaticType?>> parameters)
             {
@@ -79,8 +86,13 @@ namespace Kesa.Engine.Loading
 
             private void Body(FunctionValue function, SortedDictionary<string, StaticType?> scope)
             {
-                if (function.Definition != null) Block(function.Definition.Body, scope);
-                else Type(function.Lambda!.Body, scope);
+                if (function.Definition != null)
+                {
+                    Block(function.Definition.Body, scope);
+                    return;
+                }
+                var type = Type(function.Lambda!.Body, scope);
+                if (_report) Returned = type;
             }
 
             private void Assign(string name, StaticType? type) =>
@@ -122,7 +134,8 @@ namespace Kesa.Engine.Loading
                             Block(with.Body, scope);
                             break;
                         case ReturnStmt ret:
-                            if (ret.Value != null) Type(ret.Value, scope);
+                            var returned = ret.Value != null ? Type(ret.Value, scope) : StaticType.None;
+                            if (_report) Returned = StaticType.Join(Returned, returned ?? StaticType.Unknown);
                             break;
                     }
                 }
@@ -246,6 +259,10 @@ namespace Kesa.Engine.Loading
                         type = record.Type;
                     return new EntityType(type);
                 }
+                // 같은 모드의 함수: 적은 반환 타입이나 이 인자들로 본 본문의 return (G231)
+                if (_returns != null && call.Callee is NameExpr own && !scope.ContainsKey(own.Name) && _globals.All.Contains(own.Name) &&
+                    !_globals.Constructors.ContainsKey(own.Name))
+                    return _returns.Of(_mod, own.Name, call.Arguments, argTypes);
                 return StaticType.Unknown;
             }
 

@@ -1,6 +1,6 @@
 # 인계 메모: 현재 상태와 다음 할 일
 
-마지막 갱신: 2026-10-19. 브랜치 `spec-v0.5-scaffold`, 테스트 1952개 통과(커널 1916, CLI 36). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
+마지막 갱신: 2026-10-19. 브랜치 `spec-v0.5-scaffold`, 테스트 1955개 통과(커널 1919, CLI 36). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
 
 ## 한 줄 요약
 
@@ -22,7 +22,7 @@
 | 스크립트 속도(실행 예산 G224·G225, 실행기 구조 G226) | 끝남 (커밋 `cea92f6`, history의 "G226 실행기 구조 6단계"). 값 구조체화는 백본 ECS화와 함께 맨 끝 |
 | X4 번역 파일·포매터, S10 UI 구독 API(호스트 엔진 미정) | 없음 |
 
-결정은 `docs/spec-gaps.md`의 G1~G230.
+결정은 `docs/spec-gaps.md`의 G1~G231.
 
 ## 핵심 규칙 (자세한 것은 spec-gaps)
 
@@ -34,11 +34,11 @@
 
 ## 다음 할 일 (사용자와 고를 것)
 
-**방금 끝낸 것:** 속성 이름 오타의 로드 검사 1차(G228)와 같은 엔티티 안의 `derived` 순환 로드 검사(G229, schema-design 3.3.1 5항을 고침), 컴포넌트·신호 이름이 보이는 모드 안에서 내장을 이기는 규칙과 스텁의 이름 충돌 수정(G230), 생성자에서 속성을 읽는 것의 로드 검사(G228·G230 보강). history의 "속성 이름 오타의 로드 검사 1차", "`derived` 순환의 로드 검사", "스키마 이름과 내장의 충돌". 그 전은 문서와 큰 파일 정리(handoff·spec-gaps 나누기, 큰 소스 파일 partial 나누기와 안쪽 타입 빼기, 커밋 `c621954`~`7301b1b`). 자세한 것은 history의 "문서와 큰 파일 정리". 그 전은 S7 호스트 함수(G215~G222)와 스크립트 속도(G223~G227, history의 "S7 호스트 함수와 스크립트 속도"). 속도는 여기서 멈추기로 했다(남은 큰 몫은 값 구조체화, 백본 ECS화와 함께 맨 끝).
+**방금 끝낸 것:** 속성 이름 오타의 로드 검사 1차(G228)와 같은 엔티티 안의 `derived` 순환 로드 검사(G229, schema-design 3.3.1 5항을 고침), 컴포넌트·신호 이름이 보이는 모드 안에서 내장을 이기는 규칙과 스텁의 이름 충돌 수정(G230), 생성자에서 속성을 읽는 것의 로드 검사(G228·G230 보강), 속성 오타 검사의 함수 반환 타입 추론(G231). history의 "속성 이름 오타의 로드 검사 1차", "`derived` 순환의 로드 검사", "스키마 이름과 내장의 충돌". 그 전은 문서와 큰 파일 정리(handoff·spec-gaps 나누기, 큰 소스 파일 partial 나누기와 안쪽 타입 빼기, 커밋 `c621954`~`7301b1b`). 자세한 것은 history의 "문서와 큰 파일 정리". 그 전은 S7 호스트 함수(G215~G222)와 스크립트 속도(G223~G227, history의 "S7 호스트 함수와 스크립트 속도"). 속도는 여기서 멈추기로 했다(남은 큰 몫은 값 구조체화, 백본 ECS화와 함께 맨 끝).
 
 큰 후보:
 
-- 아래 "남은 일" 1번(속성 오타 검사의 반환 타입 추론, G228의 타입 정보를 넓힘).
+- 아래 "남은 일"의 정할 일: 생성자로 만든 컴포넌트 값의 필드를 붙이기 전에 읽을 수 있게 할지(`Moves(left=3).left`는 지금 실행 오류, 2026-10-19 재현, 의도인지 정한 적 없음).
 - 호스트 함수에서 남긴 것: 인자 8개 초과용 이름으로 꺼내기(`call.Int`), 콘텐츠 파일 최상위에서 호스트 함수를 값으로 참조(G221, 지금은 "이름 없음" 오류. Def의 `Cond`·`Action` 칸은 스크립트 함수만 받으므로 따로 정해야 함), 호스트 창구의 `choices`.
 - 속도의 작은 후보(이득은 작을 것으로 추정): 람다 없는 함수의 지역 변수 표 다시 쓰기(부를 때마다 약 64B), 문장 수준 호출(`x = f()`)의 결과 칸 번호, 컴프리헨션 이름 공간 프레임 재사용, `contribs()` 빈 목록.
 - X4 로컬라이제이션(번역 파일 형식·폴백·포매터, spec은 "v1 직전 재확인").
@@ -54,12 +54,11 @@
 
 ## 남은 일 (2026-10-19 점검, 우선순위 순)
 
-1. **속성 오타 검사의 2차: 함수 반환 타입 추론.** 1차(G228, `Loading/AttributeChecker.cs`·`.Walker.cs`)는 끝났다: 적은 타입·입구 문맥·`query`·`spawn`·역방향·지역 변수 합류로 타입을 알면 없는 이름이 로드 오류다. 남은 것은 `s = top(); s.Spel`처럼 함수 결과에서 온 값(지금은 모름으로 넘어감).
-2. **덤프의 `patches`가 부모 체인 전체를 훑는다(G76 알려진 한계).** 자식이 같은 값을 직접 적어 영향이 없었던 부모 패치도 나온다(코드로 확인). `dump`에서 특정 Def만 고르는 옵션도 미뤘다(G80).
-3. **실행 중 이름 오류의 "혹시 …?" 후보가 모드 전역을 빼먹는다.** `Session.LookupFree`는 후보에 지역 변수와 내장만 넣는다(코드로 확인, 재현 안 함). G108 뒤로는 로드 시점에 대부분 잡혀 닿기 어렵다.
-4. **종료 코드 3(엔진 내부 예외) 경로의 테스트가 없다.**
-5. **단계 순서 덤프(S9 "왜?" 도구, G80).** 파생값 추적(`Explain`)·전제 조건 보고서(`CheckPreconditions`)·반응 추적(`Reactions`)은 API로 있다. CLI는 월드를 돌리지 않으므로 CLI 명령으로 남은 것은 단계 순서(`schema.StageOrder`·`HandlerStages`)를 보여 주는 덤프뿐이다.
-6. **파일 정리의 작은 나머지.** 새로 나눈 파일의 쓰지 않는 using, 같은 기준이 맞는 나머지 결과 타입(`LoadOrder`·`DiscoveryResult`·`ChooseInfo`·`ModFunctions` 등)을 제 파일로(원하면).
+1. **덤프의 `patches`가 부모 체인 전체를 훑는다(G76 알려진 한계).** 자식이 같은 값을 직접 적어 영향이 없었던 부모 패치도 나온다(코드로 확인). `dump`에서 특정 Def만 고르는 옵션도 미뤘다(G80).
+2. **실행 중 이름 오류의 "혹시 …?" 후보가 모드 전역을 빼먹는다.** `Session.LookupFree`는 후보에 지역 변수와 내장만 넣는다(코드로 확인, 재현 안 함). G108 뒤로는 로드 시점에 대부분 잡혀 닿기 어렵다.
+3. **종료 코드 3(엔진 내부 예외) 경로의 테스트가 없다.**
+4. **단계 순서 덤프(S9 "왜?" 도구, G80).** 파생값 추적(`Explain`)·전제 조건 보고서(`CheckPreconditions`)·반응 추적(`Reactions`)은 API로 있다. CLI는 월드를 돌리지 않으므로 CLI 명령으로 남은 것은 단계 순서(`schema.StageOrder`·`HandlerStages`)를 보여 주는 덤프뿐이다.
+5. **파일 정리의 작은 나머지.** 새로 나눈 파일의 쓰지 않는 using, 같은 기준이 맞는 나머지 결과 타입(`LoadOrder`·`DiscoveryResult`·`ChooseInfo`·`ModFunctions` 등)을 제 파일로(원하면).
 
 **필요해지면 할 것** (실제 모드 사례가 생기면 정한다):
 
@@ -70,6 +69,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1952개 통과(커널 1916, CLI 36)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
+1. `git pull` 후 `dotnet test`로 1955개 통과(커널 1919, CLI 36)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(색인, 고를 항목의 영역은 `docs/gaps/`의 그 파일), 고를 항목에 맞는 `docs/spine-spec.md` 절을 읽는다. 실행기 구조는 `Script/Execution/PureEvaluator.cs`(입구)·`Session.cs`(+`.Calls`·`.Preconditions`·`.Stepping`)·`Frame.cs`·`Block.cs`·`PureEvaluator.Nodes.cs`(식 노드)·`PureEvaluator.Statements.cs`(문장 노드)·`FrameLayout.cs`·`LocalTable.cs`다. 고른 영역의 지난 기록이 필요하면 `docs/history.md`에서 그 절만 찾아 읽는다(전부 읽을 필요 없음). 옛 커맨드 첫 슬라이스의 읽을 곳: 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`)·`Frame.cs`(`Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.

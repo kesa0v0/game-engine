@@ -523,3 +523,11 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **구현:** 속성 검사(`AttributeChecker`)의 타입에 `ConstructorType`(컴포넌트·신호 생성자)을 더했다. 모드가 묶지 않은 보이는 스키마 이름(`ModNames.Constructors`, 지역 변수가 먼저)이 이 타입이고 속성이 없다. 같은 이름의 런타임 내장(`PureBuiltins.IsRuntimeName`)이 있으면 힌트가 "이 모드에서 내장이 가려졌으니 이름을 바꾸라(G230)", 아니면 "값을 먼저 만들라"다. 실행 쪽은 `PureBuiltin.Kind`를 더해 생성자의 오류 이름이 "component constructor random"·"signal constructor Hit"다. 새 결정이 아니라 G228의 규칙(타입을 아는 값에 없는 이름은 로드 오류)을 새 타입에 쓴 것이라 G 번호를 새로 두지 않고 G228·G230에 적었다.
 - **새 테스트:** `SchemaNameShadowingTests` 4개(내장을 쓰려던 경우의 힌트, 컴포넌트·신호의 멤버를 생성자에서 읽은 경우, 같은 이름의 지역 변수·매개변수는 생성자가 아님, 값을 거쳐 실행 중에 닿은 경우의 메시지).
 - **확인:** 재현 모드의 `engine check`가 pyright와 같은 자리(5:24)에서 오류를 낸다. 테스트 1952개 통과(커널 1916, CLI 36).
+
+## 속성 오타 검사의 함수 반환 타입 (G231, 2026-10-19)
+
+- **재현:** `a = first(); a.Fod`(본문에서 엔티티를 돌려줌), `annotated().Fod`(`-> Ref[Unit]`), `same(x).Fod`(`def same(u): return u`)가 `engine check` 오류 0개였고 pyright는 셋 다 잡았다.
+- **논의:** 가(적은 반환 타입 + 본문의 return), 나(가 + 부른 자리의 인자로 다시 추론), 다(적은 반환 타입만) 중 나를 골랐다(G231).
+- **구현:** `Loading/AttributeChecker.Returns.cs`의 `ReturnTypes`. 같은 모드의 함수 이름 호출이면 적은 반환 타입, 아니면 그 인자 타입으로 새 `Walker`(오류를 내지 않음)를 돌려 마지막 바퀴의 `return` 타입을 합친 것(`Walker.Returned`)이다. 함수와 인자 타입마다 결과를 기억하고, 훑는 중인 함수를 다시 부르면 모름. 적지 않은 매개변수의 인자 타입이 아직 없으면(대입을 모으는 바퀴) null이라 지역 변수 합치기와 맞물린다. `Walker.Reporting`은 `StageDiagnostics`가 없으면 거짓이다. 모드 이름(`ModNames`)은 `ReturnTypes`가 모드마다 한 번 만든다.
+- **새 테스트:** `AttributeCheckerTests` 3개(셋의 재현과 이름 인자, 이름에 묶은 람다와 함수 안의 호출 따라가기, 적은 `int`·다른 타입의 반환·모르는 인자·반환 없음은 모름). 기존 테스트의 "함수의 결과는 모른다" 주석을 고쳤다.
+- **확인:** 재현 모드의 `engine check`가 pyright와 같은 세 자리에서 오류를 낸다. 테스트 1955개 통과(커널 1919, CLI 36).
