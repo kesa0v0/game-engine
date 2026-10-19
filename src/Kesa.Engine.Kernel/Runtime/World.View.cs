@@ -58,6 +58,23 @@ namespace Kesa.Engine.Runtime
             }
         }
 
+        /// <summary>
+        /// 이 연결이 이 수를 낼 수 있는가: 제출 때처럼 <c>acts_for</c> → <c>may_act</c> (G233). 실패하면 낼 수 없음이고 진단을 남긴다.
+        /// </summary>
+        internal bool MayIssue(string issuer, string command, IReadOnlyDictionary<string, Value> move, List<Diagnostic> diagnostics)
+        {
+            try
+            {
+                return MayAct(issuer, ActsFor(FindCommand(command), Sorted(move)), command);
+            }
+            catch (WorldException e)
+            {
+                diagnostics.Add(new Diagnostic(e.Code, Severity.Error, e.Message + "; the move is not listed", null,
+                    SourceSpan.None, e.Hint));
+                return false;
+            }
+        }
+
         // 못 보는 엔티티·컴포넌트·줄은 죽은 id·붙지 않은 컴포넌트·없는 줄과 똑같이 응답한다 (G198)
 
         internal WorldException GoneForView(EntityId id) =>

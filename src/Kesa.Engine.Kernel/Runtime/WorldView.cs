@@ -339,8 +339,9 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>
-        /// 월드의 <see cref="World.LegalMoves"/>에서 이 연결이 못 보는 엔티티가 든 수를 뺀 것. <paramref name="max"/>와
-        /// <see cref="LegalMoveList.Truncated"/>는 보이는 수만 센다(아니면 "상한보다 적은데 잘림"으로 숨긴 수가 샌다).
+        /// 월드의 <see cref="World.LegalMoves"/>에서 이 연결이 못 보는 엔티티가 든 수(G202)와 이 연결이 낼 수 없는 수(입구 정책, G233)를
+        /// 뺀 것. <paramref name="max"/>와 <see cref="LegalMoveList.Truncated"/>는 남은 수만 센다(아니면 "상한보다 적은데 잘림"으로
+        /// 숨긴 수가 샌다).
         /// </summary>
         public LegalMoveList LegalMoves(string command, IReadOnlyDictionary<string, Value> args, int max)
         {
@@ -348,7 +349,7 @@ namespace Kesa.Engine.Runtime
             {
                 foreach (var v in move.Values)
                     if (!AllSeen(v)) return false;
-                return true;
+                return _world.MayIssue(Issuer, command, move, _diagnostics);
             });
             return new LegalMoveList(moves.Command, moves.Moves, moves.Truncated, Bare(moves.Arguments));
         }

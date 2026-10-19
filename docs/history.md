@@ -557,3 +557,12 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **새 테스트:** `LegalResponsesTests` 9개(대상으로 채우기와 `acts_for`로 거르기·`Needs`, 나열한 수는 모두 `Respond`가 받음, `by`로 좁히기, 상한 4가지, `ViewAs`, 없는 질문).
 - **덤으로 본 것:** `ViewAs(연결).OpenRequests`는 이미 그 연결이 답할 수 있는 질문만 준다(G200). 콘솔 호스트 구멍 2번(어느 연결이 답하나)은 `ViewAs`를 안 써서 생긴 우회일 수 있다.
 - **확인:** 테스트 1972개 통과(커널 1931, CLI 36, 콘솔 호스트 5). `spec-gaps` 표 확인 `231 6`.
+
+## 거른 합법 수에 입구 정책 (2026-10-19, G233)
+
+- **재현:** `acts_for=lambda party: party`인 자유 커맨드에서 `ViewAs("a").LegalMoves`가 남의 진영(#2)으로 내는 수까지 나열했고, 그 수를 `a`로 `Submit`하면 `GateDenied`였다(임시 테스트, 지움). 질문 쪽은 G200·G232로 이미 걸러져 있었다.
+- **논의:** 가(`ViewAs`의 `LegalMoves`가 `acts_for` → `may_act`도 거름), 나(엔티티로 행동할 수 있는 연결을 묻는 새 API), 다(호스트의 자리 차례로 내 보기를 그대로) 중 가를 골랐다. 나는 연결 목록을 엔진이 모른다.
+- **구현:** `World.MayIssue(issuer, command, move, diagnostics)`(`World.View.cs`): 제출과 같은 `ActsFor` → `MayAct`, 실패하면 빼고 진단. `WorldView.LegalMoves`의 거름 람다 끝에서 부른다. 상한·`Truncated`는 거른 뒤. 월드의 `LegalMoves`와 `Candidates`는 그대로.
+- **콘솔 호스트:** 자리마다 `ViewAs(자리)`의 `OpenRequests`·`LegalResponses`·`LegalMoves`로 할 수 있는 것을 모으고, 메뉴에 `[자리]`를 붙여 그 자리로 바로 낸다. 자리 차례로 내 보기(`Issue`)와 `Outcome.GateDenied`를 지웠다. 남은 작은 후보: 대상이 여럿인 질문이면 `Who`에 그 자리가 답할 수 없는 대상도 보인다(주석 "구멍 후보").
+- **새·바뀐 테스트:** `WorldViewTests.LegalMovesListOnlyMovesTheConnectionMayIssue`(A·B·C 연결마다 자기 진영 수만, 상한은 거른 뒤, 나열한 수는 `Submit` 통과). 기존 테스트의 "A가 B 쪽 인자로 물으면 모두 보임" 기대는 빈 목록으로 바뀌었다.
+- **확인:** 테스트 1973개 통과(커널 1932, CLI 36, 콘솔 호스트 5). `spec-gaps` 표 확인 `232 6`.

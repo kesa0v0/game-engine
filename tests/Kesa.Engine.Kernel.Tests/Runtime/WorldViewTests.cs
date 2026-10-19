@@ -381,9 +381,33 @@ namespace Kesa.Engine.Tests.Runtime
             var one = b.LegalMoves("banking.Attack", args, 1);
             Assert.That((Units(one, "unit"), one.Truncated), Is.EqualTo((new[] { u1 }, true)));
 
-            // A에게는 자기 유닛이라 모두 보인다(A는 자기 유닛을 공격할 수 없으니 B 쪽 인자로 물어도 같다)
-            Assert.That(Units(_w.ViewAs("A").LegalMoves("banking.Attack", args, 10), "unit"), Is.EqualTo(new[] { _scout, u1, h, u2 }));
+            // A는 B로서 낼 수 없으니(acts_for → may_act) B 쪽 인자로 물으면 수가 없다 (G233)
+            Assert.That(_w.ViewAs("A").LegalMoves("banking.Attack", args, 10).Moves, Is.Empty);
             Assert.That(b.Diagnostics, Is.Empty);
+        }
+
+        /// <summary>거른 합법 수는 제출 때처럼 acts_for → may_act를 통과한 수만 담는다 (G233). 담긴 수는 그 연결로 내면 입구를 지난다.</summary>
+        [Test]
+        public void LegalMovesListOnlyMovesTheConnectionMayIssue()
+        {
+            NewWorld(Defs +
+                     "@command(free=True, acts_for=lambda party: party)\n" +
+                     "def Concede(party: Ref[Party]):\n" +
+                     "    with preconditions:\n" +
+                     "        choose(party, from_=query(\"Party\"))\n" +
+                     "    pass\n");
+            var none = new Dictionary<string, Value>();
+            IEnumerable<EntityId> Parties(LegalMoveList list) => Units(list, "party");
+            Assert.That(Parties(_w.LegalMoves("banking.Concede", none, 10)), Is.EqualTo(new[] { _a, _b }));
+            var a = _w.ViewAs("A");
+            Assert.That(Parties(a.LegalMoves("banking.Concede", none, 10)), Is.EqualTo(new[] { _a }));
+            Assert.That(Parties(_w.ViewAs("B").LegalMoves("banking.Concede", none, 10)), Is.EqualTo(new[] { _b }));
+            Assert.That(_w.ViewAs("C").LegalMoves("banking.Concede", none, 10).Moves, Is.Empty);
+            // 상한은 걸러진 뒤의 수만 센다
+            var one = a.LegalMoves("banking.Concede", none, 1);
+            Assert.That((Parties(one), one.Truncated), Is.EqualTo((new[] { _a }, false)));
+            Assert.That(_w.Submit("A", "banking.Concede", a.LegalMoves("banking.Concede", none, 10).Moves.Single()).Succeeded, Is.True);
+            Assert.That(a.Diagnostics, Is.Empty);
         }
 
         [Test]

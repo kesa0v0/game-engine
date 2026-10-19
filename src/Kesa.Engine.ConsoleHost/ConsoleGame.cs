@@ -38,31 +38,20 @@ namespace Kesa.Engine.ConsoleHost
 
         private sealed class Option
         {
-            public Option(string label, Func<string, Outcome> run)
+            public Option(string seat, string label, Func<string> run)
             {
+                Seat = seat;
                 Label = label;
                 Run = run;
             }
 
+            /// <summary>이 수를 내는 자리(연결 꼬리표).</summary>
+            public string Seat { get; }
+
             public string Label { get; }
 
-            /// <summary>연결(issuer) 하나로 낸다.</summary>
-            public Func<string, Outcome> Run { get; }
-        }
-
-        /// <summary>제출·답·응답의 결과를 한 모양으로.</summary>
-        private sealed class Outcome
-        {
-            public Outcome(bool succeeded, bool gateDenied, string message)
-            {
-                Succeeded = succeeded;
-                GateDenied = gateDenied;
-                Message = message;
-            }
-
-            public bool Succeeded { get; }
-            public bool GateDenied { get; }
-            public string Message { get; }
+            /// <summary>그 자리로 내고 결과를 한 줄로 돌려준다.</summary>
+            public Func<string> Run { get; }
         }
 
         /// <summary>낼 수 있는 것이 없거나 입력이 끝나거나 <c>:q</c>면 끝난다.</summary>
@@ -78,7 +67,7 @@ namespace Kesa.Engine.ConsoleHost
                     return;
                 }
                 for (int i = 0; i < options.Count; i++)
-                    _out.WriteLine("  " + (i + 1).ToString(CultureInfo.InvariantCulture) + ") " + options[i].Label);
+                    _out.WriteLine("  " + (i + 1).ToString(CultureInfo.InvariantCulture) + ") [" + options[i].Seat + "] " + options[i].Label);
 
                 Option? picked = null;
                 while (picked == null)
@@ -92,23 +81,8 @@ namespace Kesa.Engine.ConsoleHost
                     else
                         _out.WriteLine("1부터 " + options.Count.ToString(CultureInfo.InvariantCulture) + " 사이의 번호, 끝내려면 :q");
                 }
-                _out.WriteLine(Issue(picked));
+                _out.WriteLine("[" + picked.Seat + "] " + picked.Run());
             }
-        }
-
-        /// <summary>
-        /// 구멍: 이 엔티티로 행동할 수 있는 연결이 누구인지 묻는 API가 없다(입구 정책은 모드 안에 있다).
-        /// 그래서 자리마다 차례로 내 보고 입구가 막은 것만 넘어간다. 막힌 시도는 상태를 바꾸지 않는다(C8).
-        /// </summary>
-        private string Issue(Option option)
-        {
-            Outcome? last = null;
-            foreach (var seat in _seats)
-            {
-                last = option.Run(seat);
-                if (!last.GateDenied) return "[" + seat + "] " + last.Message;
-            }
-            return "[어느 자리도 낼 수 없다] " + last!.Message;
         }
 
         // ---- 상태 ----
@@ -143,46 +117,52 @@ namespace Kesa.Engine.ConsoleHost
 
         // ---- 할 수 있는 것 ----
 
+        /// <summary>자리마다 그 연결로서 보는 읽기(<see cref="World.ViewAs"/>)로 그 자리가 낼 수 있는 것만 모은다 (G200·G232·G233).</summary>
         private List<Option> Options()
         {
             var options = new List<Option>();
-            foreach (var request in _world.OpenRequests)
+            foreach (var seat in _seats)
             {
-                foreach (var by in request.Who)
+                var view = _world.ViewAs(seat);
+                foreach (var request in view.OpenRequests)
                 {
-                    for (int i = 0; i < request.Choices.Count; i++)
+                    // 구멍 후보: 대상이 여럿인 질문이면 이 자리가 답할 수 없는 대상도 보인다(skirmish는 대상이 하나라 드러나지 않는다)
+                    foreach (var by in request.Who)
                     {
-                        long choice = i;
-                        options.Add(new Option(
-                            "질문 " + request.Id.ToString(CultureInfo.InvariantCulture) + " " + _text.Entity(by) + ": " +
-                            _text.Of(request.Choices[i]),
-                            seat => From(_world.Answer(seat, request.Id, by, choice))));
+                        for (int i = 0; i < request.Choices.Count; i++)
+                        {
+                            long choice = i;
+                            options.Add(new Option(seat,
+                                "질문 " + request.Id.ToString(CultureInfo.InvariantCulture) + " " + _text.Entity(by) + ": " +
+                                _text.Of(request.Choices[i]),
+                                () => Text(_world.Answer(seat, request.Id, by, choice))));
+                        }
                     }
+                    var responses = view.LegalResponses(request.Id, null, MaxMoves);
+                    foreach (var move in responses.Moves)
+                    {
+                        options.Add(new Option(seat, Label(move.Command, move.Arguments),
+                            () => Text(_world.Respond(seat, request.Id, move.Command, move.Arguments))));
+                    }
+                    foreach (var needs in responses.Needs)
+                        _out.WriteLine("(" + needs.Command + "의 수를 나열할 수 없다: " + string.Join(", ", needs.Parameters) + "를 정해야 한다)");
                 }
-                var responses = _world.LegalResponses(request.Id, null, MaxMoves);
-                foreach (var move in responses.Moves)
+                foreach (var command in _content.Commands.Keys.OrderBy(k => k, StringComparer.Ordinal))
                 {
-                    options.Add(new Option(Label(move.Command, move.Arguments),
-                        seat => From(_world.Respond(seat, request.Id, move.Command, move.Arguments))));
+                    if (!_content.Commands[command].Free) continue;
+                    foreach (var move in Moves(view, command, new Dictionary<string, Value>()))
+                        options.Add(new Option(seat, Label(command, move), () => Text(_world.Submit(seat, command, move))));
                 }
-                foreach (var needs in responses.Needs)
-                    _out.WriteLine("(" + needs.Command + "의 수를 나열할 수 없다: " + string.Join(", ", needs.Parameters) + "를 정해야 한다)");
-            }
-            foreach (var command in _content.Commands.Keys.OrderBy(k => k, StringComparer.Ordinal))
-            {
-                if (!_content.Commands[command].Free) continue;
-                foreach (var move in Moves(command, new Dictionary<string, Value>()))
-                    options.Add(new Option(Label(command, move), seat => From(_world.Submit(seat, command, move))));
             }
             return options;
         }
 
         /// <summary>합법 수. 호스트가 줘야 할 인자가 빠져 나열할 수 없으면 비운다.</summary>
-        private IReadOnlyList<IReadOnlyDictionary<string, Value>> Moves(string command, IReadOnlyDictionary<string, Value> args)
+        private IReadOnlyList<IReadOnlyDictionary<string, Value>> Moves(WorldView view, string command, IReadOnlyDictionary<string, Value> args)
         {
             try
             {
-                return _world.LegalMoves(command, args, MaxMoves).Moves;
+                return view.LegalMoves(command, args, MaxMoves).Moves;
             }
             catch (WorldException e)
             {
@@ -196,14 +176,12 @@ namespace Kesa.Engine.ConsoleHost
 
         // ---- 결과 ----
 
-        private Outcome From(SubmitResult r) =>
-            new Outcome(r.Succeeded, r.Outcome == SubmitOutcome.GateDenied,
-                r.Succeeded ? "ok" : r.Outcome + Why(r.Error, r.Preconditions, r.ArgumentRejections));
+        private string Text(SubmitResult r) =>
+            r.Succeeded ? "ok" : r.Outcome + Why(r.Error, r.Preconditions, r.ArgumentRejections);
 
-        private Outcome From(AnswerResult r) =>
-            new Outcome(r.Succeeded, r.Outcome == AnswerOutcome.GateDenied,
-                r.Succeeded ? "ok" : r.Outcome + (r.Message == null ? "" : ": " + r.Message) +
-                                     Why(r.Error, r.Preconditions, r.ArgumentRejections));
+        private string Text(AnswerResult r) =>
+            r.Succeeded ? "ok" : r.Outcome + (r.Message == null ? "" : ": " + r.Message) +
+                                 Why(r.Error, r.Preconditions, r.ArgumentRejections);
 
         private string Why(WorldException? error, PreconditionReport? report, IReadOnlyList<ArgumentRejection> rejections)
         {
