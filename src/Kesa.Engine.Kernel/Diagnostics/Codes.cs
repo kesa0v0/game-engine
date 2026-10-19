@@ -137,6 +137,9 @@ namespace Kesa.Engine.Diagnostics
         // 무거운 행동 (spec-gaps G225, 경고): 행동 실행 하나가 읽기 예산보다 많은 단계를 썼다. 실패하지 않고 결과에 붙는다
         public const string RunHeavy = "RUN021";
 
+        // 호스트가 부르는 모드 함수 (spec-gaps G245·G247): 쓰기·난수 함수나 입구라 부르지 않음 / 인자 수가 다름
+        public const string RunNotCallable = "RUN023";
+
         // 저장과 불러오기 (spec S8, spec-gaps G140): 깨졌거나 형식이 다른 저장 / 지금 내용과 어긋나는 저장 / 모드 목록이 달라짐(경고)
         public const string SaveCorrupt = "SAV001";
         public const string SaveMismatch = "SAV002";

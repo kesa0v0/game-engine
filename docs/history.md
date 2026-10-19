@@ -637,3 +637,10 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **정한 것:** 사용자가 고름(가: 예시를 고친다). 예시의 사용법이라 G 번호는 붙이지 않음.
 - **구현:** `samples/skirmish`의 `Attack` 본문이 `resolve(unit, target)`을 바로 불러 명중 때 맞은 쪽 진영에 버팀/후퇴를 묻는다. 차례 루프(`Start`)는 공격 응답의 답까지 끝난 뒤 돌아와 승패만 본다. 공격자·대상을 차례 루프에 넘기던 우회용 `Combat` 컴포넌트를 지웠다.
 - **확인:** 테스트 2008개 통과(커널 1965, CLI 36, 콘솔 호스트 7). `SkirmishTests.TheHitQuestionGoesToTheDefendersSeat`가 그대로 통과(질문은 파랑에게, 파랑 자리가 답함). 임시 테스트로 봇 판의 화면을 찍어 Attack 응답 뒤 `hit` 질문이 열리고 답한 뒤 피해가 들어가는 것을 보고 지웠다.
+
+## 2026-10-19: UI 값 함수 부르기 1단계 `Call`·`CheckCall` (G244~G247)
+
+- **정한 것:** G244~G248로 정한 것의 구현 첫 단계. 영수증(`Changed`)과 `ViewAs`는 다음 단계.
+- **구현:** 새 `Runtime/World.Call.cs`와 `Runtime/CallResult.cs`(`Function`·`Value`). `world.Call("모드.함수", 값들…)`은 `_scopes`에서 이름을 찾고(점은 마지막 것으로 나눔), 인자를 `ToScript`로 바꿔 `RunGateFunction`(걸음 예산 하나, 스크립트 오류는 `파일:줄`이 붙은 `WorldException`, 엔티티는 `EntityValue`로)으로 돌린다. 쓰기 함수·커맨드·핸들러·반응에 더해 난수 함수(G178)도 순수가 아니라 부르지 않는다. 없는 모드·함수는 `RUN001`과 "혹시 …?"(후보는 부를 수 있는 함수만), 부르지 않는 함수와 인자 수는 새 코드 `RUN023`(`RunNotCallable`). `CheckCall(이름, 인자 수)`는 같은 확인을 해 null이나 이유 문장. 호스트 함수 안에서는 부를 수 없다(G217, `NoHostWrites`).
+- **테스트:** 새 `WorldCallTests` 11개(평범한 값으로 돌려줌, 부르기가 아무것도 바꾸지 않음(시계·저장), 없는 이름의 제안, 쓰기·난수·커맨드·핸들러·반응 거절, 인자 수, 스크립트 오류와 예산 뒤에도 다음 호출, `CheckCall`).
+- **확인:** 테스트 2019개 통과(커널 1976, CLI 36, 콘솔 호스트 7).
