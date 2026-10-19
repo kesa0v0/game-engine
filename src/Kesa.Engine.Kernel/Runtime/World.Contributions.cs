@@ -221,6 +221,7 @@ namespace Kesa.Engine.Runtime
                 {
                     var c = _contributions[id];
                     if (c.Member != member || !SameRow(c.Row, view.Row)) continue;
+                    if (c.Source != null && HiddenFromViewer(c.Source.Value)) continue; // 못 보는 출처의 행은 빠진다 (G205·G248)
                     rows.Add(new ContributionView(this, c));
                     _trace?.Add(new ExplainNode(ExplainKind.Contribution, view.Id, view.Component.Name,
                         c.Row?.ToString().Trim('\''), member.Name, new FixedValue(c.Value), new List<ExplainNode>(), c.Op,

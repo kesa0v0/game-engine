@@ -22,11 +22,21 @@ namespace Kesa.Engine.Runtime
         internal bool MaySee(string issuer, EntityId id, string? component, List<Diagnostic> diagnostics)
         {
             if (_viewPolicy == null) return true;
-            var seats = SeatsOf(issuer);
-            if (seats.Count == 0) return MaySeeAs(NoneValue.Instance, id, component, diagnostics);
-            foreach (var viewer in seats)
-                if (MaySeeAs(new EntityValue(viewer), id, component, diagnostics)) return true;
-            return false;
+            // 정책은 실제 상태를 읽는다. 보는 쪽으로 부르는 중(G248)이면 잠시 풀고, 정책이 읽은 곳은 그 영수증에 든다
+            var saved = _viewer;
+            _viewer = null;
+            try
+            {
+                var seats = SeatsOf(issuer);
+                if (seats.Count == 0) return MaySeeAs(NoneValue.Instance, id, component, diagnostics);
+                foreach (var viewer in seats)
+                    if (MaySeeAs(new EntityValue(viewer), id, component, diagnostics)) return true;
+                return false;
+            }
+            finally
+            {
+                _viewer = saved;
+            }
         }
 
         private bool MaySeeAs(Value viewer, EntityId id, string? component, List<Diagnostic> diagnostics)

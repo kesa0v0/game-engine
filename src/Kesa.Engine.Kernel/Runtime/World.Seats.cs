@@ -29,6 +29,7 @@ namespace Kesa.Engine.Runtime
                     "use Unseat to leave an entity without a connection (spec-gaps G236)");
             if (!IsAlive(id)) throw new WorldException(Codes.RunSeat, "cannot seat a connection at " + id + ": it is not alive");
             _seats[id.Value] = (issuer, kind);
+            SeatsVersion++;
             Touch(id.Value); // controller(e)를 읽은 when 조건을 다시 본다
             Stamp(id.Value, null);
         }
@@ -38,6 +39,7 @@ namespace Kesa.Engine.Runtime
         {
             NoHostWrites("Unseat");
             if (!_seats.Remove(id.Value)) return;
+            SeatsVersion++;
             Touch(id.Value);
             Stamp(id.Value, null);
         }
@@ -75,7 +77,12 @@ namespace Kesa.Engine.Runtime
         {
             if (!_seats.TryGetValue(id, out var seat)) return;
             _seats.Remove(id);
-            Journal(() => _seats.Add(id, seat));
+            long version = SeatsVersion++;
+            Journal(() =>
+            {
+                _seats.Add(id, seat);
+                SeatsVersion = version;
+            });
         }
 
         /// <summary>
@@ -90,7 +97,7 @@ namespace Kesa.Engine.Runtime
                     "write controller(party)");
             long id = entity.EntityId.Value;
             _whenReads?.Add(id);
-            if (!_seats.TryGetValue(id, out var seat)) return NoneValue.Instance;
+            if (!_seats.TryGetValue(id, out var seat) || HiddenFromViewer(id)) return NoneValue.Instance;
             return new StrValue(seat.Kind == SeatKind.Ai ? ControllerAi : ControllerHuman);
         }
 

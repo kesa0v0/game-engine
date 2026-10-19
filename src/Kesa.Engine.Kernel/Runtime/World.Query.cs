@@ -99,6 +99,7 @@ namespace Kesa.Engine.Runtime
                 names[i] = s.Value;
             }
             var ids = Guard(() => Query(names));
+            if (_viewer != null) ids = ViewQueried(ids, names);
             if (_trace != null)
             {
                 var items = new List<Value>(ids.Count);

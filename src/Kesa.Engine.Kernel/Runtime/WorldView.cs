@@ -55,6 +55,17 @@ namespace Kesa.Engine.Runtime
             return Filter(_world.Get(id, member));
         }
 
+        // ---- 모드 함수 부르기 (G248) ----
+
+        /// <summary>
+        /// <see cref="World.Call"/>을 이 연결로서: 함수 안의 모든 읽기가 이 거른 읽기를 거친다(못 보는 엔티티는 없는 것, 못 보는 컴포넌트는
+        /// 붙지 않은 것, Ref는 <see cref="HiddenValue"/>). 결과는 따로 거르지 않는다. 영수증에는 보기 정책이 읽은 곳과 배정 표도 든다.
+        /// </summary>
+        public CallResult Call(string function, params Value[] arguments) => _world.CallAs(this, function, arguments);
+
+        /// <summary><see cref="World.CheckCall"/>과 같다: 부를 수 있는지는 보는 쪽과 상관없다.</summary>
+        public string? CheckCall(string function, int argumentCount) => _world.CheckCall(function, argumentCount);
+
         // ---- 키 컴포넌트의 줄 ----
 
         // 못 보는 컴포넌트의 줄은 붙지 않은 컴포넌트의 줄처럼, 못 보는 엔티티 키는 죽은 키처럼 응답한다 (G198)
@@ -464,7 +475,7 @@ namespace Kesa.Engine.Runtime
         // ---- 값 거르기 ----
 
         /// <summary>상태의 값: Ref는 <see cref="HiddenValue"/>, 리스트·딕트 안의 못 보는 엔티티는 빠진다 (G198).</summary>
-        private Value Filter(Value value)
+        internal Value Filter(Value value)
         {
             switch (value)
             {

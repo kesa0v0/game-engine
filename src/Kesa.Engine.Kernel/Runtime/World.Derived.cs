@@ -410,7 +410,10 @@ namespace Kesa.Engine.Runtime
         /// <summary>컴포넌트(줄)의 멤버 하나를 읽는다. <c>derived</c>면 계산한다.</summary>
         private Value ReadMember(EntityRecord entity, ComponentType component, RowKey? row, MemberDecl member)
         {
-            if (member.Kind == MemberKind.Derived) return ComputeDerived(entity, component, row, member);
+            // 보이는 derived는 숨긴 칸으로 계산돼도 보인다 (G199): 계산은 실제 상태로
+            if (member.Kind == MemberKind.Derived)
+                return _viewer == null ? ComputeDerived(entity, component, row, member)
+                    : Unviewed(() => ComputeDerived(entity, component, row, member));
             if (row == null) return Read(null, component, member, DefMembers(entity, component), entity.Values);
             if (!FindRow(entity, component, row.Value, out var defRow, out var record))
                 throw NoRow(new EntityId(entity.Id), component, row.Value);
@@ -468,7 +471,7 @@ namespace Kesa.Engine.Runtime
         {
             var member = MemberAt(view.Component, site);
             if (member == null) return ComponentAttribute(view, site.Name);
-            return ToScript(ReadMemberTraced(Record(view.Id), view.Component, view.Row, member.Member));
+            return ToScript(ViewFiltered(ReadMemberTraced(Record(view.Id), view.Component, view.Row, member.Member)));
         }
 
         private void WriteMember(ComponentView view, AttributeExpr site, Value value)
@@ -705,7 +708,8 @@ namespace Kesa.Engine.Runtime
                     continue;
                 }
                 var handle = new MemberHandle(inverse.Source, null, inverse.Member);
-                return new EntityGroup(this, Inverse(id, handle), inverse.Name);
+                // 가리키는 쪽이나 그 Ref가 든 컴포넌트가 안 보이면 빠진다 (G198)
+                return new EntityGroup(this, ViewFiltered(Inverse(id, handle), inverse.Source.Name), inverse.Name);
             }
             throw new ScriptRuntimeException(Codes.RunScript,
                 id + " (" + entity.Def.Id + ") has no component or collection '" + name + "'", Suggest.Hint(name, candidates));
@@ -763,6 +767,7 @@ namespace Kesa.Engine.Runtime
         {
             // Def가 가진 컴포넌트는 늘 있고, 런타임에 붙는 컴포넌트는 없을 수 있다 (None)
             if (!Has(entity, component)) return NoneValue.Instance;
+            if (_viewer != null && HiddenFromViewer(entity.Id, component.Name)) return NoneValue.Instance; // 못 보는 컴포넌트는 붙지 않은 것 (G198)
             var id = new EntityId(entity.Id);
             if (component.IsKeyed) return new RowsView(this, id, component);
             return new ComponentView(this, id, component, null);
@@ -772,7 +777,8 @@ namespace Kesa.Engine.Runtime
         {
             var entity = Record(view.Id);
             var component = view.Component;
-            if (component.TryGetMember(name, out var member)) return ToScript(ReadMemberTraced(entity, component, view.Row, member));
+            if (component.TryGetMember(name, out var member))
+                return ToScript(ViewFiltered(ReadMemberTraced(entity, component, view.Row, member)));
             if (name == "entity") return new EntityView(this, view.Id);
             if (name == "key" && view.Row != null)
                 return view.Row.Value.IsEntity ? new EntityView(this, new EntityId(view.Row.Value.EntityKey))
@@ -794,12 +800,23 @@ namespace Kesa.Engine.Runtime
         private Value RowOrNone(EntityId id, ComponentType component, RowKey key)
         {
             var entity = Record(id);
+            HiddenKey(key);
             if (!FindRow(entity, component, key, out _, out _)) return NoneValue.Instance;
             return new ComponentView(this, id, component, key);
         }
 
-        private bool HasRowKey(EntityId id, ComponentType component, RowKey key) =>
-            FindRow(Record(id), component, key, out _, out _);
+        private bool HasRowKey(EntityId id, ComponentType component, RowKey key)
+        {
+            var entity = Record(id);
+            HiddenKey(key);
+            return FindRow(entity, component, key, out _, out _);
+        }
+
+        /// <summary>보는 쪽으로 부르는 중이면 못 보는 엔티티 키는 죽은 키와 같다 (G198·G248).</summary>
+        private void HiddenKey(RowKey key)
+        {
+            if (_viewer != null && key.IsEntity && HiddenFromViewer(key.EntityKey)) throw KeyGoneForView(new EntityId(key.EntityKey));
+        }
 
         private IReadOnlyList<Value> RowKeyValues(EntityId id, ComponentType component)
         {
@@ -810,7 +827,7 @@ namespace Kesa.Engine.Runtime
                     foreach (var key in RowKeys(id, component.Name)) keys.Add(new StrValue(key));
                     break;
                 case KeyKind.Entity:
-                    foreach (var key in RowEntities(id, component.Name)) keys.Add(new EntityView(this, key));
+                    foreach (var key in ViewFiltered(RowEntities(id, component.Name), null)) keys.Add(new EntityView(this, key));
                     break;
                 default:
                     foreach (var key in RowInts(id, component.Name)) keys.Add(new IntValue(key));

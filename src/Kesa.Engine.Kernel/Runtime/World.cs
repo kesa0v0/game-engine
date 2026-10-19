@@ -446,7 +446,12 @@ namespace Kesa.Engine.Runtime
         private EntityRecord Record(EntityId id)
         {
             _whenReads?.Add(id.Value); // when 조건을 평가하는 중이면 이 엔티티를 읽었다 (S5)
-            if (_entities.TryGetValue(id.Value, out var entity)) return entity;
+            if (_entities.TryGetValue(id.Value, out var entity))
+            {
+                // 보는 쪽으로 부르는 중이면 못 보는 엔티티는 죽은 id와 같다 (G198·G248)
+                if (_viewer != null && HiddenFromViewer(id.Value)) throw GoneForView(id);
+                return entity;
+            }
             throw new WorldException(Codes.RunDeadEntity,
                 id.Value < 1 || id.Value >= _nextId ? id + " was never created" : id + " was destroyed");
         }

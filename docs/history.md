@@ -650,3 +650,9 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **구현:** `World.Call`이 부르는 동안 `@when` 조건의 기록 장치(`_whenReads`·`_whenReadsSources`·`_whenReadsTick`, 앞의 값은 끝나면 되돌림)로 읽은 엔티티·`query` 출처·틱을 모은다. 결과를 만들 때 엔티티마다 지금 `Version(id)`, 출처마다 출처 도장을 적고, 틱을 읽었으면 그 틱을 적는다. `CallResult.Changed(world)`는 다른 월드면 참, 아니면 셋 가운데 하나라도 달라졌나. 출처 도장은 새로(`World.Stamps.cs`의 `_sourceStamps`·`SourceVersion`·`StampSource`): `TouchSource`가 when이 없어도 찍고, 커맨드 안에서는 처음 찍을 때 옛 값을 기록해 실패하면 되감는다(엔티티 도장과 같은 규칙).
 - **테스트:** `WorldCallTests`에 6개(읽은 엔티티만·죽음, Ref를 따라간 엔티티, 목록의 생성·삭제·붙이기·떼기, 틱은 읽었을 때만, 실패한 커맨드(값·생성·붙이기)는 영수증을 그대로 둠, 불러온 월드는 늘 참). 출처 도장의 두 되감기 갈래를 하나씩 빼 보면 실패하는 것을 확인.
 - **확인:** 테스트 2025개 통과(커널 1982, CLI 36, 콘솔 호스트 7).
+
+## 2026-10-19: UI 값 함수 부르기 3단계 `ViewAs(연결).Call` (G248)
+
+- **구현:** `WorldView.Call`·`CheckCall`. `World.CallAs`가 부르는 동안 `_viewer`(그 `WorldView`)를 걸어 두고, 스크립트가 읽는 길마다 `WorldView`와 같은 거르기를 한다: `Record`(못 보는 엔티티는 죽은 id, RUN002), `SiblingOrNone`(못 보는 컴포넌트는 None), 멤버 값(`WorldView.Filter`를 internal로: Ref는 `HiddenValue`, Ref 목록에서는 빠짐), 역방향 컬렉션(가리키는 쪽과 그 컴포넌트), `query`(`ViewQueried`), 엔티티 키 줄(목록에서 빠지고 꼬집으면 죽은 키), `contribs`(못 보는 출처의 행 빠짐), `controller`(None). 보기 정책(`MaySee`)과 `derived` 계산(G199) 안에서는 `_viewer`를 잠시 풀어 실제 상태를 읽는다. 정책이 읽은 곳은 그대로 영수증에 들고, 보는 쪽 영수증은 배정 표의 횟수(`SeatsVersion`, `Seat`·`Unseat`·죽을 때 지움, 커맨드 안이면 되감음)도 본다.
+- **테스트:** 새 `WorldViewCallTests` 11개(query, 못 보는 컴포넌트, 역방향 컬렉션과 키 줄, 숨긴 Ref, 못 보는 인자, 보이는 derived, controller, contribs, 정책이 읽은 것(안개가 걷힘)과 처음 읽는 자리에 앉기의 영수증, 보는 쪽으로 불러도 월드는 그대로). 거르기 갈래 10개를 하나씩 빼 보면 각각 테스트가 실패하는 것을 확인. 처음의 배정 표 테스트는 앉힌 엔티티를 함수가 이미 읽어 엔티티 도장만으로도 통과했으므로, 읽은 적 없는 자리에 앉는 테스트로 바꿈.
+- **확인:** 테스트 2036개 통과(커널 1993, CLI 36, 콘솔 호스트 7).

@@ -47,6 +47,82 @@ namespace Kesa.Engine.Runtime
             return Receipt(function, value, reads, sources, tick);
         }
 
+        // ---- 보는 쪽으로 부르기 (G248) ----
+
+        /// <summary>
+        /// 보는 쪽으로 부르는 중이면 그 연결. 함수 안의 읽기가 <see cref="WorldView"/>처럼 걸러진다. 보기 정책과 <c>derived</c> 계산(G199)
+        /// 안에서는 잠시 풀어 실제 상태를 읽는다.
+        /// </summary>
+        private WorldView? _viewer;
+
+        /// <summary>배정 표가 바뀐 횟수: 보는 쪽 영수증은 이것도 본다(앉은 곳이 바뀌면 보이는 것이 바뀐다).</summary>
+        internal long SeatsVersion { get; private set; }
+
+        internal CallResult CallAs(WorldView viewer, string function, Value[] arguments)
+        {
+            var saved = _viewer;
+            _viewer = viewer;
+            try
+            {
+                return Call(function, arguments);
+            }
+            finally
+            {
+                _viewer = saved;
+            }
+        }
+
+        private T Unviewed<T>(Func<T> read)
+        {
+            var saved = _viewer;
+            _viewer = null;
+            try
+            {
+                return read();
+            }
+            finally
+            {
+                _viewer = saved;
+            }
+        }
+
+        /// <summary>보는 쪽으로 부르는 중이고 이 살아 있는 엔티티가 안 보인다.</summary>
+        private bool HiddenFromViewer(long id) => _viewer != null && _entities.ContainsKey(id) && !_viewer.Sees(new EntityId(id));
+
+        /// <summary>보는 쪽으로 부르는 중이고 이 엔티티의 이 컴포넌트가 안 보인다.</summary>
+        private bool HiddenFromViewer(long id, string component) =>
+            _viewer != null && _entities.ContainsKey(id) && !_viewer.Sees(new EntityId(id), component);
+
+        /// <summary>읽은 값의 Ref: 못 보는 엔티티는 <see cref="HiddenValue"/>, 목록에서는 빠진다 (G198).</summary>
+        private Value ViewFiltered(Value value) => _viewer == null ? value : _viewer.Filter(value);
+
+        /// <summary><c>query</c>의 목록을 보이는 것만으로: 엔티티가 보이고 이름으로 고른 컴포넌트가 모두 보여야 한다 (<see cref="WorldView.Query"/>).</summary>
+        private IReadOnlyList<EntityId> ViewQueried(IReadOnlyList<EntityId> ids, string[] names)
+        {
+            var kept = new List<EntityId>(ids.Count);
+            foreach (var id in ids)
+            {
+                bool seen = _viewer!.Sees(id);
+                foreach (var name in names)
+                {
+                    if (!seen) break;
+                    if (IsComponentName(name)) seen = _viewer.Sees(id, name);
+                }
+                if (seen) kept.Add(id);
+            }
+            return kept;
+        }
+
+        /// <summary>엔티티 목록에서 못 보는 것을 뺀다. <paramref name="component"/>가 있으면 그 컴포넌트도 보여야 한다.</summary>
+        private IReadOnlyList<EntityId> ViewFiltered(IReadOnlyList<EntityId> ids, string? component)
+        {
+            if (_viewer == null) return ids;
+            var kept = new List<EntityId>(ids.Count);
+            foreach (var id in ids)
+                if (component == null ? _viewer.Sees(id) : _viewer.Sees(id, component)) kept.Add(id);
+            return kept;
+        }
+
         private CallResult Receipt(string function, Value value, SortedSet<long> reads, SortedSet<string> sources, bool tick)
         {
             var ids = new long[reads.Count];
@@ -57,7 +133,8 @@ namespace Kesa.Engine.Runtime
             sources.CopyTo(names);
             var sourceVersions = new long[names.Length];
             for (int i = 0; i < names.Length; i++) sourceVersions[i] = SourceVersion(names[i]);
-            return new CallResult(function, value, this, ids, versions, names, sourceVersions, tick ? _tick : (long?)null);
+            return new CallResult(function, value, this, ids, versions, names, sourceVersions, tick ? _tick : (long?)null,
+                _viewer != null && _viewPolicy != null ? SeatsVersion : (long?)null);
         }
 
         /// <summary>
