@@ -285,3 +285,15 @@
 **이유:** 고른 것은 가(읽지 않음), 나(`seated(e)`로 앉았나만), 다(종류) 중 다. 꼬리표 글자는 판마다 달라 규칙이 기대면 깨지므로 셋 다 꼬리표는 주지 않는다. 규칙이 실제로 묻는 것은 "사람·AI·빈자리"이고, 나는 AI도 앉은 연결이라 사람과 AI를 가르지 못한다. 레퍼런스: Wesnoth는 자리마다 `controller`가 `human`·`ai`·`none`(`connect_engine.cpp`의 `side_controller`, 시나리오의 `controller=human`, 소스 확인), EU4는 세이브의 나라마다 `human` 표시가 있고 업적 검사가 그것을 본다(`eu4game/src/achievements.rs`, 소스 확인), CK3·Stellaris의 `is_ai` 조건(일반 지식). 호스트의 `Seat` 호출은 커맨드처럼 기록되므로 리플레이에서도 같게 읽힌다.
 
 **상태:** 확인
+
+## G242
+
+**위치:** G236에서 이어서 정할 것: 배정 표 API 이름
+
+**무엇이 비어 있었나:** G236·G239·G241의 이름(`Seat`·`Unseat`·`SeatOf`·`SeatsOf`·`SeatKindOf`·`SeatChoices`·`SeatKind`, 스크립트 `controller(e)`)은 구현하며 붙인 것이고 사용자가 고른 적이 없었다. 한 개념에 호스트는 "자리", 스크립트는 "조종자"라는 두 낱말을 쓴다.
+
+**어떻게 정했나:** **지금 이름 그대로 확정한다.** 호스트 API는 자리(seat) 계열, 스크립트는 `controller(e)`. `Seatable`은 G239에서 사용자가 정했다.
+
+**이유:** 고른 것은 가(그대로), 나(스크립트도 `seat_kind(e)`로 seat 통일), 다(호스트를 `SetController` 등으로 controller 통일) 중 가. 호스트는 로비에서 자리를 다루고 규칙은 누가 조종하나를 물으므로 보는 쪽마다 낱말이 다른 것이 자연스럽다. Wesnoth도 자리 `side`와 그 속성 `controller=human/ai`로 나눈다(소스 확인). 다는 로비·핫시트의 "자리에 앉는다" 그림을 잃고 바꿀 곳이 가장 많다.
+
+**상태:** 확인

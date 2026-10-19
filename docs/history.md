@@ -616,3 +616,9 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **구현:** 새 `Runtime/SeatKind.cs`(`Human`·`Ai`). 배정 표는 엔티티 → (꼬리표, 종류). `World.Seat(e, issuer, kind = Human)`, `SeatKindOf(e)`. 내장 `controller(e)`(`World.Seats.cs`의 `ControllerBuiltin`, `PureBuiltins.ControllerName`, 런타임 이름 목록): `"human"`·`"ai"`·`None`, 엔티티가 아니면 RUN005(타입 오류). when 조건이 읽으면 그 엔티티를 읽은 것으로 기록하고, `Seat`·`Unseat`가 `Touch`해 다음 정착에서 다시 본다. 저장의 `seats` 줄에 `"kind"`(필수, `human`·`ai` 밖이면 형식 오류). 저장 형식 버전은 그대로 1(G236 때처럼 출시 전). 스텁에 `def controller(entity: Any, /) -> Literal["human", "ai"] | None`.
 - **테스트:** 새 `ControllerTests` 4개(사람·AI·빈자리 읽기, AI가 되면 when이 발동하고 사람으로 돌아갔다 다시 AI면 또 발동, 종류 저장, 엔티티가 아닌 인자). `WorldSaveTests.ABrokenSeatIsCorrupt`에 `kind` 칸과 잘못된 종류 사례. `Seat`의 `Touch`를 지우면 when 테스트가 실패하는 것을 임시로 확인하고 되돌림.
 - **확인:** 테스트 1994개 통과(커널 1951, CLI 36, 콘솔 호스트 7). `spec-gaps` 표 확인 `240 6`.
+
+## 2026-10-19: G236의 남은 것 정리 (공동 조종 미룸, API 이름 G242)
+
+- **공동 조종(한 엔티티에 연결 여럿):** 미룸. 지금은 호스트가 한 꼬리표를 여러 사람에게 나눠 주면 된다(규칙이 그중 누가 냈는지 가르는 것만 안 됨). 사례가 생기면 `Seat`가 바꾸나 더하나, `SeatOf`의 목록화, 섞인 종류의 `controller()`, 저장 형식을 함께 정한다. spine-spec S6과 handoff에 적음.
+- **API 이름(G242):** 가(그대로)·나(seat 통일)·다(controller 통일) 중 가. 코드 변경 없음.
+- **확인:** `spec-gaps` 표 확인 `241 6`. 테스트는 코드 변경이 없어 1994개 그대로.
