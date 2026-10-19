@@ -102,5 +102,25 @@ namespace Kesa.Engine.Runtime
             else if (_undo != null) Journal(() => byName.Remove(name));
             byName[name] = now;
         }
+
+        // ---- query 목록 출처의 도장 (G246) ----
+
+        /// <summary>출처 이름(Def 타입·컴포넌트) → 그 목록이 마지막으로 바뀐 때: 그 타입의 엔티티가 생기거나 죽었고, 그 컴포넌트가 붙거나 떨어졌다.</summary>
+        private readonly Dictionary<string, long> _sourceStamps = new Dictionary<string, long>(StringComparer.Ordinal);
+
+        /// <summary><c>query</c>로 읽는 출처 하나의 목록이 마지막으로 바뀐 때. 이 월드에서 바뀐 적이 없으면 0.</summary>
+        internal long SourceVersion(string name) => _sourceStamps.TryGetValue(name, out var v) ? v : 0;
+
+        private void StampSource(string name)
+        {
+            if (_rewinding) return;
+            long now = ++_clock;
+            if (_sourceStamps.TryGetValue(name, out var old))
+            {
+                if (_undo != null && old <= _stampFloor) Journal(() => _sourceStamps[name] = old);
+            }
+            else if (_undo != null) Journal(() => _sourceStamps.Remove(name));
+            _sourceStamps[name] = now;
+        }
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Runtime;
@@ -16,6 +17,7 @@ namespace Kesa.Engine.Tests.Runtime
             "component(\"Side\", name=field(str, default=\"\"))\n" +
             "deftype(\"Party\", components=[\"Side\"])\n" +
             "deftype(\"Unit\", components=[\"Life\", \"Owner\"])\n" +
+            "component(\"Mark\", x=field(int, default=0))\n" +
             "signal(\"Poked\")\n";
 
         private const string Defs =
@@ -30,7 +32,13 @@ namespace Kesa.Engine.Tests.Runtime
             "def roll():\n    return random.randint(1, 6)\n" +
             "@command(free=True, acts_for=None)\ndef Hurt(u: Ref[Unit]):\n    u.Life.hp -= 1\n" +
             "@on(Poked)\ndef ouch():\n    return None\n" +
-            "@when(lambda: False)\ndef never():\n    pass\n";
+            "@when(lambda: False)\ndef never():\n    pass\n" +
+            // 영수증 (G246)
+            "def hp(u):\n    return u.Life.hp\n" +
+            "def owner_name(u):\n    return u.Owner.party.Side.name\n" +
+            "def marked():\n    return len(query(\"Unit\", \"Mark\"))\n" +
+            "def clock():\n    return now()\n" +
+            "@command(free=True, acts_for=None)\ndef Wreck(u: Ref[Unit]):\n    u.Life.hp = 0\n    spawn(\"Soldier\")\n    attach(u, Mark(x=1))\n    u.Life.hp // 0\n";
 
         private World Make(out EntityId unit, int stepBudget = World.DefaultStepBudget)
         {
@@ -128,6 +136,94 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(world.CheckCall("ranks.unit_row", 1), Is.Null);
             Assert.That(world.CheckCall("ranks.unit_rows", 1), Does.Contain("unit_row"));
             Assert.That(world.CheckCall("ranks.unit_row", 2), Does.Contain("takes 1 argument"));
+        }
+
+        // ---- 영수증 (G246) ----
+
+        [Test]
+        public void ChangedWhenAReadEntityChanges()
+        {
+            var world = Make(out var unit);
+            var other = world.Create("Soldier");
+            var r = world.Call("ranks.hp", new EntityValue(unit));
+            Assert.That(r.Changed(world), Is.False);
+            world.Set(other, world.Member("Life", "hp"), new IntValue(9));
+            Assert.That(r.Changed(world), Is.False, "another unit is not in the receipt");
+            world.Set(unit, world.Member("Life", "hp"), new IntValue(3));
+            Assert.That(r.Changed(world), Is.True);
+            r = world.Call("ranks.hp", new EntityValue(unit));
+            Assert.That(r.Changed(world), Is.False);
+            world.Destroy(unit);
+            Assert.That(r.Changed(world), Is.True, "death changes it");
+        }
+
+        [Test]
+        public void ARefFollowedIntoAnotherEntityIsInTheReceipt()
+        {
+            var world = Make(out var unit);
+            var red = ((EntityValue)world.Get(unit, world.Member("Owner", "party"))).Id;
+            var r = world.Call("ranks.owner_name", new EntityValue(unit));
+            world.Set(red, world.Member("Side", "name"), new StrValue("Crimson"));
+            Assert.That(r.Changed(world), Is.True);
+        }
+
+        [Test]
+        public void AQueryListChangesWithSpawnDeathAndAttach()
+        {
+            var world = Make(out var unit);
+            var r = world.Call("ranks.units");
+            world.Set(unit, world.Member("Life", "hp"), new IntValue(1));
+            Assert.That(r.Changed(world), Is.False, "the list did not change and no member was read");
+            var other = world.Create("Soldier");
+            Assert.That(r.Changed(world), Is.True);
+            r = world.Call("ranks.units");
+            world.Destroy(other);
+            Assert.That(r.Changed(world), Is.True);
+
+            var m = world.Call("ranks.marked");
+            Assert.That(m.Changed(world), Is.False);
+            world.Add(unit, "Mark");
+            Assert.That(m.Changed(world), Is.True);
+            m = world.Call("ranks.marked");
+            world.Remove(unit, "Mark");
+            Assert.That(m.Changed(world), Is.True);
+        }
+
+        [Test]
+        public void TheTickCountsOnlyWhenRead()
+        {
+            var world = Make(out var unit);
+            var c = world.Call("ranks.clock");
+            var h = world.Call("ranks.hp", new EntityValue(unit));
+            world.Advance();
+            Assert.That(c.Changed(world), Is.True);
+            Assert.That(h.Changed(world), Is.False);
+        }
+
+        [Test]
+        public void AFailedCommandLeavesTheReceiptsAlone()
+        {
+            var world = Make(out var unit);
+            var h = world.Call("ranks.hp", new EntityValue(unit));
+            var u = world.Call("ranks.units");
+            var m = world.Call("ranks.marked");
+            var result = world.Submit("host", "ranks.Wreck", new Dictionary<string, Value> { ["u"] = new EntityValue(unit) });
+            Assert.That(result.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(h.Changed(world), Is.False);
+            Assert.That(u.Changed(world), Is.False);
+            Assert.That(m.Changed(world), Is.False);
+            Assert.That(world.Submit("host", "ranks.Hurt", new Dictionary<string, Value> { ["u"] = new EntityValue(unit) }).Outcome,
+                Is.EqualTo(SubmitOutcome.Succeeded));
+            Assert.That(h.Changed(world), Is.True);
+        }
+
+        [Test]
+        public void AnotherWorldAlwaysAsksForACall()
+        {
+            var world = Make(out var unit);
+            var r = world.Call("ranks.hp", new EntityValue(unit));
+            var loaded = World.Load(LoadClean(), world.Save()).World!;
+            Assert.That(r.Changed(loaded), Is.True);
         }
     }
 }

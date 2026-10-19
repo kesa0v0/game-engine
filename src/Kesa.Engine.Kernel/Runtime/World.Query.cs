@@ -183,15 +183,15 @@ namespace Kesa.Engine.Runtime
         /// <summary>엔티티가 생기거나 죽었다: 그 타입과 가진 컴포넌트를 출처로 읽은 조건을 다시 본다.</summary>
         private void TouchSources(EntityRecord entity)
         {
-            if (_whens.Count == 0) return;
-            _whenTouchedSources.Add(entity.Def.Type.Name);
-            foreach (var c in ComponentsOf(entity)) _whenTouchedSources.Add(c.Name);
+            TouchSource(entity.Def.Type.Name);
+            foreach (var c in ComponentsOf(entity)) TouchSource(c.Name);
         }
 
-        /// <summary>컴포넌트가 붙거나 떨어졌다.</summary>
+        /// <summary>컴포넌트가 붙거나 떨어졌다. 그 목록을 읽은 영수증(G246)을 위해 출처 도장도 찍는다.</summary>
         private void TouchSource(string name)
         {
             if (_whens.Count > 0) _whenTouchedSources.Add(name);
+            StampSource(name);
         }
     }
 }

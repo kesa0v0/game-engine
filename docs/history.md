@@ -644,3 +644,9 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **구현:** 새 `Runtime/World.Call.cs`와 `Runtime/CallResult.cs`(`Function`·`Value`). `world.Call("모드.함수", 값들…)`은 `_scopes`에서 이름을 찾고(점은 마지막 것으로 나눔), 인자를 `ToScript`로 바꿔 `RunGateFunction`(걸음 예산 하나, 스크립트 오류는 `파일:줄`이 붙은 `WorldException`, 엔티티는 `EntityValue`로)으로 돌린다. 쓰기 함수·커맨드·핸들러·반응에 더해 난수 함수(G178)도 순수가 아니라 부르지 않는다. 없는 모드·함수는 `RUN001`과 "혹시 …?"(후보는 부를 수 있는 함수만), 부르지 않는 함수와 인자 수는 새 코드 `RUN023`(`RunNotCallable`). `CheckCall(이름, 인자 수)`는 같은 확인을 해 null이나 이유 문장. 호스트 함수 안에서는 부를 수 없다(G217, `NoHostWrites`).
 - **테스트:** 새 `WorldCallTests` 11개(평범한 값으로 돌려줌, 부르기가 아무것도 바꾸지 않음(시계·저장), 없는 이름의 제안, 쓰기·난수·커맨드·핸들러·반응 거절, 인자 수, 스크립트 오류와 예산 뒤에도 다음 호출, `CheckCall`).
 - **확인:** 테스트 2019개 통과(커널 1976, CLI 36, 콘솔 호스트 7).
+
+## 2026-10-19: UI 값 함수 부르기 2단계 영수증 `CallResult.Changed` (G246)
+
+- **구현:** `World.Call`이 부르는 동안 `@when` 조건의 기록 장치(`_whenReads`·`_whenReadsSources`·`_whenReadsTick`, 앞의 값은 끝나면 되돌림)로 읽은 엔티티·`query` 출처·틱을 모은다. 결과를 만들 때 엔티티마다 지금 `Version(id)`, 출처마다 출처 도장을 적고, 틱을 읽었으면 그 틱을 적는다. `CallResult.Changed(world)`는 다른 월드면 참, 아니면 셋 가운데 하나라도 달라졌나. 출처 도장은 새로(`World.Stamps.cs`의 `_sourceStamps`·`SourceVersion`·`StampSource`): `TouchSource`가 when이 없어도 찍고, 커맨드 안에서는 처음 찍을 때 옛 값을 기록해 실패하면 되감는다(엔티티 도장과 같은 규칙).
+- **테스트:** `WorldCallTests`에 6개(읽은 엔티티만·죽음, Ref를 따라간 엔티티, 목록의 생성·삭제·붙이기·떼기, 틱은 읽었을 때만, 실패한 커맨드(값·생성·붙이기)는 영수증을 그대로 둠, 불러온 월드는 늘 참). 출처 도장의 두 되감기 갈래를 하나씩 빼 보면 실패하는 것을 확인.
+- **확인:** 테스트 2025개 통과(커널 1982, CLI 36, 콘솔 호스트 7).

@@ -22,7 +22,42 @@ namespace Kesa.Engine.Runtime
             var fn = Callable(function, arguments.Length);
             var args = new List<Value>(arguments.Length);
             foreach (var a in arguments) args.Add(ToScript(a));
-            return new CallResult(function, RunGateFunction(fn, args, function));
+            // 읽은 곳은 when 조건과 같은 장치로 모은다 (G246)
+            var savedReads = _whenReads;
+            var savedSources = _whenReadsSources;
+            bool savedTick = _whenReadsTick;
+            var reads = new SortedSet<long>();
+            var sources = new SortedSet<string>(StringComparer.Ordinal);
+            _whenReads = reads;
+            _whenReadsSources = sources;
+            _whenReadsTick = false;
+            Value value;
+            bool tick;
+            try
+            {
+                value = RunGateFunction(fn, args, function);
+            }
+            finally
+            {
+                tick = _whenReadsTick;
+                _whenReads = savedReads;
+                _whenReadsSources = savedSources;
+                _whenReadsTick = savedTick;
+            }
+            return Receipt(function, value, reads, sources, tick);
+        }
+
+        private CallResult Receipt(string function, Value value, SortedSet<long> reads, SortedSet<string> sources, bool tick)
+        {
+            var ids = new long[reads.Count];
+            reads.CopyTo(ids);
+            var versions = new long[ids.Length];
+            for (int i = 0; i < ids.Length; i++) versions[i] = Version(new EntityId(ids[i]));
+            var names = new string[sources.Count];
+            sources.CopyTo(names);
+            var sourceVersions = new long[names.Length];
+            for (int i = 0; i < names.Length; i++) sourceVersions[i] = SourceVersion(names[i]);
+            return new CallResult(function, value, this, ids, versions, names, sourceVersions, tick ? _tick : (long?)null);
         }
 
         /// <summary>
