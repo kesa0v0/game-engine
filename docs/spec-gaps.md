@@ -262,6 +262,7 @@
 | [G80](gaps/S9-diagnostics.md#g80) | S9 최종 Def 덤프의 CLI 진입점 (G76 보강) | 덤프는 별도 명령 `engine dump <mods-dir>`: stdout에 덤프 JSON, 로드 진단은 텍스트로 stderr, 오류가 있어도 살아남은 모드로 냄, Def 고르기 옵션은 미룸. | 확인 |
 | [G84](gaps/S9-diagnostics.md#g84) | S9 경고를 오류로 올리는 옵션 (S9 열린 질문, G78 보강) | `engine check --warnings-as-errors` 하나로 모든 경고를 `error`로 올려 출력·`ok`·종료 코드에 반영(정보는 그대로), `dump`·`stubs`는 이 옵션을 안 받음. | 확인 |
 | [G85](gaps/S9-diagnostics.md#g85) | S9 `check`와 `optional` 모드 (G38의 열린 점) | `check`는 옵션 없이 폴더에 있는 모드 집합만 검사(호환 패치를 검사하려면 선택 모드를 함께 둠). | 확인 |
+| [G252](gaps/S9-diagnostics.md#g252) | 모더용 문서의 형식 | 저장소 안 마크다운 안내서 `docs/modding/`(개념·순서·예시, 스커미시를 따라감). 빠짐없는 목록(레퍼런스)은 따로 쓰지 않고 엔진이 만드는 `.pyi` 스텁(G207~G209)을 가리킴. 안내서의 예시는 테스트가 로드하는 모드에서 가져와 어긋나면 테스트가 실패. 생성 레퍼런스(`kesa docs`)와 문서 사이트는 미룸. | 확인 |
 
 ## X1 질문·X2 시간·X3 스택
 
