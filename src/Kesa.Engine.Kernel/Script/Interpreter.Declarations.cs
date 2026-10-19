@@ -280,8 +280,8 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary>
-        /// <c>def</c> 위의 데코레이터. <c>@command</c>(<c>free=</c>, <c>acts_for=</c>)와 <c>@submit_policy</c>(<c>override=</c>)를
-        /// 받는다 (spec S6, spec-gaps G109·G122~G124·G130). 커맨드 id는 <c>모드id.함수이름</c>이다.
+        /// <c>def</c> 위의 데코레이터. <c>@command</c>(<c>free=</c>, <c>acts_for=</c>)와 <c>@view_policy</c>(<c>override=</c>)를
+        /// 받는다 (spec S6, spec-gaps G109·G123·G130·G203). 없어진 <c>@submit_policy</c>는 오류로 알린다(G237). 커맨드 id는 <c>모드id.함수이름</c>이다.
         /// </summary>
         private void DeclareCommand(FunctionDef def, FunctionValue function)
         {
@@ -308,12 +308,14 @@ namespace Kesa.Engine.Script
 
             if (name == SubmitPolicyName)
             {
-                DeclarePolicy(def, function, decorator, PolicyKind.Submit);
+                _context.Error(Codes.CmdSubmitPolicy,
+                    "@submit_policy was removed: the gate checks the kernel's seat table, not a policy function", decorator.Span,
+                    hint: "delete this function; the host seats connections with World.Seat, and acts_for=None lets anyone in (spec-gaps G236·G237)");
                 return;
             }
             if (name == ViewPolicyName)
             {
-                DeclarePolicy(def, function, decorator, PolicyKind.View);
+                DeclarePolicy(def, function, decorator);
                 return;
             }
             if (name == OnName)
@@ -328,7 +330,7 @@ namespace Kesa.Engine.Script
             }
             if (name != CommandName)
             {
-                _context.Error(Codes.CmdBadDecorator, "unknown decorator; only @command, @on, @when, @submit_policy and @view_policy are supported",
+                _context.Error(Codes.CmdBadDecorator, "unknown decorator; only @command, @on, @when and @view_policy are supported",
                     decorator.Span, hint: "write @command or @command(free=True, acts_for=...)");
                 return;
             }
@@ -403,13 +405,12 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary>
-        /// <c>@submit_policy</c> / <c>@submit_policy(override=True)</c> (G122·G124): 기본값 없는 매개변수 둘 <c>(issuer, target)</c>.
-        /// <c>@view_policy</c> (G197·G203): 기본값 없는 매개변수 셋 <c>(issuer, entity, component)</c>.
-        /// 개수와 교체는 모든 모드를 모은 뒤 본다.
+        /// <c>@view_policy</c> / <c>@view_policy(override=True)</c> (G197·G203·G238): 기본값 없는 매개변수 셋
+        /// <c>(viewer, entity, component)</c>. 개수와 교체는 모든 모드를 모은 뒤 본다.
         /// </summary>
-        private void DeclarePolicy(FunctionDef def, FunctionValue function, Expr decorator, PolicyKind kind)
+        private void DeclarePolicy(FunctionDef def, FunctionValue function, Expr decorator)
         {
-            string at = "@" + (kind == PolicyKind.Submit ? SubmitPolicyName : ViewPolicyName);
+            string at = "@" + ViewPolicyName;
             bool isOverride = false;
             if (decorator is CallExpr call)
             {
@@ -433,22 +434,18 @@ namespace Kesa.Engine.Script
                 }
             }
 
-            bool shapeOk = def.Parameters.Count == (kind == PolicyKind.Submit ? 2 : 3);
+            bool shapeOk = def.Parameters.Count == 3;
             foreach (var p in def.Parameters)
                 if (p.Default != null) shapeOk = false;
             if (!shapeOk)
             {
-                if (kind == PolicyKind.Submit)
-                    _context.Error(Codes.CmdSubmitPolicy,
-                        "a submit policy takes exactly two parameters without defaults: (issuer, target)", def.Span,
-                        hint: "issuer is the connection's tag, target is the entity chosen by acts_for or None (spec-gaps G122)");
-                else
-                    _context.Error(Codes.CmdViewPolicy,
-                        "a view policy takes exactly three parameters without defaults: (issuer, entity, component)", def.Span,
-                        hint: "component is a component name, or None when asking whether the entity itself is seen (spec-gaps G197)");
+                _context.Error(Codes.CmdViewPolicy,
+                    "a view policy takes exactly three parameters without defaults: (viewer, entity, component)", def.Span,
+                    hint: "viewer is an entity the connection sits at, or None for a spectator; component is a component name, " +
+                          "or None when asking whether the entity itself is seen (spec-gaps G197·G238)");
                 return;
             }
-            _context.Functions.Policies.Add(new PolicyDecl(_context.Mod, function, isOverride, decorator.Span, kind));
+            _context.Functions.Policies.Add(new PolicyDecl(_context.Mod, function, isOverride, decorator.Span));
         }
     }
 }

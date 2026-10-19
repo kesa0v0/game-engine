@@ -81,7 +81,6 @@ namespace Kesa.Engine.Loading
                 return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
                     run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound, scopes, commands)
                 {
-                    SubmitPolicy = run.Policy,
                     ViewPolicy = run.ViewPolicy,
                     Handlers = handlers,
                     Whens = whens,
@@ -112,9 +111,6 @@ namespace Kesa.Engine.Loading
             public SchemaSet Schema { get; }
             public DefRegistry Defs { get; }
             public ModVisibility Visibility { get; }
-
-            /// <summary>제출 정책 함수 (G124). 없으면 null.</summary>
-            public PolicyDecl? Policy { get; set; }
 
             /// <summary>보기 정책 함수 (G203). 없으면 null.</summary>
             public PolicyDecl? ViewPolicy { get; set; }
@@ -193,13 +189,13 @@ namespace Kesa.Engine.Loading
             }
 
             // ②b 끝: Def 등록 (고정점). 모드가 더 빠졌으면 스키마도 그 모드의 확장 없이 다시 만든다.
-            var defs = BuildDefs(units, visibility, order, runDiagnostics, out var policy, out var viewPolicy);
+            var defs = BuildDefs(units, visibility, order, runDiagnostics, out var viewPolicy);
             if (CountSurvivors(units) != survivorsBefore)
             {
                 schema = BuildSchema(units, visibility, runDiagnostics);
                 Rebind(defs, schema);
             }
-            return new DefinitionRun(schema, defs, visibility) { Policy = policy, ViewPolicy = viewPolicy };
+            return new DefinitionRun(schema, defs, visibility) { ViewPolicy = viewPolicy };
         }
 
         /// <summary>

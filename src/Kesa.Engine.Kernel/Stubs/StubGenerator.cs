@@ -92,10 +92,6 @@ namespace Kesa.Engine.Stubs
             "@overload\n" +
             "def command[F: Callable[..., Any]](*, free: bool = ..., acts_for: Any = ..., on_stale: Any = ...) -> Callable[[F], F]: ...\n" +
             "@overload\n" +
-            "def submit_policy[F: Callable[..., Any]](f: F, /) -> F: ...\n" +
-            "@overload\n" +
-            "def submit_policy[F: Callable[..., Any]](*, override: bool = ...) -> Callable[[F], F]: ...\n" +
-            "@overload\n" +
             "def view_policy[F: Callable[..., Any]](f: F, /) -> F: ...\n" +
             "@overload\n" +
             "def view_policy[F: Callable[..., Any]](*, override: bool = ...) -> Callable[[F], F]: ...\n" +

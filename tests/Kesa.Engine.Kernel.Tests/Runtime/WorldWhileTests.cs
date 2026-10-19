@@ -47,6 +47,7 @@ namespace Kesa.Engine.Tests.Runtime
             _content = LoadClean();
             _world = new World(_content, actionStepBudget: actionStepBudget);
             _red = _world.Create("Red");
+            _world.Seat(_red, "host");
         }
 
         private long V(World w) => ((IntValue)w.Get(_red, w.Member("Score", "v"))).Value;
@@ -88,14 +89,14 @@ namespace Kesa.Engine.Tests.Runtime
             NewWorld();
             var picks = new[] { 0, 0, 0, 1 };
             var straight = new World(_content);
-            straight.Create("Red");
+            straight.Seat(straight.Create("Red"), "host");
             Play(straight, picks, stopAt: -1);
             Assert.That(V(straight), Is.EqualTo(-3 - 1000));
 
             for (int stop = 0; stop < picks.Length; stop++)
             {
                 var w = new World(_content);
-                w.Create("Red");
+                w.Seat(w.Create("Red"), "host");
                 var done = Play(w, picks, stop);
                 Assert.That(done.Save(), Is.EqualTo(straight.Save()), "saved before answer " + stop);
             }

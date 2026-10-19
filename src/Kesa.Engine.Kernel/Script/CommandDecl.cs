@@ -44,38 +44,28 @@ namespace Kesa.Engine.Script
         public IReadOnlyList<CommandParameter> Parameters { get; internal set; } = Array.Empty<CommandParameter>();
     }
 
-    /// <summary>정책 함수의 종류: 입구(<c>@submit_policy</c>, G122)와 보기(<c>@view_policy</c>, G197).</summary>
-    public enum PolicyKind
-    {
-        Submit,
-        View,
-    }
-
     /// <summary>
-    /// <c>@submit_policy</c>로 선언한 제출 정책 함수 (spec S6 입구, spec-gaps G122·G124·G130) 또는 <c>@view_policy</c>로 선언한
-    /// 보기 정책 함수 (spec-gaps G196·G197·G203). 순수 함수이고 종류마다 활성 모드 전체에서 최대 하나다. 교체는 <c>override=True</c>.
+    /// <c>@view_policy</c>로 선언한 보기 정책 함수 (spec-gaps G196·G197·G203·G238). 순수 함수이고 활성 모드 전체에서 최대 하나다.
+    /// 교체는 <c>override=True</c>. 입구 정책 <c>@submit_policy</c>는 없어졌다(입구는 커널의 배정 표, G237).
     /// </summary>
     public sealed class PolicyDecl
     {
-        public PolicyDecl(string mod, FunctionValue function, bool isOverride, SourceSpan span, PolicyKind kind = PolicyKind.Submit)
+        public PolicyDecl(string mod, FunctionValue function, bool isOverride, SourceSpan span)
         {
             Mod = mod;
             Function = function;
             IsOverride = isOverride;
             Span = span;
-            Kind = kind;
         }
 
-        public PolicyKind Kind { get; }
-
-        /// <summary>메시지에 쓰는 이름: "submit policy" / "view policy".</summary>
-        public string Noun => Kind == PolicyKind.Submit ? "submit policy" : "view policy";
+        /// <summary>메시지에 쓰는 이름.</summary>
+        public string Noun => "view policy";
 
         public string Mod { get; }
         public FunctionValue Function { get; }
         public bool IsOverride { get; }
 
-        /// <summary><c>@submit_policy</c> 데코레이터의 위치.</summary>
+        /// <summary><c>@view_policy</c> 데코레이터의 위치.</summary>
         public SourceSpan Span { get; }
 
         /// <summary>교체한 정책 (교체가 아니면 null).</summary>

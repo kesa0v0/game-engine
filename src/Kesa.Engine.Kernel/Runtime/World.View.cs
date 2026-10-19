@@ -15,19 +15,30 @@ namespace Kesa.Engine.Runtime
         public WorldView ViewAs(string issuer) => new WorldView(this, issuer);
 
         /// <summary>
-        /// 보기 정책 <c>may_see(issuer, entity, component)</c>. 없으면 모두 보인다. 실패하거나 bool이 아니면 "안 보임"이고
+        /// 보기 정책 <c>may_see(viewer, entity, component)</c>를 이 연결이 앉은 엔티티마다 불러 하나라도 참이면 보인다. 앉은 곳이 없으면
+        /// <c>viewer=None</c>으로 한 번 부른다 (G238). 정책이 없으면 모두 보인다. 실패하거나 bool이 아니면 그 호출은 "안 보임"이고
         /// 진단을 남긴다 (G203, 닫는 쪽).
         /// </summary>
         internal bool MaySee(string issuer, EntityId id, string? component, List<Diagnostic> diagnostics)
         {
             if (_viewPolicy == null) return true;
-            var function = _viewPolicy.Function;
-            string label = "the view policy '" + function.Name + "' for " + id + (component == null ? "" : " and '" + component + "'");
+            var seats = SeatsOf(issuer);
+            if (seats.Count == 0) return MaySeeAs(NoneValue.Instance, id, component, diagnostics);
+            foreach (var viewer in seats)
+                if (MaySeeAs(new EntityValue(viewer), id, component, diagnostics)) return true;
+            return false;
+        }
+
+        private bool MaySeeAs(Value viewer, EntityId id, string? component, List<Diagnostic> diagnostics)
+        {
+            var function = _viewPolicy!.Function;
+            string label = "the view policy '" + function.Name + "' for " + id + (component == null ? "" : " and '" + component + "'") +
+                           (viewer is EntityValue v ? " seen by " + v.Id : " seen by a spectator");
             try
             {
                 var value = RunGateFunction(function, new[]
                 {
-                    new StrValue(issuer), ToScript(new EntityValue(id)),
+                    ToScript(viewer), ToScript(new EntityValue(id)),
                     component == null ? (Value)NoneValue.Instance : new StrValue(component),
                 }, label);
                 if (value is BoolValue b) return b.Value;
@@ -43,29 +54,18 @@ namespace Kesa.Engine.Runtime
             return false;
         }
 
-        /// <summary>질문을 이 연결이 답할 수 있는가: 입구 정책 <c>may_act</c> (G200). 실패하면 답할 수 없음이고 진단을 남긴다.</summary>
-        internal bool MayAnswer(string issuer, EntityId who, List<Diagnostic> diagnostics)
-        {
-            try
-            {
-                return MayAct(issuer, new EntityValue(who), "a question");
-            }
-            catch (WorldException e)
-            {
-                diagnostics.Add(new Diagnostic(e.Code, Severity.Error, e.Message + "; the question is not shown", null,
-                    SourceSpan.None, e.Hint));
-                return false;
-            }
-        }
+        /// <summary>질문을 이 연결이 그 대상으로서 답할 수 있는가: 대상에 앉아 있나 (G200·G237).</summary>
+        internal bool MayAnswer(string issuer, EntityId who) => MayAct(issuer, new EntityValue(who));
 
         /// <summary>
-        /// 이 연결이 이 수를 낼 수 있는가: 제출 때처럼 <c>acts_for</c> → <c>may_act</c> (G233). 실패하면 낼 수 없음이고 진단을 남긴다.
+        /// 이 연결이 이 수를 낼 수 있는가: 제출 때처럼 <c>acts_for</c> → 배정 표 (G233·G237). <c>acts_for</c>가 실패하면 낼 수 없음이고
+        /// 진단을 남긴다.
         /// </summary>
         internal bool MayIssue(string issuer, string command, IReadOnlyDictionary<string, Value> move, List<Diagnostic> diagnostics)
         {
             try
             {
-                return MayAct(issuer, ActsFor(FindCommand(command), Sorted(move)), command);
+                return MayAct(issuer, ActsFor(FindCommand(command), Sorted(move)));
             }
             catch (WorldException e)
             {

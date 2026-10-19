@@ -20,10 +20,10 @@ namespace Kesa.Engine.Tests.Runtime
     {
         private const string Schema =
             "component(\"Life\", hp=field(int, default=20))\n" +
-            "component(\"Seat\", next=ref(\"Party\", optional=True))\n" +
+            "component(\"Order\", next=ref(\"Party\", optional=True))\n" +
             "component(\"Pending\", by=ref(\"Party\", optional=True), target=ref(\"Party\", optional=True),\n" +
             "    victim=ref(\"Spell\", optional=True))\n" +
-            "deftype(\"Party\", components=[\"Life\", \"Seat\"])\n" +
+            "deftype(\"Party\", components=[\"Life\", \"Order\"])\n" +
             "deftype(\"Spell\", effect=const(Action[\"Spell\"]), components=[\"Pending\"])\n";
 
         private const string Defs =
@@ -52,7 +52,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\n" +
             "def Cast(by: Ref[Party], spell: DefId[Spell], target: Ref[Party]):\n" +
             "    spawn(spell, Pending=Pending(by=by, target=target))\n" +
-            "    p = by.Seat.next\n" +
+            "    p = by.Order.next\n" +
             "    passes = 0\n" +
             // 끝이 참가자들에게 달린 반복: 상한은 단계 예산이고, 바퀴마다 묻기 때문에 걸리지 않는다 (G195)
             "    while top() is not None:\n" +
@@ -66,10 +66,10 @@ namespace Kesa.Engine.Tests.Runtime
             "                passes = 0\n" +
             "                p = by\n" +
             "            else:\n" +
-            "                p = p.Seat.next\n" +
+            "                p = p.Order.next\n" +
             "        else:\n" +
             "            passes = 0\n" +
-            "            p = p.Seat.next\n" +
+            "            p = p.Order.next\n" +
             "@command(acts_for=lambda party: party)\n" +
             "def Pass(party: Ref[Party]):\n" +
             "    pass\n" +
@@ -96,13 +96,14 @@ namespace Kesa.Engine.Tests.Runtime
             _a = w.Create("Player");
             _b = w.Create("Player");
             _c = w.Create("Player");
-            Seat(w, _a, _b);
-            Seat(w, _b, _c);
-            Seat(w, _c, _a);
+            foreach (var p in new[] { _a, _b, _c }) w.Seat(p, "host");
+            Next(w, _a, _b);
+            Next(w, _b, _c);
+            Next(w, _c, _a);
             return w;
         }
 
-        private static void Seat(World w, EntityId p, EntityId next) => w.Set(p, w.Member("Seat", "next"), new EntityValue(next));
+        private static void Next(World w, EntityId p, EntityId next) => w.Set(p, w.Member("Order", "next"), new EntityValue(next));
 
         private long Hp(World w, EntityId p) => ((IntValue)w.Get(p, w.Member("Life", "hp"))).Value;
 

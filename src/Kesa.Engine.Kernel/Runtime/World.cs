@@ -50,9 +50,6 @@ namespace Kesa.Engine.Runtime
 
         /// <param name="stepBudget">읽기 실행 하나의 단계 예산 (<see cref="DefaultStepBudget"/>, G101).</param>
         /// <param name="actionStepBudget">행동 실행 하나의 단계 예산 (<see cref="DefaultActionStepBudget"/>, G224).</param>
-        /// <param name="requireSubmitPolicy">
-        /// 멀티 게임처럼 제출 정책 함수가 꼭 있어야 하는 호스트가 켠다. 켰는데 정책이 없으면 만들지 않는다 (spec-gaps G124).
-        /// </param>
         /// <param name="maxSignalDepth">
         /// 신호 연쇄의 세대 상한 (spec-gaps G147·G150). 이보다 깊은 신호는 핸들러를 돌리지 않고 결과에 알린다.
         /// </param>
@@ -67,14 +64,13 @@ namespace Kesa.Engine.Runtime
         /// 저장에 남고 불러오면 그대로 잇는다.
         /// </param>
         /// <param name="requireViewPolicy">
-        /// 서버 권위 멀티 게임처럼 숨김이 꼭 지켜져야 하는 호스트가 켠다. 켰는데 보기 정책이나 입구 정책이 없으면 만들지 않는다
-        /// (spec-gaps G203: "답할 수 있는 질문"을 입구 정책으로 정하기 때문에 둘 다 필요하다).
+        /// 서버 권위 멀티 게임처럼 숨김이 꼭 지켜져야 하는 호스트가 켠다. 켰는데 보기 정책이 없으면 만들지 않는다 (spec-gaps G203).
         /// </param>
-        public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget, bool requireSubmitPolicy = false,
+        public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget,
             int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
             int maxSettleRounds = DefaultMaxSettleRounds, long seed = 0, bool requireViewPolicy = false,
             int actionStepBudget = DefaultActionStepBudget)
-            : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, loaded.SubmitPolicy, actionStepBudget)
+            : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, actionStepBudget)
         {
             _viewPolicy = loaded.ViewPolicy;
             _mods = loaded.Mods;
@@ -97,24 +93,15 @@ namespace Kesa.Engine.Runtime
             _seed = seed;
             SetHandlers(loaded.Handlers);
             SetWhens(loaded.Whens);
-            if (requireSubmitPolicy && loaded.SubmitPolicy == null)
-                throw new WorldException(Codes.RunNoSubmitPolicy,
-                    "the host requires a submit policy, but no active mod declares one",
-                    "a mod must declare @submit_policy def may_act(issuer, target) (spec-gaps G124)");
-            if (requireViewPolicy && (loaded.ViewPolicy == null || loaded.SubmitPolicy == null))
+            if (requireViewPolicy && loaded.ViewPolicy == null)
                 throw new WorldException(Codes.RunNoViewPolicy,
-                    loaded.ViewPolicy == null
-                        ? "the host requires a view policy, but no active mod declares one"
-                        : "the host requires a view policy, which also needs a submit policy, but no active mod declares one",
-                    loaded.ViewPolicy == null
-                        ? "a mod must declare @view_policy def may_see(issuer, entity, component) (spec-gaps G203)"
-                        : "questions are shown to the connections that may answer them, which the submit policy decides; " +
-                          "declare @submit_policy def may_act(issuer, target) (spec-gaps G203)");
+                    "the host requires a view policy, but no active mod declares one",
+                    "a mod must declare @view_policy def may_see(viewer, entity, component) (spec-gaps G203·G238)");
         }
 
         public World(DefSet defs, SchemaSet schema, IReadOnlyDictionary<string, ModScope>? scopes = null,
             int stepBudget = DefaultStepBudget, IReadOnlyDictionary<string, CommandDecl>? commands = null,
-            PolicyDecl? submitPolicy = null, int actionStepBudget = DefaultActionStepBudget)
+            int actionStepBudget = DefaultActionStepBudget)
         {
             _defs = defs;
             _schema = schema;
@@ -122,7 +109,6 @@ namespace Kesa.Engine.Runtime
             _stepBudget = stepBudget;
             _actionStepBudget = actionStepBudget;
             _commands = commands ?? new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
-            _submitPolicy = submitPolicy;
         }
 
         // ---- 이름 풀기 ----
@@ -253,6 +239,7 @@ namespace Kesa.Engine.Runtime
             Touch(id.Value); // 이 엔티티를 읽거나 Ref로 가리킨 조건을 다시 본다
             TouchSources(entity);
             StampDestroyed(id.Value);
+            DropSeat(id.Value);
             _entities.Remove(id.Value);
             var set = _byType[entity.Def.Type];
             set.Remove(id.Value);

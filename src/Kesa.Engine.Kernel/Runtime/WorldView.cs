@@ -156,7 +156,7 @@ namespace Kesa.Engine.Runtime
         // ---- 열린 질문 ----
 
         /// <summary>
-        /// 이 연결이 답할 수 있는 질문만 (질문 대상 중 <c>may_act</c>가 참인 엔티티가 있음, G200). 대상 목록에는 이 연결이 답할 수 있고
+        /// 이 연결이 답할 수 있는 질문만 (질문 대상 중 이 연결이 앉은 엔티티가 있음, G200·G237). 대상 목록에는 이 연결이 답할 수 있고
         /// 보이는 대상만 남고(G234), 제목·선택지·<c>data</c> 안의 못 보는 엔티티는 <see cref="HiddenValue"/>다(선택지는 번호가 그대로라
         /// 뒷면을 보고 고를 수 있다).
         /// </summary>
@@ -180,7 +180,7 @@ namespace Kesa.Engine.Runtime
             if (q == null) return null;
             var answerable = new List<EntityId>();
             foreach (var who in q.Who)
-                if (_world.IsAlive(who) && _world.MayAnswer(Issuer, who, _diagnostics)) answerable.Add(who);
+                if (_world.IsAlive(who) && _world.MayAnswer(Issuer, who)) answerable.Add(who);
             return answerable.Count == 0 ? null : Filtered(q, answerable);
         }
 
@@ -359,7 +359,7 @@ namespace Kesa.Engine.Runtime
                 if (q.Id == request) open = q;
             if (ForMe(open) == null) throw World.NoRequest(request);
             return _world.LegalResponses(request, by, max,
-                who => _world.IsAlive(who) && _world.MayAnswer(Issuer, who, _diagnostics),
+                who => _world.IsAlive(who) && _world.MayAnswer(Issuer, who),
                 move =>
                 {
                     foreach (var v in move.Values)

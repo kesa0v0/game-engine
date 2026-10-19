@@ -237,6 +237,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "    }\n" +
                 "  ],\n" +
                 "  \"contributions\": [],\n" +
+                "  \"seats\": [],\n" +
                 "  \"flows\": [],\n" +
                 "  \"when\": [],\n" +
                 "  \"when_cooldown\": [],\n" +
@@ -394,6 +395,7 @@ namespace Kesa.Engine.Tests.Runtime
             _world.AddContribution(a, M("Power", "total"), "add", new IntValue(1), ranger);
             _world.AddContribution(ranger, M("Power", "total"), "add", new IntValue(1));
             _world.Add(a, "Rival", new Init(M("Rival", "target"), new EntityValue(ranger)));
+            _world.Seat(ranger, "bob");
             _world.Submit("host", "banking.Brew", new Dictionary<string, Value> { ["u"] = new EntityValue(ranger) });
             _world.Submit("host", "banking.Brew", new Dictionary<string, Value> { ["u"] = new EntityValue(a) });
             var save = _world.Save();
@@ -414,6 +416,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "SAV005 Warning contribution 1 to #1 from #2 went with its entity",
                 "SAV005 Warning contribution 2 to #2 went with its entity",
                 "SAV005 Warning flow 1 (banking.Brew) was canceled: its subject #2 was destroyed",
+                "SAV005 Warning the seat of 'bob' at #2 went with its entity",
             }));
 
             var w = result.World!;
@@ -587,6 +590,24 @@ namespace Kesa.Engine.Tests.Runtime
             var d = result.Diagnostics.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.SaveCorrupt));
             Assert.That(d.Message, Does.Contain(expected));
+        }
+
+        /// <summary>배정 표의 줄은 저장 안의 엔티티를 한 번씩, 빈 꼬리표 없이 가리켜야 한다 (G236).</summary>
+        [TestCase("{\n      \"entity\": 99,\n      \"issuer\": \"bob\"\n    }")]
+        [TestCase("{\n      \"entity\": 1,\n      \"issuer\": \"bob\"\n    },\n    {\n      \"entity\": 1,\n      \"issuer\": \"carol\"\n    }")]
+        [TestCase("{\n      \"entity\": 1,\n      \"issuer\": \"\"\n    }")]
+        public void ABrokenSeatIsCorrupt(string seats)
+        {
+            var town = _world.Create("Town");
+            _world.Seat(town, "bob");
+            string save = Encoding.UTF8.GetString(_world.Save());
+            string seated = "{\n      \"entity\": " + town.Value + ",\n      \"issuer\": \"bob\"\n    }";
+            Assert.That(save, Does.Contain(seated));
+            var result = World.Load(LoadClean(), Encoding.UTF8.GetBytes(save.Replace(seated, seats)));
+            Assert.That(result.Succeeded, Is.False);
+            var d = result.Diagnostics.Single(x => x.Code != Codes.SaveModsChanged);
+            Assert.That(d.Code, Is.EqualTo(Codes.SaveCorrupt));
+            Assert.That(d.Message, Does.Contain("seats must name entities in the save once each"));
         }
 
         [Test]

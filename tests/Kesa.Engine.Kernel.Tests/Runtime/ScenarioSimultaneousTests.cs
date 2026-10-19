@@ -18,26 +18,22 @@ namespace Kesa.Engine.Tests.Runtime
     public class ScenarioSimultaneousTests : LoaderTestBase
     {
         private const string Schema =
-            "component(\"Seat\", conn=field(str, default=\"\"))\n" +
             "component(\"Pick\", choice=field(int, default=-1))\n" +
             "component(\"Ready\", done=field(bool, default=False))\n" +
             "component(\"Score\", wins=field(int, default=0))\n" +
             "component(\"Round\", revealed=field(bool, default=False))\n" +
-            "deftype(\"Party\", components=[\"Seat\", \"Pick\", \"Ready\", \"Score\"])\n" +
+            "deftype(\"Party\", components=[\"Pick\", \"Ready\", \"Score\"])\n" +
             "deftype(\"Game\", components=[\"Round\"])\n" +
             "signal(\"AskPick\", who=Ref[\"Party\"])\n";
 
         private const string Defs =
             "Party(\"Player\")\nGame(\"Match\")\n" +
-            "@submit_policy\n" +
-            "def may_act(issuer, target):\n" +
-            "    return target is None or (target.Seat is not None and target.Seat.conn == issuer)\n" +
             // 남의 선택은 공개될 때까지 못 본다. 그 밖에는 다 보인다
             "@view_policy\n" +
-            "def may_see(issuer, entity, component):\n" +
+            "def may_see(viewer, entity, component):\n" +
             "    if component != \"Pick\":\n" +
             "        return True\n" +
-            "    return entity.Seat.conn == issuer or any(g.Round.revealed for g in query(\"Game\"))\n" +
+            "    return viewer == entity or any(g.Round.revealed for g in query(\"Game\"))\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Start():\n" +
             "    for p in query(\"Party\"):\n" +
@@ -73,7 +69,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var w = new World(_content, seed: 3, requireViewPolicy: true);
             foreach (var conn in Conns)
-                w.Set(w.Create("Player"), w.Member("Seat", "conn"), new StrValue(conn));
+                w.Seat(w.Create("Player"), conn);
             w.Create("Match");
             var s = w.Submit("host", "core.Start", new Dictionary<string, Value>());
             Assert.That(s.Succeeded, Is.True, s.Error?.ToString());
@@ -81,7 +77,7 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         private static EntityId PartyOf(World w, string conn) =>
-            w.Query("Party").Single(p => ((StrValue)w.Get(p, w.Member("Seat", "conn"))).Value == conn);
+            w.SeatsOf(conn).Single();
 
         /// <summary>그 연결이 자기 질문에 답한다.</summary>
         private static void Choose(World w, string conn, int pick)
@@ -102,7 +98,7 @@ namespace Kesa.Engine.Tests.Runtime
                 sb.Append(e).Append(' ').Append(v.DefOf(e)).Append('\n');
                 foreach (var (component, members) in new[]
                          {
-                             ("Seat", new[] { "conn" }), ("Pick", new[] { "choice" }), ("Ready", new[] { "done" }),
+                             ("Pick", new[] { "choice" }), ("Ready", new[] { "done" }),
                              ("Score", new[] { "wins" }), ("Round", new[] { "revealed" }),
                          })
                 {

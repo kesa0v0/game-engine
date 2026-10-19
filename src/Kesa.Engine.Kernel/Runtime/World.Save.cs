@@ -64,6 +64,11 @@ namespace Kesa.Engine.Runtime
             var contributions = new JsonArray();
             foreach (var c in _contributions.Values) contributions.Add(SaveContribution(c));
 
+            // 배정 표 (G236): 엔티티 id 순
+            var seats = new JsonArray();
+            foreach (var pair in _seats)
+                seats.Add(new JsonObject().Add("entity", new JsonNumber(pair.Key)).Add("issuer", new JsonString(pair.Value)));
+
             var root = new JsonObject()
                 .Add("format", new JsonNumber(SaveFormatVersion))
                 .Add("mods", mods)
@@ -72,6 +77,7 @@ namespace Kesa.Engine.Runtime
                 .Add("counters", counters)
                 .Add("entities", entities)
                 .Add("contributions", contributions)
+                .Add("seats", seats)
                 .Add("flows", SaveFlows())
                 .Add("when", SaveWhens())
                 .Add("when_cooldown", SaveCooldowns())
@@ -195,7 +201,7 @@ namespace Kesa.Engine.Runtime
         /// 멈추기 전까지 한 일은 남고 반응은 부르지 않는다.
         /// </summary>
         public static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, int stepBudget = DefaultStepBudget,
-            bool requireSubmitPolicy = false, int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
+            int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
             int maxSettleRounds = DefaultMaxSettleRounds, bool requireViewPolicy = false, bool dropRemoved = false,
             bool cancelBrokenFlows = false, int actionStepBudget = DefaultActionStepBudget)
         {
@@ -203,7 +209,7 @@ namespace Kesa.Engine.Runtime
             World world;
             try
             {
-                world = new World(loaded, stepBudget, requireSubmitPolicy, maxSignalDepth, maxAdvancePerCall, maxSettleRounds,
+                world = new World(loaded, stepBudget, maxSignalDepth, maxAdvancePerCall, maxSettleRounds,
                     requireViewPolicy: requireViewPolicy, actionStepBudget: actionStepBudget);
             }
             catch (WorldException e)
@@ -287,6 +293,7 @@ namespace Kesa.Engine.Runtime
 
             foreach (var node in AsArray(Field(root, "contributions"), "contributions").Items)
                 RestoreContribution(AsObject(node, "a contribution"), problems);
+            RestoreSeats(AsArray(Field(root, "seats"), "seats"), problems);
 
             RestoreFlows(AsArray(Field(root, "flows"), "flows"), problems);
             RestoreWhens(AsArray(Field(root, "when"), "when"));
@@ -646,6 +653,26 @@ namespace Kesa.Engine.Runtime
                 default:
                     if (!(node is JsonNumber n)) throw new JsonFormatException("an int row key should be a number");
                     return RowKey.Int(n.Value);
+            }
+        }
+
+        /// <summary>배정 표 (G236). 버린 엔티티의 배정은 함께 버린다. 같은 엔티티가 두 번이거나 저장에 없는 엔티티면 형식 오류다.</summary>
+        private void RestoreSeats(JsonArray seats, LoadProblems problems)
+        {
+            foreach (var node in seats.Items)
+            {
+                var obj = AsObject(node, "a seat");
+                long id = Long(Field(obj, "entity"), "a seat entity");
+                string issuer = Text(Field(obj, "issuer"), "a seat issuer");
+                if (problems.Skipped.Contains(id))
+                {
+                    problems.DroppedWith("the seat of '" + issuer + "' at " + new EntityId(id) + " went with its entity");
+                    continue;
+                }
+                if (!_entities.ContainsKey(id) || _seats.ContainsKey(id) || issuer.Length == 0)
+                    throw new JsonFormatException("seats must name entities in the save once each, with a non-empty issuer (found #" +
+                                                  id.ToString(CultureInfo.InvariantCulture) + ")");
+                _seats.Add(id, issuer);
             }
         }
 

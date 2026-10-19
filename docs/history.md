@@ -584,3 +584,13 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **새 테스트:** `WorldStampTests` 6개(쓴 칸만 바뀜, 역방향 컬렉션과 기여 행, 붙이기·줄·삭제와 키 엔티티 삭제로 지워진 줄, 성공한 커맨드는 찍고 실패한 커맨드는 쓰기·만들기·붙이기·삭제를 모두 되감음, 없는 이름은 오류, 불러온 월드). `SkirmishTests`에 도장으로 건너뛴 화면과 매번 다시 그린 화면이 같은지 1개.
 - **남은 몫:** `ViewAs`의 도장(숨긴 정보), 남의 엔티티를 읽는 `derived`(읽기 집합), 호스트용 경로 읽기(handoff 구멍 3의 다음 후보).
 - **확인:** 테스트 1981개 통과(커널 1939, CLI 36, 콘솔 호스트 6). `spec-gaps` 표 확인 `234 6`.
+
+## 배정 표와 입구·보기 정책 다시 짜기 (2026-10-19, G236·G237·G238)
+
+- **왜:** 콘솔 호스트 구멍 5번. 예시 모드의 `Start`가 `Seat(conn="red")`를 박아 넣었다. G121(담당은 모드 데이터)·G122(입구 검사는 모드의 `may_act`) 때문에 로비 배정이 게임에 들어갈 길이 없었다.
+- **논의:** "로비는 호스트 몫"과 "모드가 자리를 내놓고 호스트가 채움"은 사용자가 아니라고 해서 레퍼런스를 소스로 확인했다(Wesnoth `connect_engine.cpp`·`[side]`, 0 A.D. `NetServer.cpp` `m_PlayerAssignments`, OpenTTD `client_playas`, EU4 세이브의 `players_countries`·`was_player`(pdx-tools)). 모두 배정과 입구 검사를 엔진이 한다. 이전 엔진은 G121의 근거와 달리 빈자리였다(`EngineCommandRouter`가 클라이언트가 적은 진영 id를 믿음, TR·WG가 `SessionCommandRouter`로 메움). 사용자가 G121·G122를 다시 열고 G236 가(게임 상태 안의 배정 표), G237 ㄱ(`may_act` 없앰), G238 ㄱ(`may_see(viewer, entity, component)`)을 골랐다. 앞 결정을 바꾼 G에는 "바뀜" 상태와 `**바뀜:**` 줄을 붙이는 규칙도 정했다(A, spec-gaps 머리말과 CLAUDE.md).
+- **구현:** `World.Seats.cs`: `SortedDictionary<long, string>` 배정 표, `Seat`·`Unseat`(호스트 쓰기, 커맨드 안에서는 금지, 빈 꼬리표와 죽은 엔티티는 `RUN022`, 도장을 찍음)·`SeatOf`·`SeatsOf`(id 순). 입구 `MayAct(issuer, target)`는 `None`이면 통과, 엔티티면 표에 그 연결이 앉아 있어야 한다. 엔티티가 죽으면 배정도 지우고 되감기를 기록한다. 저장에 `"seats"`(엔티티 id 순, 필수 필드, 형식 번호는 1 그대로), 불러올 때 버린 엔티티의 배정은 `SAV005` 경고, 없는 엔티티·중복·빈 꼬리표는 손상. 보기 정책은 연결이 앉은 엔티티마다 `may_see(viewer, ...)`를 부르고 하나라도 참이면 보임, 앉은 데가 없으면 `viewer=None`으로 한 번. `@submit_policy`는 `CMD005` "was removed" 오류, `requireSubmitPolicy`·`ContentLoadResult.SubmitPolicy`·`PolicyKind`·`IsSubmitPolicy`·`RUN016`(번호는 다시 쓰지 않음)을 지웠다.
+- **예시 게임·콘솔 호스트:** `Seat` 컴포넌트 대신 차례 순서만 `Order(next=)`로. `kesa-play samples/skirmish --seat red=Red --seat blue=Blue`: 그 Def의 엔티티가 생기면 호스트가 앉힌다("[red] #1 Red에 앉음"). 로비 목록은 아직 없어 Def 이름으로 고른다.
+- **테스트:** 새 `WorldSeatTests` 8개(아무도 앉지 않으면 거절, `None`은 자리 없이, 다시 앉히면 넘겨받음, 한 연결이 여러 엔티티, 입력 검사, 도장, 죽음과 되감기, 저장·불러오기), `WorldSaveTests.ABrokenSeatIsCorrupt` 3개와 버린 엔티티의 배정 경고, `WorldViewTests`의 관전자(`viewer=None`)·핫시트 합·진단의 "seen by a spectator", `SubmitGateDeclarationTests`의 정책 교체 규칙 테스트를 `@view_policy`로 옮김. 기존 테스트는 `may_act`·`Seat.conn` 대신 `World.Seat`로 앉히고, 질문에 `host`로 답하던 테스트는 답하는 엔티티에 `host`를 앉혔다(아무도 앉지 않은 엔티티로는 답할 수 없으므로).
+- **문서:** spine-spec S6 권한 3층·배정 표·두 종류의 제출·네트워크, S10 5항, X1 `accepts`, 공개/비공개 정보. 바뀜 표시: G17·G121~G124·G125·G126·G127·G130·G131·G139·G197·G200·G203·G233·G234.
+- **확인:** 테스트 1979개 통과(커널 1937, CLI 36, 콘솔 호스트 6). `spec-gaps` 표 확인 `237 6`.

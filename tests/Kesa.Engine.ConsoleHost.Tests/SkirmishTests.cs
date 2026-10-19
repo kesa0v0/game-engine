@@ -72,7 +72,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             var screen = new StringWriter();
             var errors = new StringWriter();
-            int code = Play.Run(new[] { Samples(), "--seat", "red", "--seat", "blue", "--seed", seed.ToString() },
+            int code = Play.Run(new[] { Samples(), "--seat", "red=Red", "--seat", "blue=Blue", "--seed", seed.ToString() },
                 new Bot(screen, limit), screen, errors);
             Assert.That(code, Is.EqualTo(0), errors.ToString());
             return screen.ToString();
@@ -89,7 +89,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         [Test]
         public void TheHitQuestionGoesToTheDefendersSeat()
         {
-            // 빨강이 공격해 명중하면 질문은 파랑 진영에게 가고, 파랑 자리가 답한다(입구 정책)
+            // 빨강이 공격해 명중하면 질문은 파랑 진영에게 가고, 파랑에 앉은 연결이 답한다(배정 표, G236)
             string screen = PlayOut(seed: 1);
             var asked = Regex.Match(screen, @"질문 \d+: hit → #2 Blue[^\n]*\n(?:  \d+\)[^\n]*\n)+> (\[\w+\])");
             Assert.That(asked.Success, Is.True);
@@ -122,7 +122,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         public void AWrongNumberAsksAgain()
         {
             var screen = new StringWriter();
-            Play.Run(new[] { Samples(), "--seat", "red" }, new StringReader("9\nx\n:q\n"), screen, new StringWriter());
+            Play.Run(new[] { Samples(), "--seat", "red=Red" }, new StringReader("9\nx\n:q\n"), screen, new StringWriter());
             Assert.That(Regex.Matches(screen.ToString(), "1부터 1 사이의 번호").Count, Is.EqualTo(2));
         }
 
@@ -131,7 +131,8 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             var errors = new StringWriter();
             Assert.That(Play.Run(new[] { Samples() }, new StringReader(""), new StringWriter(), errors), Is.EqualTo(2));
-            Assert.That(Play.Run(new[] { "no/such/dir", "--seat", "a" }, new StringReader(""), new StringWriter(), errors),
+            Assert.That(Play.Run(new[] { Samples(), "--seat", "red" }, new StringReader(""), new StringWriter(), errors), Is.EqualTo(2));
+            Assert.That(Play.Run(new[] { "no/such/dir", "--seat", "a=A" }, new StringReader(""), new StringWriter(), errors),
                 Is.EqualTo(2));
         }
     }

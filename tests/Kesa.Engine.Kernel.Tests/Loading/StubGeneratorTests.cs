@@ -148,7 +148,7 @@ namespace Kesa.Engine.Tests.Loading
                     Assert.That(Declares(stub, name), Is.True, name + " is missing from the mod stub");
             foreach (var name in new[]
                      {
-                         Kesa.Engine.Script.Interpreter.CommandName, Kesa.Engine.Script.Interpreter.SubmitPolicyName,
+                         Kesa.Engine.Script.Interpreter.CommandName,
                          Kesa.Engine.Script.Interpreter.ViewPolicyName, Kesa.Engine.Script.Interpreter.OnName,
                          Kesa.Engine.Script.Interpreter.WhenName, "preconditions", "require", "cost", "choose", "Ref", "DefId",
                      })

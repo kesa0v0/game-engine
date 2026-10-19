@@ -18,17 +18,13 @@ namespace Kesa.Engine.Tests.Runtime
     public class ScenarioRealtimeTests : LoaderTestBase
     {
         private const string Schema =
-            "component(\"Seat\", conn=field(str, default=\"\"))\n" +
             "component(\"Gold\", n=field(int, default=0))\n" +
             "component(\"Army\", at=field(str, default=\"home\"), decided=field(int, default=-1), marched=field(int, default=0),\n" +
             "    walls=field(int, default=0))\n" +
-            "deftype(\"Party\", components=[\"Seat\", \"Gold\", \"Army\"])\n";
+            "deftype(\"Party\", components=[\"Gold\", \"Army\"])\n";
 
         private const string Defs =
             "Party(\"Player\")\n" +
-            "@submit_policy\n" +
-            "def may_act(issuer, target):\n" +
-            "    return target is None or target.Seat.conn == issuer\n" +
             "@on(Tick)\n" +
             "def income():\n" +
             "    for p in query(\"Party\"):\n" +
@@ -70,12 +66,12 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var w = new World(_content, seed: 4);
             foreach (var conn in new[] { "A", "B" })
-                w.Set(w.Create("Player"), w.Member("Seat", "conn"), new StrValue(conn));
+                w.Seat(w.Create("Player"), conn);
             return w;
         }
 
         private static EntityId PartyOf(World w, string conn) =>
-            w.Query("Party").Single(p => ((StrValue)w.Get(p, w.Member("Seat", "conn"))).Value == conn);
+            w.SeatsOf(conn).Single();
 
         private static SubmitResult Do(World w, string conn, string command)
         {

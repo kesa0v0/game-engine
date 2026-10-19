@@ -23,8 +23,7 @@ namespace Kesa.Engine.Script
         public List<CommandDecl> Commands { get; } = new List<CommandDecl>();
 
         /// <summary>
-        /// <c>@submit_policy</c>(G122)와 <c>@view_policy</c>(G197)로 선언한 정책 함수, 두 종류가 함께 든다(<see cref="PolicyDecl.Kind"/>).
-        /// 모드 안에서 같은 종류가 둘 이상이면 로드 오류다.
+        /// <c>@view_policy</c>(G197)로 선언한 보기 정책 함수. 모드 안에서 둘 이상이면 로드 오류다.
         /// </summary>
         public List<PolicyDecl> Policies { get; } = new List<PolicyDecl>();
 

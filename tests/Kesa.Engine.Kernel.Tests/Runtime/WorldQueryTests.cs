@@ -171,6 +171,7 @@ namespace Kesa.Engine.Tests.Runtime
             {
                 var world = new World(content);
                 var u = world.Create("Scout");
+                world.Seat(u, "host");
                 world.Create("Town");
                 world.Create("Town");
                 Assert.That(world.Submit("host", "core.Poll", new Dictionary<string, Value> { ["u"] = new EntityValue(u) }).Succeeded, Is.True);

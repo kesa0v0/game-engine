@@ -116,7 +116,9 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var world = new World(Content());
             var red = world.Create("Red");
+            world.Seat(red, "host");
             var blue = world.Create("Blue");
+            world.Seat(blue, "host");
             var log = new List<string>();
             string? saved = null;
 
@@ -201,7 +203,9 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var world = new World(Content());
             var red = world.Create("Red");
+            world.Seat(red, "host");
             var blue = world.Create("Blue");
+            world.Seat(blue, "host");
             world.Submit("host", "banking.Campaign",
                 new Dictionary<string, Value> { ["p"] = new EntityValue(red), ["q"] = new EntityValue(blue) });
             for (int i = 0; i < answers; i++)
@@ -308,6 +312,7 @@ namespace Kesa.Engine.Tests.Runtime
                                                  "    p.Score.v = -r.index if r.index > 0 else len([lambda x: x[0]])\n");
             var world = new World(LoadClean());
             var red = world.Create("Red");
+            world.Seat(red, "host");
             world.Submit("host", "banking.Hold", new Dictionary<string, Value> { ["p"] = new EntityValue(red) });
             Assert.That(Encoding.UTF8.GetString(world.Save()), Does.Contain("\"hash\": \"15198fccf5c8e6bb4be771e5743b6936\""));
         }
@@ -317,7 +322,9 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var world = new World(Content());
             var red = world.Create("Red");
+            world.Seat(red, "host");
             var blue = world.Create("Blue");
+            world.Seat(blue, "host");
             world.Submit("host", "banking.Campaign",
                 new Dictionary<string, Value> { ["p"] = new EntityValue(red), ["q"] = new EntityValue(blue) });
             world.Answer("host", world.OpenRequests.Single().Id, red, 0); // survey 안에서 멈춤
@@ -347,7 +354,9 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: Schema, defs: Defs + Nap);
             var world = new World(LoadClean());
             var red = world.Create("Red");
+            world.Seat(red, "host");
             var blue = world.Create("Blue");
+            world.Seat(blue, "host");
             world.Submit("host", "banking.Campaign",
                 new Dictionary<string, Value> { ["p"] = new EntityValue(red), ["q"] = new EntityValue(blue) });
             var request = world.OpenRequests.Single().Id;
@@ -401,7 +410,9 @@ namespace Kesa.Engine.Tests.Runtime
             // Flow 밖의 어긋남(엔티티에 쓴 값의 멤버가 지워짐)은 이 옵션으로 넘어가지 않는다
             var world = new World(Content());
             var red = world.Create("Red");
+            world.Seat(red, "host");
             var blue = world.Create("Blue");
+            world.Seat(blue, "host");
             world.Set(red, world.Member("Score", "log"), new StrValue("x"));
             world.Submit("host", "banking.Campaign",
                 new Dictionary<string, Value> { ["p"] = new EntityValue(red), ["q"] = new EntityValue(blue) });
@@ -458,7 +469,9 @@ namespace Kesa.Engine.Tests.Runtime
 
             var world = new World(RoundContent());
             var red = world.Create("Red");
+            world.Seat(red, "host");
             var blue = world.Create("Blue");
+            world.Seat(blue, "host");
             var steps = new (string Command, long Amount)[] { ("Bid", 3), ("Bid", 0), ("Bid", 2), ("Pass", 0), ("Pass", 0) };
             var log = new List<string>();
             for (int step = 0; step <= steps.Length; step++)
@@ -509,6 +522,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: Schema, defs: RoundDefs);
             var world = new World(LoadClean());
             var red = world.Create("Red");
+            world.Seat(red, "host");
             world.Submit("host", "banking.Round",
                 new Dictionary<string, Value> { ["a"] = new EntityValue(red), ["b"] = new EntityValue(red) });
             var save = world.Save();
@@ -527,6 +541,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var world = new World(Content());
             var red = world.Create("Red");
+            world.Seat(red, "host");
             world.Submit("host", "banking.Campaign",
                 new Dictionary<string, Value> { ["p"] = new EntityValue(red), ["q"] = new EntityValue(red) });
             var save = world.Save();

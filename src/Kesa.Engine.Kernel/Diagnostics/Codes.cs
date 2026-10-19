@@ -121,10 +121,12 @@ namespace Kesa.Engine.Diagnostics
         public const string RunCycle = "RUN014";
         public const string RunScript = "RUN015";
 
-        // 제출 입구 (spec S6, spec-gaps G124): 호스트가 정책 필수를 켰는데 정책 함수가 없다
-        public const string RunNoSubmitPolicy = "RUN016";
+        // RUN016(입구 정책 필수인데 없음, G124)은 입구 정책이 없어져(G237) 쓰지 않는다. 번호는 다시 쓰지 않는다.
 
-        // 거른 읽기 (spec-gaps G203): 호스트가 보기 정책 필수를 켰는데 보기·입구 정책이 없다 / 보기 정책이 실패해 "안 보임"으로 처리함
+        // 배정 표 (spec-gaps G236): 죽은 엔티티에 앉히기, 빈 연결 꼬리표
+        public const string RunSeat = "RUN022";
+
+        // 거른 읽기 (spec-gaps G203): 호스트가 보기 정책 필수를 켰는데 보기 정책이 없다 / 보기 정책이 실패해 "안 보임"으로 처리함
         public const string RunNoViewPolicy = "RUN017";
         public const string RunViewPolicy = "RUN018";
 
@@ -163,7 +165,7 @@ namespace Kesa.Engine.Diagnostics
         // 함수 효과: 쓰기 함수를 부를 수 있는 자리 (spec S2 함수 효과 표, spec-gaps G117)
         public const string CmdWriteEffect = "CMD004";
 
-        // 제출 정책 함수: 모양·개수·교체 (spec S6 입구, spec-gaps G122·G124·G130)
+        // 없어진 제출 정책 함수 @submit_policy를 선언함 (spec-gaps G237, 옛 G122·G124·G130의 모양·개수·교체)
         public const string CmdSubmitPolicy = "CMD005";
 
         // 보기 정책 함수: 모양·개수·교체 (spec-gaps G197·G203)

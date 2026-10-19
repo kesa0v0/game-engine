@@ -32,6 +32,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var world = new World(Content(defs));
             _u = world.Create("Scout");
+            world.Seat(_u, "host");
             return world;
         }
 
@@ -239,6 +240,7 @@ namespace Kesa.Engine.Tests.Runtime
                       "@command(free=True, acts_for=None)\ndef Bell(u: Ref[Unit]):\n    emit(Ring(u=u))\n");
             var world = new World(LoadClean());
             _u = world.Create("Scout");
+            world.Seat(_u, "host");
             var r = world.Submit("host", "core.Bell", new Dictionary<string, Value> { ["u"] = new EntityValue(_u) });
             Assert.That(r.Reactions.Single().Outcome, Is.EqualTo(ReactionOutcome.Suspended), "sleeping is not finishing");
             Assert.That(r.Reactions.Single().OpenedRequest, Is.Null);
@@ -310,6 +312,7 @@ namespace Kesa.Engine.Tests.Runtime
                       "@command(free=True, acts_for=None)\ndef Bell(u: Ref[Unit]):\n    emit(Ring(u=u))\n");
             var world = new World(LoadClean(), maxSignalDepth: 1);
             _u = world.Create("Scout");
+            world.Seat(_u, "host");
             world.Submit("host", "core.Bell", new Dictionary<string, Value> { ["u"] = new EntityValue(_u) });
             var r = world.Advance(2);
             Assert.That(r.Reactions.Select(x => x.Signal + " " + x.Generation + " " + x.Outcome), Is.EqualTo(new[]

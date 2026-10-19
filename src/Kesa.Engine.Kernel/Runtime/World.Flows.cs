@@ -197,7 +197,7 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>
         /// 열린 질문 <paramref name="request"/>에 엔티티 <paramref name="by"/>로서 선택지 <paramref name="choice"/>를 골라 답한다
-        /// (spec X1, spec-gaps G126). 질문 확인 → 목록 → 입구 <c>may_act(issuer, by)</c> → 선택지 범위 순서이고, 통과하면 기다리던 Flow를
+        /// (spec X1, spec-gaps G126). 질문 확인 → 목록 → 입구(배정 표, G237) → 선택지 범위 순서이고, 통과하면 기다리던 Flow를
         /// 이어서 실행한다. 거절과 오류는 상태를 건드리지 않는다 (C8·C9·C10).
         /// </summary>
         public AnswerResult Answer(string issuer, long request, EntityId by, long choice)
@@ -243,7 +243,7 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>
         /// 열린 질문 <paramref name="request"/>에 응답 커맨드 <paramref name="command"/>로 답한다 (spec X1·S6, spec-gaps G139).
-        /// 질문 확인 → 그 커맨드를 받나 → 인자(G115) → <c>acts_for</c> → 목록 → <c>may_act</c> → 사전 조건 → 본문 순서이고, 본문은
+        /// 질문 확인 → 그 커맨드를 받나 → 인자(G115) → <c>acts_for</c> → 목록 → 입구(배정 표) → 사전 조건 → 본문 순서이고, 본문은
         /// 기다리던 Flow를 이어서 실행하는 것과 같은 트랜잭션이다. 끝나면 <c>ask</c>가 그 커맨드 이름과 답한 엔티티를 돌려준다.
         /// 없는 커맨드 id만 호출자 오류(<see cref="WorldException"/>)다.
         /// </summary>
@@ -342,7 +342,7 @@ namespace Kesa.Engine.Runtime
             new AnswerResult(request, issuer, AnswerOutcome.UnknownRequest,
                 "there is no open request " + request.ToString(CultureInfo.InvariantCulture) + "; it may have been answered already");
 
-        /// <summary>답하는 엔티티가 목록에 있고 정책이 허용하는가 (G125·G126). 통과하면 null.</summary>
+        /// <summary>답하는 엔티티가 목록에 있고 이 연결이 그 엔티티에 앉아 있는가 (G125·G126·G237). 통과하면 null.</summary>
         private AnswerResult? Gate(string issuer, Request open, EntityId by)
         {
             bool listed = false;
@@ -353,16 +353,9 @@ namespace Kesa.Engine.Runtime
                 return new AnswerResult(open.Id, issuer, AnswerOutcome.NotListed,
                     "entity " + by + " cannot answer request " + number + ", allowed: [" + string.Join(", ", open.Who) + "]");
             }
-            try
-            {
-                if (!MayAct(issuer, new EntityValue(by), "request " + number))
-                    return new AnswerResult(open.Id, issuer, AnswerOutcome.GateDenied,
-                        "the submit policy does not let '" + issuer + "' act as " + by);
-            }
-            catch (WorldException e)
-            {
-                return new AnswerResult(open.Id, issuer, AnswerOutcome.ScriptError) { Error = e };
-            }
+            if (!MayAct(issuer, new EntityValue(by)))
+                return new AnswerResult(open.Id, issuer, AnswerOutcome.GateDenied,
+                    "'" + issuer + "' is not seated at " + by + ", so it cannot answer request " + number);
             return null;
         }
 

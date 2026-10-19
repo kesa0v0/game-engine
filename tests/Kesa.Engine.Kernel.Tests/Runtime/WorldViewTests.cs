@@ -10,35 +10,31 @@ using NUnit.Framework;
 namespace Kesa.Engine.Tests.Runtime
 {
     /// <summary>
-    /// 거른 읽기 <c>ViewAs(issuer)</c>와 보기 정책 <c>@view_policy</c> (spec-gaps G196~G203). 진영마다 연결 꼬리표가 있고
+    /// 거른 읽기 <c>ViewAs(issuer)</c>와 보기 정책 <c>@view_policy</c> (spec-gaps G196~G203·G238). 연결은 진영에 앉고(배정 표, G236)
     /// 남의 <c>Hand</c>와 안개 속(<c>Fog.hidden</c>) 유닛은 못 본다.
     /// </summary>
     public class WorldViewTests : LoaderTestBase
     {
         private const string Schema =
-            "component(\"Seat\", conn=field(str, default=\"\"))\n" +
+            "component(\"Crest\", motto=field(str, default=\"\"))\n" +
             "component(\"Hand\", cards=field(int, default=0))\n" +
             "component(\"Owner\", party=ref(\"Party\"))\n" +
             "component(\"Fog\", hidden=field(bool, default=False))\n" +
             "component(\"Battle\", attacker=ref(\"Unit\"))\n" +
             "component(\"Spy\", on=ref(\"Unit\", optional=True))\n" +
             "component(\"Known\", key=Ref[\"Unit\"], note=field(int, default=0))\n" +
-            "deftype(\"Party\", components=[\"Seat\", \"Hand\", \"Known\"])\n" +
+            "deftype(\"Party\", components=[\"Crest\", \"Hand\", \"Known\"])\n" +
             "deftype(\"Unit\", components=[\"Owner\", \"Fog\", \"Spy\"])\n" +
             "deftype(\"Field\", components=[\"Battle\"])\n";
 
+        // 보는 이(viewer)는 연결이 앉은 엔티티다. 앉은 데가 없는 구경꾼은 None (G238)
         private const string Policies =
-            "def mine(issuer, party):\n" +
-            "    return party.Seat.conn == issuer\n" +
-            "@submit_policy\n" +
-            "def may_act(issuer, target):\n" +
-            "    return target is None or mine(issuer, target)\n" +
             "@view_policy\n" +
-            "def may_see(issuer, entity, component):\n" +
-            "    if entity.Seat is not None:\n" +
-            "        return component != \"Hand\" or mine(issuer, entity)\n" +
+            "def may_see(viewer, entity, component):\n" +
+            "    if entity.Crest is not None:\n" +
+            "        return component != \"Hand\" or viewer == entity\n" +
             "    if entity.Fog is not None:\n" +
-            "        return not entity.Fog.hidden or mine(issuer, entity.Owner.party)\n" +
+            "        return not entity.Fog.hidden or viewer == entity.Owner.party\n" +
             "    return True\n";
 
         private const string Defs =
@@ -70,7 +66,7 @@ namespace Kesa.Engine.Tests.Runtime
         private EntityId Party(string conn, int cards)
         {
             var p = _w.Create("Side");
-            _w.Set(p, M("Seat", "conn"), new StrValue(conn));
+            _w.Seat(p, conn);
             _w.Set(p, M("Hand", "cards"), new IntValue(cards));
             return p;
         }
@@ -84,7 +80,7 @@ namespace Kesa.Engine.Tests.Runtime
             var b = _w.ViewAs("B");
             Assert.That(((IntValue)b.Get(_b, M("Hand", "cards"))).Value, Is.EqualTo(5));
             Assert.That(b.Has(_a, "Hand"), Is.False);
-            Assert.That(b.Has(_a, "Seat"), Is.True);
+            Assert.That(b.Has(_a, "Crest"), Is.True);
             var e = Assert.Throws<WorldException>(() => b.Get(_a, M("Hand", "cards")))!;
             Assert.That(e.Code, Is.EqualTo(Codes.RunNoComponent));
             Assert.That(e.Message, Is.EqualTo(_a + " (Side) has no 'Hand'"));
@@ -276,15 +272,17 @@ namespace Kesa.Engine.Tests.Runtime
                     "deftype(\"Unit\", components=[\"Side\", \"Combat\", \"Fog\"])\n" +
                     "deftype(\"Castle\", components=[\"Side\", \"Defense\"])\n",
                 defs: "Unit(\"Raider\")\nCastle(\"Keep\")\n" +
-                      "@view_policy\ndef may_see(issuer, entity, component):\n" +
-                      "    return entity.Fog is None or not entity.Fog.hidden or entity.Side.conn == issuer\n");
+                      "@view_policy\ndef may_see(viewer, entity, component):\n" +
+                      "    return entity.Fog is None or not entity.Fog.hidden or (viewer is not None and entity.Side.conn == viewer.Side.conn)\n");
             var w = new World(LoadClean());
             var castle = w.Create("Keep");
             w.Set(castle, w.Member("Side", "conn"), new StrValue("B"));
+            w.Seat(castle, "B");
             foreach (var (atk, hidden) in units)
             {
                 var u = w.Create("Raider");
                 w.Set(u, w.Member("Side", "conn"), new StrValue("A"));
+                w.Seat(u, "A"); // 한 연결이 여러 엔티티에 앉으면 보는 것은 합이다 (G238)
                 w.Set(u, w.Member("Combat", "atk"), new IntValue(atk));
                 w.Set(u, w.Member("Fog", "hidden"), hidden ? BoolValue.True : BoolValue.False);
             }
@@ -381,12 +379,12 @@ namespace Kesa.Engine.Tests.Runtime
             var one = b.LegalMoves("banking.Attack", args, 1);
             Assert.That((Units(one, "unit"), one.Truncated), Is.EqualTo((new[] { u1 }, true)));
 
-            // A는 B로서 낼 수 없으니(acts_for → may_act) B 쪽 인자로 물으면 수가 없다 (G233)
+            // A는 B로서 낼 수 없으니(acts_for → 배정 표) B 쪽 인자로 물으면 수가 없다 (G233)
             Assert.That(_w.ViewAs("A").LegalMoves("banking.Attack", args, 10).Moves, Is.Empty);
             Assert.That(b.Diagnostics, Is.Empty);
         }
 
-        /// <summary>거른 합법 수는 제출 때처럼 acts_for → may_act를 통과한 수만 담는다 (G233). 담긴 수는 그 연결로 내면 입구를 지난다.</summary>
+        /// <summary>거른 합법 수는 제출 때처럼 acts_for → 배정 표(G236)를 통과한 수만 담는다 (G233). 담긴 수는 그 연결로 내면 입구를 지난다.</summary>
         [Test]
         public void LegalMovesListOnlyMovesTheConnectionMayIssue()
         {
@@ -429,21 +427,22 @@ namespace Kesa.Engine.Tests.Runtime
         public void HiddenRowsAnswerLikeUnattachedComponentsAndDeadKeys()
         {
             Mod("banking", schema:
-                    "component(\"Seat\", conn=field(str, default=\"\"))\n" +
+                    "component(\"Label\", name=field(str, default=\"\"))\n" +
                     "component(\"Tricks\", key=\"Card\", keys=\"listed\", n=field(int, default=0))\n" +
                     "component(\"Moods\", key=\"Card\", keys=\"all\", n=field(int, default=0))\n" +
                     "component(\"Known\", key=Ref[\"Party\"], n=field(int, default=0))\n" +
-                    "deftype(\"Card\")\ndeftype(\"Party\", components=[\"Seat\", \"Known\"])\n",
+                    "deftype(\"Card\")\ndeftype(\"Party\", components=[\"Label\", \"Known\"])\n",
                 defs: "Card(\"Ace\")\nParty(\"Side\")\n" +
-                      "@view_policy\ndef may_see(issuer, entity, component):\n" +
+                      "@view_policy\ndef may_see(viewer, entity, component):\n" +
                       "    if component == \"Tricks\" or component == \"Moods\":\n" +
-                      "        return entity.Seat.conn == issuer\n" +
-                      "    return entity.Seat.conn != \"ghost\"\n");
+                      "        return entity == viewer\n" +
+                      "    return entity.Label.name != \"ghost\"\n");
             var w = new World(LoadClean());
             EntityId P(string conn)
             {
                 var p = w.Create("Side");
-                w.Set(p, w.Member("Seat", "conn"), new StrValue(conn));
+                w.Set(p, w.Member("Label", "name"), new StrValue(conn));
+                w.Seat(p, conn);
                 return p;
             }
             var a = P("A");
@@ -581,7 +580,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ABrokenPolicyHidesAndLeavesADiagnostic(string body, string expected)
         {
             NewWorld(Defs.Replace(Policies, Policies.Substring(0, Policies.IndexOf("@view_policy")) +
-                                            "@view_policy\ndef may_see(issuer, entity, component):\n" + body));
+                                            "@view_policy\ndef may_see(viewer, entity, component):\n" + body));
             var b = _w.ViewAs("B");
             Assert.That(b.All("Party"), Is.Empty);
             Assert.That(b.Diagnostics.Select(d => d.Code), Has.All.EqualTo(Codes.RunViewPolicy));
@@ -598,10 +597,10 @@ namespace Kesa.Engine.Tests.Runtime
             return diags.ToList();
         }
 
-        [TestCase("@view_policy\ndef may_see(issuer, entity):\n    return True\n",
-            "CMD006 a view policy takes exactly three parameters without defaults: (issuer, entity, component)")]
-        [TestCase("@view_policy\ndef may_see(issuer, entity, component=None):\n    return True\n",
-            "CMD006 a view policy takes exactly three parameters without defaults: (issuer, entity, component)")]
+        [TestCase("@view_policy\ndef may_see(viewer, entity):\n    return True\n",
+            "CMD006 a view policy takes exactly three parameters without defaults: (viewer, entity, component)")]
+        [TestCase("@view_policy\ndef may_see(viewer, entity, component=None):\n    return True\n",
+            "CMD006 a view policy takes exactly three parameters without defaults: (viewer, entity, component)")]
         [TestCase("@view_policy\ndef a(i, e, c):\n    return True\n@view_policy\ndef b(i, e, c):\n    return True\n",
             "CMD006 a mod can declare only one view policy")]
         [TestCase("@view_policy(override=True)\ndef a(i, e, c):\n    return True\n",
@@ -618,11 +617,10 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
-        public void ASubmitAndAViewPolicyCanLiveSideBySide()
+        public void TheViewPolicyIsInTheResult()
         {
             Mod("banking", schema: Schema, defs: Defs);
             var loaded = LoadClean();
-            Assert.That(loaded.SubmitPolicy!.Function.Name, Is.EqualTo("may_act"));
             Assert.That(loaded.ViewPolicy!.Function.Name, Is.EqualTo("may_see"));
             Assert.That(loaded.ViewPolicy.Function.IsViewPolicy, Is.True);
             Assert.That(loaded.ViewPolicy.Function.IsCommand, Is.False);
@@ -630,19 +628,53 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
-        public void RequiringAViewPolicyAlsoRequiresASubmitPolicy()
+        public void TheHostCanRequireAViewPolicy()
         {
             Mod("banking", schema: Schema, defs: "Party(\"Side\")\n");
             var none = Assert.Throws<WorldException>(() => new World(LoadClean(), requireViewPolicy: true))!;
             Assert.That(none.Code, Is.EqualTo(Codes.RunNoViewPolicy));
             Assert.That(none.Message, Is.EqualTo("the host requires a view policy, but no active mod declares one"));
+            Assert.That(none.Hint, Does.Contain("may_see(viewer, entity, component)"));
 
-            Mod("banking", schema: Schema, defs: "Party(\"Side\")\n@view_policy\ndef may_see(i, e, c):\n    return True\n");
-            var noGate = Assert.Throws<WorldException>(() => new World(LoadClean(), requireViewPolicy: true))!;
-            Assert.That(noGate.Code, Is.EqualTo(Codes.RunNoViewPolicy));
-            Assert.That(noGate.Message, Does.Contain("also needs a submit policy"));
+            NewWorld(requireView: true); // 있으면 된다 (입구 정책은 없어졌다, G237)
+        }
 
-            NewWorld(requireView: true); // 둘 다 있으면 된다
+        // ---- 보는 이 (G238) ----
+
+        [Test]
+        public void AConnectionSeatedNowhereSeesAsASpectator()
+        {
+            NewWorld();
+            var c = _w.ViewAs("C");
+            Assert.That(c.Has(_a, "Hand"), Is.False);
+            Assert.That(c.Has(_b, "Hand"), Is.False);
+            Assert.That(c.All("Unit"), Is.Empty, "the fogged scout is nobody's to see");
+            Assert.That(c.Diagnostics, Is.Empty, "the policy is called with viewer=None and compares it like any value");
+        }
+
+        [Test]
+        public void AConnectionAtTwoSeatsSeesWhatEitherSees()
+        {
+            NewWorld();
+            _w.Seat(_b, "A"); // 핫시트: A가 두 진영에 앉는다
+            var a = _w.ViewAs("A");
+            Assert.That(((IntValue)a.Get(_a, M("Hand", "cards"))).Value, Is.EqualTo(3));
+            Assert.That(((IntValue)a.Get(_b, M("Hand", "cards"))).Value, Is.EqualTo(5));
+            Assert.That(_w.ViewAs("B").Has(_b, "Hand"), Is.False, "B no longer sits at its party");
+
+            _w.Unseat(_b);
+            Assert.That(_w.ViewAs("A").Has(_b, "Hand"), Is.False);
+            Assert.That(_w.ViewAs("B").Has(_b, "Hand"), Is.False);
+        }
+
+        [Test]
+        public void ABrokenPolicyNamesTheViewerInItsDiagnostic()
+        {
+            NewWorld(Defs.Replace(Policies, "@view_policy\ndef may_see(viewer, entity, component):\n    return viewer.Hand.cards > 0\n"));
+            var c = _w.ViewAs("C");
+            Assert.That(c.All("Party"), Is.Empty);
+            Assert.That(c.Diagnostics.Select(d => d.Message), Has.Some.Contains("seen by a spectator"));
+            Assert.That(_w.ViewAs("A").All("Party"), Is.EqualTo(new[] { _a, _b }));
         }
     }
 }

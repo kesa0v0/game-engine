@@ -33,6 +33,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var world = new World(Content(logic), maxSignalDepth: maxSignalDepth);
             _u = world.Create("Scout");
+            world.Seat(_u, "host");
             return world;
         }
 

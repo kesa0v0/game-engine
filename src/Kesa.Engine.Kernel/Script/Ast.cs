@@ -413,7 +413,7 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary>
-        /// 커맨드로 볼 함수인가: 데코레이터가 있고 <c>@submit_policy</c>·<c>@view_policy</c>가 아니다. 잘못된 데코레이터도 커맨드로 봐서
+        /// 커맨드로 볼 함수인가: 데코레이터가 있고 <c>@view_policy</c>나 없어진 <c>@submit_policy</c>(G237)가 아니다. 잘못된 데코레이터도 커맨드로 봐서
         /// 원인 오류 하나가 다른 오류로 번지지 않게 한다 (데코레이터 자체는 인터프리터가 검사).
         /// </summary>
         public bool IsCommand => Decorators.Count > 0 && DecoratorName != Interpreter.SubmitPolicyName &&

@@ -8,14 +8,14 @@ using NUnit.Framework;
 
 namespace Kesa.Engine.Tests.Runtime
 {
-    /// <summary>제출: 자유 커맨드 → 인자 → 입구 → 전제 조건 (spec S6, spec-gaps G122~G124·G131).</summary>
+    /// <summary>제출: 자유 커맨드 → 인자 → 입구(배정 표) → 전제 조건 (spec S6, spec-gaps G122·G123·G131·G236·G237).</summary>
     public class WorldSubmitTests : LoaderTestBase
     {
         internal const string Schema =
-            "component(\"Seat\", player=field(str, default=\"\"))\n" +
+            "component(\"Banner\", motto=field(str, default=\"\"))\n" +
             "component(\"Owner\", party=ref(\"Party\", optional=True))\n" +
             "component(\"Moves\", left=field(int, default=1))\n" +
-            "deftype(\"Party\", components=[\"Seat\"])\n" +
+            "deftype(\"Party\", components=[\"Banner\"])\n" +
             "deftype(\"Unit\", components=[\"Owner\", \"Moves\"])\n";
 
         internal const string Commands =
@@ -44,13 +44,8 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=lambda party: party)\n" +
             "def Crash(party: Ref[Party]):\n" +
             "    with preconditions:\n" +
-            "        require([party.Seat][0].nope > 0, text(\"msg.never\"))\n" +
+            "        require([party.Banner][0].nope > 0, text(\"msg.never\"))\n" +
             "    return 0\n";
-
-        private const string Policy =
-            "@submit_policy\n" +
-            "def may_act(issuer, target):\n" +
-            "    return target is None or target.Seat.player == issuer\n";
 
         private World _world = null!;
         private EntityId _red, _blue, _scout;
@@ -58,13 +53,12 @@ namespace Kesa.Engine.Tests.Runtime
         [SetUp]
         public void NewWorld()
         {
-            Mod("banking", schema: Schema, defs: Commands + Policy);
+            Mod("banking", schema: Schema, defs: Commands);
             _world = new World(LoadClean());
-            var seat = _world.Member("Seat", "player");
             _red = _world.Create("Red");
-            _world.Set(_red, seat, new StrValue("alice"));
+            _world.Seat(_red, "alice");
             _blue = _world.Create("Blue");
-            _world.Set(_blue, seat, new StrValue("bob"));
+            _world.Seat(_blue, "bob");
             _scout = _world.Create("Scout");
             _world.Set(_scout, _world.Member("Owner", "party"), new EntityValue(_red));
         }
@@ -96,7 +90,7 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
-        public void ThePolicyDeniesActingForAnotherParty()
+        public void TheSeatTableDeniesActingForAnotherParty()
         {
             var r = Move("bob", _red);
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.GateDenied));
@@ -124,7 +118,7 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
-        public void ActsForNoneStillAsksThePolicyWithNone()
+        public void ActsForNoneLetsAnyConnectionIn()
         {
             var r = _world.Submit("carol", "banking.Chat", new Dictionary<string, Value> { ["msg"] = new StrValue("hi") });
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.Succeeded));
@@ -184,59 +178,125 @@ namespace Kesa.Engine.Tests.Runtime
         }
     }
 
-    /// <summary>정책 함수가 없거나 이상할 때 (G124·G131).</summary>
-    public class WorldSubmitPolicyTests : LoaderTestBase
+    /// <summary>배정 표: 앉히기·비우기·죽음·되감기·저장 (G236·G237).</summary>
+    public class WorldSeatTests : LoaderTestBase
     {
-        private static Dictionary<string, Value> Chat => new Dictionary<string, Value> { ["msg"] = new StrValue("hi") };
+        private World _world = null!;
+        private EntityId _red, _blue, _scout;
+
+        [SetUp]
+        public void NewWorld()
+        {
+            Mod("banking", schema: WorldSubmitTests.Schema, defs: WorldSubmitTests.Commands +
+                "@command(free=True, acts_for=lambda party: party)\n" +
+                "def Disband(party: Ref[Party], unit: Ref[Unit]):\n" +
+                "    destroy(party)\n" +
+                "    unit.Moves.left = unit.Moves.left // 0\n" +
+                "@command(free=True, acts_for=lambda party: party)\n" +
+                "def Quit(party: Ref[Party]):\n" +
+                "    destroy(party)\n");
+            _world = new World(LoadClean());
+            _red = _world.Create("Red");
+            _blue = _world.Create("Blue");
+            _scout = _world.Create("Scout");
+            _world.Set(_scout, _world.Member("Owner", "party"), new EntityValue(_red));
+        }
+
+        private SubmitResult Rest(string issuer) =>
+            _world.Submit(issuer, "banking.Rest", new Dictionary<string, Value> { ["unit"] = new EntityValue(_scout) });
+
+        private SubmitResult Quit(string issuer, EntityId party) =>
+            _world.Submit(issuer, "banking.Quit", new Dictionary<string, Value> { ["party"] = new EntityValue(party) });
 
         [Test]
-        public void WithoutAPolicyEveryIssuerMayAct()
+        public void AnEntityNobodySitsAtTakesNoCommands()
         {
-            Mod("banking", schema: WorldSubmitTests.Schema, defs: WorldSubmitTests.Commands);
-            var world = new World(LoadClean());
-            var red = world.Create("Red");
-            var scout = world.Create("Scout");
-            world.Set(scout, world.Member("Owner", "party"), new EntityValue(red));
-            var r = world.Submit("anyone", "banking.Rest", new Dictionary<string, Value> { ["unit"] = new EntityValue(scout) });
+            Assert.That(Rest("alice").Outcome, Is.EqualTo(SubmitOutcome.GateDenied));
+            _world.Seat(_red, "alice");
+            Assert.That(Rest("alice").Outcome, Is.EqualTo(SubmitOutcome.Succeeded));
+            Assert.That(Rest("Alice").Outcome, Is.EqualTo(SubmitOutcome.GateDenied), "connection tags compare exactly");
+            _world.Unseat(_red);
+            Assert.That(Rest("alice").Outcome, Is.EqualTo(SubmitOutcome.GateDenied));
+            _world.Unseat(_red); // 빈자리를 또 비워도 된다
+        }
+
+        [Test]
+        public void ActsForNoneNeedsNoSeat()
+        {
+            var r = _world.Submit("spectator", "banking.Chat", new Dictionary<string, Value> { ["msg"] = new StrValue("hi") });
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.Succeeded));
         }
 
         [Test]
-        public void TheHostCanRequireAPolicy()
+        public void SeatingAgainHandsTheEntityOver()
         {
-            Mod("banking", schema: WorldSubmitTests.Schema, defs: WorldSubmitTests.Commands);
-            var loaded = LoadClean();
-            var e = Assert.Throws<WorldException>(() => new World(loaded, requireSubmitPolicy: true));
-            Assert.That(e!.Code, Is.EqualTo(Codes.RunNoSubmitPolicy));
+            _world.Seat(_red, "alice");
+            _world.Seat(_red, "ai-1"); // 사람이 나가고 AI가 넘겨받음
+            Assert.That(_world.SeatOf(_red), Is.EqualTo("ai-1"));
+            Assert.That(Rest("alice").Outcome, Is.EqualTo(SubmitOutcome.GateDenied));
+            Assert.That(Rest("ai-1").Outcome, Is.EqualTo(SubmitOutcome.Succeeded));
         }
 
         [Test]
-        public void ARequiredPolicyThatExistsIsFine()
+        public void OneConnectionCanSitAtManyEntities()
         {
-            Mod("banking", schema: WorldSubmitTests.Schema,
-                defs: WorldSubmitTests.Commands + "@submit_policy\ndef gate(issuer, target):\n    return True\n");
-            var world = new World(LoadClean(), requireSubmitPolicy: true);
-            Assert.That(world.Submit("x", "banking.Chat", Chat).Succeeded, Is.True);
+            _world.Seat(_blue, "alice");
+            _world.Seat(_red, "alice");
+            Assert.That(_world.SeatsOf("alice"), Is.EqualTo(new[] { _red, _blue }), "in id order");
+            Assert.That(_world.SeatsOf("bob"), Is.Empty);
+            Assert.That(_world.SeatOf(_scout), Is.Null);
+            Assert.That(Quit("alice", _blue).Succeeded, Is.True);
         }
 
         [Test]
-        public void APolicyMustReturnABool()
+        public void SeatingChecksItsInput()
         {
-            Mod("banking", schema: WorldSubmitTests.Schema,
-                defs: WorldSubmitTests.Commands + "@submit_policy\ndef gate(issuer, target):\n    return 1\n");
-            var r = new World(LoadClean()).Submit("x", "banking.Chat", Chat);
-            Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
-            Assert.That(r.Error!.Message, Does.Contain("the submit policy 'gate' for banking.Chat: it must return True or False, not int"));
+            var empty = Assert.Throws<WorldException>(() => _world.Seat(_red, ""))!;
+            Assert.That(empty.Code, Is.EqualTo(Codes.RunSeat));
+            Assert.That(empty.Message, Is.EqualTo("a connection tag must not be empty"));
+            _world.Destroy(_blue);
+            var dead = Assert.Throws<WorldException>(() => _world.Seat(_blue, "bob"))!;
+            Assert.That(dead.Code, Is.EqualTo(Codes.RunSeat));
+            Assert.That(dead.Message, Is.EqualTo("cannot seat a connection at " + _blue + ": it is not alive"));
         }
 
         [Test]
-        public void ThePolicySeesTheIssuerAsAString()
+        public void SeatingStampsTheEntity()
         {
-            Mod("banking", schema: WorldSubmitTests.Schema,
-                defs: WorldSubmitTests.Commands + "@submit_policy\ndef gate(issuer, target):\n    return issuer == \"host\"\n");
-            var world = new World(LoadClean());
-            Assert.That(world.Submit("host", "banking.Chat", Chat).Outcome, Is.EqualTo(SubmitOutcome.Succeeded));
-            Assert.That(world.Submit("guest", "banking.Chat", Chat).Outcome, Is.EqualTo(SubmitOutcome.GateDenied));
+            long before = _world.Version(_red);
+            _world.Seat(_red, "alice");
+            long seated = _world.Version(_red);
+            Assert.That(seated, Is.Not.EqualTo(before));
+            _world.Unseat(_red);
+            Assert.That(_world.Version(_red), Is.Not.EqualTo(seated));
+        }
+
+        [Test]
+        public void ASeatDiesWithItsEntityAndComesBackOnRollback()
+        {
+            _world.Seat(_red, "alice");
+            var failed = _world.Submit("alice", "banking.Disband", new Dictionary<string, Value>
+            {
+                ["party"] = new EntityValue(_red), ["unit"] = new EntityValue(_scout),
+            });
+            Assert.That(failed.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(_world.SeatOf(_red), Is.EqualTo("alice"), "the rolled-back destroy keeps the seat");
+
+            Assert.That(Quit("alice", _red).Succeeded, Is.True);
+            Assert.That(_world.SeatOf(_red), Is.Null);
+            Assert.That(_world.SeatsOf("alice"), Is.Empty);
+        }
+
+        [Test]
+        public void SeatsAreSavedAndLoaded()
+        {
+            _world.Seat(_red, "alice");
+            _world.Seat(_blue, "alice");
+            var save = _world.Save();
+            Assert.That(System.Text.Encoding.UTF8.GetString(save), Does.Contain("\"seats\": [\n    {\n      \"entity\": 1,\n      \"issuer\": \"alice\""));
+            var loaded = World.Load(LoadClean(), save).World!;
+            Assert.That(loaded.SeatsOf("alice"), Is.EqualTo(new[] { _red, _blue }));
+            Assert.That(loaded.Save(), Is.EqualTo(save));
         }
     }
 }

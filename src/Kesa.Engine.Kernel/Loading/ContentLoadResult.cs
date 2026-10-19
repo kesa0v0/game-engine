@@ -72,13 +72,7 @@ namespace Kesa.Engine.Loading
         public IReadOnlyDictionary<string, CommandDecl> Commands { get; }
 
         /// <summary>
-        /// 제출 정책 함수 (spec-gaps G122·G124). 활성 모드 전체에서 최대 하나이고 교체됐으면 마지막 것이다. 없으면 null이고
-        /// 그때 입구는 모든 issuer를 허용한다.
-        /// </summary>
-        public PolicyDecl? SubmitPolicy { get; internal set; }
-
-        /// <summary>
-        /// 보기 정책 함수 <c>may_see(issuer, entity, component)</c> (spec-gaps G196·G197·G203). 활성 모드 전체에서 최대 하나이고
+        /// 보기 정책 함수 <c>may_see(viewer, entity, component)</c> (spec-gaps G196·G197·G203·G238). 활성 모드 전체에서 최대 하나이고
         /// 교체됐으면 마지막 것이다. 없으면 null이고 그때 거른 읽기는 모두 보인다.
         /// </summary>
         public PolicyDecl? ViewPolicy { get; internal set; }

@@ -70,6 +70,7 @@ namespace Kesa.Engine.Tests.Runtime
             _world = new World(LoadClean(), stepBudget: 300, actionStepBudget: 20_000);
             _units.Clear();
             for (int i = 0; i < units; i++) _units.Add(_world.Create("Soldier"));
+            foreach (var u in _units) _world.Seat(u, "host");
         }
 
         private static void IsHeavy(IReadOnlyList<Diagnostic> warnings, string label)

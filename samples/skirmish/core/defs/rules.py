@@ -1,11 +1,6 @@
 SIZE = 5
 DIRS = {"north": [0, -1], "south": [0, 1], "west": [-1, 0], "east": [1, 0]}
 
-# 연결 "red"/"blue"는 자기 진영으로만 행동한다 (U1)
-@submit_policy
-def may_act(issuer, target):
-    return target is None or target.Seat.conn == issuer
-
 def game():
     for g in query("Game"):
         return g
@@ -67,10 +62,10 @@ def resolve(g):
 def Start():
     with preconditions:
         require(game() is None, text("skirmish.already_started"))
-    red = spawn("Red", Seat=Seat(conn="red"))
-    blue = spawn("Blue", Seat=Seat(conn="blue"))
-    red.Seat.next = blue
-    blue.Seat.next = red
+    red = spawn("Red")
+    blue = spawn("Blue")
+    red.Order.next = blue
+    blue.Order.next = red
     g = spawn("Battle")
     place(red, "Soldier", 1, 4)
     place(red, "Archer", 2, 4)
@@ -83,12 +78,12 @@ def Start():
         r = ask(p, "turn", responses=["Move", "Attack", "EndTurn"], data={"turn": g.Match.turn})
         if r.response == "Attack":
             resolve(g)
-            if alive(p.Seat.next) == 0:
+            if alive(p.Order.next) == 0:
                 g.Match.winner = p
         elif r.response == "EndTurn":
             for u in query("Unit"):
                 u.Ready.acted = False
-            p = p.Seat.next
+            p = p.Order.next
             g.Match.turn += 1
 
 @command(acts_for=lambda party: party)

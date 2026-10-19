@@ -5,13 +5,11 @@ using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Runtime
 {
-    /// <summary>커맨드 제출 (spec S6 권한 3층, spec-gaps G122~G124·G131).</summary>
+    /// <summary>커맨드 제출 (spec S6 권한 3층, spec-gaps G122·G123·G131·G237).</summary>
     public sealed partial class World
     {
-        private readonly PolicyDecl? _submitPolicy;
-
         /// <summary>
-        /// 커맨드를 제출한다: 자유 커맨드 확인 → 인자 검사(G115) → 입구 <c>may_act(issuer, acts_for(인자))</c>(G122) →
+        /// 커맨드를 제출한다: 자유 커맨드 확인 → 인자 검사(G115) → 입구(<c>acts_for(인자)</c>에 이 연결이 앉아 있나, G237) →
         /// 전제 조건(G110) → 본문(G132) 순서다. <paramref name="issuer"/>는 호스트가 연결에 붙인 불투명한 꼬리표다 (G119).
         /// 없는 커맨드 id만 호출자 오류(<see cref="WorldException"/>)이고 나머지는 모두 결과로 돌려준다 (G131).
         /// </summary>
@@ -35,7 +33,7 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var target = ActsFor(decl, checkedArgs);
-                if (!MayAct(issuer, target, command)) return Copy(result, SubmitOutcome.GateDenied, target);
+                if (!MayAct(issuer, target)) return Copy(result, SubmitOutcome.GateDenied, target);
                 // 본문이 중간에 실패하면 그때까지의 쓰기를 되감는다 (C8, G133)
                 Request? opened = null;
                 long? flow = null;
@@ -108,18 +106,6 @@ namespace Kesa.Engine.Runtime
                     "acts_for picks whom the command acts as (spec-gaps G122)");
             }
             return value;
-        }
-
-        /// <summary>정책 함수 <c>may_act(issuer, target)</c>. 없으면 모두 허용한다 (G124). bool이어야 한다.</summary>
-        private bool MayAct(string issuer, Value target, string command)
-        {
-            if (_submitPolicy == null) return true;
-            var function = _submitPolicy.Function;
-            string label = "the submit policy '" + function.Name + "' for " + command;
-            var value = RunGateFunction(function, new[] { new StrValue(issuer), ToScript(target) }, label);
-            if (value is BoolValue b) return b.Value;
-            throw new WorldException(Codes.RunType, "computing " + label + ": it must return True or False, not " + value.KindName,
-                "spec-gaps G122");
         }
 
         /// <summary>입구의 순수 함수 실행: 예산 하나, 스크립트 오류는 위치가 붙은 <see cref="WorldException"/>, 엔티티는 저장 값으로.</summary>

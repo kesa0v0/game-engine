@@ -127,9 +127,7 @@ namespace Kesa.Engine.Script
                 context.Error(Codes.CmdWriteEffect,
                     "the " + policy.Noun + " '" + policy.Function.Name + "' changes the world; it can only read",
                     policy.Function.Definition!.Span,
-                    policy.Kind == PolicyKind.Submit
-                        ? "the gate must not change anything (spec-gaps G122)"
-                        : "reading the world for a viewer must not change anything (spec-gaps G197)",
+                    "reading the world for a viewer must not change anything (spec-gaps G197)",
                     new[] { policy.Function.WriteWitness!.Value });
             }
 

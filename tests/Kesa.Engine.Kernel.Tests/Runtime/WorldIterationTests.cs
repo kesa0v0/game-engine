@@ -38,10 +38,12 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("core", schema: Schema, defs: Defs + defs);
             _w = new World(LoadClean());
             _city = _w.Create("Town");
+            _w.Seat(_city, "host");
             _units.Clear();
             for (int i = 0; i < 3; i++)
             {
                 var u = _w.Create("Scout");
+                _w.Seat(u, "host");
                 _w.Set(u, _w.Member("Home", "city"), new EntityValue(_city));
                 _units.Add(u);
             }

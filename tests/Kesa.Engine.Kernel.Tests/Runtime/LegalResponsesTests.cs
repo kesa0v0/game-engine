@@ -11,17 +11,14 @@ namespace Kesa.Engine.Tests.Runtime
     public class LegalResponsesTests : LoaderTestBase
     {
         private const string Schema =
-            "component(\"Seat\", conn=field(str, default=\"\"))\n" +
+            "component(\"Banner\", motto=field(str, default=\"\"))\n" +
             "component(\"Owner\", party=ref(\"Party\", optional=True))\n" +
             "component(\"Pos\", x=field(int, default=0))\n" +
-            "deftype(\"Party\", components=[\"Seat\"])\n" +
+            "deftype(\"Party\", components=[\"Banner\"])\n" +
             "deftype(\"Unit\", components=[\"Owner\", \"Pos\"])\n";
 
         private const string Defs =
             "Party(\"Side\")\nUnit(\"Pawn\")\n" +
-            "@submit_policy\n" +
-            "def may_act(issuer, target):\n" +
-            "    return target is None or target.Seat.conn == issuer\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Open(a: Ref[Party], b: Ref[Party]):\n" +
             "    r = ask([a, b], \"go\", responses=[\"Step\", \"Push\", \"Wait\", \"Bid\"])\n" +
@@ -56,7 +53,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("core", schema: Schema, defs: Defs);
             _content = LoadClean();
-            _w = new World(_content, requireSubmitPolicy: true);
+            _w = new World(_content);
             _a = Party("a");
             _b = Party("b");
             _c = Party("c");
@@ -72,7 +69,7 @@ namespace Kesa.Engine.Tests.Runtime
         private EntityId Party(string conn)
         {
             var p = _w.Create("Side");
-            _w.Set(p, _w.Member("Seat", "conn"), new StrValue(conn));
+            _w.Seat(p, conn);
             return p;
         }
 
@@ -112,7 +109,7 @@ namespace Kesa.Engine.Tests.Runtime
                 var conn = move.By == _a ? "a" : "b";
                 var r = _w.Respond(conn, _q, move.Command, move.Arguments);
                 Assert.That(r.Succeeded, Is.True, Show(move) + ": " + r.Outcome + " " + r.Message);
-                _w = World.Load(_content, save, requireSubmitPolicy: true).World!;
+                _w = World.Load(_content, save).World!;
             }
         }
 

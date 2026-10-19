@@ -1,6 +1,6 @@
 # 인계 메모: 현재 상태와 다음 할 일
 
-마지막 갱신: 2026-10-19. 브랜치 `spec-v0.5-scaffold`, 테스트 1981개 통과(커널 1939, CLI 36, 콘솔 호스트 6). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
+마지막 갱신: 2026-10-19. 브랜치 `spec-v0.5-scaffold`, 테스트 1979개 통과(커널 1937, CLI 36, 콘솔 호스트 6). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
 
 ## 한 줄 요약
 
@@ -35,18 +35,18 @@
 
 ## 다음 할 일 (사용자와 고를 것)
 
-**방금 끝낸 것:** 바뀜 도장(G235, 콘솔 호스트 구멍 3번). history의 "바뀜 도장". 그 전은 함께 물은 질문의 거른 대상 목록(G234). history의 "함께 물은 질문의 거른 대상 목록". 그 전은 거른 합법 수에 입구 정책(G233, 콘솔 호스트 구멍 2번). history의 "거른 합법 수에 입구 정책". 그 전은 질문 단위 응답 합법 수 `LegalResponses`(G232, 구멍 1번). history의 "질문 단위 응답 합법 수". 그 전은 텍스트 콘솔 호스트와 예시 게임(작은 전투: 5×5, 두 진영, 차례는 모드의 `ask` 루프, 명중 때 맞은 쪽에 버팀/후퇴 질문). history의 "텍스트 콘솔 호스트와 예시 게임". 실행: `kesa-play samples/skirmish --seat red --seat blue [--seed N]`. 그 전은 속성 이름 오타의 로드 검사 1차(G228)와 같은 엔티티 안의 `derived` 순환 로드 검사(G229, schema-design 3.3.1 5항을 고침), 컴포넌트·신호 이름이 보이는 모드 안에서 내장을 이기는 규칙과 스텁의 이름 충돌 수정(G230), 생성자에서 속성을 읽는 것의 로드 검사(G228·G230 보강), 속성 오타 검사의 함수 반환 타입 추론(G231), 덤프의 `patches`를 값을 만든 패치만으로(G76 구현 보강). history의 "속성 이름 오타의 로드 검사 1차", "`derived` 순환의 로드 검사", "스키마 이름과 내장의 충돌". 그 전은 문서와 큰 파일 정리(handoff·spec-gaps 나누기, 큰 소스 파일 partial 나누기와 안쪽 타입 빼기, 커밋 `c621954`~`7301b1b`). 자세한 것은 history의 "문서와 큰 파일 정리". 그 전은 S7 호스트 함수(G215~G222)와 스크립트 속도(G223~G227, history의 "S7 호스트 함수와 스크립트 속도"). 속도는 여기서 멈추기로 했다(남은 큰 몫은 값 구조체화, 백본 ECS화와 함께 맨 끝).
+**방금 끝낸 것:** 배정 표와 입구·보기 정책 다시 짜기(G236·G237·G238, 콘솔 호스트 구멍 5번). history의 "배정 표와 입구·보기 정책 다시 짜기". 커밋 전(사용자가 요청하면 커밋). 그 전은 바뀜 도장(G235, 구멍 3번). history의 "바뀜 도장". 그 전은 함께 물은 질문의 거른 대상 목록(G234). history의 "함께 물은 질문의 거른 대상 목록". 그 전은 거른 합법 수에 입구 정책(G233, 콘솔 호스트 구멍 2번). history의 "거른 합법 수에 입구 정책". 그 전은 질문 단위 응답 합법 수 `LegalResponses`(G232, 구멍 1번). history의 "질문 단위 응답 합법 수". 그 전은 텍스트 콘솔 호스트와 예시 게임(작은 전투: 5×5, 두 진영, 차례는 모드의 `ask` 루프, 명중 때 맞은 쪽에 버팀/후퇴 질문). history의 "텍스트 콘솔 호스트와 예시 게임". 실행: `kesa-play samples/skirmish --seat red=Red --seat blue=Blue [--seed N]`(G236 뒤). 그 전은 속성 이름 오타의 로드 검사 1차(G228)와 같은 엔티티 안의 `derived` 순환 로드 검사(G229, schema-design 3.3.1 5항을 고침), 컴포넌트·신호 이름이 보이는 모드 안에서 내장을 이기는 규칙과 스텁의 이름 충돌 수정(G230), 생성자에서 속성을 읽는 것의 로드 검사(G228·G230 보강), 속성 오타 검사의 함수 반환 타입 추론(G231), 덤프의 `patches`를 값을 만든 패치만으로(G76 구현 보강). history의 "속성 이름 오타의 로드 검사 1차", "`derived` 순환의 로드 검사", "스키마 이름과 내장의 충돌". 그 전은 문서와 큰 파일 정리(handoff·spec-gaps 나누기, 큰 소스 파일 partial 나누기와 안쪽 타입 빼기, 커밋 `c621954`~`7301b1b`). 자세한 것은 history의 "문서와 큰 파일 정리". 그 전은 S7 호스트 함수(G215~G222)와 스크립트 속도(G223~G227, history의 "S7 호스트 함수와 스크립트 속도"). 속도는 여기서 멈추기로 했다(남은 큰 몫은 값 구조체화, 백본 ECS화와 함께 맨 끝).
 
 ### 콘솔 호스트에서 드러난 구멍 (2026-10-19, 실제로 우회한 것. 결정 아님)
 
 호스트 코드(`ConsoleGame.cs`)의 "구멍:" 주석 자리다. 하나씩 사용자와 정한다.
 
 1. ~~응답 커맨드의 합법 수를 질문 하나에 대해 물을 수 없다.~~ **해결(G232):** `LegalResponses(질문, by, 최대)`. 콘솔 호스트의 람다 들여다보기를 지웠다.
-2. ~~이 엔티티로 행동할 수 있는 연결이 누구인지 물을 수 없다.~~ **해결(G233):** `ViewAs(연결).LegalMoves`가 `acts_for` → `may_act`도 거른다. 콘솔 호스트는 자리마다 `ViewAs`로 할 수 있는 것을 모으고 그 자리로 바로 낸다(자리 차례로 내 보기를 지웠다). 그때 본 작은 후보(함께 물은 질문의 `Who`에 답할 수 없는 대상도 보임)도 **해결(G234):** 거른 질문의 `Who`는 답할 수 있는 대상만.
+2. ~~이 엔티티로 행동할 수 있는 연결이 누구인지 물을 수 없다.~~ **해결(G233):** `ViewAs(연결).LegalMoves`가 `acts_for` → 입구 검사(지금은 배정 표, G237)도 거른다. 콘솔 호스트는 자리마다 `ViewAs`로 할 수 있는 것을 모으고 그 자리로 바로 낸다(자리 차례로 내 보기를 지웠다). 그때 본 작은 후보(함께 물은 질문의 `Who`에 답할 수 없는 대상도 보임)도 **해결(G234):** 거른 질문의 `Who`는 답할 수 있는 대상만.
 3. ~~무엇이 바뀌었나 구독이 없다.~~ **해결(G235):** 바뀜 도장 `Version()`·`Version(id)`·`Version(id, 이름)`. 콘솔 호스트는 도장이 그대로인 엔티티 줄을 다시 읽지 않는다. 남은 몫: 거른 읽기(`ViewAs`)의 도장, 남의 엔티티를 읽는 `derived`(읽기 집합 필요).
    - **다음 후보(3에서 이어짐): 호스트용 경로 읽기.** 이전 엔진(`kesa0v0/unity-kesa-engine`)은 UXML `binding-path="Self.X.Y"`를 `DataPathResolver`가 풀어 R3로 갱신했다. 잘한 점(UI 파일은 경로만, 참조가 바뀌면 다시 붙음)은 잇고, 문제(필드마다 모더가 `TryResolveBinding`을 손으로, 로드 때 검사 없음, 커맨드 한가운데서 즉시 알림, 조용히 멈추는 바인딩·구독 누수, 숨긴 정보 거름 없음)는 피한다. 지금 호스트는 핸들(`Member`·`Get`)로 한 단계씩 따라가야 하고, 경로는 모드 스크립트 안에서만 된다. 방향: 경로를 로드 때 스키마로 컴파일해 (엔티티, 칸) 읽기 집합을 얻고 G235 도장으로 다시 읽을지 정한다(S3·S10 4항). 2026-10-19 분석, 결정 아님.
 4. **번역이 없다(X4).** 질문 제목·선택지·`require` 메시지가 키 그대로(`turn`, `hold`, `skirmish.already_started`) 나온다. 엔티티는 번호와 Def id.
-5. **연결 이름을 모드가 박아 둔다.** 예시 모드의 `Start`가 `Seat(conn="red")`를 직접 적는다. 자리 배정(어느 연결이 어느 진영)은 호스트가 정할 일로 보이는데 넘겨줄 길이 `Start`의 인자뿐이다.
+5. ~~연결 이름을 모드가 박아 둔다.~~ **해결(G236·G237·G238):** 커널의 배정 표(`World.Seat`·`Unseat`·`SeatOf`·`SeatsOf`, 저장됨), 입구는 표만 봄(`may_act`·`@submit_policy` 없앰), 보기 정책은 `may_see(viewer, entity, component)`. 콘솔 호스트는 `--seat red=Red`로 그 Def의 엔티티가 생기면 앉힌다. **G236에서 이어서 정할 것:** 로비가 고를 수 있는 엔티티 목록을 얻는 길(지금 콘솔 호스트는 Def 이름으로 고름), 스크립트가 배정을 읽는 길(예: 사람이 빠진 자리를 AI 규칙이 알아야 할 때), 한 엔티티에 연결 여럿(공동 조종). API 이름(`Seat` 등)은 구현하며 붙인 것이고 사용자가 고른 적 없음.
 6. (알려진 제한, 이번엔 피함) 응답 커맨드 본문에서 `ask`를 하면 "not supported yet" 실행 오류다(G139). 모더가 처음 쓸 자연스러운 모양(공격 커맨드 안에서 맞은 쪽에 묻기)이라, 예시는 공격을 기록만 하고 차례 루프가 묻게 짰다.
 
 큰 후보:
@@ -82,6 +82,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 1981개 통과(커널 1939, CLI 36, 콘솔 호스트 6)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
+1. `git pull` 후 `dotnet test`로 1979개 통과(커널 1937, CLI 36, 콘솔 호스트 6)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(색인, 고를 항목의 영역은 `docs/gaps/`의 그 파일), 고를 항목에 맞는 `docs/spine-spec.md` 절을 읽는다. 실행기 구조는 `Script/Execution/PureEvaluator.cs`(입구)·`Session.cs`(+`.Calls`·`.Preconditions`·`.Stepping`)·`Frame.cs`·`Block.cs`·`PureEvaluator.Nodes.cs`(식 노드)·`PureEvaluator.Statements.cs`(문장 노드)·`FrameLayout.cs`·`LocalTable.cs`다. 고른 영역의 지난 기록이 필요하면 `docs/history.md`에서 그 절만 찾아 읽는다(전부 읽을 필요 없음). 옛 커맨드 첫 슬라이스의 읽을 곳: 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`)·`Frame.cs`(`Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.

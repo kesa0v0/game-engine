@@ -154,9 +154,6 @@ namespace Kesa.Engine.Script
         /// <summary>메시지에 쓰는 입구 종류: <c>@command</c>, <c>@on handler</c> 또는 <c>@when reaction</c>.</summary>
         public string EntryKind => IsHandler ? "@on handler" : IsWhen ? "@when reaction" : "@command";
 
-        /// <summary><c>@submit_policy</c> 함수인가 (G122). 순수 자리다.</summary>
-        public bool IsSubmitPolicy => Definition != null && Definition.DecoratorName == Interpreter.SubmitPolicyName;
-
         /// <summary><c>@view_policy</c> 함수인가 (G197). 순수 자리다.</summary>
         public bool IsViewPolicy => Definition != null && Definition.DecoratorName == Interpreter.ViewPolicyName;
 

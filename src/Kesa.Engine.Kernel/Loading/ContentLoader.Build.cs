@@ -83,36 +83,31 @@ namespace Kesa.Engine.Loading
         /// Def와 정책 함수(제출 G124, 보기 G203)를 로드 순서대로 등록한다. 정책은 종류마다 따로 센다. 고정점은 <see cref="BuildSchema"/>와 같다.
         /// </summary>
         private static DefRegistry BuildDefs(List<ModUnit> units, ModVisibility visibility, LoadOrder order,
-            DiagnosticBag diagnostics, out PolicyDecl? submitPolicy, out PolicyDecl? viewPolicy)
+            DiagnosticBag diagnostics, out PolicyDecl? viewPolicy)
         {
             while (true)
             {
                 var stage = new StageDiagnostics(SurvivorIds(units));
                 var registry = new DefRegistry();
-                submitPolicy = null;
                 viewPolicy = null;
                 foreach (var u in units)
                 {
                     if (u.Failed) continue;
                     foreach (var record in u.Defs) Register(registry, record, visibility, order, stage);
-                    foreach (var p in u.Functions.Policies)
-                    {
-                        if (p.Kind == PolicyKind.Submit) submitPolicy = RegisterPolicy(submitPolicy, p, visibility, order, stage);
-                        else viewPolicy = RegisterPolicy(viewPolicy, p, visibility, order, stage);
-                    }
+                    foreach (var p in u.Functions.Policies) viewPolicy = RegisterPolicy(viewPolicy, p, visibility, order, stage);
                 }
                 if (!Settle(units, stage, diagnostics)) return registry;
             }
         }
 
         /// <summary>
-        /// 제출 정책 함수는 활성 모드 전체에서 최대 하나이고 교체는 <c>override=True</c>다 (spec-gaps G124). 판정은 Def 교체
+        /// 보기 정책 함수는 활성 모드 전체에서 최대 하나이고 교체는 <c>override=True</c>다 (spec-gaps G203). 판정은 Def 교체
         /// (<see cref="Register"/>, spec S1)와 같다. 돌려주는 값은 지금까지의 정책이다.
         /// </summary>
         private static PolicyDecl? RegisterPolicy(PolicyDecl? current, PolicyDecl record,
             ModVisibility visibility, LoadOrder order, StageDiagnostics stage)
         {
-            string code = record.Kind == PolicyKind.Submit ? Codes.CmdSubmitPolicy : Codes.CmdViewPolicy;
+            string code = Codes.CmdViewPolicy;
             string noun = record.Noun;
             if (current == null)
             {
@@ -136,7 +131,7 @@ namespace Kesa.Engine.Loading
                 if (own || canReplace)
                 {
                     stage.Error(record.Mod, code, message, record.Span,
-                        canReplace ? "add override=True to replace it (spec-gaps G124)" : null, new[] { original.Span });
+                        canReplace ? "add override=True to replace it (spec-gaps G203)" : null, new[] { original.Span });
                     return current;
                 }
                 // 서로 의존하지 않는 두 모드: 어느 정책이 맞는지 근거가 없으므로 둘 다 오류 (Def와 같은 규칙)

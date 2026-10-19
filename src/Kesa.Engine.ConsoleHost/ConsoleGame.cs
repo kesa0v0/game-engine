@@ -21,16 +21,23 @@ namespace Kesa.Engine.ConsoleHost
 
         private readonly ContentLoadResult _content;
         private readonly World _world;
+        /// <summary>연결마다 앉힐 Def. 그 Def의 엔티티가 생기면 앉힌다.</summary>
+        private readonly IReadOnlyList<(string Connection, string Def)> _wanted;
+
+        /// <summary>연결 꼬리표, 처음 나온 순서.</summary>
         private readonly IReadOnlyList<string> _seats;
+
         private readonly TextReader _in;
         private readonly TextWriter _out;
         private readonly ValueText _text;
 
-        public ConsoleGame(ContentLoadResult content, World world, IReadOnlyList<string> seats, TextReader input, TextWriter output)
+        public ConsoleGame(ContentLoadResult content, World world, IReadOnlyList<(string Connection, string Def)> seats,
+            TextReader input, TextWriter output)
         {
             _content = content;
             _world = world;
-            _seats = seats;
+            _wanted = seats;
+            _seats = seats.Select(s => s.Connection).Distinct().ToList();
             _in = input;
             _out = output;
             _text = new ValueText(world);
@@ -59,6 +66,7 @@ namespace Kesa.Engine.ConsoleHost
         {
             while (true)
             {
+                SeatArrivals();
                 WriteState();
                 var options = Options();
                 if (options.Count == 0)
@@ -82,6 +90,30 @@ namespace Kesa.Engine.ConsoleHost
                         _out.WriteLine("1부터 " + options.Count.ToString(CultureInfo.InvariantCulture) + " 사이의 번호, 끝내려면 :q");
                 }
                 _out.WriteLine("[" + picked.Seat + "] " + picked.Run());
+            }
+        }
+
+        // ---- 자리 ----
+
+        /// <summary>
+        /// 원하는 Def의 엔티티가 생겼고 아무도 앉지 않았으면 그 연결을 앉힌다 (G236의 호스트 쓰기 경로). 진짜 로비라면 모드가 고를 수 있는
+        /// 엔티티 목록을 내놓아야 하는데 그 길은 아직 없다.
+        /// </summary>
+        private void SeatArrivals()
+        {
+            foreach (var (connection, def) in _wanted)
+            {
+                foreach (var type in _content.Schema.Types)
+                {
+                    foreach (var id in _world.All(type.Name))
+                    {
+                        if (_world.DefOf(id) != def || _world.SeatOf(id) != null) continue;
+                        _world.Seat(id, connection);
+                        _out.WriteLine("[" + connection + "] " + _text.Entity(id) + "에 앉음");
+                        goto next;
+                    }
+                }
+                next: ;
             }
         }
 

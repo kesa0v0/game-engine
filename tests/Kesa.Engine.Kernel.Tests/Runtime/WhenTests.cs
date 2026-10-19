@@ -32,6 +32,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var world = new World(Content(defs), maxSettleRounds: maxSettleRounds);
             _a = world.Create("Scout");
+            world.Seat(_a, "host");
             _b = world.Create("Scout");
             return world;
         }
@@ -114,6 +115,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "@when(lambda u: u.Out.n >= 5, stage=\"core.first\")\ndef a(u: Ref[Unit]):\n    u.Out.s = u.Out.s + \"a\"\n");
             var world = new World(LoadClean());
             _a = world.Create("Scout");
+            world.Seat(_a, "host");
             Set(world, _a, 5);
             Assert.That(S(world, _a), Is.EqualTo("abc"), "stages first, then reactions without a stage (S5)");
         }
@@ -260,6 +262,7 @@ namespace Kesa.Engine.Tests.Runtime
             var content = Content(Cool);
             var world = new World(content);
             _a = world.Create("Scout");
+            world.Seat(_a, "host");
             Set(world, _a, 5);
             Set(world, _a, 0);
             var save = world.Save();
@@ -301,6 +304,7 @@ namespace Kesa.Engine.Tests.Runtime
                                   "@when(lambda: now() >= 1, once=\"game\")\ndef dawn():\n    pass\n");
             var world = new World(content);
             _a = world.Create("Scout");
+            world.Seat(_a, "host");
             Set(world, _a, 5);
             Set(world, _a, 0);
             world.Advance(1);
@@ -367,6 +371,7 @@ namespace Kesa.Engine.Tests.Runtime
             var content = Content(Mark);
             var world = new World(content);
             _a = world.Create("Scout");
+            world.Seat(_a, "host");
             Set(world, _a, 5);
             var save = world.Save();
             Assert.That(Encoding.UTF8.GetString(save), Does.Contain("\"reaction\": \"core.mark\""));
