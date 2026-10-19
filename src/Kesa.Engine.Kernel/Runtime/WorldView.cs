@@ -156,8 +156,9 @@ namespace Kesa.Engine.Runtime
         // ---- 열린 질문 ----
 
         /// <summary>
-        /// 이 연결이 답할 수 있는 질문만 (질문 대상 중 <c>may_act</c>가 참인 엔티티가 있음, G200). 대상 목록에서 못 보는 엔티티는
-        /// 빠지고, 제목·선택지·<c>data</c> 안의 못 보는 엔티티는 <see cref="HiddenValue"/>다(선택지는 번호가 그대로라 뒷면을 보고 고를 수 있다).
+        /// 이 연결이 답할 수 있는 질문만 (질문 대상 중 <c>may_act</c>가 참인 엔티티가 있음, G200). 대상 목록에는 이 연결이 답할 수 있고
+        /// 보이는 대상만 남고(G234), 제목·선택지·<c>data</c> 안의 못 보는 엔티티는 <see cref="HiddenValue"/>다(선택지는 번호가 그대로라
+        /// 뒷면을 보고 고를 수 있다).
         /// </summary>
         public IReadOnlyList<Request> OpenRequests
         {
@@ -166,34 +167,27 @@ namespace Kesa.Engine.Runtime
                 var result = new List<Request>();
                 foreach (var q in _world.OpenRequests)
                 {
-                    bool mine = false;
-                    foreach (var who in q.Who)
-                    {
-                        if (_world.IsAlive(who) && _world.MayAnswer(Issuer, who, _diagnostics))
-                        {
-                            mine = true;
-                            break;
-                        }
-                    }
-                    if (mine) result.Add(Filtered(q));
+                    var mine = ForMe(q);
+                    if (mine != null) result.Add(mine);
                 }
                 return result;
             }
         }
 
-        /// <summary>이 연결이 답할 수 있으면 거른 질문, 아니면 null (G200).</summary>
+        /// <summary>이 연결이 답할 수 있으면 거른 질문, 아니면 null (G200). 대상은 답할 수 있는 것만 (G234).</summary>
         private Request? ForMe(Request? q)
         {
             if (q == null) return null;
+            var answerable = new List<EntityId>();
             foreach (var who in q.Who)
-                if (_world.IsAlive(who) && _world.MayAnswer(Issuer, who, _diagnostics)) return Filtered(q);
-            return null;
+                if (_world.IsAlive(who) && _world.MayAnswer(Issuer, who, _diagnostics)) answerable.Add(who);
+            return answerable.Count == 0 ? null : Filtered(q, answerable);
         }
 
-        private Request Filtered(Request q)
+        private Request Filtered(Request q, List<EntityId> answerable)
         {
             var who = new List<EntityId>();
-            foreach (var e in q.Who)
+            foreach (var e in answerable)
                 if (Sees(e)) who.Add(e);
             var choices = new List<Value>(q.Choices.Count);
             foreach (var c in q.Choices) choices.Add(Mask(c));

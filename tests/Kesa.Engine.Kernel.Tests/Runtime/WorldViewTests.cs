@@ -511,6 +511,26 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(((IntValue)_w.Get(_b, M("Hand", "cards"))).Value, Is.EqualTo(0));
         }
 
+        /// <summary>여럿에게 함께 물은 질문에서 거른 대상 목록은 이 연결이 답할 수 있는 대상만이다 (G234). 남도 물었다는 것은 G200처럼 숨는다.</summary>
+        [Test]
+        public void AQuestionToSeveralListsOnlyTheTargetsThisConnectionMayAnswerFor()
+        {
+            NewWorld(Defs +
+                     "@command(free=True, acts_for=None)\n" +
+                     "def Vote(a: Ref[Party], b: Ref[Party]):\n" +
+                     "    r = ask([a, b], \"vote\", choices=[\"yes\", \"no\"])\n");
+            var r = _w.Submit("A", "banking.Vote", new Dictionary<string, Value>
+            {
+                ["a"] = new EntityValue(_a), ["b"] = new EntityValue(_b),
+            });
+            Assert.That(r.Succeeded, Is.True, r.Error?.ToString());
+            Assert.That(_w.OpenRequests.Single().Who, Is.EqualTo(new[] { _a, _b }));
+            Assert.That(_w.ViewAs("A").OpenRequests.Single().Who, Is.EqualTo(new[] { _a }));
+            Assert.That(_w.ViewAs("B").OpenRequests.Single().Who, Is.EqualTo(new[] { _b }));
+            Assert.That(_w.ViewAs("A").Show(r).OpenedRequest!.Who, Is.EqualTo(new[] { _a }));
+            Assert.That(_w.ViewAs("C").OpenRequests, Is.Empty);
+        }
+
         [Test]
         public void AHiddenValueCannotBeSubmitted()
         {

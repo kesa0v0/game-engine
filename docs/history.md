@@ -566,3 +566,11 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **콘솔 호스트:** 자리마다 `ViewAs(자리)`의 `OpenRequests`·`LegalResponses`·`LegalMoves`로 할 수 있는 것을 모으고, 메뉴에 `[자리]`를 붙여 그 자리로 바로 낸다. 자리 차례로 내 보기(`Issue`)와 `Outcome.GateDenied`를 지웠다. 남은 작은 후보: 대상이 여럿인 질문이면 `Who`에 그 자리가 답할 수 없는 대상도 보인다(주석 "구멍 후보").
 - **새·바뀐 테스트:** `WorldViewTests.LegalMovesListOnlyMovesTheConnectionMayIssue`(A·B·C 연결마다 자기 진영 수만, 상한은 거른 뒤, 나열한 수는 `Submit` 통과). 기존 테스트의 "A가 B 쪽 인자로 물으면 모두 보임" 기대는 빈 목록으로 바뀌었다.
 - **확인:** 테스트 1973개 통과(커널 1932, CLI 36, 콘솔 호스트 5). `spec-gaps` 표 확인 `232 6`.
+
+## 함께 물은 질문의 거른 대상 목록 (2026-10-19, G234)
+
+- **재현:** `ask([a, b], "vote", ...)`(a는 A 연결, b는 B 연결의 진영)에서 `ViewAs("A").OpenRequests`의 `Who`가 `#1, #2`였고, A가 #2로서 답하면 `GateDenied`였다(임시 테스트, 지움). G233 때 콘솔 호스트에 "구멍 후보"로 적어 둔 것.
+- **논의:** 가(거른 `Who`를 답할 수 있는 대상만으로), 나(`Who`는 그대로, 답할 수 있는 대상을 따로), 다(그대로) 중 가를 골랐다. G200이 남의 질문을 통째로 숨기니 "남도 물었다"도 숨기는 게 같은 기준이다.
+- **구현:** `WorldView.ForMe`가 답할 수 있는 살아 있는 대상을 모아 `Filtered`에 넘기고, `Filtered`는 그중 보이는 것만 `Who`에 둔다. `OpenRequests`도 `ForMe`를 쓴다. `Show`의 열린 질문과 `BlockedBy`도 같은 길이라 함께 바뀐다.
+- **새 테스트:** `WorldViewTests.AQuestionToSeveralListsOnlyTheTargetsThisConnectionMayAnswerFor`(월드는 둘, A·B는 자기 것만, `Show` 결과도, C에게는 질문 없음).
+- **확인:** 테스트 1974개 통과(커널 1933, CLI 36, 콘솔 호스트 5). `spec-gaps` 표 확인 `233 6`.

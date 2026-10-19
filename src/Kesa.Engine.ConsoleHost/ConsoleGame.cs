@@ -126,7 +126,7 @@ namespace Kesa.Engine.ConsoleHost
                 var view = _world.ViewAs(seat);
                 foreach (var request in view.OpenRequests)
                 {
-                    // 구멍 후보: 대상이 여럿인 질문이면 이 자리가 답할 수 없는 대상도 보인다(skirmish는 대상이 하나라 드러나지 않는다)
+                    // 거른 질문의 대상은 이 자리가 답할 수 있는 것만이다 (G234)
                     foreach (var by in request.Who)
                     {
                         for (int i = 0; i < request.Choices.Count; i++)
