@@ -9,3 +9,7 @@ obj/
 
 # Test output
 TestResults/
+
+# 모더 안내서대로 samples에서 engine stubs를 돌리면 생기는 파일
+samples/**/__builtins__.pyi
+samples/**/pyrightconfig.json

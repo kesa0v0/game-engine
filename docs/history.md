@@ -672,3 +672,13 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **구현:** `ConsoleGame.WriteEntities`가 `derived` 칸이 있는 엔티티(`HasDerived`)는 도장을 보지 않고 매번 다시 읽는다.
 - **테스트:** `ConsoleUiTests`의 테스트 모드에 동전(`Coin`, 역방향 `coins`)과 금고의 `Worth.total`을 더하고 1개(동전을 닦으면 덤프의 `Worth`가 바뀜). `WorldViewCallTests`에 1개(남의 엔티티를 읽는 derived는 영수증에 들고 도장에는 없음).
 - **확인:** 테스트 2042개 통과(커널 1994, CLI 36, 콘솔 호스트 12). `spec-gaps` 표 확인 `250 6`.
+
+## 2026-10-19: 모더 안내서 `docs/modding/` (G252)
+
+- **정한 것:** 사용자가 고름(가: 저장소 안 마크다운 안내서, 레퍼런스는 스텁, 예시는 테스트가 도는 모드에서). 한 번에 다 쓰기.
+- **조사:** 세 갈래(모드 구조·스키마·Def·패치 / 로직·커맨드·흐름·반응 / 자리·숨긴 정보·저장·화면)로 실제 문법과 오류 코드를 소스와 테스트에서 확인. 드러난 것: CLI 이름은 `engine`, `mod.py` 필드는 camelCase(`loadAfter`), Def 삭제 패치 없음, `match`·`try`는 PAR002(spec 72줄은 `match`를 허용으로 적음), `ask`의 선택지는 `choices=`만(spec 73줄의 위치 인자 아님), 틱 핸들러는 `@on(Tick)`(spec의 `on("tick")` 아님), `has()` 내장 없음(G248 본문이 언급), `World.cs:40` 주석은 사전 조건을 읽기 예산으로 적었으나 실제로는 쓰기 예산(G224), `World.Save.cs:14` 주석은 멈춘 흐름을 저장하지 못한다고 적었으나 저장됨.
+- **예시 모드:** 새 `samples/guide`(`harbor`: 키 줄, `derived`와 기여 행, 추상 Def·상속·`inherit`, 비용과 `choose`, 난수, 신호·`@on`·단계·`@on(Tick)`, `@when(once=True)`, 마감 있는 `ask`와 `wait`, 보기 정책, 화면 함수와 `ui/console.txt` / `lighthouse`: `dependencies`, `patch.add`·`set`·`append`, 새 Def, `mod_loaded` 조건). `engine check`는 정보 `PAT002` 하나(조건 모드 없음)만.
+- **문서:** `docs/modding/README.md`와 1~9장(시작하기, 데이터, 로직, 커맨드, 흐름과 시간, 반응, 자리와 숨긴 정보, 화면에 보일 값, 모드를 고칠 때와 아직 없는 것). 예시 코드는 두 샘플 모드에서 옮김.
+- **테스트:** 새 `GuideSampleTests` 10개(로드 진단은 PAT002뿐, 상속과 패치 결과, 비용 거절, 입구, 침몰 신호와 보험, 기여 행, 용선 질문과 2틱 뒤 생선, 마감 거절, `@when`과 보기 정책으로 남의 계획은 "?", 콘솔 패널).
+- **그 밖:** `.gitignore`에 샘플에서 `engine stubs`로 생기는 파일.
+- **확인:** 테스트 2052개 통과(커널 1994, CLI 36, 콘솔 호스트 22). `spec-gaps` 표 확인 `251 6`.
