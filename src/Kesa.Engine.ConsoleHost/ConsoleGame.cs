@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Runtime;
+using Kesa.Engine.Schema;
 using Kesa.Engine.Script;
 
 namespace Kesa.Engine.ConsoleHost
@@ -226,7 +227,10 @@ namespace Kesa.Engine.ConsoleHost
             return (result, lines);
         }
 
-        /// <summary>그 엔티티가 바뀌었을 때만(도장) 다시 읽는다. 다른 엔티티를 읽는 <c>derived</c> 값은 도장이 담지 않는다(G235의 남은 몫).</summary>
+        /// <summary>
+        /// 그 엔티티가 바뀌었을 때만(도장) 다시 읽는다. 도장은 저장된 값의 것이라 남의 엔티티를 읽는 <c>derived</c>를 담지 않으므로,
+        /// <c>derived</c> 칸이 있는 엔티티는 매번 다시 읽는다 (G251).
+        /// </summary>
         private void WriteEntities()
         {
             foreach (var type in _content.Schema.Types)
@@ -234,12 +238,15 @@ namespace Kesa.Engine.ConsoleHost
                 foreach (var id in _world.All(type.Name))
                 {
                     long version = _world.Version(id);
-                    if (AlwaysRedraw || !_lines.TryGetValue(id.Value, out var drawn) || drawn.Version != version)
+                    if (AlwaysRedraw || HasDerived(id) || !_lines.TryGetValue(id.Value, out var drawn) || drawn.Version != version)
                         _lines[id.Value] = drawn = (version, Line(id));
                     _out.WriteLine(drawn.Line);
                 }
             }
         }
+
+        private bool HasDerived(EntityId id) =>
+            _content.Schema.Components.Any(c => c.Members.Any(m => m.Kind == MemberKind.Derived) && _world.Has(id, c.Name));
 
         private string Line(EntityId id)
         {

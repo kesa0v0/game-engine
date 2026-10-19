@@ -132,6 +132,19 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
+        public void ADerivedThatReadsOtherEntitiesIsInTheReceiptButNotTheStamp()
+        {
+            // G251: 도장은 저장된 값의 것이라 진영의 도장은 그대로지만, 함수 안의 derived가 읽은 유닛은 영수증에 든다
+            var r = _w.Call("scouts.power", new EntityValue(_blue));
+            long stamp = _w.Version(_blue, "Power");
+            Assert.That(r.Changed(_w), Is.False);
+            _w.Set(_b1, M("Life", "hp"), new IntValue(1));
+            Assert.That(_w.Version(_blue, "Power"), Is.EqualTo(stamp));
+            Assert.That(r.Changed(_w), Is.True);
+            Assert.That(Int(_w.Call("scouts.power", new EntityValue(_blue))), Is.EqualTo(11));
+        }
+
+        [Test]
         public void ControllerOfAnUnseenEntityIsNone()
         {
             _w.Seat(_b2, "bluebot", SeatKind.Ai);

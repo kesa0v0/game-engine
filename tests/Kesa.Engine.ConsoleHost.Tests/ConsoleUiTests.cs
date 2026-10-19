@@ -18,11 +18,18 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Directory.CreateDirectory(Path.Combine(mod, "defs"));
             File.WriteAllText(Path.Combine(mod, "mod.py"), "Mod(id=\"banking\")\nuse_all(\"schema/\")\nuse_all(\"defs/\")\n");
             File.WriteAllText(Path.Combine(mod, "schema", "types.py"),
-                "component(\"Purse\", gold=field(int, default=0))\ndeftype(\"Bank\", components=[\"Purse\", \"Seatable\"])\n");
+                "component(\"Purse\", gold=field(int, default=0))\n" +
+                "component(\"Worth\", total=derived(int, lambda c: sum([x.Coin.value for x in c.entity.coins])))\n" +
+                "component(\"Coin\", bank=ref(\"Bank\", optional=True, inverse=\"coins\"), value=field(int, default=1))\n" +
+                "deftype(\"Bank\", components=[\"Purse\", \"Worth\", \"Seatable\"])\ndeftype(\"Token\", components=[\"Coin\"])\n");
             File.WriteAllText(Path.Combine(mod, "defs", "rules.py"),
-                "Bank(\"Vault\")\n" +
+                "Bank(\"Vault\")\nToken(\"Penny\")\n" +
                 "@command(free=True, acts_for=None)\ndef Open():\n    with preconditions:\n" +
-                "        require(len(query(\"Bank\")) == 0, text(\"banking.open\"))\n    spawn(\"Vault\")\n" +
+                "        require(len(query(\"Bank\")) == 0, text(\"banking.open\"))\n" +
+                "    v = spawn(\"Vault\")\n    spawn(\"Penny\", Coin=Coin(bank=v))\n" +
+                "@command(free=True, acts_for=None)\ndef Polish():\n    with preconditions:\n" +
+                "        require(len(query(\"Bank\")) > 0, text(\"banking.closed\"))\n" +
+                "    for t in query(\"Token\"):\n        t.Coin.value += 1\n" +
                 "@command(free=True, acts_for=lambda bank: bank)\ndef Earn(bank: Ref[Bank]):\n    with preconditions:\n" +
                 "        choose(bank, where=lambda b: True)\n    bank.Purse.gold += 5\n" +
                 "def gold(me):\n    return me.Purse.gold\n" +
@@ -84,7 +91,16 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             var (code, screen, errors) = Play("1\n:q\n");
             Assert.That(code, Is.EqualTo(0), errors);
-            Assert.That(screen, Does.Contain("#1 Vault  Seatable() Purse(gold=0)"));
+            Assert.That(screen, Does.Contain("#1 Vault  Seatable() Purse(gold=0) Worth(total=1)"));
+        }
+
+        [Test]
+        public void TheListingRereadsADerivedValueThatReadsOtherEntities()
+        {
+            // 동전을 닦으면 금고의 도장은 그대로지만 Worth.total은 바뀐다 (G251)
+            var (code, screen, errors) = Play("1\n2\n:q\n"); // Open, 그다음 Polish
+            Assert.That(code, Is.EqualTo(0), errors);
+            Assert.That(screen, Does.Contain("#1 Vault  Seatable() Purse(gold=0) Worth(total=2)"));
         }
     }
 }
