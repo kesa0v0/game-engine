@@ -222,6 +222,7 @@
 | [G247](gaps/S6-commands.md#g247) | G244에서 이어서: 부르는 API의 모양 | `world.Call("모드.함수", 값들…)`이 값과 영수증을 담은 `CallResult`를 주고 `r.Changed(world)`로 다시 부를지 묻는다. `world.CheckCall(이름, 인자 수)`는 미리 확인해 괜찮으면 null, 아니면 "혹시 …?"가 든 오류 문장. 실패는 `Get`처럼 `WorldException`으로 던지고 걸음 예산(G224)이 걸린다. | 확인 |
 | [G248](gaps/S6-commands.md#g248) | G244에서 이어서: `ViewAs` 아래에서 부르기 | `world.ViewAs(연결).Call(…)`은 함수 안의 모든 읽기를 보는 쪽 세계(G196~G200)로 돌린다: 못 보는 엔티티는 `query`에서 빠지고, 못 보는 컴포넌트는 붙지 않은 것, Ref는 `HiddenValue`. 정책이 읽은 곳도 영수증에 넣어 시야가 바뀌면 다시 부른다. 다 보이는 연결은 `world.Call`. | 확인 |
 | [G249](gaps/S6-commands.md#g249) | S10 2·4항 UI 정의 파일은 누구의 것인가 (G244에서 이어서) | UI 정의 파일은 호스트마다 제 형식(Unity UXML/USS, Godot 장면·Theme, 콘솔은 콘솔 호스트가 정함)이고 값 함수와 모양을 함께 담는다. 엔진은 UI 파일을 읽지 않고 G247·G248의 `Call`·`CheckCall`·`Changed`만 준다. 바인딩 확인은 호스트가 로드할 때 `CheckCall`로, 엔진 공통 패널 목록은 두지 않음(범용 호스트가 늘면 덧붙임). | 확인 |
+| [G250](gaps/S6-commands.md#g250) | G249에서 이어서: 콘솔 호스트의 UI 파일 | 모드 폴더의 `ui/console.txt`, 한 줄에 `모드.함수` 하나(`#` 주석·빈 줄 무시), 로드 순서대로 모음. 자리마다 앉은 엔티티를 인자로 `ViewAs(연결).Call`, 문자열은 그대로·목록은 한 줄씩, `Changed`가 거짓이면 다시 부르지 않음. 시작 때 `CheckCall`로 확인해 틀리면 `파일:줄`과 함께 멈춤, 부르다 실패한 칸은 오류 줄을 보이고 계속. 파일이 없으면 지금의 덤프. | 확인 |
 
 ## S7 호스트 함수
 
