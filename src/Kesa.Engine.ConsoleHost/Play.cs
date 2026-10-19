@@ -11,7 +11,7 @@ namespace Kesa.Engine.ConsoleHost
 {
     /// <summary>
     /// <c>kesa-play &lt;mods-dir&gt; --seat &lt;conn&gt;=&lt;Def&gt;... [--seed N]</c>: 모드 폴더를 불러 터미널에서 한 판을 돌린다.
-    /// <c>--seat red=Red</c>는 연결 <c>red</c>를 Def <c>Red</c>인 엔티티에 앉힌다(그 엔티티가 생기면, G236). 로비 목록은 아직 없다.
+    /// <c>--seat red=Red</c>는 연결 <c>red</c>를 Def <c>Red</c>인 엔티티에 앉힌다(그 엔티티가 생기면, G236). 로비 후보 목록 World.SeatChoices(G239)는 아직 쓰지 않는다.
     /// 종료 코드는 CLI와 같다(G78): 0 끝까지 돎, 1 모드 콘텐츠 오류, 2 사용법.
     /// </summary>
     public static class Play

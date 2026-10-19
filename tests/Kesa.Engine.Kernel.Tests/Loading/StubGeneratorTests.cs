@@ -43,6 +43,10 @@ namespace Kesa.Engine.Tests.Loading
                 "type fixed = int | float\n" +
                 "type TextKey = str\n" +
                 "\n" +
+                // 엔진 컴포넌트는 모든 모드에 보인다 (G239)
+                "class Seatable:\n" +
+                "    def __init__(self, /) -> None: ...\n" +
+                "\n" +
                 // 컴포넌트: 엔티티로 읽는 속성(field는 쓸 수 있고 const·derived는 읽기만, G207)과 Def 파일의 생성자
                 "class Health:\n" +
                 "    @property\n    def base_max(self) -> int: ...\n" +
@@ -68,6 +72,7 @@ namespace Kesa.Engine.Tests.Loading
                 "\n" +
                 // Def 타입이 갖지 않은 컴포넌트는 붙어 있지 않을 수 있다
                 "class Resource:\n" +
+                "    Seatable: Seatable | None\n" +
                 "    Health: Health | None\n" +
                 "    Skill: _Skill_rows | None\n" +
                 "    Resource: _Resource_consts\n" +
@@ -84,6 +89,7 @@ namespace Kesa.Engine.Tests.Loading
                 "class Unit:\n" +
                 "    Health: Health\n" +
                 "    Skill: _Skill_rows\n" +
+                "    Seatable: Seatable | None\n" +
                 "    Unit: _Unit_consts\n" +
                 "    def __init__(self, id: str, /, *, parent: Literal[\"Base\", \"Scout\"] | None = None, abstract: bool = False, " +
                 "override: bool = False, move: int = ..., ratio: fixed = ..., label: TextKey = ..., tags: list[str] = ..., " +

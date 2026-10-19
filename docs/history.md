@@ -594,3 +594,11 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **테스트:** 새 `WorldSeatTests` 8개(아무도 앉지 않으면 거절, `None`은 자리 없이, 다시 앉히면 넘겨받음, 한 연결이 여러 엔티티, 입력 검사, 도장, 죽음과 되감기, 저장·불러오기), `WorldSaveTests.ABrokenSeatIsCorrupt` 3개와 버린 엔티티의 배정 경고, `WorldViewTests`의 관전자(`viewer=None`)·핫시트 합·진단의 "seen by a spectator", `SubmitGateDeclarationTests`의 정책 교체 규칙 테스트를 `@view_policy`로 옮김. 기존 테스트는 `may_act`·`Seat.conn` 대신 `World.Seat`로 앉히고, 질문에 `host`로 답하던 테스트는 답하는 엔티티에 `host`를 앉혔다(아무도 앉지 않은 엔티티로는 답할 수 없으므로).
 - **문서:** spine-spec S6 권한 3층·배정 표·두 종류의 제출·네트워크, S10 5항, X1 `accepts`, 공개/비공개 정보. 바뀜 표시: G17·G121~G124·G125·G126·G127·G130·G131·G139·G197·G200·G203·G233·G234.
 - **확인:** 테스트 1979개 통과(커널 1937, CLI 36, 콘솔 호스트 6). `spec-gaps` 표 확인 `237 6`.
+
+## 2026-10-19: 로비 후보 `Seatable` (G239·G240)
+
+- **정한 것:** G236에서 이어서 정할 것의 첫째. 로비가 보일 앉을 후보는 엔진 기본 제공 표시 컴포넌트 `Seatable`이 붙은 살아 있는 엔티티(G239). 엔진 제공 컴포넌트는 커널·호스트 API가 이름을 알아야 할 때만, 엔진 필드는 커널·호스트가 읽는 것만, 게임 데이터는 모드 컴포넌트, 그래픽·UI는 공식 모듈 몫(G240).
+- **구현:** `Schema/EngineComponents.cs`(`Seatable`, 주인 자리 `""`). `SchemaBuilder.RegisterNames`가 엔진 신호처럼 먼저 등록하고, 모드가 같은 이름을 쓰면 SCH001 "'Seatable' is a component declared by the engine". 모든 모드에 보임(`ModVisibility`의 주인 `""`). `World.SeatChoices()` = `Query("Seatable")`, id 순. 스텁에는 `class Seatable`과 모든 타입의 `Seatable: Seatable | None`이 나온다. 예시 게임 `deftype("Party", components=["Order", "Seatable"])`. 콘솔 호스트는 아직 `--seat red=Red`(Def 이름)로 고른다.
+- **구현하며 바로잡은 것:** G239 초안의 "모드는 `extend`로 필드를 더한다"는 틀렸다. `extend`는 타입에 컴포넌트·`const`를 더할 뿐 남의 컴포넌트에 칼럼을 더하지 못한다(S1). 게임 데이터는 같은 엔티티에 모드 컴포넌트를 붙인다로 고침. 또 Def에 적은 컴포넌트는 뗄 수 없으므로(S4) 후보에서 빠질 수 있는 엔티티는 Def에 적지 않고 붙인다를 G239에 적음.
+- **테스트:** 새 `SeatChoicesTests` 9개(id 순 목록, 규칙의 `attach`·`detach`, 죽으면 빠짐, 호스트 `Add`·`Remove`, Def 것은 못 뗌, `Seat`를 막지 않음, 저장, 의존 없이 보임, 같은 이름 선언은 오류). `StubGeneratorTests` 기대값에 `Seatable`.
+- **확인:** 테스트 1988개 통과(커널 1946, CLI 36, 콘솔 호스트 6). `spec-gaps` 표 확인 `239 6`.

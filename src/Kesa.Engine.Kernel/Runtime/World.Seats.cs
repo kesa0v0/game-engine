@@ -50,6 +50,12 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>
+        /// 로비가 보일 앉을 후보 (G239): <see cref="Schema.EngineComponents.Seatable"/>이 붙은 살아 있는 엔티티, id 순. 후보일 뿐
+        /// <see cref="Seat"/>를 막지 않는다(AI 연결을 목록 밖 엔티티에 앉힐 수 있다).
+        /// </summary>
+        public IReadOnlyList<EntityId> SeatChoices() => Query(Schema.EngineComponents.Seatable);
+
+        /// <summary>
         /// 입구 검사 (G237): <c>acts_for</c>가 고른 엔티티(응답이면 답하는 엔티티)에 이 연결이 앉아 있어야 한다. <c>None</c>은 누구나 통과한다.
         /// </summary>
         private bool MayAct(string issuer, Value target) =>

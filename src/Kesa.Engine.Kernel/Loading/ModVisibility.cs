@@ -28,7 +28,7 @@ namespace Kesa.Engine.Loading
 
         /// <summary><paramref name="from"/> 모드가 <paramref name="owner"/> 모드의 이름을 쓸 수 있는가.</summary>
         public bool CanSee(string from, string owner) =>
-            owner == Schema.EngineSignals.Owner || // 엔진이 선언한 것(Tick)은 모두에게 보인다 (G154)
+            owner == Schema.EngineSignals.Owner || // 엔진이 선언한 것(Tick·Seatable)은 모두에게 보인다 (G154·G239)
             _visible.TryGetValue(from, out var set) && set.Contains(owner);
     }
 }

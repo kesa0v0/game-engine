@@ -187,13 +187,27 @@ namespace Kesa.Engine.Schema
                 // 엔진 신호(Tick)는 먼저 자리를 잡는다. 모드가 같은 이름을 쓰면 그 모드의 오류다 (G154)
                 foreach (var name in EngineSignals.All)
                     _set.Add(new SignalType(new SignalDecl(name, SourceSpan.None, EngineSignals.Owner, new List<SignalField>())));
+                // 엔진 컴포넌트(Seatable)도 같다 (G239)
+                foreach (var name in EngineComponents.All)
+                    _set.Add(new ComponentType(new ComponentDecl(name, SourceSpan.None, EngineComponents.Owner, null, KeyKind.Def,
+                        KeysMode.All, new List<MemberDecl>())));
                 bool Reserved(string name, string mod, SourceSpan span)
                 {
-                    if (!EngineSignals.IsEngine(name)) return false;
-                    Error(mod, Codes.SchDuplicateName, "'" + name + "' is a signal declared by the engine", span,
-                        hint: "pick another name; handle the engine's signal with @on(" + name + ") (spec-gaps G154)");
-                    return true;
+                    if (EngineSignals.IsEngine(name))
+                    {
+                        Error(mod, Codes.SchDuplicateName, "'" + name + "' is a signal declared by the engine", span,
+                            hint: "pick another name; handle the engine's signal with @on(" + name + ") (spec-gaps G154)");
+                        return true;
+                    }
+                    if (EngineComponents.IsEngine(name))
+                    {
+                        Error(mod, Codes.SchDuplicateName, "'" + name + "' is a component declared by the engine", span,
+                            hint: "pick another name; put the engine's component in a Def's components= (spec-gaps G239)");
+                        return true;
+                    }
+                    return false;
                 }
+                bool Engine(string name) => EngineSignals.IsEngine(name) || EngineComponents.IsEngine(name);
 
                 foreach (var m in _mods)
                 {
@@ -228,11 +242,11 @@ namespace Kesa.Engine.Schema
                 {
                     // 엔진 이름과 겹친 선언은 위에서 오류를 냈고 등록하지 않는다
                     foreach (var t in m.Types)
-                        if (!EngineSignals.IsEngine(t.Name) && Unique(t.Name, t.Mod, t.Span)) _set.Add(new DefType(t));
+                        if (!Engine(t.Name) && Unique(t.Name, t.Mod, t.Span)) _set.Add(new DefType(t));
                     foreach (var c in m.Components)
-                        if (!EngineSignals.IsEngine(c.Name) && Unique(c.Name, c.Mod, c.Span)) _set.Add(new ComponentType(c));
+                        if (!Engine(c.Name) && Unique(c.Name, c.Mod, c.Span)) _set.Add(new ComponentType(c));
                     foreach (var s in m.Signals)
-                        if (!EngineSignals.IsEngine(s.Name) && Unique(s.Name, s.Mod, s.Span)) _set.Add(new SignalType(s));
+                        if (!Engine(s.Name) && Unique(s.Name, s.Mod, s.Span)) _set.Add(new SignalType(s));
                 }
             }
 
