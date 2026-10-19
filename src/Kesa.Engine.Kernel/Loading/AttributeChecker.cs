@@ -61,15 +61,28 @@ namespace Kesa.Engine.Loading
         private static object Node(FunctionValue function) => (object?)function.Definition ?? function.Lambda!;
 
         /// <summary>같은 이름의 내장을 가리는 이름: 모드가 묶은 이름과 이 모드에 보이는 컴포넌트·신호 이름 (G112·G230).</summary>
-        private static HashSet<string> Globals(ModCode mod, SchemaSet schema)
+        private static ModNames Globals(ModCode mod, SchemaSet schema)
         {
-            var globals = new HashSet<string>(mod.Scope.Names, StringComparer.Ordinal);
-            globals.UnionWith(mod.Functions.TopLevelNames);
+            var names = new ModNames();
+            names.All.UnionWith(mod.Scope.Names);
+            names.All.UnionWith(mod.Functions.TopLevelNames);
+            // 모드가 묶지 않은 보이는 컴포넌트·신호 이름은 그 생성자다 (G230)
             foreach (var c in schema.Components)
-                if (mod.Scope.IsSchemaName(c.Name)) globals.Add(c.Name);
+                if (mod.Scope.IsSchemaName(c.Name) && !names.All.Contains(c.Name)) names.Constructors[c.Name] = "component";
             foreach (var s in schema.Signals)
-                if (!EngineSignals.IsEngine(s.Name) && mod.Scope.IsSchemaName(s.Name)) globals.Add(s.Name);
-            return globals;
+                if (!EngineSignals.IsEngine(s.Name) && mod.Scope.IsSchemaName(s.Name) && !names.All.Contains(s.Name))
+                    names.Constructors[s.Name] = "signal";
+            names.All.UnionWith(names.Constructors.Keys);
+            return names;
+        }
+
+        /// <summary>모드 함수 본문에서 지역 변수가 아닌 이름: 모드가 묶은 것과 보이는 스키마 이름 (G112·G230).</summary>
+        private sealed class ModNames
+        {
+            public HashSet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal);
+
+            /// <summary>생성자인 스키마 이름과 그 종류(<c>component</c>·<c>signal</c>).</summary>
+            public SortedDictionary<string, string> Constructors { get; } = new SortedDictionary<string, string>(StringComparer.Ordinal);
         }
 
         // ---- 문맥: 매개변수 타입을 정해 주는 자리 ----

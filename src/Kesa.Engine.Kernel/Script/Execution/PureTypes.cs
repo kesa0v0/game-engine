@@ -248,7 +248,10 @@ namespace Kesa.Engine.Script
         /// </summary>
         public Func<string, IReadOnlyList<Value>, IReadOnlyDictionary<string, Value>, Value>? CallerBody { get; set; }
 
-        public override string KindName => "built-in function";
+        /// <summary>오류 메시지의 이름. 없으면 "built-in function"이다 (컴포넌트·신호 생성자는 "component constructor Health", G230).</summary>
+        public string? Kind { get; set; }
+
+        public override string KindName => Kind ?? "built-in function";
     }
 
     /// <summary>

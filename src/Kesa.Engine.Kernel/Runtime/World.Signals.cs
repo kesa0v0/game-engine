@@ -33,10 +33,11 @@ namespace Kesa.Engine.Runtime
             foreach (var signal in _schema.Signals)
             {
                 var s = signal;
-                Value constructor = EngineSignals.IsEngine(s.Name)
+                var constructor = EngineSignals.IsEngine(s.Name)
                     // 엔진 신호의 값은 엔진만 만든다. 이름이 적힌 호출은 로드 때 잡히고, 함수 값을 거친 길은 여기서 막는다 (G156)
                     ? new PureBuiltin(s.Name, (p, k) => throw new ScriptRuntimeException(Codes.RunScript, EngineSignals.Why(s.Name)))
                     : new PureBuiltin(s.Name, (p, k) => ConstructSignal(s, p, k));
+                constructor.Kind = "signal constructor " + s.Name;
                 // 컴포넌트와 신호는 이름을 함께 쓴다 (스키마의 이름 겹침 검사)
                 if (!names.ContainsKey(s.Name)) names.Add(s.Name, new KeyValuePair<string, Value>(s.Mod, constructor));
             }

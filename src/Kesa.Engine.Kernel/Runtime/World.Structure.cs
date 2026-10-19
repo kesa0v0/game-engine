@@ -61,7 +61,7 @@ namespace Kesa.Engine.Runtime
             {
                 var c = component;
                 names.Add(c.Name, new KeyValuePair<string, Value>(c.Mod,
-                    new PureBuiltin(c.Name, (p, k) => ConstructComponent(c, p, k))));
+                    new PureBuiltin(c.Name, (p, k) => ConstructComponent(c, p, k)) { Kind = "component constructor " + c.Name }));
             }
         }
 

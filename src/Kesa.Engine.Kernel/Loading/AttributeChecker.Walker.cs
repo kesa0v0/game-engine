@@ -18,7 +18,7 @@ namespace Kesa.Engine.Loading
 
             private readonly SchemaSet _schema;
             private readonly DefRegistry _defs;
-            private readonly HashSet<string> _globals;
+            private readonly ModNames _globals;
             private readonly StageDiagnostics? _stage;
             private readonly string _mod;
 
@@ -31,7 +31,7 @@ namespace Kesa.Engine.Loading
             /// <summary>마지막 바퀴인가: 이때만 오류를 낸다.</summary>
             private bool _report;
 
-            public Walker(SchemaSet schema, DefRegistry defs, HashSet<string> globals, StageDiagnostics? stage, string mod,
+            public Walker(SchemaSet schema, DefRegistry defs, ModNames globals, StageDiagnostics? stage, string mod,
                 DerivedReads? reads = null)
             {
                 _schema = schema;
@@ -133,7 +133,7 @@ namespace Kesa.Engine.Loading
 
             /// <summary>이름이 지역 변수나 모드의 최상위 이름이라 내장을 가렸는가 (G112).</summary>
             private bool Shadowed(string name, SortedDictionary<string, StaticType?> scope) =>
-                scope.ContainsKey(name) || _globals.Contains(name);
+                scope.ContainsKey(name) || _globals.All.Contains(name);
 
             /// <summary>식의 타입. null은 아직 정보가 없다는 뜻이다 (대입을 모으는 중).</summary>
             private StaticType? Type(Expr expr, SortedDictionary<string, StaticType?> scope)
@@ -141,7 +141,10 @@ namespace Kesa.Engine.Loading
                 switch (expr)
                 {
                     case NameExpr name:
-                        return scope.TryGetValue(name.Name, out var local) ? local : StaticType.Unknown;
+                        if (scope.TryGetValue(name.Name, out var local)) return local;
+                        return _globals.Constructors.TryGetValue(name.Name, out var kind)
+                            ? new ConstructorType(name.Name, kind)
+                            : StaticType.Unknown;
                     case NoneLiteral _:
                         return StaticType.None;
                     case AttributeExpr attr:
@@ -271,7 +274,23 @@ namespace Kesa.Engine.Loading
                         return new ComponentStatic(rows.Component, rows.Owner, true);
                     case DefConstsType consts:
                         return DefConst(consts, attr);
+                    case ConstructorType constructor:
+                        return ConstructorAttribute(constructor, attr);
                 }
+                return StaticType.Unknown;
+            }
+
+            /// <summary>생성자에는 속성이 없다. 같은 이름의 엔진 내장을 쓰려던 것이면 그렇다고 알린다 (G230).</summary>
+            private StaticType? ConstructorAttribute(ConstructorType constructor, AttributeExpr attr)
+            {
+                if (!Reporting) return StaticType.Unknown;
+                string hint = PureBuiltins.IsRuntimeName(constructor.Name)
+                    ? "this mod sees a " + constructor.Kind + " named '" + constructor.Name + "', so the built-in " + constructor.Name +
+                      " is not available here; rename the " + constructor.Kind + " (spec-gaps G230)"
+                    : "make a value first, like " + constructor.Name + "(...), and read it from the entity or the signal";
+                _stage!.Error(_mod, Codes.EvlUnknownName,
+                    "'" + constructor.Name + "' here is the " + constructor.Kind + " constructor, which has no attribute '" + attr.Name + "'",
+                    attr.Span, hint);
                 return StaticType.Unknown;
             }
 

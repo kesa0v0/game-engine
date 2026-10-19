@@ -143,7 +143,7 @@ namespace Kesa.Engine.Loading
             private readonly SchemaSet _schema;
             private readonly DefRegistry _defs;
             private readonly Dictionary<string, ModCode> _mods = new Dictionary<string, ModCode>(StringComparer.Ordinal);
-            private readonly Dictionary<string, HashSet<string>> _globals = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            private readonly Dictionary<string, ModNames> _globals = new Dictionary<string, ModNames>(StringComparer.Ordinal);
 
             /// <summary>따라 들어가는 중인 함수들. 로직 함수의 재귀는 로드 오류지만(EVL002) 그 모드가 꺼지기 전에도 이 검사는 돈다.</summary>
             private readonly HashSet<object> _active = new HashSet<object>();
@@ -214,12 +214,12 @@ namespace Kesa.Engine.Loading
                 _active.Remove(Node(fn));
             }
 
-            private HashSet<string> Globals(string mod)
+            private ModNames Globals(string mod)
             {
                 if (_globals.TryGetValue(mod, out var names)) return names;
                 names = _mods.TryGetValue(mod, out var code)
                     ? AttributeChecker.Globals(code, _schema)
-                    : new HashSet<string>(StringComparer.Ordinal);
+                    : new ModNames();
                 _globals[mod] = names;
                 return names;
             }

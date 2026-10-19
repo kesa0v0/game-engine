@@ -112,6 +112,25 @@ namespace Kesa.Engine.Loading
         public override bool Same(StaticType other) => other is DefConstsType d && d.Type == Type;
     }
 
+    /// <summary>
+    /// 컴포넌트·신호의 생성자 (<c>Health</c>, <c>Damaged</c>): 모드가 묶지 않은 보이는 스키마 이름이다(G230). 속성이 없다.
+    /// </summary>
+    internal sealed class ConstructorType : StaticType
+    {
+        public ConstructorType(string name, string kind)
+        {
+            Name = name;
+            Kind = kind;
+        }
+
+        public string Name { get; }
+
+        /// <summary><c>component</c>나 <c>signal</c>.</summary>
+        public string Kind { get; }
+
+        public override bool Same(StaticType other) => other is ConstructorType c && c.Name == Name;
+    }
+
     /// <summary>돌면 원소가 나오는 묶음: <c>query(...)</c>, 역방향 컬렉션, <c>list[Ref[X]]</c>, 리스트 컴프리헨션.</summary>
     internal sealed class GroupType : StaticType
     {
