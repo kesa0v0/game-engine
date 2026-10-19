@@ -365,12 +365,16 @@ namespace Kesa.Engine.Runtime
             public override string KindName => "question";
         }
 
-        /// <summary><c>ask</c>가 돌려주는 값 (G138): <c>r.response</c>·<c>r.index</c>·<c>r.choice</c>·<c>r.by</c>.</summary>
+        /// <summary>
+        /// <c>ask</c>가 돌려주는 값 (G138): <c>r.response</c>·<c>r.index</c>·<c>r.choice</c>·<c>r.by</c>, 그리고 응답 본문이 끝까지 가지 못하고
+        /// 버려졌는가 <c>r.interrupted</c> (G243).
+        /// </summary>
         private sealed class AnswerValue : Value, IRuntimeAttributes, IValueEquality
         {
-            /// <summary>같은 응답·번호·선택지·답한 엔티티면 같다 (G142).</summary>
+            /// <summary>같은 응답·번호·선택지·답한 엔티티·끊김이면 같다 (G142).</summary>
             public bool ValueEquals(Value other) =>
                 other is AnswerValue a && a._response == _response && a._index == _index && a._by == _by &&
+                a._interrupted == _interrupted &&
                 (a._choice == null ? _choice == null : _choice != null && PureOps.ValuesEqual(a._choice, _choice));
 
             private readonly World _world;
@@ -378,14 +382,16 @@ namespace Kesa.Engine.Runtime
             private readonly long? _index;
             private readonly Value? _choice;
             private readonly EntityId? _by;
+            private readonly bool _interrupted;
 
-            public AnswerValue(World world, string? response, long? index, Value? choice, EntityId? by)
+            public AnswerValue(World world, string? response, long? index, Value? choice, EntityId? by, bool interrupted = false)
             {
                 _world = world;
                 _response = response;
                 _index = index;
                 _choice = choice;
                 _by = by;
+                _interrupted = interrupted;
             }
 
             public override string KindName => "answer";
@@ -394,6 +400,7 @@ namespace Kesa.Engine.Runtime
             public long? Index => _index;
             public Value? Choice => _choice;
             public EntityId? By => _by;
+            public bool Interrupted => _interrupted;
 
             public Value GetAttribute(string name)
             {
@@ -403,9 +410,11 @@ namespace Kesa.Engine.Runtime
                     case "index": return _index == null ? NoneValue.Instance : new IntValue(_index.Value);
                     case "choice": return _choice == null ? NoneValue.Instance : _world.ToScript(_choice);
                     case "by": return _by == null ? NoneValue.Instance : _world.ToScript(new EntityValue(_by.Value));
+                    case "interrupted": return _interrupted ? BoolValue.True : BoolValue.False;
                 }
                 throw new ScriptRuntimeException(Codes.RunScript, "an answer has no attribute '" + name + "'",
-                    Suggest.Hint(name, new[] { "response", "index", "choice", "by" }) ?? "it has response, index, choice and by");
+                    Suggest.Hint(name, new[] { "response", "index", "choice", "by", "interrupted" }) ??
+                    "it has response, index, choice, by and interrupted");
             }
         }
     }

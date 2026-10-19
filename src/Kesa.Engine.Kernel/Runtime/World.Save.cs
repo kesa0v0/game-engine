@@ -867,6 +867,17 @@ namespace Kesa.Engine.Runtime
                 return true;
             }
 
+            /// <summary>
+            /// 취소한 응답 본문 Flow를 기다리던 바깥 Flow도 취소함 (G243). 호스트가 취소나 버림을 허락했을 때만 적는다(아니면 로드는 어차피
+            /// 실패하고 원인은 이미 적었다).
+            /// </summary>
+            public void CanceledWith(string message)
+            {
+                if ((!_cancelBrokenFlows && !_dropRemoved) || !_seen.Add(message)) return;
+                _diagnostics.Add(new Diagnostic(Codes.SaveFlowCanceled, Severity.Warning, message, null, SourceSpan.None,
+                    "a flow waiting for a response command cannot go on without it while loading; what it did before pausing stays (spec S8)"));
+            }
+
             /// <summary>Def가 없어져 만들지 못한 엔티티. 그것을 가리키는 줄·기여 행은 따로 보고하지 않는다(로드는 어차피 실패한다).</summary>
             public HashSet<long> Skipped { get; } = new HashSet<long>();
 

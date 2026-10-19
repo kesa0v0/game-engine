@@ -55,6 +55,32 @@ namespace Kesa.Engine.Runtime
 
             /// <summary>이 Flow의 난수열 (G182). 이어 갈 때 사본으로 잇는다: 그 구간이 실패하면 멈춘 때의 n으로 남는다.</summary>
             public RandStream? Rand { get; set; }
+
+            /// <summary>
+            /// 응답 커맨드의 본문이 멈춰 생긴 Flow면 그 응답을 기다리는 바깥 Flow (G243). 이 Flow가 끝나면 바깥의 <c>ask</c>가 이 응답으로
+            /// 돌아온다.
+            /// </summary>
+            public ParentLink? Parent { get; set; }
+
+            /// <summary>
+            /// 질문에 응답이 왔는데 그 응답 커맨드의 본문이 아직 멈춰 있으면 그 Flow (G243). 그동안 이 Flow는 질문도 깨울 틱도 없다.
+            /// </summary>
+            public long? AwaitsChild { get; set; }
+        }
+
+        /// <summary>안쪽 Flow가 끝나면 바깥 Flow에 줄 응답: 바깥 Flow, 응답 이름, 답한 엔티티 (G243).</summary>
+        private sealed class ParentLink
+        {
+            public ParentLink(long flow, string response, EntityId by)
+            {
+                Flow = flow;
+                Response = response;
+                By = by;
+            }
+
+            public long Flow { get; }
+            public string Response { get; }
+            public EntityId By { get; }
         }
 
         /// <summary>멈춘 Flow, 번호 순 (실행 순서가 결정론적이다, X1).</summary>
@@ -153,6 +179,20 @@ namespace Kesa.Engine.Runtime
                     Message = "flow " + flow.Id.ToString(CultureInfo.InvariantCulture) + " was canceled: " + pair.Value,
                 });
             }
+            // 함께 사라진 바깥은 이어 가지 않도록 모두 버린 뒤에 (G243)
+            foreach (var pair in stale) ResumeAfterInterrupted(pair.Key, reactions);
+        }
+
+        /// <summary>
+        /// 버린 응답 본문 Flow <paramref name="child"/>를 기다리던 바깥 Flow를 이어 간다 (G243): 바깥의 <c>ask</c>는 그 응답과 응답한
+        /// 엔티티로 돌아오고 <c>r.interrupted</c>가 참이다. 본문이 멈추기 전에 한 일은 남아 있다. 바깥도 이미 없으면 할 일이 없다.
+        /// </summary>
+        private void ResumeAfterInterrupted(FlowRecord child, List<Reaction> reactions)
+        {
+            if (!(child.Parent is ParentLink up) || !_flows.TryGetValue(up.Flow, out var outer) || outer.AwaitsChild != child.Id) return;
+            Resume(outer, Reaction.InterruptedSignal, new AnswerValue(this, up.Response, null, null, up.By, interrupted: true),
+                "after its response " + child.Command + " was cut short", reactions);
+            reactions.AddRange(RunReactions());
         }
 
         /// <summary>
@@ -220,6 +260,7 @@ namespace Kesa.Engine.Runtime
             try
             {
                 IReadOnlyList<Diagnostic> warnings;
+                var lineage = Lineage(flow);
                 var outerWarnings = OpenWarnings();
                 try
                 {
@@ -229,9 +270,11 @@ namespace Kesa.Engine.Runtime
                 {
                     warnings = CloseWarnings(outerWarnings);
                 }
+                var reactions = AfterRun();
+                var leaf = Leaf(lineage);
                 return new AnswerResult(request, issuer, AnswerOutcome.Succeeded)
                 {
-                    Reactions = AfterRun(), OpenedRequest = HeldRequest(flow.Id), SleepsUntil = SleepsUntil(flow.Id),
+                    Reactions = reactions, OpenedRequest = leaf?.Request, SleepsUntil = leaf?.WakeAt,
                     Warnings = warnings,
                 };
             }
@@ -295,6 +338,7 @@ namespace Kesa.Engine.Runtime
             {
                 PreconditionReport report;
                 IReadOnlyList<Diagnostic> warnings;
+                var lineage = Lineage(flow);
                 var outerWarnings = OpenWarnings();
                 try
                 {
@@ -303,13 +347,9 @@ namespace Kesa.Engine.Runtime
                         var r = EvaluateRequires(decl, checkedArgs, runBody: true, out var inner);
                         if (!r.Passed) return r; // 본문이 돌지 않았다: 쓴 것이 없다
                         if (inner != null)
-                        {
-                            string at = inner.Request is WaitPayload ? "wait()" : inner.Request is AdvancePayload ? "advance()" : "ask()";
-                            throw new WorldException(Codes.RunScript,
-                                "the response command " + command + " stopped at " + at + ", which is not supported yet",
-                                "ask from the command that is waiting instead (spec-gaps G139)");
-                        }
-                        Continue(flow, new AnswerValue(this, open.ResponseNames[accepted], null, null, by));
+                            AwaitResponse(flow, command, inner, checkedArgs, open.ResponseNames[accepted], by);
+                        else
+                            Continue(flow, new AnswerValue(this, open.ResponseNames[accepted], null, null, by));
                         return r;
                     });
                 }
@@ -318,10 +358,12 @@ namespace Kesa.Engine.Runtime
                     warnings = CloseWarnings(outerWarnings);
                 }
                 var outcome = report.Passed ? AnswerOutcome.Succeeded : AnswerOutcome.PreconditionsFailed;
+                var reactions = AfterRun();
+                var leaf = Leaf(lineage);
                 return new AnswerResult(request, issuer, outcome)
                 {
-                    Arguments = checkedArgs, Preconditions = report, Reactions = AfterRun(),
-                    OpenedRequest = HeldRequest(flow.Id), SleepsUntil = SleepsUntil(flow.Id),
+                    Arguments = checkedArgs, Preconditions = report, Reactions = reactions,
+                    OpenedRequest = leaf?.Request, SleepsUntil = leaf?.WakeAt,
                     Warnings = warnings,
                 };
             }
@@ -359,6 +401,50 @@ namespace Kesa.Engine.Runtime
             return null;
         }
 
+        /// <summary>
+        /// 응답 커맨드 <paramref name="command"/>의 본문이 <paramref name="inner"/>에서 멈췄다 (G243): 본문은 새 Flow가 되어 기다리고,
+        /// 질문을 들었던 <paramref name="flow"/>는 질문을 닫고 그 Flow가 끝나기를 기다린다. 끝나면 바깥의 <c>ask</c>가 이 응답으로 돌아온다.
+        /// </summary>
+        private void AwaitResponse(FlowRecord flow, string command, PureEvaluator.Suspended inner,
+            IReadOnlyDictionary<string, Value> args, string response, EntityId by)
+        {
+            long child = _nextFlow;
+            DropFlow(flow);
+            var waiting = new FlowRecord(flow.Id, flow.Command, flow.Run, null, flow.Handler)
+            {
+                Subjects = flow.Subjects, About = flow.About, Rand = flow.Rand, Parent = flow.Parent, AwaitsChild = child,
+            };
+            _flows.Add(flow.Id, waiting);
+            Journal(() => _flows.Remove(flow.Id));
+            OpenFlow(command, inner, SubjectsOf(args.Values));
+            _flows[child].Parent = new ParentLink(flow.Id, response, by);
+        }
+
+        /// <summary>
+        /// <paramref name="flow"/>와 그 바깥 Flow들의 id, 안쪽부터 (G243). 실행이 끝난 뒤 <see cref="Leaf"/>로 어디서 멈췄는지 찾는다.
+        /// </summary>
+        private List<long> Lineage(FlowRecord flow)
+        {
+            var ids = new List<long> { flow.Id };
+            for (var up = flow.Parent; up != null && _flows.TryGetValue(up.Flow, out var outer); up = outer.Parent) ids.Add(up.Flow);
+            return ids;
+        }
+
+        /// <summary>
+        /// 실행이 끝난 뒤 그 실행이 멈춘 Flow: <paramref name="lineage"/>에서 아직 남은 첫 Flow에서 안쪽 Flow를 따라 내려간 끝.
+        /// 모두 끝났으면 null. 답한 Flow가 끝나 바깥이 이어져 새 질문을 들었으면 그 바깥이다 (G243).
+        /// </summary>
+        private FlowRecord? Leaf(List<long> lineage)
+        {
+            foreach (long id in lineage)
+            {
+                if (!_flows.TryGetValue(id, out var flow)) continue;
+                while (flow.AwaitsChild is long child && _flows.TryGetValue(child, out var inner)) flow = inner;
+                return flow;
+            }
+            return null;
+        }
+
         /// <summary>Flow를 답으로 이어서 실행한다 (한 트랜잭션, S5). 다시 멈추면 같은 Flow가 새 질문을 든다.</summary>
         private Request? Continue(FlowRecord flow, Value answer, string after = "after an answer")
         {
@@ -369,7 +455,16 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var next = Evaluator.Resume(flow.Run, answer, _meter);
-                return next == null ? null : Park(flow.Id, flow.Command, next, flow.Handler, flow.Subjects);
+                if (next != null)
+                {
+                    var request = Park(flow.Id, flow.Command, next, flow.Handler, flow.Subjects);
+                    _flows[flow.Id].Parent = flow.Parent;
+                    return request;
+                }
+                // 응답 커맨드의 본문이 끝났다: 그 응답을 기다리던 바깥 Flow를 같은 트랜잭션에서 이어 간다 (G243)
+                if (flow.Parent is ParentLink up && _flows.TryGetValue(up.Flow, out var outer) && outer.AwaitsChild == flow.Id)
+                    return Continue(outer, new AnswerValue(this, up.Response, null, null, up.By), "after its response " + flow.Command + " finished");
+                return null;
             }
             catch (ScriptRuntimeException e)
             {

@@ -17,6 +17,7 @@ namespace Kesa.Engine.Runtime
         {
             long lastFlow = 0;
             var requestIds = new HashSet<long>();
+            var savedFlows = new Dictionary<long, string>();
             foreach (var node in saved.Items)
             {
                 var obj = AsObject(node, "a flow");
@@ -38,6 +39,27 @@ namespace Kesa.Engine.Runtime
                 long? request = requestNode is JsonObject r && r.Get("id") is JsonNumber n ? n.Value : (long?)null;
                 bool broken = problems.LeaveFlow(where, request);
                 if (record != null && !broken) _flows.Add(id, record);
+                savedFlows.Add(id, where);
+            }
+            // 불러오며 응답 본문 Flow를 취소했으면 그것을 기다리던 바깥도 취소한다: 불러오기는 스크립트를 돌리지 않아 바깥을
+            // r.interrupted로 이어 갈 수 없다. 안쪽부터 보아 여러 겹도 함께 (G243)
+            var ids = new List<long>(_flows.Keys);
+            for (int i = ids.Count - 1; i >= 0; i--)
+            {
+                var flow = _flows[ids[i]];
+                if (!(flow.AwaitsChild is long child) || _flows.ContainsKey(child)) continue;
+                if (!savedFlows.TryGetValue(child, out var childWhere))
+                    throw new JsonFormatException(savedFlows[flow.Id] + " awaits flow " + child + ", which is not in the save");
+                _flows.Remove(flow.Id);
+                problems.CanceledWith(savedFlows[flow.Id] + " was canceled: the response it awaited, " + childWhere + ", was canceled");
+            }
+            // 바깥 Flow와 응답 본문 Flow는 서로를 가리켜야 한다 (G243). 바깥이 먼저 끝났거나 취소되었으면 안쪽은 짝 없이 남는다
+            foreach (var flow in _flows.Values)
+            {
+                if (flow.Parent != null && _flows.TryGetValue(flow.Parent.Flow, out var outer) && outer.AwaitsChild != flow.Id)
+                    throw new JsonFormatException("flow " + flow.Id + " names flow " + outer.Id + " as its parent, which does not await it");
+                if (flow.AwaitsChild is long child && _flows.TryGetValue(child, out var inner) && inner.Parent?.Flow != flow.Id)
+                    throw new JsonFormatException("flow " + flow.Id + " awaits flow " + child + ", which does not name it as its parent");
             }
         }
 
@@ -59,7 +81,26 @@ namespace Kesa.Engine.Runtime
                     wakeAt = Long(wakeNode, "a wake tick");
                     if (wakeAt.Value <= _tick) throw new JsonFormatException(where + " should have woken by tick " + wakeAt.Value);
                 }
-                var request = wakeAt == null ? LoadRequest(obj, id, command, where, requestIds, problems) : null;
+                // 응답 본문을 기다리는 Flow는 질문도 깨울 틱도 없다 (G243)
+                var awaitsNode = obj.Get("awaits");
+                long? awaits = null;
+                if (awaitsNode != null)
+                {
+                    if (wakeNode != null) throw new JsonFormatException(where + " cannot both sleep and await a response");
+                    awaits = Long(awaitsNode, "an awaited flow");
+                    if (awaits.Value <= id || awaits.Value >= _nextFlow)
+                        throw new JsonFormatException(where + " awaits flow " + awaits.Value + ", which must come after it");
+                }
+                ParentLink? parent = null;
+                if (obj.Get("parent") is JsonNode parentNode)
+                {
+                    var p = AsObject(parentNode, "a flow parent");
+                    long outer = Long(Field(p, "flow"), "a parent flow");
+                    if (outer >= id) throw new JsonFormatException(where + " has parent flow " + outer + ", which must come before it");
+                    parent = new ParentLink(outer, Text(Field(p, "response"), "a parent response"),
+                        new EntityId(SavedId(Field(p, "by"), "a parent responder")));
+                }
+                var request = wakeAt == null && awaits == null ? LoadRequest(obj, id, command, where, requestIds, problems) : null;
 
                 // 람다는 프레임이나 묶음의 사전을 잡고, 사전은 람다를 든다(자기를 잡을 수도 있다).
                 // 그래서 빈 프레임 → 빈 묶음 → 람다 → 값 채우기 순서로 만든다 (G143)
@@ -112,7 +153,8 @@ namespace Kesa.Engine.Runtime
                     return null;
                 }
 
-                Value payload = request == null
+                Value payload = awaits != null ? NoneValue.Instance
+                    : request == null
                     ? new WaitPayload(wakeAt!.Value - _tick)
                     : new AskPayload(request.Who, request.Title, request.Choices, request.Responses, request.ResponseNames,
                         request.Hint, request.Data) { BlocksTime = request.BlocksTime };
@@ -130,6 +172,7 @@ namespace Kesa.Engine.Runtime
                 var record = new FlowRecord(id, command, run, request, handler, wakeAt)
                 {
                     Subjects = subjects, About = about, Rand = LoadStream(Field(obj, "rand"), command),
+                    AwaitsChild = awaits, Parent = parent,
                 };
                 // 실행이 끝날 때마다 버리므로 대상이 사라진 Flow는 저장에 있을 수 없다 (G164)
                 var stale = StaleReason(record);
@@ -468,7 +511,8 @@ namespace Kesa.Engine.Runtime
                                 response is JsonNull ? null : Text(response, "an answer response"),
                                 index is JsonNull ? (long?)null : Long(index, "an answer index"),
                                 index is JsonNull ? null : LoadValue(choice),
-                                by is JsonNull ? (EntityId?)null : new EntityId(SavedId(by, "an answer entity")));
+                                by is JsonNull ? (EntityId?)null : new EntityId(SavedId(by, "an answer entity")),
+                                v.Get("interrupted") is JsonNode cut && Bool(cut, "an answer's interrupted flag"));
                         }
                         case "component_value":
                         {

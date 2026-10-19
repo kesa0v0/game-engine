@@ -622,3 +622,12 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **공동 조종(한 엔티티에 연결 여럿):** 미룸. 지금은 호스트가 한 꼬리표를 여러 사람에게 나눠 주면 된다(규칙이 그중 누가 냈는지 가르는 것만 안 됨). 사례가 생기면 `Seat`가 바꾸나 더하나, `SeatOf`의 목록화, 섞인 종류의 `controller()`, 저장 형식을 함께 정한다. spine-spec S6과 handoff에 적음.
 - **API 이름(G242):** 가(그대로)·나(seat 통일)·다(controller 통일) 중 가. 코드 변경 없음.
 - **확인:** `spec-gaps` 표 확인 `241 6`. 테스트는 코드 변경이 없어 1994개 그대로.
+
+## 2026-10-19: 멈추는 응답 커맨드 (G243, 콘솔 호스트 구멍 6번)
+
+- **정한 것:** 가(쌓는다)·나(나란히) 중 가. 응답 본문이 `ask`·`wait`·`advance`에서 멈추면 새 Flow가 되고, 바깥은 질문을 닫고 기다리다 그 Flow가 끝나면 같은 트랜잭션에서 `r.response`·`r.by`로 이어 간다. 이어서 "안쪽이 버려지면 바깥은?"을 물어 (가) 함께 버림·(나) 이어 감·(나+) 이어 가며 끊김 표시·(다) 질문 다시 열기 중 나+. 불러오며 취소되면 스크립트를 돌릴 수 없어 바깥도 함께 취소.
+- **구현:** `FlowRecord`에 `Parent`(`ParentLink`: 바깥 Flow·응답 이름·응답한 엔티티)와 `AwaitsChild`. `World.Flows.cs`의 `AwaitResponse`(바깥을 질문 없는 기다림으로 바꾸고 본문을 `OpenFlow`), `Continue`가 본문이 끝나면 바깥을 재귀로 이어 감, `Lineage`·`Leaf`로 답·응답·깨우기 결과의 `OpenedRequest`·`SleepsUntil`을 실행이 끝난 뒤 멈춘 곳(맨 안쪽)으로. `ResumeAfterInterrupted`: 대상 소멸 취소(`SweepStale`·`WakeSleepers`), 깨운 뒤 오류(`Resume`의 catch, G157), `advance` 한도(G168)에서 버린 Flow의 바깥을 `r.interrupted=True` 답으로 이어 가고 결과 목록에 신호 `interrupted`(`Reaction.InterruptedSignal`). `SweepStale`은 함께 사라진 바깥을 잇지 않게 모두 버린 뒤에 잇는다. 답 값에 `interrupted`(스텁 `interrupted: bool`, 끊겼을 때만 저장에 `"interrupted": true`). 저장은 바깥에 `awaits`, 안쪽에 `parent`. 불러오기는 `awaits`와 `wake_at`이 함께 있거나 순서가 어긋나면 형식 오류, 양쪽 짝 확인, 기다리던 Flow가 저장에 없으면 형식 오류, 불러오며 취소되었으면 안쪽부터 바깥도 취소하고 `SAV006` 경고(`LoadProblems.CanceledWith`).
+- **재현:** 응답 본문의 `ask`가 "not supported yet" 오류인 것, 그리고 핵심 구현 뒤 깨운 뒤 오류로 안쪽이 버려지면 바깥이 열린 질문도 깰 틱도 없이 영원히 남는 것을 임시 테스트로 재현하고 지웠다.
+- **테스트:** 새 `NestedResponseTests` 14개(바깥은 본문이 끝난 뒤 돌아옴, 세 겹, `wait`·`advance`하는 본문, 이은 뒤 오류면 둘 다 기다림, 깨운 뒤 오류·대상 소멸·`advance` 한도로 끊기면 `interrupted`로 이어 감과 그 답의 저장, 바깥이 먼저 사라지면 혼자 끝남, 끊기지 않으면 거짓, 불러오며 세 겹 함께 취소, 기다리던 Flow가 없는 저장은 깨짐, 걸음마다 저장·불러오기가 같은 결과와 바이트, 저장에 연결 양쪽).
+- **문서:** G243(색인·X-flow-time), G139 `일부 바뀜(G237·G243)`과 바뀜 줄, spine-spec X1 응답 문단.
+- **확인:** 테스트 2008개 통과(커널 1965, CLI 36, 콘솔 호스트 7). `spec-gaps` 표 확인 `242 6`.

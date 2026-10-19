@@ -35,9 +35,16 @@ namespace Kesa.Engine.Runtime
                 var saved = new JsonObject()
                     .Add("id", new JsonNumber(flow.Id))
                     .Add(flow.Handler ? "handler" : "command", new JsonString(flow.Command));
+                // 응답 본문을 기다리는 Flow는 그 Flow 번호 "awaits"를 적는다 (G243)
                 if (flow.Request != null) saved.Add("request", SaveRequest(flow.Request));
                 else if (flow.WakeAt != null) saved.Add("wake_at", new JsonNumber(flow.WakeAt.Value));
+                else if (flow.AwaitsChild != null) saved.Add("awaits", new JsonNumber(flow.AwaitsChild.Value));
                 else throw new InvalidOperationException("engine: flow " + flow.Id + " is paused at advance(), which finishes within its call");
+                if (flow.Parent != null)
+                    saved.Add("parent", new JsonObject()
+                        .Add("flow", new JsonNumber(flow.Parent.Flow))
+                        .Add("response", new JsonString(flow.Parent.Response))
+                        .Add("by", new JsonNumber(flow.Parent.By.Value)));
                 var subjects = new JsonArray();
                 foreach (var s in flow.Subjects) subjects.Add(new JsonNumber(s.Value));
                 JsonNode about = JsonNull.Instance;
@@ -396,11 +403,14 @@ namespace Kesa.Engine.Runtime
                         .Add("entity", new JsonNumber(d.Id))
                         .Add("type", new JsonString(d.Type.Name)));
                 case AnswerValue a:
-                    return Tag("answer", new JsonObject()
+                    var answer = new JsonObject()
                         .Add("response", a.Response == null ? (JsonNode)JsonNull.Instance : new JsonString(a.Response))
                         .Add("index", a.Index == null ? (JsonNode)JsonNull.Instance : new JsonNumber(a.Index.Value))
                         .Add("choice", a.Choice == null ? (JsonNode)JsonNull.Instance : SaveValue(a.Choice))
-                        .Add("by", a.By == null ? (JsonNode)JsonNull.Instance : new JsonNumber(a.By.Value.Value)));
+                        .Add("by", a.By == null ? (JsonNode)JsonNull.Instance : new JsonNumber(a.By.Value.Value));
+                    // 끊긴 응답일 때만 적는다 (G243)
+                    if (a.Interrupted) answer.Add("interrupted", new JsonBool(true));
+                    return Tag("answer", answer);
                 case ComponentInitValue c:
                     var given = new JsonArray();
                     foreach (var pair in c.Values)

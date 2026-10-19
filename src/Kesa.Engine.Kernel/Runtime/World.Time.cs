@@ -110,6 +110,7 @@ namespace Kesa.Engine.Runtime
                             " ticks per call, so the flow was dropped",
                             "a loop of advance() should pause on a question each turn; a host that needs more can raise maxAdvancePerCall (spec-gaps G168)"),
                     });
+                    ResumeAfterInterrupted(flow, reactions);
                     continue;
                 }
                 int advanced = AdvanceTicks(want, reactions, out _);
@@ -148,6 +149,7 @@ namespace Kesa.Engine.Runtime
                         Flow = flow.Id,
                         Message = "flow " + flow.Id.ToString(CultureInfo.InvariantCulture) + " was canceled: " + stale,
                     });
+                    ResumeAfterInterrupted(flow, reactions);
                     continue;
                 }
                 if (asked == null) Resume(flow, signal, NoneValue.Instance, "after waking", reactions);
@@ -166,22 +168,23 @@ namespace Kesa.Engine.Runtime
             var outerWarnings = OpenWarnings();
             try
             {
-                Request? opened;
                 IReadOnlyList<Diagnostic> warnings;
+                var lineage = Lineage(flow);
                 try
                 {
-                    opened = Atomically(() => Continue(flow, answer, after));
+                    Atomically(() => Continue(flow, answer, after));
                 }
                 finally
                 {
                     warnings = CloseWarnings(outerWarnings);
                 }
-                bool paused = _flows.ContainsKey(flow.Id);
-                reactions.Add(new Reaction(signal, values, flow.Command, 0, paused ? ReactionOutcome.Suspended : ReactionOutcome.Finished)
+                // 끝난 응답 본문이 바깥 Flow를 이어 갔으면 그 바깥이 멈춘 곳을 알린다 (G243)
+                var leaf = Leaf(lineage);
+                reactions.Add(new Reaction(signal, values, flow.Command, 0, leaf != null ? ReactionOutcome.Suspended : ReactionOutcome.Finished)
                 {
                     Flow = flow.Id,
-                    OpenedRequest = opened,
-                    SleepsUntil = SleepsUntil(flow.Id),
+                    OpenedRequest = leaf?.Request,
+                    SleepsUntil = leaf?.WakeAt,
                     Warnings = warnings,
                 });
             }
@@ -193,6 +196,7 @@ namespace Kesa.Engine.Runtime
                     Flow = flow.Id,
                     Error = e,
                 });
+                ResumeAfterInterrupted(flow, reactions); // 버린 Flow가 응답 본문이었으면 바깥은 이어 간다 (G243)
             }
         }
 

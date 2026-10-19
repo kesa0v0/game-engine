@@ -60,6 +60,9 @@ namespace Kesa.Engine.Runtime
         /// <summary><c>advance(n)</c>으로 시간을 흘린 뒤 이어 간 Flow 항목의 신호 자리 (G167).</summary>
         public const string AdvanceSignal = "advance";
 
+        /// <summary>응답 본문 Flow가 버려져 그 응답을 기다리던 바깥 Flow를 <c>r.interrupted</c>로 이어 간 항목의 신호 자리 (G243).</summary>
+        public const string InterruptedSignal = "interrupted";
+
         /// <summary><c>@when</c> 반응이 발동한 항목의 신호 자리 (G169). 값은 반응의 매개변수(엔티티)이고, 전역 조건이면 비어 있다.</summary>
         public const string WhenSignal = "when";
 
