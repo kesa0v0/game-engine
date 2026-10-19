@@ -64,7 +64,14 @@ namespace Kesa.Engine.ConsoleHost
             }
 
             var world = new World(content, seed: seed);
-            new ConsoleGame(content, world, seats, stdin, stdout).Run();
+            var panels = ConsoleUi.Load(root, content);
+            var wrong = ConsoleUi.Check(world, panels);
+            if (wrong.Count > 0)
+            {
+                foreach (var line in wrong) stderr.WriteLine(line);
+                return 1;
+            }
+            new ConsoleGame(content, world, seats, panels, stdin, stdout).Run();
             return 0;
         }
     }

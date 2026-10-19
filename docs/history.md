@@ -656,3 +656,11 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **구현:** `WorldView.Call`·`CheckCall`. `World.CallAs`가 부르는 동안 `_viewer`(그 `WorldView`)를 걸어 두고, 스크립트가 읽는 길마다 `WorldView`와 같은 거르기를 한다: `Record`(못 보는 엔티티는 죽은 id, RUN002), `SiblingOrNone`(못 보는 컴포넌트는 None), 멤버 값(`WorldView.Filter`를 internal로: Ref는 `HiddenValue`, Ref 목록에서는 빠짐), 역방향 컬렉션(가리키는 쪽과 그 컴포넌트), `query`(`ViewQueried`), 엔티티 키 줄(목록에서 빠지고 꼬집으면 죽은 키), `contribs`(못 보는 출처의 행 빠짐), `controller`(None). 보기 정책(`MaySee`)과 `derived` 계산(G199) 안에서는 `_viewer`를 잠시 풀어 실제 상태를 읽는다. 정책이 읽은 곳은 그대로 영수증에 들고, 보는 쪽 영수증은 배정 표의 횟수(`SeatsVersion`, `Seat`·`Unseat`·죽을 때 지움, 커맨드 안이면 되감음)도 본다.
 - **테스트:** 새 `WorldViewCallTests` 11개(query, 못 보는 컴포넌트, 역방향 컬렉션과 키 줄, 숨긴 Ref, 못 보는 인자, 보이는 derived, controller, contribs, 정책이 읽은 것(안개가 걷힘)과 처음 읽는 자리에 앉기의 영수증, 보는 쪽으로 불러도 월드는 그대로). 거르기 갈래 10개를 하나씩 빼 보면 각각 테스트가 실패하는 것을 확인. 처음의 배정 표 테스트는 앉힌 엔티티를 함수가 이미 읽어 엔티티 도장만으로도 통과했으므로, 읽은 적 없는 자리에 앉는 테스트로 바꿈.
 - **확인:** 테스트 2036개 통과(커널 1993, CLI 36, 콘솔 호스트 7).
+
+## 2026-10-19: UI 정의 파일은 호스트의 것, 콘솔의 `ui/console.txt` (G249·G250)
+
+- **정한 것:** G249(사용자가 고름: UI 정의 파일은 호스트마다 제 형식이고 엔진은 읽지 않음, 엔진 공통 패널 목록은 두지 않음. 처음 추천한 두 층 나누기는 "모더는 호스트 하나를 목표로 한다"는 지적으로 거둠). G250(가: 콘솔은 모드 폴더의 `ui/console.txt`, 한 줄에 `모드.함수`).
+- **구현:** 새 `ConsoleHost/ConsoleUi.cs`(`Load`: 로드 순서대로 모드 폴더의 파일을 읽어 `#` 주석·빈 줄을 빼고 `모드폴더/ui/console.txt:줄`을 붙임, `Check`: 줄마다 `CheckCall(함수, 1)`). `Play`가 시작 때 틀린 줄을 stderr에 보이고 1로 끝남. `ConsoleGame.WritePanels`: 자리마다 앉은 엔티티마다 `ViewAs(연결).Call(함수, 앉은 엔티티)`, 문자열은 그대로·목록은 한 줄씩·그 밖은 `ValueText`, 지난 결과의 `Changed`가 거짓이면 다시 부르지 않음, 실패한 칸은 오류 줄. 파일이 없으면 지금의 덤프(`WriteEntities`). 스커미시에 `ui/console.txt`와 `defs/view.py`(`status`·`board`·`units`, 내 유닛 대문자 `S`·`A`, 상대 소문자).
+- **테스트:** 새 `ConsoleUiTests` 4개(값과 목록이 자리 아래 보임, 틀린 이름·커맨드는 줄 번호와 함께 시작에서 멈춤, 실패한 칸은 오류 줄이고 나머지는 그려짐, 파일이 없으면 덤프). `SkirmishTests`의 봇은 `units` 패널을 읽게 바꾸고, 도장 비교 테스트는 영수증 비교로 이름을 바꿈. `Changed`를 늘 거짓으로 바꿔 보면 4개가 실패하는 것을 확인.
+- **본 것:** 순수 함수에 `str()`이 없어 숫자를 글에 넣을 수 없다(handoff 구멍 3의 후보).
+- **확인:** 테스트 2040개 통과(커널 1993, CLI 36, 콘솔 호스트 11). `spec-gaps` 표 확인 `250 6`.

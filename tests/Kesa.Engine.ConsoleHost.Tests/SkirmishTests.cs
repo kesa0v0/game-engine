@@ -55,7 +55,9 @@ namespace Kesa.Engine.ConsoleHost.Tests
             /// <summary>그 이동으로 가장 가까운 적까지의 거리가 얼마나 바뀌나 (음수면 가까워짐).</summary>
             private static int Gain(string block, string move)
             {
-                var units = Regex.Matches(block, @"^#(\d+) \w+  Pos\(x=(\d+), y=(\d+)\).*party=#(\d+)", RegexOptions.Multiline)
+                // 모드의 units 패널(ui/console.txt)을 읽는다. 자리마다 한 번씩 보이므로 같은 유닛이 두 번 나온다
+                var units = Regex.Matches(block, @"^  \{unit: #(\d+) \w+, x: (\d+), y: (\d+), .*party: #(\d+)", RegexOptions.Multiline)
+                    .GroupBy(m => m.Groups[1].Value).Select(g => g.First())
                     .ToDictionary(m => m.Groups[1].Value,
                         m => (x: int.Parse(m.Groups[2].Value), y: int.Parse(m.Groups[3].Value), party: m.Groups[4].Value));
                 var m = Regex.Match(move, @"dir=(\w+).*unit=#(\d+)");
@@ -100,7 +102,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             string screen = PlayOut(seed: 1);
             Assert.That(screen, Does.EndWith("낼 수 있는 것이 없다. 끝.\n").Or.EndWith("낼 수 있는 것이 없다. 끝.\r\n"));
-            Assert.That(screen, Does.Match(@"winner=#\d \w+"));
+            Assert.That(screen, Does.Match(@"winner: #\d \w+"));
         }
 
         [Test]
@@ -114,8 +116,9 @@ namespace Kesa.Engine.ConsoleHost.Tests
         }
 
         [Test]
-        public void SkippingUnchangedEntitiesByStampDrawsTheSameScreens()
+        public void SkippingUnchangedPanelsByReceiptDrawsTheSameScreens()
         {
+            // 스커미시는 ui/console.txt가 있어 패널의 영수증(CallResult.Changed, G246·G250)으로 건너뛴다
             string skipped = PlayOut(seed: 2);
             ConsoleGame.AlwaysRedraw = true;
             try

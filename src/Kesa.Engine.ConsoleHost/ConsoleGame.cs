@@ -34,12 +34,16 @@ namespace Kesa.Engine.ConsoleHost
         private readonly TextWriter _out;
         private readonly ValueText _text;
 
+        /// <summary>모드의 <c>ui/console.txt</c> (G250). 비면 엔티티를 늘어놓는다.</summary>
+        private readonly IReadOnlyList<ConsoleUi.Panel> _panels;
+
         public ConsoleGame(ContentLoadResult content, World world, IReadOnlyList<(string Connection, string? Def)> seats,
-            TextReader input, TextWriter output)
+            IReadOnlyList<ConsoleUi.Panel> panels, TextReader input, TextWriter output)
         {
             _content = content;
             _world = world;
             _wanted = seats;
+            _panels = panels;
             _seats = seats.Select(s => s.Connection).Distinct().ToList();
             _in = input;
             _out = output;
@@ -162,11 +166,69 @@ namespace Kesa.Engine.ConsoleHost
         /// <summary>테스트용: 도장을 보지 않고 매번 다시 읽는다. 도장으로 건너뛴 화면과 견주는 데 쓴다.</summary>
         internal static bool AlwaysRedraw { get; set; }
 
-        /// <summary>그 엔티티가 바뀌었을 때만(도장) 다시 읽는다. 다른 엔티티를 읽는 <c>derived</c> 값은 도장이 담지 않는다(G235의 남은 몫).</summary>
+        /// <summary>모드의 UI 파일이 있으면 그 패널들, 없으면 엔티티를 늘어놓고, 열린 질문을 덧붙인다.</summary>
         private void WriteState()
         {
             _out.WriteLine();
             _out.WriteLine("== 틱 " + _world.Tick.ToString(CultureInfo.InvariantCulture) + " ==");
+            if (_panels.Count > 0) WritePanels();
+            else WriteEntities();
+            foreach (var request in _world.OpenRequests)
+            {
+                _out.WriteLine("질문 " + request.Id.ToString(CultureInfo.InvariantCulture) + ": " + _text.Of(request.Title) +
+                               " → " + string.Join(", ", request.Who.Select(_text.Entity)) +
+                               (request.Data is NoneValue ? "" : "  " + _text.Of(request.Data)));
+            }
+        }
+
+        /// <summary>
+        /// 자리마다, 그 연결이 앉은 엔티티마다 UI 파일의 함수를 그 연결이 보는 세계에서 부른다 (G248·G250). 지난 결과의 영수증이
+        /// 그대로면 부르지 않는다(G246). 부르다 실패한 칸은 오류 줄을 보이고 나머지는 계속 그린다(G247).
+        /// </summary>
+        private void WritePanels()
+        {
+            foreach (var seat in _seats)
+            {
+                foreach (var me in _world.SeatsOf(seat))
+                {
+                    _out.WriteLine("[" + seat + "] " + _text.Entity(me));
+                    var view = _world.ViewAs(seat);
+                    foreach (var panel in _panels)
+                    {
+                        var key = (seat, me.Value, panel.Place);
+                        if (AlwaysRedraw || !_drawn.TryGetValue(key, out var drawn) || drawn.Result == null || drawn.Result.Changed(_world))
+                            _drawn[key] = drawn = Draw(view, panel, me);
+                        foreach (var line in drawn.Lines) _out.WriteLine(line);
+                    }
+                }
+            }
+        }
+
+        /// <summary>(연결, 앉은 엔티티, 패널 곳)마다 지난 결과와 그린 줄. 실패한 칸은 결과가 없어 다음에 다시 부른다.</summary>
+        private readonly Dictionary<(string, long, string), (CallResult? Result, List<string> Lines)> _drawn =
+            new Dictionary<(string, long, string), (CallResult?, List<string>)>();
+
+        private (CallResult? Result, List<string> Lines) Draw(WorldView view, ConsoleUi.Panel panel, EntityId me)
+        {
+            CallResult result;
+            try
+            {
+                result = view.Call(panel.Function, new EntityValue(me));
+            }
+            catch (WorldException e)
+            {
+                return (null, new List<string> { "  " + panel.Place + ": " + e.Message });
+            }
+            var lines = new List<string>();
+            if (result.Value is ListValue list)
+                foreach (var item in list.Items) lines.Add("  " + _text.Of(item));
+            else lines.Add("  " + _text.Of(result.Value));
+            return (result, lines);
+        }
+
+        /// <summary>그 엔티티가 바뀌었을 때만(도장) 다시 읽는다. 다른 엔티티를 읽는 <c>derived</c> 값은 도장이 담지 않는다(G235의 남은 몫).</summary>
+        private void WriteEntities()
+        {
             foreach (var type in _content.Schema.Types)
             {
                 foreach (var id in _world.All(type.Name))
@@ -176,12 +238,6 @@ namespace Kesa.Engine.ConsoleHost
                         _lines[id.Value] = drawn = (version, Line(id));
                     _out.WriteLine(drawn.Line);
                 }
-            }
-            foreach (var request in _world.OpenRequests)
-            {
-                _out.WriteLine("질문 " + request.Id.ToString(CultureInfo.InvariantCulture) + ": " + _text.Of(request.Title) +
-                               " → " + string.Join(", ", request.Who.Select(_text.Entity)) +
-                               (request.Data is NoneValue ? "" : "  " + _text.Of(request.Data)));
             }
         }
 
