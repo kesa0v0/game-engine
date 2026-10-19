@@ -75,8 +75,11 @@ namespace Kesa.Engine.Loading
 
         // ---- 컴포넌트와 줄 붙이기·떼기 (G44·G51) ----
 
-        private static ResolvedValue Patched(PatchLogEntry entry, ResolvedDef def, Value value, SourceSpan span) =>
-            new ResolvedValue(value, ValueOrigin.Patched, def.Record, span, entry);
+        /// <param name="before">이 패치가 그 위에 쌓은 값 (통째로 바꾸면 null, G76)</param>
+        private static ResolvedValue Patched(PatchLogEntry entry, ResolvedDef def, Value value, SourceSpan span,
+            ResolvedValue? before = null) =>
+            new ResolvedValue(value, ValueOrigin.Patched, def.Record, span, entry,
+                ResolvedValue.Join(before?.Patches ?? Array.Empty<PatchLogEntry>(), new[] { entry }));
 
         private static void SetMembers(OrderedMap<ResolvedValue> members, ComponentValue source, PatchLogEntry entry, ResolvedDef def)
         {
@@ -183,7 +186,9 @@ namespace Kesa.Engine.Loading
             var type = member.Spec.Type;
             var leafType = target.ValueType!;
             Value updated = Update(effective, type, keys, 0, current => Leaf(call, leafType, current, keys.Count > 0, def), call);
-            map.Set(member.Name, Patched(entry, def, updated, call.Span));
+            // 통째로 set하면 그 전 값(과 그 값을 만든 패치)은 남지 않는다
+            bool replaced = call.Op == PatchOp.Set && keys.Count == 0;
+            map.Set(member.Name, Patched(entry, def, updated, call.Span, replaced ? null : stored));
         }
 
         private static ResolvedComponent EnsureComponent(ResolvedDef def, PatchTarget target, PatchCall call)

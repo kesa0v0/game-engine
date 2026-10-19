@@ -46,6 +46,19 @@ namespace Kesa.Engine.Loading
         /// <summary>식을 평가하는 동안 난 진단.</summary>
         public DiagnosticBag Bag { get; }
 
+        /// <summary>
+        /// <see cref="ResetReads"/> 뒤로 <c>inherit.이름</c>이 읽은 부모 값들을 만든 패치 (적용 순서, 덤프의 <c>patches</c>, G76).
+        /// </summary>
+        public IReadOnlyList<PatchLogEntry> ReadPatches { get; private set; } = Array.Empty<PatchLogEntry>();
+
+        public void ResetReads() => ReadPatches = Array.Empty<PatchLogEntry>();
+
+        private Value Read(ResolvedValue resolved)
+        {
+            ReadPatches = ResolvedValue.Join(ReadPatches, resolved.Patches);
+            return resolved.Value;
+        }
+
         /// <summary>식을 평가하고 결과가 Def 값으로 쓸 수 있는 데이터인지 본다 (내장 이름·타입 표기 등이 값에 남지 않게).</summary>
         public Value EvaluateData(Expr expr)
         {
@@ -206,7 +219,7 @@ namespace Kesa.Engine.Loading
             foreach (var k in type.Consts)
             {
                 if (k.Name != name) continue;
-                if (_parent.Consts.TryGet(name, out var resolved)) return resolved.Value;
+                if (_parent.Consts.TryGet(name, out var resolved)) return Read(resolved);
                 if (k.Spec.Default != null) return k.Spec.Default;
                 throw _context.Fail(Codes.InhNoValue, "parent '" + _parent.Id + "' has no value for '" + name + "'", span,
                     hint: "give '" + name + "' a value in the parent, or use a default= in its schema");
@@ -254,7 +267,7 @@ namespace Kesa.Engine.Loading
             if (_parent.Components.TryGet(componentName, out var resolvedComponent))
             {
                 members = resolvedComponent.Members;
-                if (members.TryGet(memberName, out var resolved)) return resolved.Value;
+                if (members.TryGet(memberName, out var resolved)) return Read(resolved);
             }
             var fallback = MemberDefaults.Of(component, member, members);
             if (fallback != null) return fallback;

@@ -531,3 +531,11 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **구현:** `Loading/AttributeChecker.Returns.cs`의 `ReturnTypes`. 같은 모드의 함수 이름 호출이면 적은 반환 타입, 아니면 그 인자 타입으로 새 `Walker`(오류를 내지 않음)를 돌려 마지막 바퀴의 `return` 타입을 합친 것(`Walker.Returned`)이다. 함수와 인자 타입마다 결과를 기억하고, 훑는 중인 함수를 다시 부르면 모름. 적지 않은 매개변수의 인자 타입이 아직 없으면(대입을 모으는 바퀴) null이라 지역 변수 합치기와 맞물린다. `Walker.Reporting`은 `StageDiagnostics`가 없으면 거짓이다. 모드 이름(`ModNames`)은 `ReturnTypes`가 모드마다 한 번 만든다.
 - **새 테스트:** `AttributeCheckerTests` 3개(셋의 재현과 이름 인자, 이름에 묶은 람다와 함수 안의 호출 따라가기, 적은 `int`·다른 타입의 반환·모르는 인자·반환 없음은 모름). 기존 테스트의 "함수의 결과는 모른다" 주석을 고쳤다.
 - **확인:** 재현 모드의 `engine check`가 pyright와 같은 세 자리에서 오류를 낸다. 테스트 1955개 통과(커널 1919, CLI 36).
+
+## 덤프의 `patches`를 값을 만든 패치만으로 (G76 구현 보강, 2026-10-19)
+
+- **재현:** `Unit("Base", move=2)`, `Unit("Scout", parent="Base", move=3)`에 `patch.set("Base", "move", 5)`를 하면 Scout의 `move`(3, own) 칸 `patches`에 Base의 set이 나왔다. `DefDump`가 뿌리부터 이 Def까지 체인의 Def마다 겹치는 경로의 패치를 모두 훑었기 때문이다.
+- **수정 방향:** G76이 정한 "그 칸에 영향을 준 패치"를 바르게 구현하는 것이라 묻지 않았다. 체인을 훑지 않고 값을 만들 때 기여한 패치를 따라 적는다.
+- **구현:** `ResolvedValue.Patches`(적용 순서). 물려받으면 그대로(`AsInherited`), 자식이 직접 적은 값은 빈 목록, `PatchApplier`의 통째 `set`은 그 패치 하나, `add`·`append`·`remove`·맵 항목 `set`은 그 전 값의 목록 뒤에, 패치로 붙인 컴포넌트·줄의 값은 그 패치. `InheritanceExpander`는 `merge="append"` 리스트면 부모 값의 목록을, `inherit` 식이면 `DeferredEvaluator.ReadPatches`(식이 읽은 부모 값들의 목록, 값마다 `ResetReads`)를 쓴다. `DefDump.ValueEntry`는 이 목록만 낸다. `PatchLog.ForField`(그 칸을 건드린 모든 패치)는 공개 API로 그대로 둔다.
+- **새 테스트:** `DefDumpTests` 3개(자식이 직접 적거나 통째 set한 값에는 부모 패치가 없음, 물려받은 값·`inherit` 식 위의 `add`는 부모 쪽 먼저 적용 순서로, `merge="append"` 리스트는 부모의 패치를 이음).
+- **확인:** 테스트 1958개 통과(커널 1922, CLI 36).

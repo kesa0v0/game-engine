@@ -111,6 +111,58 @@ namespace Kesa.Engine.Tests.Loading
                                                 "            \"file\": \"addon/defs/defs.py\""));
         }
 
+        /// <summary>Scout의 그 칸(기본 move)에 나온 패치들의 (def, op).</summary>
+        private static string[] ScoutPatches(string json, string field = "move")
+        {
+            string scout = json.Substring(json.IndexOf("\"id\": \"Scout\"", System.StringComparison.Ordinal));
+            string move = scout.Substring(scout.IndexOf("\"" + field + "\": {", System.StringComparison.Ordinal));
+            move = move.Substring(0, move.IndexOf("\n        }", System.StringComparison.Ordinal));
+            var found = new System.Collections.Generic.List<string>();
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(move,
+                         "\"def\": \"(\\w+)\",\\s*\"op\": \"(\\w+)\""))
+                found.Add(m.Groups[1].Value + " " + m.Groups[2].Value);
+            return found.ToArray();
+        }
+
+        private string DumpWith(string schema, string defs, string patches)
+        {
+            Mod("core", schema: schema, defs: defs);
+            Mod("addon", defs: patches, extra: ", dependencies=[\"core\"]");
+            return DefDump.ToJson(LoadClean());
+        }
+
+        [Test]
+        public void AParentPatchThatTheChildOverwroteIsNotListed()
+        {
+            // 자식이 직접 적은 값, 자식의 통째 set이 덮은 값에는 부모 패치가 영향을 주지 않았다
+            const string schema = "deftype(\"Unit\", move=const(int, default=1))\n";
+            Assert.That(ScoutPatches(DumpWith(schema, "Unit(\"Base\", move=2)\nUnit(\"Scout\", parent=\"Base\", move=3)\n",
+                "patch.set(\"Base\", \"move\", 5)\n")), Is.Empty);
+            TearDown();
+            SetUp();
+            Assert.That(ScoutPatches(DumpWith(schema, "Unit(\"Base\", move=2)\nUnit(\"Scout\", parent=\"Base\")\n",
+                "patch.set(\"Base\", \"move\", 5)\npatch.set(\"Scout\", \"move\", 7)\n")), Is.EqualTo(new[] { "Scout set" }));
+        }
+
+        [Test]
+        public void ParentPatchesUnderTheChildsValueAreListedParentFirst()
+        {
+            // 물려받은 값, inherit 식이 읽은 값, 그 위에 쌓은 add
+            const string schema = "deftype(\"Unit\", move=const(int, default=1))\n";
+            Assert.That(ScoutPatches(DumpWith(schema, "Unit(\"Base\", move=2)\nUnit(\"Scout\", parent=\"Base\", move=inherit.move + 1)\n",
+                "patch.add(\"Scout\", \"move\", 1)\npatch.set(\"Base\", \"move\", 5)\n")), Is.EqualTo(new[] { "Base set", "Scout add" }));
+        }
+
+        [Test]
+        public void AnAppendMergedListKeepsTheParentsPatches()
+        {
+            // 자식의 값은 부모의 (패치된) 리스트 뒤에 붙인 것이다
+            Assert.That(ScoutPatches(DumpWith("deftype(\"Unit\", tags=const(list[str], merge=\"append\"))\n",
+                    "Unit(\"Base\", tags=[\"a\"])\nUnit(\"Scout\", parent=\"Base\", tags=[\"b\"])\n",
+                    "patch.append(\"Base\", \"tags\", [\"c\"])\n"), "tags"),
+                Is.EqualTo(new[] { "Base append" }));
+        }
+
         [Test]
         public void AttachedComponentsAndRowsShowTheirPatch()
         {

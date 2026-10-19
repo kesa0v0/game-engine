@@ -30,9 +30,6 @@ namespace Kesa.Engine.Reporting
 
             public JsonNode Def(ResolvedDef def)
             {
-                // 부모 쪽 패치부터 보이도록 뿌리 조상에서 이 Def까지
-                var chain = new List<ResolvedDef>();
-                for (var d = def; d != null; d = d.Parent) chain.Insert(0, d);
 
                 OrderedMap<ResolvedValue> consts = def.Consts;
                 OrderedMap<ResolvedComponent> components = def.Components;
@@ -46,14 +43,14 @@ namespace Kesa.Engine.Reporting
                 foreach (var name in consts.Keys)
                 {
                     consts.TryGet(name, out var value);
-                    constNodes.Add(name, ValueEntry(value, chain, name));
+                    constNodes.Add(name, ValueEntry(value));
                 }
 
                 var componentNodes = new JsonObject();
                 foreach (var name in components.Keys)
                 {
                     components.TryGet(name, out var rc);
-                    componentNodes.Add(name, Component(rc, chain));
+                    componentNodes.Add(name, Component(rc));
                 }
 
                 return new JsonObject()
@@ -66,25 +63,23 @@ namespace Kesa.Engine.Reporting
                     .Add("components", componentNodes);
             }
 
-            private JsonNode Component(ResolvedComponent rc, List<ResolvedDef> chain)
+            private JsonNode Component(ResolvedComponent rc)
             {
-                string name = rc.Component.Name;
                 var values = new JsonObject();
                 foreach (var member in rc.Members.Keys)
                 {
                     rc.Members.TryGet(member, out var value);
-                    values.Add(member, ValueEntry(value, chain, name + "." + member));
+                    values.Add(member, ValueEntry(value));
                 }
                 var rows = new JsonObject();
                 foreach (var key in rc.Rows.Keys)
                 {
                     rc.Rows.TryGet(key, out var row);
                     var rowValues = new JsonObject();
-                    string rowPath = name + "['" + key + "']";
                     foreach (var member in row.Members.Keys)
                     {
                         row.Members.TryGet(member, out var value);
-                        rowValues.Add(member, ValueEntry(value, chain, rowPath + "." + member));
+                        rowValues.Add(member, ValueEntry(value));
                     }
                     rows.Add(key, new JsonObject()
                         .Add("attachedBy", row.AttachedBy == null ? JsonNode.Null : Patch(row.AttachedBy))
@@ -96,14 +91,13 @@ namespace Kesa.Engine.Reporting
                     .Add("rows", rows);
             }
 
-            private JsonNode ValueEntry(ResolvedValue value, List<ResolvedDef> chain, string path)
+            /// <summary>
+            /// 값 한 칸. <c>patches</c>는 이 값을 만든 패치뿐이다(적용 순서, 부모 쪽 먼저): 자식이 직접 적어 덮은 부모 패치는 없다 (G76).
+            /// </summary>
+            private JsonNode ValueEntry(ResolvedValue value)
             {
                 var patches = new JsonArray();
-                if (PatchPath.TryParse(path, out var parsed, out _))
-                {
-                    foreach (var def in chain)
-                        foreach (var entry in _result.PatchLog.ForField(def.Id, parsed)) patches.Add(Patch(entry));
-                }
+                foreach (var entry in value.Patches) patches.Add(Patch(entry));
                 return new JsonObject()
                     .Add("value", Value(value.Value))
                     .Add("origin", JsonNode.String(OriginName(value.Origin)))

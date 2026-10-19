@@ -174,6 +174,8 @@ namespace Kesa.Engine.Loading
             {
                 if (k.Name != field.Name) continue;
                 var value = Evaluated(field.Value, evaluator);
+                // inherit 식이 읽은 부모 값의 패치는 이 값에도 영향을 줬다 (덤프, G76)
+                var patches = evaluator.ReadPatches;
                 // inherit 식의 결과는 부모 값을 이미 포함한 전체 값이다 (G59)
                 if (k.Spec.Merge == MergeMode.Append && !(field.Value is DeferredValue) && value is ListValue own &&
                     resolved.Consts.TryGet(k.Name, out var inherited) && inherited.Origin == ValueOrigin.Inherited &&
@@ -182,8 +184,9 @@ namespace Kesa.Engine.Loading
                     var items = new List<Value>(baseList.Items);
                     items.AddRange(own.Items);
                     value = new ListValue(items);
+                    patches = inherited.Patches;
                 }
-                resolved.Consts.Set(k.Name, new ResolvedValue(value, ValueOrigin.Own, record, field.Span));
+                resolved.Consts.Set(k.Name, new ResolvedValue(value, ValueOrigin.Own, record, field.Span, patches: patches));
                 return;
             }
 
@@ -195,8 +198,12 @@ namespace Kesa.Engine.Loading
             }
         }
 
-        private static Value Evaluated(Value value, DeferredEvaluator evaluator) =>
-            value is DeferredValue deferred ? evaluator.EvaluateData(deferred.Expr) : value;
+        /// <summary>값 하나를 평가한다. <see cref="DeferredEvaluator.ReadPatches"/>는 이 값이 읽은 것만 남는다.</summary>
+        private static Value Evaluated(Value value, DeferredEvaluator evaluator)
+        {
+            evaluator.ResetReads();
+            return value is DeferredValue deferred ? evaluator.EvaluateData(deferred.Expr) : value;
+        }
 
         private void ApplyComponent(ResolvedDef resolved, ComponentType component, DefField field, Value value,
             DeferredEvaluator evaluator)
@@ -248,7 +255,10 @@ namespace Kesa.Engine.Loading
             DeferredEvaluator evaluator)
         {
             foreach (var f in source.Fields)
-                members.Set(f.Name, new ResolvedValue(Evaluated(f.Value, evaluator), ValueOrigin.Own, record, f.Span));
+            {
+                var value = Evaluated(f.Value, evaluator);
+                members.Set(f.Name, new ResolvedValue(value, ValueOrigin.Own, record, f.Span, patches: evaluator.ReadPatches));
+            }
         }
 
         private static ScriptError Fail(DeferredEvaluator evaluator, DefRecord record, string message, SourceSpan span)

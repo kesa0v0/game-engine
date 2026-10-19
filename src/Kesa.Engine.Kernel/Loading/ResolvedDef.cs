@@ -28,13 +28,30 @@ namespace Kesa.Engine.Loading
     /// </summary>
     public sealed class ResolvedValue
     {
-        internal ResolvedValue(Value value, ValueOrigin origin, DefRecord source, SourceSpan span, PatchLogEntry? patch = null)
+        internal ResolvedValue(Value value, ValueOrigin origin, DefRecord source, SourceSpan span, PatchLogEntry? patch = null,
+            IReadOnlyList<PatchLogEntry>? patches = null)
         {
             Value = value;
             Origin = origin;
             Source = source;
             Span = span;
             Patch = patch;
+            Patches = patches ?? Array.Empty<PatchLogEntry>();
+        }
+
+        /// <summary>
+        /// 이 값을 만든 패치들을 적용 순서로 (부모 쪽 먼저, G76). 덮어쓴 값(자식이 직접 적음, 통째로 <c>set</c>)에는 그 전 것이 남지 않는다.
+        /// <c>add</c>·<c>append</c>·<c>remove</c>·맵 항목 <c>set</c>은 그 전 값 위에 쌓고, <c>merge="append"</c>와 <c>inherit</c> 식은 읽은 부모 값의 것을 잇는다.
+        /// </summary>
+        public IReadOnlyList<PatchLogEntry> Patches { get; }
+
+        /// <summary>둘을 순서대로 잇는다 (같은 항목은 한 번).</summary>
+        internal static IReadOnlyList<PatchLogEntry> Join(IReadOnlyList<PatchLogEntry> first, IEnumerable<PatchLogEntry> then)
+        {
+            var joined = new List<PatchLogEntry>(first);
+            foreach (var entry in then)
+                if (!joined.Contains(entry)) joined.Add(entry);
+            return joined;
         }
 
         /// <summary>
@@ -52,7 +69,7 @@ namespace Kesa.Engine.Loading
         public SourceSpan Span { get; }
 
         internal ResolvedValue AsInherited() =>
-            Origin == ValueOrigin.Inherited ? this : new ResolvedValue(Value, ValueOrigin.Inherited, Source, Span, Patch);
+            Origin == ValueOrigin.Inherited ? this : new ResolvedValue(Value, ValueOrigin.Inherited, Source, Span, Patch, Patches);
     }
 
     /// <summary>적힌 순서를 지키는 이름 → 값 맵. 순회 순서가 결정적이어야 해서 Dictionary를 직접 순회하지 않는다.</summary>
