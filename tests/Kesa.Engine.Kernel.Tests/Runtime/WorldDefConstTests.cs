@@ -14,7 +14,8 @@ namespace Kesa.Engine.Tests.Runtime
             "    upkeep=derived(int, lambda p: p.entity.Unit.cost // 10),\n" +
             "    done=derived(bool, lambda p: p.Unit.ok(p)),\n" +
             "    other=derived(int, lambda p: 1 if p.Banner else 0),\n" +
-            "    typo=derived(int, lambda p: p.entity.Unit.cosst),\n" +
+            // 리스트로 감싸 타입을 모르게 한다: 실행 중 안전망을 본다 (아니면 G228의 로드 오류)
+            "    typo=derived(int, lambda p: [p.entity.Unit][0].cosst),\n" +
             "    fx=derived(fixed, lambda p: p.entity.Unit.rate))\n" +
             "deftype(\"Unit\", cost=const(int), rate=const(fixed, default=2), ok=const(Cond[\"Unit\"]),\n" +
             "    components=[\"Progress\"])\n" +

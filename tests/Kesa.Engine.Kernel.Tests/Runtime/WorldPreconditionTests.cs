@@ -36,7 +36,8 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\n" +
             "def Buggy(unit: Ref[Unit]):\n" +
             "    with preconditions:\n" +
-            "        require(unit.Moves.nope > 0, text(\"msg.first\"))\n" +
+            // 리스트로 감싸 타입을 모르게 한다: 실행 중 안전망을 본다 (아니면 G228의 로드 오류)
+            "        require([unit.Moves][0].nope > 0, text(\"msg.first\"))\n" +
             "        require(False, text(\"msg.second\"))\n" +
             "    return 0\n" +
             "@command(free=True, acts_for=None)\n" +

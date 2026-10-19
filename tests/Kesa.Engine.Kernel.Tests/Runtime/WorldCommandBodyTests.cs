@@ -92,7 +92,8 @@ namespace Kesa.Engine.Tests.Runtime
             "    unit.Moves.doubled = 9\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Typo(unit: Ref[Unit]):\n" +
-            "    unit.Moves.lefft = 1\n" +
+            // 리스트로 감싸 타입을 모르게 한다: 실행 중 안전망을 본다 (아니면 G228의 로드 오류)
+            "    [unit.Moves][0].lefft = 1\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Wrong(unit: Ref[Unit]):\n" +
             "    unit.Moves.left = \"many\"\n" +

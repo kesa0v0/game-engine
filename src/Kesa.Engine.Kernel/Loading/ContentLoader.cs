@@ -237,6 +237,11 @@ namespace Kesa.Engine.Loading
             }
             Linker.Check(run.Expanded, run.Defs, run.Schema, run.Visibility, id => units.Find(u => u.Manifest.Id == id)?.Manifest, stage,
                 commands, functions);
+            // 함수 본문의 속성 이름: Def의 최종 값으로 Cond·Action 칸의 함수를 안다 (G228)
+            var code = new List<AttributeChecker.ModCode>();
+            foreach (var u in units)
+                if (!u.Failed) code.Add(new AttributeChecker.ModCode(u.Manifest.Id, u.Functions, u.Scope));
+            AttributeChecker.Check(code, run.Expanded, run.Defs, run.Schema, stage);
             Validator.Check(run.Expanded, run.Schema, run.Visibility, stage);
 
             var failedBefore = new HashSet<string>(StringComparer.Ordinal);

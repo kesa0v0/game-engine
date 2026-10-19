@@ -406,9 +406,11 @@ namespace Kesa.Engine.Tests.Runtime
                 new Dictionary<string, Value> { ["p"] = new EntityValue(red), ["q"] = new EntityValue(blue) });
             world.Answer("host", world.OpenRequests.Single().Id, red, Answers[0]);
             save = world.Save();
+            // 로직이 지운 멤버를 쓰는 곳은 타입을 모르게 감싸 로드가 되게 한다 (아니면 G228의 로드 오류)
             Mod("banking", schema: Schema.Replace(", log=field(str, default=\"\")", ""),
                 defs: Defs.Replace("def survey(p, others):", "def survey2(p, others):")
-                    .Replace("picked = survey(p, [p, q])", "picked = survey2(p, [p, q])"));
+                    .Replace("picked = survey(p, [p, q])", "picked = survey2(p, [p, q])")
+                    .Replace("hv.log", "[hv][0].log").Replace("h.log", "[h][0].log"));
             result = World.Load(LoadClean(), save, cancelBrokenFlows: true);
             Assert.That(result.Succeeded, Is.False);
             Assert.That(result.Diagnostics.Where(d => d.Severity == Severity.Error).Select(d => d.Code).Distinct(),

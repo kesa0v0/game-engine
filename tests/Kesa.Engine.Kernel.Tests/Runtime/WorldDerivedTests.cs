@@ -30,7 +30,8 @@ namespace Kesa.Engine.Tests.Runtime
             "    return total\n" +
             "component(\"Total\", value=derived(int, total_levels))\n" +
             "component(\"Loop\", a=derived(int, lambda l: l.b), b=derived(int, lambda l: l.a))\n" +
-            "component(\"Bad\", ratio=derived(int, lambda b: 1 / 2), oops=derived(int, lambda b: b.nope),\n" +
+            // oops는 리스트로 감싸 타입을 모르게 한다: 실행 중 안전망을 본다 (아니면 G228의 로드 오류)
+            "component(\"Bad\", ratio=derived(int, lambda b: 1 / 2), oops=derived(int, lambda b: [b][0].nope),\n" +
             "    text=derived(int, lambda b: \"x\"), whole=derived(fixed, lambda b: 3))\n" +
             "deftype(\"SkillDef\")\n" +
             "deftype(\"Banner\", components=[\"Health\"])\n" +

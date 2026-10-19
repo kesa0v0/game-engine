@@ -160,7 +160,8 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AWriterCannotFillACondSlotButCanFillAnAction()
         {
-            Mod("core", schema: "deftype(\"Goal\", check=const(Cond[\"Goal\"]), effect=const(Action[\"Goal\"]))\n",
+            Mod("core", schema: "component(\"Score\", points=field(int, default=0))\n" +
+                                "deftype(\"Goal\", check=const(Cond[\"Goal\"]), effect=const(Action[\"Goal\"]))\n",
                 defs: "def win(g):\n    g.Score.points = 1\n" +
                       "def done(g):\n    return True\n" +
                       "Goal(\"A\", check=done, effect=win)\n" +

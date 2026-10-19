@@ -68,7 +68,8 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\n" +
             "def Typo(party: Ref[Party]):\n" +
             "    with preconditions:\n" +
-            "        cost(party.Treasury.gld, 1)\n" +
+            // 리스트로 감싸 타입을 모르게 한다: 실행 중 안전망을 본다 (아니면 G228의 로드 오류)
+            "        cost([party.Treasury][0].gld, 1)\n" +
             "@command(free=True, acts_for=None)\n" +
             "def OnEntity(party: Ref[Party]):\n" +
             "    with preconditions:\n" +
