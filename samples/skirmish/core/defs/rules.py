@@ -36,11 +36,7 @@ def alive(party):
     return len([u for u in query("Unit") if u.Owner.party == party])
 
 # 명중하면 맞은 쪽 주인이 버틸지 물러날지 고른다. 물러나면 피해가 절반이고 공격자 반대쪽으로 한 칸 간다
-def resolve(g):
-    a = g.Combat.attacker
-    t = g.Combat.target
-    g.Combat.attacker = None
-    g.Combat.target = None
+def resolve(a, t):
     roll = random.randint(1, 6)
     if roll < 4:
         return
@@ -75,9 +71,9 @@ def Start():
     place(blue, "Soldier", 3, 0)
     p = red
     while g.Match.winner is None:
+        # Attack의 본문이 맞은 쪽에 물으면 그 답까지 끝난 뒤에 여기로 돌아온다 (G243)
         r = ask(p, "turn", responses=["Move", "Attack", "EndTurn"], data={"turn": g.Match.turn})
         if r.response == "Attack":
-            resolve(g)
             if alive(p.Order.next) == 0:
                 g.Match.winner = p
         elif r.response == "EndTurn":
@@ -101,9 +97,7 @@ def Attack(party: Ref[Party], unit: Ref[Unit], target: Ref[Unit]):
         choose(unit, where=lambda u: u.Owner.party == party and not u.Ready.acted)
         choose(target, where=lambda t: t.Owner.party != party and dist(unit, t) <= unit.Unit.reach)
     unit.Ready.acted = True
-    g = game()
-    g.Combat.attacker = unit
-    g.Combat.target = target
+    resolve(unit, target)
 
 @command(acts_for=lambda party: party)
 def EndTurn(party: Ref[Party]):
