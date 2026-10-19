@@ -548,3 +548,12 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **드러난 구멍(우회함, 결정 아님):** 응답 커맨드의 합법 수를 질문에 대해 물을 수 없음(호스트가 `acts_for` 람다 AST를 엶), 엔티티로 행동할 연결을 물을 수 없음(자리마다 내 보고 `GateDenied`면 넘김), 변경 구독 없음, 번역 없음, 자리 배정을 모드가 박아 둠, 응답 커맨드 안의 `ask`는 G139 제한으로 피함. handoff의 "콘솔 호스트에서 드러난 구멍".
 - **테스트:** `tests/Kesa.Engine.ConsoleHost.Tests`의 5개. 화면을 읽고 고르는 봇(맞으면 버팀, 공격 가능하면 공격, 아니면 가장 가까운 적 쪽으로 이동, 그다음 차례 넘김)이 한 판을 끝까지(시드 1: 21턴, 빨강 승) 돌림, 명중 질문을 파랑 자리가 답함, 같은 시드면 같은 화면·다른 시드면 다른 화면, 잘못된 번호는 다시 물음, 자리·폴더 없음은 사용법 오류.
 - **확인:** `engine check samples/skirmish` 오류 없음. 테스트 1963개 통과(커널 1922, CLI 36, 콘솔 호스트 5).
+
+## 질문 단위 응답 합법 수 `LegalResponses` (2026-10-19, G232)
+
+- **재현:** 예시 게임에서 빨강에게 연 질문에 `LegalMoves("skirmish.Move", {})`는 "`party`를 호스트가 줘야 함"(G184) 오류, `party`에 파랑을 넣으면 파랑의 수 5개를 나열했고 그 수를 `Respond`하면 `NotListed`. 콘솔 호스트는 `acts_for` 람다 구문을 열어 우회하고 있었다.
+- **논의:** 다른 사례(OpenSpiel `legal_actions(player)`, boardgame.io `activePlayers`+`enumerate`, CK3 이벤트 선택지·상호작용(기억), RimWorld Gizmo(기억), 이전 TR의 `ValidTargetIds`(U6))는 모두 "누구 기준인가"를 엔진이 알거나 API 인자로 받는다. 구조는 게임–엔진–UI(엔진이 가운데)이고, 이번 구멍은 UI가 엔진을 건너뛰어 모드를 읽는 변이었다. `Who`로 거르기는 `Respond`의 `NotListed` 검사를 미리 하는 것이라 엔진에 맞다(사용자 확인).
+- **구현:** `World.LegalResponses(request, by, max)`(`World.Choices.cs`), 결과 `ResponseMoveList`·`ResponseMove`·`ResponseNeeds`(`ResponseMoveList.cs`). 답하는 매개변수는 `acts_for` 람다의 본문이 람다 매개변수이자 커맨드 매개변수인 이름이고 `choose`가 없을 때(`ActorParameter`). 그 밖에는 `LegalMoves`의 `keep`으로 `acts_for` 결과가 대상인 것만. 상한은 남은 몫으로 부르고 몫이 없으면 하나만 더 찾아 `Truncated`. `WorldView.LegalResponses`는 `MayAnswer`(G200)로 대상을 좁히고 `AllSeen`(G202)으로 수를 거르며, 답할 수 없는 질문은 `World.NoRequest`와 같은 오류. 콘솔 호스트는 새 API를 쓰고 람다 들여다보기(`ResponseArgs`)를 지웠다.
+- **새 테스트:** `LegalResponsesTests` 9개(대상으로 채우기와 `acts_for`로 거르기·`Needs`, 나열한 수는 모두 `Respond`가 받음, `by`로 좁히기, 상한 4가지, `ViewAs`, 없는 질문).
+- **덤으로 본 것:** `ViewAs(연결).OpenRequests`는 이미 그 연결이 답할 수 있는 질문만 준다(G200). 콘솔 호스트 구멍 2번(어느 연결이 답하나)은 `ViewAs`를 안 써서 생긴 우회일 수 있다.
+- **확인:** 테스트 1972개 통과(커널 1931, CLI 36, 콘솔 호스트 5). `spec-gaps` 표 확인 `231 6`.

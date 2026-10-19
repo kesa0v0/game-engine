@@ -158,15 +158,15 @@ namespace Kesa.Engine.ConsoleHost
                             _text.Of(request.Choices[i]),
                             seat => From(_world.Answer(seat, request.Id, by, choice))));
                     }
-                    foreach (var command in request.Responses)
-                    {
-                        foreach (var move in Moves(command, ResponseArgs(command, by)))
-                        {
-                            options.Add(new Option(Label(command, move),
-                                seat => From(_world.Respond(seat, request.Id, command, move))));
-                        }
-                    }
                 }
+                var responses = _world.LegalResponses(request.Id, null, MaxMoves);
+                foreach (var move in responses.Moves)
+                {
+                    options.Add(new Option(Label(move.Command, move.Arguments),
+                        seat => From(_world.Respond(seat, request.Id, move.Command, move.Arguments))));
+                }
+                foreach (var needs in responses.Needs)
+                    _out.WriteLine("(" + needs.Command + "의 수를 나열할 수 없다: " + string.Join(", ", needs.Parameters) + "를 정해야 한다)");
             }
             foreach (var command in _content.Commands.Keys.OrderBy(k => k, StringComparer.Ordinal))
             {
@@ -189,20 +189,6 @@ namespace Kesa.Engine.ConsoleHost
                 _out.WriteLine("(" + command + "의 수를 나열할 수 없다: " + e.Message + ")");
                 return Array.Empty<IReadOnlyDictionary<string, Value>>();
             }
-        }
-
-        /// <summary>
-        /// 구멍: 응답 커맨드의 합법 수를 질문 하나에 대해 묻는 API가 없다. 답하는 엔티티를 어느 매개변수에 넣을지는
-        /// <c>acts_for</c> 람다 안에 있으므로, <c>lambda p: p</c> 모양이면 그 매개변수에 넣는다.
-        /// </summary>
-        private IReadOnlyDictionary<string, Value> ResponseArgs(string command, EntityId by)
-        {
-            var args = new Dictionary<string, Value>();
-            var lambda = _content.Commands[command].ActsFor?.Lambda;
-            if (lambda != null && lambda.Parameters.Count == 1 && lambda.Body is NameExpr name &&
-                name.Name == lambda.Parameters[0].Name)
-                args[name.Name] = new EntityValue(by);
-            return args;
         }
 
         private string Label(string command, IReadOnlyDictionary<string, Value> move) =>

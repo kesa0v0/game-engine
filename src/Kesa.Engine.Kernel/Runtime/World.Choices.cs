@@ -111,6 +111,107 @@ namespace Kesa.Engine.Runtime
             return new LegalMoveList(command, moves, truncated, Array.Empty<ArgumentRejection>());
         }
 
+        /// <summary>
+        /// 열린 질문 <paramref name="request"/>에 응답 커맨드로 낼 수 있는 수 (spec-gaps G232). 질문이 받는 응답 커맨드마다
+        /// <see cref="LegalMoves"/>처럼 펼치되, 답하는 엔티티는 엔진이 정한다: <c>acts_for</c>가 매개변수를 그대로 돌려주고
+        /// (<c>lambda party: party</c>) 그 매개변수에 <c>choose</c>가 없으면 질문 대상으로 채우고, 아니면 펼친 뒤 <c>acts_for</c>가
+        /// 질문 대상인 수만 남긴다. <paramref name="by"/>가 있으면 그 대상의 수만 (대상이 아니면 빈 목록).
+        /// 입구 정책은 보지 않는다(어느 연결이 낼 수 있는지는 <see cref="ViewAs"/>). 선택지 답은 <see cref="Request.Choices"/>다.
+        /// 없는 질문 번호는 <see cref="WorldException"/>이다.
+        /// </summary>
+        public ResponseMoveList LegalResponses(long request, EntityId? by, int max) => LegalResponses(request, by, max, null, null);
+
+        /// <param name="answers">있으면 이 대상만 (보기 쪽: 그 연결이 답할 수 있는 대상, G200).</param>
+        /// <param name="keep">있으면 이것이 참인 수만 센다 (거른 읽기, G202).</param>
+        internal ResponseMoveList LegalResponses(long request, EntityId? by, int max, Func<EntityId, bool>? answers,
+            Func<IReadOnlyDictionary<string, Value>, bool>? keep)
+        {
+            if (max < 1) throw new WorldException(Codes.RunRange, "max must be at least 1, not " + max);
+            var flow = FindFlow(request);
+            if (flow == null) throw NoRequest(request);
+            var open = flow.Request!;
+            var who = new List<EntityId>();
+            foreach (var id in open.Who)
+                if ((by == null || id == by) && (answers == null || answers(id))) who.Add(id);
+
+            var moves = new List<ResponseMove>();
+            var needs = new List<ResponseNeeds>();
+            bool truncated = false;
+            foreach (var command in open.Responses)
+            {
+                var decl = FindCommand(command);
+                var chooses = ChoosesOf(decl);
+                string? actor = ActorParameter(decl);
+                if (actor != null && chooses.Exists(c => c.Parameter == actor)) actor = null;
+                var missing = new List<string>();
+                foreach (var p in decl.Parameters)
+                    if (p.Name != actor && p.Default == null && !chooses.Exists(c => c.Parameter == p.Name)) missing.Add(p.Name);
+                if (missing.Count > 0)
+                {
+                    needs.Add(new ResponseNeeds(command, missing));
+                    continue;
+                }
+
+                // 펼치기 한 번: 정한 인자와 거르기. 상한은 남은 몫이고, 남은 몫이 없으면 하나라도 더 있는지만 본다
+                bool Expand(IReadOnlyDictionary<string, Value> args, Func<IReadOnlyDictionary<string, Value>, EntityId?> answerer)
+                {
+                    int room = max - moves.Count;
+                    var list = LegalMoves(command, args, Math.Max(room, 1),
+                        move => answerer(move) != null && (keep == null || keep(move)));
+                    if (room == 0)
+                    {
+                        if (list.Moves.Count > 0) truncated = true;
+                        return !truncated;
+                    }
+                    foreach (var move in list.Moves) moves.Add(new ResponseMove(command, move, answerer(move)!.Value));
+                    if (list.Truncated) truncated = true;
+                    return !truncated;
+                }
+
+                if (actor != null)
+                {
+                    foreach (var id in who)
+                    {
+                        var fixedBy = id;
+                        if (!Expand(new SortedDictionary<string, Value>(StringComparer.Ordinal) { [actor] = new EntityValue(id) }, _ => fixedBy)) break;
+                    }
+                }
+                else
+                {
+                    Expand(new SortedDictionary<string, Value>(StringComparer.Ordinal), move =>
+                        ActsFor(decl, Sorted(move))
+                            is EntityValue e && who.Contains(e.Id) ? e.Id : (EntityId?)null);
+                }
+                if (truncated) break;
+            }
+            return new ResponseMoveList(request, moves, truncated, needs);
+        }
+
+        internal static WorldException NoRequest(long request) =>
+            new WorldException(Codes.RunUnknownName,
+                "there is no open request " + request.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "it may have been answered already; OpenRequests lists the open ones");
+
+        /// <summary>합법 수(<see cref="CheckArguments"/>가 만든 정렬 맵)를 <see cref="ActsFor"/>에 넘길 모양으로.</summary>
+        private static SortedDictionary<string, Value> Sorted(IReadOnlyDictionary<string, Value> move)
+        {
+            if (move is SortedDictionary<string, Value> sorted) return sorted;
+            var copy = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+            foreach (var pair in move) copy[pair.Key] = pair.Value;
+            return copy;
+        }
+
+        /// <summary><c>acts_for</c>가 커맨드 매개변수 하나를 그대로 돌려주는 람다면 그 이름 (<c>lambda party: party</c>).</summary>
+        private static string? ActorParameter(CommandDecl decl)
+        {
+            var lambda = decl.ActsFor?.Lambda;
+            if (lambda == null || !(lambda.Body is NameExpr name)) return null;
+            bool own = false, declared = false;
+            foreach (var p in lambda.Parameters) own |= p.Name == name.Name;
+            foreach (var p in decl.Parameters) declared |= p.Name == name.Name;
+            return own && declared ? name.Name : null;
+        }
+
         private CommandDecl FindCommand(string command)
         {
             if (_commands.TryGetValue(command, out var decl)) return decl;

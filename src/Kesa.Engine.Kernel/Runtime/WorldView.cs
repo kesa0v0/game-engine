@@ -353,6 +353,26 @@ namespace Kesa.Engine.Runtime
             return new LegalMoveList(moves.Command, moves.Moves, moves.Truncated, Bare(moves.Arguments));
         }
 
+        /// <summary>
+        /// 월드의 <see cref="World.LegalResponses"/>를 이 연결이 답할 수 있는 대상(G200)으로 좁히고 못 보는 엔티티가 든 수를 뺀 것 (G232).
+        /// 이 연결이 답할 수 없는 질문은 <see cref="OpenRequests"/>에 없듯 없는 질문과 같은 오류다.
+        /// </summary>
+        public ResponseMoveList LegalResponses(long request, EntityId? by, int max)
+        {
+            Request? open = null;
+            foreach (var q in _world.OpenRequests)
+                if (q.Id == request) open = q;
+            if (ForMe(open) == null) throw World.NoRequest(request);
+            return _world.LegalResponses(request, by, max,
+                who => _world.IsAlive(who) && _world.MayAnswer(Issuer, who, _diagnostics),
+                move =>
+                {
+                    foreach (var v in move.Values)
+                        if (!AllSeen(v)) return false;
+                    return true;
+                });
+        }
+
         /// <summary>값 안의 살아 있는 엔티티가 모두 보이는가.</summary>
         private bool AllSeen(Value value)
         {
