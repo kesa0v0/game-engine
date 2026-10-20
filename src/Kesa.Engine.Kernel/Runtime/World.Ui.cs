@@ -45,22 +45,22 @@ namespace Kesa.Engine.Runtime
             }
             if (_act != null) throw new InvalidOperationException("World.Act cannot be called while another UI action runs");
 
-            var rejections = new List<ArgumentRejection>();
-            var checkedArgs = CheckArguments(decl, args, rejections);
-            if (rejections.Count > 0) return new ActResult(action, ActOutcome.ArgumentsRejected) { ArgumentRejections = rejections };
-
             var run = new ActRun(ui.Draft());
             var savedViewer = _viewer;
-            _viewer = viewer;
+            _viewer = viewer; // 인자 검사도 보는 쪽으로: 숨긴 엔티티는 죽은 것과 같다 (G198)
             _act = run;
             PreconditionReport report;
+            SortedDictionary<string, Value> checkedArgs;
             try
             {
+                var rejections = new List<ArgumentRejection>();
+                checkedArgs = CheckArguments(decl, args, rejections);
+                if (rejections.Count > 0) return new ActResult(action, ActOutcome.ArgumentsRejected) { ArgumentRejections = rejections };
                 report = RunUiAction(decl, checkedArgs);
             }
             catch (WorldException e)
             {
-                return new ActResult(action, ActOutcome.ScriptError) { Arguments = checkedArgs, Error = e };
+                return new ActResult(action, ActOutcome.ScriptError) { Error = e };
             }
             finally
             {

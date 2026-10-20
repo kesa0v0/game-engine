@@ -15,14 +15,18 @@ namespace Kesa.Engine.Tests.Runtime
     public class UiActTests : LoaderTestBase
     {
         private const string Schema =
-            "component(\"Hp\", v=field(int, default=3))\n" +
-            "deftype(\"Party\", components=[\"Hp\"])\n" +
-            "deftype(\"Unit\", components=[\"Hp\"])\n" +
+            "component(\"Hp\", v=field(int, default=3))\ncomponent(\"Cloak\", on=field(bool, default=False))\n" +
+            "deftype(\"Party\", components=[\"Hp\", \"Cloak\"])\n" +
+            "deftype(\"Unit\", components=[\"Hp\", \"Cloak\"])\n" +
             "ui_state(\"Selection\", unit=ref(\"Unit\", optional=True), group=field(list[Ref[\"Unit\"]], default=[]), " +
             "count=field(int, default=0))\n";
 
         private const string Defs =
-            "Party(\"Red\")\nUnit(\"Soldier\")\n" +
+            "Party(\"Red\")\nUnit(\"Soldier\")\nUnit(\"Ghost\", Cloak=Cloak(on=True))\n" +
+            // 망토를 두른 유닛은 아무에게도 안 보인다
+            "@view_policy\ndef may_see(viewer, entity, component):\n    return not entity.Cloak.on\n" +
+            "@ui_action\ndef grow(u: Ref[Unit]):\n    ui.Selection.group += [u]\n" +
+            "@command(free=True, acts_for=None)\ndef Hide(target: Ref[Unit]):\n    target.Cloak.on = True\n" +
             "@command(free=True, acts_for=None)\ndef Hit(target: Ref[Unit]):\n    target.Hp.v -= 1\n" +
             "@command(free=True, acts_for=None)\ndef Kill(target: Ref[Unit]):\n    destroy(target)\n" +
             // 응답 커맨드: Turn이 연 질문의 답으로만 들어간다
@@ -132,6 +136,47 @@ namespace Kesa.Engine.Tests.Runtime
             _view.Act(_ui, "core.count_group", Args());
             Assert.That(((IntValue)_ui.Stored("Selection", "count")).Value, Is.EqualTo(1)); // G284
             Assert.That(((ListValue)_ui.Stored("Selection", "group")).Items.Count, Is.EqualTo(2)); // 적힌 값은 그대로
+        }
+
+        [Test]
+        public void AHiddenEntityAnswersLikeADeadOne()
+        {
+            var ghost = _world.Create("core:Ghost");
+            var dead = _world.Create("core:Soldier");
+            _world.Destroy(dead);
+            var hidden = _view.Act(_ui, "core.click", Args(("u", new EntityValue(ghost))));
+            var gone = _view.Act(_ui, "core.click", Args(("u", new EntityValue(dead))));
+            Assert.That(hidden.Outcome, Is.EqualTo(ActOutcome.ArgumentsRejected));
+            Assert.That(hidden.ArgumentRejections.Single().Problem, Is.EqualTo(gone.ArgumentRejections.Single().Problem));
+            Assert.That(_ui.Stored("Selection", "unit"), Is.SameAs(NoneValue.Instance));
+        }
+
+        [Test]
+        public void EntitiesHiddenLaterDropOutOfLists()
+        {
+            // 고를 때는 보였는데 나중에 망토를 둘렀다: 읽을 때 빠진다 (G284)
+            _view.Act(_ui, "core.pick_all", Args(("units", new ListValue(new Value[] { new EntityValue(_a), new EntityValue(_b) }))));
+            _world.Submit("host", "core.Hide", Args(("target", new EntityValue(_a))));
+            _view.Act(_ui, "core.count_group", Args());
+            Assert.That(((IntValue)_ui.Stored("Selection", "count")).Value, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ListPlusEqualsIsRefusedLikeLocals()
+        {
+            var result = _view.Act(_ui, "core.grow", Args(("u", new EntityValue(_a))));
+            Assert.That(result.Outcome, Is.EqualTo(ActOutcome.ScriptError));
+            Assert.That(result.Error!.Message, Does.Contain("'+=' cannot be used on a list"));
+            Assert.That(result.Error.Hint, Does.Contain("ui.Selection.group = ui.Selection.group + [...]"));
+        }
+
+        [Test]
+        public void TheShownResultHasNoMessages()
+        {
+            var shown = _view.Show(_view.Act(_ui, "core.broken", Args()));
+            Assert.That(shown.Error!.Message, Is.EqualTo("script error"));
+            var rejected = _view.Show(_view.Act(_ui, "core.click", Args(("u", new EntityValue(_red)))));
+            Assert.That(rejected.ArgumentRejections.Single().Message, Is.Empty);
         }
 
         [Test]

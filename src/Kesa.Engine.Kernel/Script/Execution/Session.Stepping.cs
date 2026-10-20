@@ -266,10 +266,17 @@ namespace Kesa.Engine.Script
             }
             else
             {
-                // 상태 칸에는 리스트·맵이 없으므로(SCH004, G129) 리스트 +=의 제자리 수정 문제(G104)는 생기지 않는다
+                // 컴포넌트의 쓸 수 있는 칸에는 리스트·맵이 없다(SCH004, G129: 리스트 칸은 const라 쓰기 거부). UI 기록 칸에는 있으므로(G277)
+                // 지역 변수처럼 리스트 +=를 막는다 (G104)
                 var current = owner is ISiteAttributes site
                     ? site.GetAttribute(attr)
                     : ((IRuntimeAttributes)owner).GetAttribute(attr.Name);
+                if (owner is IUiRecord && assign.Compound == BinaryOp.Add && current is ListValue)
+                {
+                    string path = attr.Target is AttributeExpr s && s.Target is NameExpr n ? n.Name + "." + s.Name + "." + attr.Name : attr.Name;
+                    throw Fail(Codes.RunScript, "'+=' cannot be used on a list in a logic function",
+                        "write " + path + " = " + path + " + [...]: values in logic functions never change in place");
+                }
                 var right = Eval(assign.Value, frame);
                 value = Binary(assign.Compound, current, right, assign);
             }

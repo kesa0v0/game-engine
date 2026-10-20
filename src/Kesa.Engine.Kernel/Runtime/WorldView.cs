@@ -243,6 +243,29 @@ namespace Kesa.Engine.Runtime
             };
         }
 
+        /// <summary>
+        /// UI 동작 결과를 이 연결에게 보낼 모양으로 (G201과 같다): 인자 거절은 문제 종류와 매개변수 이름만, 스크립트 오류는 코드만 남는다.
+        /// 본문은 이미 이 연결로서 읽었으므로 <see cref="ActResult.Submissions"/>는 그대로다(인자 안의 못 보는 엔티티만 가린다).
+        /// </summary>
+        public ActResult Show(ActResult result)
+        {
+            var submissions = new List<UiSubmission>(result.Submissions.Count);
+            foreach (var s in result.Submissions) submissions.Add(new UiSubmission(s.Command, MaskArguments(s.Arguments)!));
+            return new ActResult(result.Action, result.Outcome)
+            {
+                Arguments = MaskArguments(result.Arguments),
+                ArgumentRejections = Bare(result.ArgumentRejections),
+                Preconditions = Show(result.Preconditions),
+                Error = Bare(result.Error),
+                Submissions = submissions,
+            };
+        }
+
+        /// <summary><see cref="World.Deliver"/>의 결과를 이 연결에게 보낼 모양으로: 안의 제출·답 결과를 각각 거른다 (G201).</summary>
+        public DeliveryResult Show(DeliveryResult result) =>
+            new DeliveryResult(result.Submitted == null ? null : Show(result.Submitted),
+                result.Answered == null ? null : Show(result.Answered), result.Refusal);
+
         /// <summary>답·응답 결과를 이 연결에게 보낼 모양으로 (G201). 거절 이유 본문(<see cref="AnswerResult.Message"/>)도 빠진다.</summary>
         public AnswerResult Show(AnswerResult result)
         {
