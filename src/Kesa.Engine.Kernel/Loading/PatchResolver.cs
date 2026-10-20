@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Schema;
+using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Loading
 {
@@ -24,13 +25,34 @@ namespace Kesa.Engine.Loading
                 {
                     var record = CheckTarget(entry.Key, call, defs, visibility, stage);
                     if (record == null) continue;
-                    var target = new PathResolver(entry.Key, call, record, defs, schema, visibility, stage).Resolve();
+                    var resolver = new PathResolver(entry.Key, call, record, defs, schema, visibility, stage);
+                    var target = resolver.Resolve();
                     if (target == null) continue;
+                    call.Path = resolver.NormalizedPath();
+                    if (call.Value != null) call.Value = NormalizeValue(call, target, entry.Key.Id);
                     var patch = new ResolvedPatch(call, record, target);
                     if (PatchOperationCheck.Check(entry.Key, patch, stage)) resolved.Add(patch);
                 }
             }
             return resolved;
+        }
+
+        /// <summary>
+        /// 패치 값의 Def id를 패치한 모드 기준 전체 이름으로 (G261). <c>remove</c>의 셋째 인자는 리스트면 원소, 맵이면 키다.
+        /// 컴포넌트 값(<c>Morale(...)</c>)은 만들 때 바꿨다.
+        /// </summary>
+        private static Value NormalizeValue(PatchCall call, PatchTarget target, string mod)
+        {
+            var value = call.Value!;
+            var type = target.ValueType;
+            if (type == null || value is ComponentValue) return value;
+            if (call.Op == PatchOp.Remove)
+            {
+                if (type is ListTypeRef list) return DefIds.Normalize(value, list.Element, mod);
+                if (type is DictTypeRef dict) return DefIds.Normalize(value, dict.Key, mod);
+                return value;
+            }
+            return DefIds.Normalize(value, type, mod);
         }
 
         /// <summary>
@@ -44,7 +66,7 @@ namespace Kesa.Engine.Loading
             if (!defs.TryGet(call.TargetId, out var record))
             {
                 stage.Error(mod.Id, Codes.PatTargetNotFound, "there is no Def '" + call.TargetId + "' to patch",
-                    call.TargetSpan, hint: Suggest.Hint(call.TargetId, defs.Ids));
+                    call.TargetSpan, hint: DefIds.Hint(call.TargetId, defs.Ids));
                 return null;
             }
 
@@ -112,6 +134,19 @@ namespace Kesa.Engine.Loading
                 _visibility = visibility;
                 _stage = stage;
                 _segments = call.Path.Segments;
+                _normalized = new List<PathSegment>(_segments);
+            }
+
+            // Def id 키 조각을 쓰는 모드 기준 전체 이름으로 바꾼 경로 (G261)
+            private readonly List<PathSegment> _normalized;
+
+            public PatchPath NormalizedPath() => _call.Path.WithSegments(_normalized);
+
+            private string DefKey(int index)
+            {
+                string key = DefIds.Resolve(_segments[index].Text!, _mod.Id);
+                _normalized[index] = PathSegment.StringKey(key);
+                return key;
             }
 
             private PatchTarget? Fail(string code, string message, string? hint = null,
@@ -223,7 +258,7 @@ namespace Kesa.Engine.Loading
                 if (keySegment.IsNumber)
                     return Fail(Codes.PatBadPathStep, "the key of '" + component.Name + "' is a Def id, not an integer");
 
-                string key = keySegment.Text!;
+                string key = DefKey(1);
                 if (!_defs.TryGet(key, out var keyDef) || keyDef.Type != component.Key)
                 {
                     var ids = new List<string>();
@@ -231,7 +266,7 @@ namespace Kesa.Engine.Loading
                         if (d.Type == component.Key) ids.Add(d.Id);
                     return Fail(Codes.PatBadField,
                         "there is no " + component.Key!.Name + " '" + key + "' to use as the key of '" + component.Name + "'",
-                        hint: Suggest.Hint(key, ids));
+                        hint: DefIds.Hint(key, ids));
                 }
 
                 if (_segments.Count == 2)
@@ -299,8 +334,9 @@ namespace Kesa.Engine.Loading
                             }
                             if (!segment.Bracketed && nameKeyStart < 0) nameKeyStart = i;
                             else if (segment.Bracketed) nameKeyStart = -1;
+                            if (dict.Key is DefIdTypeRef) DefKey(i);
                             target.Entry = dict;
-                            target.EntryKey = segment;
+                            target.EntryKey = _normalized[i];
                             type = dict.Value;
                             break;
 

@@ -57,7 +57,7 @@ namespace Kesa.Engine.Tests.Runtime
             _a = Party("a");
             _b = Party("b");
             _c = Party("c");
-            foreach (var p in new[] { _a, _b, _c }) _w.Create("Pawn", new Init(_w.Member("Owner", "party"), new EntityValue(p)));
+            foreach (var p in new[] { _a, _b, _c }) _w.Create("core:Pawn", new Init(_w.Member("Owner", "party"), new EntityValue(p)));
             var opened = _w.Submit("host", "core.Open", new Dictionary<string, Value>
             {
                 ["a"] = new EntityValue(_a), ["b"] = new EntityValue(_b),
@@ -68,7 +68,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private EntityId Party(string conn)
         {
-            var p = _w.Create("Side");
+            var p = _w.Create("core:Side");
             _w.Seat(p, conn);
             return p;
         }

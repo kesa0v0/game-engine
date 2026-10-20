@@ -53,9 +53,9 @@ namespace Kesa.Engine.Tests.Loading
         public void ValuesAreNotChangedByLinking()
         {
             var result = Run("Unit(\"Scout\", home=\"Hut\")\n", out _);
-            result.Expanded.TryGet("Scout", out var scout);
+            result.Expanded.TryGet("core:Scout", out var scout);
             scout.Consts.TryGet("home", out var home);
-            Assert.That(((Kesa.Engine.Script.StrValue)home.Value).Value, Is.EqualTo("Hut"));
+            Assert.That(((Kesa.Engine.Script.StrValue)home.Value).Value, Is.EqualTo("core:Hut"));
         }
 
         // ---- 존재, 타입 ----
@@ -64,7 +64,7 @@ namespace Kesa.Engine.Tests.Loading
         public void AMissingDefIsAnErrorWithASuggestion()
         {
             var d = Single("Unit(\"Scout\", cost={\"Wod\": 1})\n", Codes.LnkNotFound);
-            Assert.That(d.Hint, Is.EqualTo("did you mean 'Wood'?"));
+            Assert.That(d.Hint, Is.EqualTo("did you mean 'core:Wood'?"));
             Assert.That((d.Mod, d.Line), Is.EqualTo(("core", 5)));
         }
 
@@ -110,7 +110,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AnAbstractParentIsStillFine()
         {
-            var result = Run("Unit(\"Base\", abstract=True, home=\"Hut\")\nUnit(\"Scout\", parent=\"Base\")\n", out var diags);
+            var result = Run("Unit(\"Base\", abstract=True, home=\"Hut\")\nUnit(\"Scout\", parent=\"core:Base\")\n", out var diags);
             Assert.That(diags, Is.Empty, string.Join("\n", diags));
             Assert.That(result.Disabled, Is.Empty);
         }
@@ -122,7 +122,7 @@ namespace Kesa.Engine.Tests.Loading
         {
             Mod("core", schema: Schema, defs: "Resource(\"Wood\")\n");
             Mod("huts", defs: "Building(\"Hut\")\n", extra: CoreDep);
-            Mod("lone", defs: "Unit(\"Scout\", home=\"Hut\")\n", extra: CoreDep);
+            Mod("lone", defs: "Unit(\"Scout\", home=\"huts:Hut\")\n", extra: CoreDep);
             var result = Load(out var diags);
             Assert.That(diags.Select(d => (d.Code, d.Mod)), Does.Contain((Codes.LnkNotVisible, "lone")));
             Assert.That(result.Disabled, Does.Contain("lone"));
@@ -132,7 +132,7 @@ namespace Kesa.Engine.Tests.Loading
         public void ADefOfADependencyIsVisible()
         {
             Mod("core", schema: Schema, defs: Things);
-            Mod("addon", defs: "Unit(\"Scout\", home=\"Hut\")\n", extra: CoreDep);
+            Mod("addon", defs: "Unit(\"Scout\", home=\"core:Hut\")\n", extra: CoreDep);
             Assert.That(LoadClean().Disabled, Is.Empty);
         }
 
@@ -140,7 +140,7 @@ namespace Kesa.Engine.Tests.Loading
         public void ABadInheritedValueIsBlamedOnTheModThatWroteIt()
         {
             Mod("core", schema: Schema, defs: Things + "Unit(\"Base\", home=\"Nope\")\n");
-            Mod("addon", defs: "Unit(\"Scout\", parent=\"Base\")\nUnit(\"Archer\", parent=\"Base\")\n", extra: CoreDep);
+            Mod("addon", defs: "Unit(\"Scout\", parent=\"core:Base\")\nUnit(\"Archer\", parent=\"core:Base\")\n", extra: CoreDep);
             var result = Load(out var diags);
             Assert.That(diags.Where(d => d.Code == Codes.LnkNotFound).Select(d => d.Mod), Is.EqualTo(new[] { "core" }));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "addon", "core" }));
@@ -152,7 +152,7 @@ namespace Kesa.Engine.Tests.Loading
         public void ABadPatchValueIsBlamedOnThePatchingMod()
         {
             Mod("core", schema: Schema, defs: Things + "Unit(\"Scout\")\n");
-            Mod("addon", defs: "patch.set(\"Scout\", \"home\", \"Nope\")\n", extra: CoreDep);
+            Mod("addon", defs: "patch.set(\"core:Scout\", \"home\", \"Nope\")\n", extra: CoreDep);
             var result = Load(out var diags);
             var d = diags.Single();
             Assert.That((d.Code, d.Mod, d.Line), Is.EqualTo((Codes.LnkNotFound, "addon", 1)));
@@ -169,7 +169,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AGuardOpensAnOptionalModsDefsInPatchValues()
         {
-            OptionalSetup("if mod_loaded(\"farm\"):\n    patch.append(\"Scout\", \"cost\", {\"FarmCoin\": 1})\n");
+            OptionalSetup("if mod_loaded(\"farm\"):\n    patch.append(\"core:Scout\", \"cost\", {\"farm:FarmCoin\": 1})\n");
             var result = Load(out var diags);
             Assert.That(diags, Is.Empty, string.Join("\n", diags));
             Assert.That(result.Disabled, Is.Empty);
@@ -178,7 +178,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void WithoutTheGuardTheOptionalModsDefIsNotVisible()
         {
-            OptionalSetup("patch.append(\"Scout\", \"cost\", {\"FarmCoin\": 1})\n");
+            OptionalSetup("patch.append(\"core:Scout\", \"cost\", {\"farm:FarmCoin\": 1})\n");
             Load(out var diags);
             var d = diags.Single(x => x.Code == Codes.LnkNotVisible);
             Assert.That(d.Mod, Is.EqualTo("addon"));
@@ -191,7 +191,7 @@ namespace Kesa.Engine.Tests.Loading
             Mod("core", schema: Schema, defs: Things + "Unit(\"Scout\")\n");
             Mod("farm", defs: "Resource(\"FarmCoin\")\n", extra: CoreDep);
             Mod("mine", defs: "Resource(\"Ore\")\n", extra: CoreDep);
-            Mod("addon", defs: "if mod_loaded(\"mine\"):\n    patch.append(\"Scout\", \"cost\", {\"FarmCoin\": 1})\n",
+            Mod("addon", defs: "if mod_loaded(\"mine\"):\n    patch.append(\"core:Scout\", \"cost\", {\"farm:FarmCoin\": 1})\n",
                 extra: CoreDep + ", optional=[\"farm\", \"mine\"]");
             Load(out var diags);
             Assert.That(diags.Select(d => d.Code), Does.Contain(Codes.LnkNotVisible));
@@ -201,7 +201,7 @@ namespace Kesa.Engine.Tests.Loading
         public void ASkippedGuardIsNotLinked()
         {
             Mod("core", schema: Schema, defs: Things + "Unit(\"Scout\")\n");
-            Mod("addon", defs: "if mod_loaded(\"farm\"):\n    patch.append(\"Scout\", \"cost\", {\"FarmCoin\": 1})\n",
+            Mod("addon", defs: "if mod_loaded(\"farm\"):\n    patch.append(\"core:Scout\", \"cost\", {\"farm:FarmCoin\": 1})\n",
                 extra: CoreDep + ", optional=[\"farm\"]");
             Mod("farm", defs: "Resource(\"FarmCoin\")\n", extra: CoreDep);
             System.IO.Directory.Delete(System.IO.Path.Combine(_root, "farm"), true);
@@ -215,7 +215,7 @@ namespace Kesa.Engine.Tests.Loading
         {
             Mod("core", schema: Schema, defs: Things);
             Mod("farm", defs: "Resource(\"FarmCoin\")\n", extra: CoreDep);
-            Mod("addon", defs: "Unit(\"Scout\", cost={\"FarmCoin\": 1})\n", extra: CoreDep + ", optional=[\"farm\"]");
+            Mod("addon", defs: "Unit(\"Scout\", cost={\"farm:FarmCoin\": 1})\n", extra: CoreDep + ", optional=[\"farm\"]");
             Load(out var diags);
             Assert.That(diags.Select(d => d.Code), Does.Contain(Codes.LnkNotVisible));
         }
@@ -225,7 +225,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void SeveralBadReferencesAreAllReportedAndOnlyOnceEach()
         {
-            Run("Unit(\"Scout\", home=\"Nope\", cost={\"Hut\": 1})\nUnit(\"Archer\", parent=\"Scout\")\n", out var diags);
+            Run("Unit(\"Scout\", home=\"Nope\", cost={\"Hut\": 1})\nUnit(\"Archer\", parent=\"core:Scout\")\n", out var diags);
             Assert.That(diags.Select(d => d.Code), Is.EquivalentTo(new[] { Codes.LnkNotFound, Codes.LnkWrongType }));
         }
     }

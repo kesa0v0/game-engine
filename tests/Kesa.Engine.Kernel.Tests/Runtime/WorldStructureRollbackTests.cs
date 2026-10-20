@@ -62,9 +62,9 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             _world = new World(LoadClean());
-            _town = _world.Create("Town");
-            _scout = _world.Create("Scout");
-            _other = _world.Create("Scout");
+            _town = _world.Create("banking:Town");
+            _scout = _world.Create("banking:Scout");
+            _other = _world.Create("banking:Scout");
         }
 
         private void SubmitFailing(string command, Dictionary<string, Value>? extra = null)
@@ -87,7 +87,7 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(_world.All("Settler"), Is.Empty);
             Assert.That(_world.Inverse(_town, _world.Member("Home", "city")), Is.Empty);
             // 실패한 커맨드는 id를 쓰지 않는다: 다음 엔티티는 바로 다음 번호다
-            Assert.That(_world.Create("Scout").Value, Is.EqualTo(_other.Value + 1));
+            Assert.That(_world.Create("banking:Scout").Value, Is.EqualTo(_other.Value + 1));
         }
 
         [Test]
@@ -101,7 +101,7 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(_world.All("Glass"), Is.Empty);
             Assert.That(_world.Has(_scout, "Escort"), Is.False);
             Assert.That(_world.Inverse(_town, _world.Member("Home", "city")), Is.Empty);
-            Assert.That(_world.Create("Scout").Value, Is.EqualTo(_other.Value + 1));
+            Assert.That(_world.Create("banking:Scout").Value, Is.EqualTo(_other.Value + 1));
         }
 
         [Test]
@@ -153,20 +153,20 @@ namespace Kesa.Engine.Tests.Runtime
         public void AnAddedRowIsUndone()
         {
             SubmitFailing("AddRow");
-            Assert.That(_world.HasRow(_scout, "Skill", "Mining"), Is.False);
+            Assert.That(_world.HasRow(_scout, "Skill", "banking:Mining"), Is.False);
         }
 
         [Test]
         public void ARemovedRowIsUndoneWithItsValuesAndContributions()
         {
-            _world.AddRow(_scout, "Skill", "Mining", new Init(_world.Member("Skill", "level"), new IntValue(4)));
-            _world.AddContribution(_scout, _world.Member("Skill", "value"), "Mining", "value", new IntValue(1));
+            _world.AddRow(_scout, "Skill", "banking:Mining", new Init(_world.Member("Skill", "level"), new IntValue(4)));
+            _world.AddContribution(_scout, _world.Member("Skill", "value"), "banking:Mining", "value", new IntValue(1));
 
             SubmitFailing("RemoveRow");
 
-            Assert.That(_world.HasRow(_scout, "Skill", "Mining"), Is.True);
-            Assert.That(((IntValue)_world.GetRow(_scout, _world.Member("Skill", "level"), "Mining")).Value, Is.EqualTo(4));
-            Assert.That(((IntValue)_world.GetRow(_scout, _world.Member("Skill", "value"), "Mining")).Value, Is.EqualTo(1));
+            Assert.That(_world.HasRow(_scout, "Skill", "banking:Mining"), Is.True);
+            Assert.That(((IntValue)_world.GetRow(_scout, _world.Member("Skill", "level"), "banking:Mining")).Value, Is.EqualTo(4));
+            Assert.That(((IntValue)_world.GetRow(_scout, _world.Member("Skill", "value"), "banking:Mining")).Value, Is.EqualTo(1));
         }
     }
 }

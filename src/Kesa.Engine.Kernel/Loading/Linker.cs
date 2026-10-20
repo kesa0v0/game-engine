@@ -44,7 +44,7 @@ namespace Kesa.Engine.Loading
             {
                 foreach (var pair in functions)
                 foreach (var spawned in pair.Value.SpawnedDefs)
-                    linker.CheckId(new ValueBlame(pair.Key, spawned.Value, Array.Empty<string>()), spawned.Key, null);
+                    linker.CheckId(new ValueBlame(pair.Key, spawned.Value, Array.Empty<string>()), DefIds.Resolve(spawned.Key, pair.Key), null);
                 foreach (var pair in functions)
                 foreach (var names in pair.Value.QueriedNames)
                     linker.CheckQuery(pair.Key, names);
@@ -164,7 +164,7 @@ namespace Kesa.Engine.Loading
                 var ids = new List<string>();
                 foreach (var d in _defs.Defs)
                     if (typeName == null ? !d.Type.IsDataOnly && !d.IsAbstract : d.Type.Name == typeName) ids.Add(d.Id);
-                Fail(Codes.LnkNotFound, "there is no " + (typeName ?? "Def") + " '" + id + "'", Suggest.Hint(id, ids));
+                Fail(Codes.LnkNotFound, "there is no " + (typeName ?? "Def") + " '" + id + "'", DefIds.Hint(id, ids));
                 return;
             }
 

@@ -31,7 +31,7 @@ namespace Kesa.Engine.Tests.Runtime
         private World Make(string defs)
         {
             var world = new World(Content(defs));
-            _u = world.Create("Scout");
+            _u = world.Create("core:Scout");
             world.Seat(_u, "host");
             return world;
         }
@@ -239,7 +239,7 @@ namespace Kesa.Engine.Tests.Runtime
                 defs: "Unit(\"Scout\")\n@on(Ring)\ndef later(u):\n    wait(ticks=1)\n    u.Out.s = \"rang\"\n" +
                       "@command(free=True, acts_for=None)\ndef Bell(u: Ref[Unit]):\n    emit(Ring(u=u))\n");
             var world = new World(LoadClean());
-            _u = world.Create("Scout");
+            _u = world.Create("core:Scout");
             world.Seat(_u, "host");
             var r = world.Submit("host", "core.Bell", new Dictionary<string, Value> { ["u"] = new EntityValue(_u) });
             Assert.That(r.Reactions.Single().Outcome, Is.EqualTo(ReactionOutcome.Suspended), "sleeping is not finishing");
@@ -311,7 +311,7 @@ namespace Kesa.Engine.Tests.Runtime
                 defs: "Unit(\"Scout\")\n@on(Ring)\ndef again(u):\n    u.Out.n = u.Out.n + 1\n    wait(ticks=1)\n    emit(Ring(u=u))\n" +
                       "@command(free=True, acts_for=None)\ndef Bell(u: Ref[Unit]):\n    emit(Ring(u=u))\n");
             var world = new World(LoadClean(), maxSignalDepth: 1);
-            _u = world.Create("Scout");
+            _u = world.Create("core:Scout");
             world.Seat(_u, "host");
             world.Submit("host", "core.Bell", new Dictionary<string, Value> { ["u"] = new EntityValue(_u) });
             var r = world.Advance(2);

@@ -46,8 +46,8 @@ namespace Kesa.Engine.Tests.Runtime
                       "def Probe(u: Ref[Unit], v: Ref[Unit]):\n" +
                       "    u.Out.bits = \"yes\" if " + expression + " else \"no\"\n");
             var world = new World(LoadClean());
-            var u = world.Create("Scout");
-            var v = world.Create("Scout");
+            var u = world.Create("banking:Scout");
+            var v = world.Create("banking:Scout");
             var result = world.Submit("host", "banking.Probe",
                 new Dictionary<string, Value> { ["u"] = new EntityValue(u), ["v"] = new EntityValue(v) });
             Assert.That(result.Succeeded, Is.True, result.Error?.ToString());

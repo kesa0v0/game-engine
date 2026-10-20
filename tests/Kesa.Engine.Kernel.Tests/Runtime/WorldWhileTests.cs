@@ -46,7 +46,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: Schema, defs: Defs);
             _content = LoadClean();
             _world = new World(_content, actionStepBudget: actionStepBudget);
-            _red = _world.Create("Red");
+            _red = _world.Create("banking:Red");
             _world.Seat(_red, "host");
         }
 
@@ -89,14 +89,14 @@ namespace Kesa.Engine.Tests.Runtime
             NewWorld();
             var picks = new[] { 0, 0, 0, 1 };
             var straight = new World(_content);
-            straight.Seat(straight.Create("Red"), "host");
+            straight.Seat(straight.Create("banking:Red"), "host");
             Play(straight, picks, stopAt: -1);
             Assert.That(V(straight), Is.EqualTo(-3 - 1000));
 
             for (int stop = 0; stop < picks.Length; stop++)
             {
                 var w = new World(_content);
-                w.Seat(w.Create("Red"), "host");
+                w.Seat(w.Create("banking:Red"), "host");
                 var done = Play(w, picks, stop);
                 Assert.That(done.Save(), Is.EqualTo(straight.Save()), "saved before answer " + stop);
             }

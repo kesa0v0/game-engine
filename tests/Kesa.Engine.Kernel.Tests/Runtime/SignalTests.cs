@@ -141,8 +141,8 @@ namespace Kesa.Engine.Tests.Runtime
                                                 "@command(free=True, acts_for=None)\n" +
                                                 "def Probe(u: Ref[Unit], v: Ref[Unit]):\n" + body);
             var world = new World(LoadClean());
-            var u = world.Create("Scout");
-            var v = world.Create("Scout");
+            var u = world.Create("combat:Scout");
+            var v = world.Create("combat:Scout");
             result = world.Submit("host", "combat.Probe",
                 new Dictionary<string, Value> { ["u"] = new EntityValue(u), ["v"] = new EntityValue(v) });
             return world;
@@ -255,7 +255,7 @@ namespace Kesa.Engine.Tests.Runtime
                                                 "    ask(u, \"Go\", choices=[\"ok\"])\n" +
                                                 "    u.Out.n = d.amount\n");
             var world = new World(LoadClean());
-            var u = world.Create("Scout");
+            var u = world.Create("combat:Scout");
             world.Submit("host", "combat.Probe", new Dictionary<string, Value> { ["u"] = new EntityValue(u) });
             var save = world.Save();
             Assert.That(Encoding.UTF8.GetString(save), Does.Contain("\"signal\": {\n"));

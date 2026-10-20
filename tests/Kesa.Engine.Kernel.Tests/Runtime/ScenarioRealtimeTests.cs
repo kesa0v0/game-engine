@@ -66,7 +66,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var w = new World(_content, seed: 4);
             foreach (var conn in new[] { "A", "B" })
-                w.Seat(w.Create("Player"), conn);
+                w.Seat(w.Create("core:Player"), conn);
             return w;
         }
 

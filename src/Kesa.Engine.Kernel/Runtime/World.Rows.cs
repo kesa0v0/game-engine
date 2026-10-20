@@ -230,7 +230,7 @@ namespace Kesa.Engine.Runtime
             {
                 var ids = new List<string>();
                 foreach (var d in _defs.OfType(component.Key!.Name)) ids.Add(d.Id);
-                throw Unknown("there is no " + component.Key!.Name + " '" + key.DefKey + "' to key '" + component.Name + "' by",
+                throw UnknownDef("there is no " + component.Key!.Name + " '" + key.DefKey + "' to key '" + component.Name + "' by",
                     key.DefKey!, ids);
             }
         }

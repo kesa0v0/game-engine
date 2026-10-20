@@ -65,7 +65,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private EntityId Party(string conn, int cards)
         {
-            var p = _w.Create("Side");
+            var p = _w.Create("scouts:Side");
             _w.Seat(p, conn);
             _w.Set(p, M("Hand", "cards"), new IntValue(cards));
             return p;
@@ -73,7 +73,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private EntityId Unit(EntityId party, int hp, bool hidden)
         {
-            var u = _w.Create("Soldier");
+            var u = _w.Create("scouts:Soldier");
             _w.Set(u, M("Owner", "party"), new EntityValue(party));
             _w.Set(u, M("Life", "hp"), new IntValue(hp));
             _w.Set(u, M("Fog", "hidden"), hidden ? BoolValue.True : BoolValue.False);

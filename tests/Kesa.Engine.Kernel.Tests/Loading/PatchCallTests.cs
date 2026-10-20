@@ -31,12 +31,12 @@ namespace Kesa.Engine.Tests.Loading
         {
             Core();
             Mod("compat",
-                defs: "patch.set(\"Scout\", \"move\", 4)\n" +
-                      "patch.add(\"Scout\", \"Health.base_max\", 2)\n" +
-                      "patch.append(\"Scout\", \"tags\", [\"fast\"])\n" +
-                      "patch.remove(\"Scout\", \"tags\", \"slow\")\n" +
-                      "patch.set(\"Scout\", \"Morale\", Morale(value=1))\n" +
-                      "patch.remove(\"Scout\", \"Morale\")\n",
+                defs: "patch.set(\"core:Scout\", \"move\", 4)\n" +
+                      "patch.add(\"core:Scout\", \"Health.base_max\", 2)\n" +
+                      "patch.append(\"core:Scout\", \"tags\", [\"fast\"])\n" +
+                      "patch.remove(\"core:Scout\", \"tags\", \"slow\")\n" +
+                      "patch.set(\"core:Scout\", \"Morale\", Morale(value=1))\n" +
+                      "patch.remove(\"core:Scout\", \"Morale\")\n",
                 extra: CoreDep);
             var result = LoadClean();
             var calls = result.Patches;
@@ -46,7 +46,7 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(calls.Select(c => c.Span.Line), Is.EqualTo(new[] { 1, 2, 3, 4, 5, 6 }));
             Assert.That(calls.Select(c => c.Path.Text),
                 Is.EqualTo(new[] { "move", "Health.base_max", "tags", "tags", "Morale", "Morale" }));
-            Assert.That(calls.Select(c => c.TargetId), Has.All.EqualTo("Scout"));
+            Assert.That(calls.Select(c => c.TargetId), Has.All.EqualTo("core:Scout"));
             Assert.That(calls.Select(c => c.Mod), Has.All.EqualTo("compat"));
             Assert.That(((IntValue)calls[0].Value!).Value, Is.EqualTo(4));
             Assert.That(calls[2].Value, Is.InstanceOf<ListValue>());
@@ -59,9 +59,9 @@ namespace Kesa.Engine.Tests.Loading
         public void CallsAreInModLoadOrderThenCallOrder()
         {
             Core("A");
-            Mod("omega", defs: "patch.set(\"A\", \"x\", 1)\npatch.set(\"A\", \"y\", 1)\n",
+            Mod("omega", defs: "patch.set(\"core:A\", \"x\", 1)\npatch.set(\"core:A\", \"y\", 1)\n",
                 extra: ", loadAfter=[\"alpha\"]" + CoreDep);
-            Mod("alpha", defs: "patch.set(\"A\", \"z\", 1)\n", extra: CoreDep);
+            Mod("alpha", defs: "patch.set(\"core:A\", \"z\", 1)\n", extra: CoreDep);
             var result = LoadClean();
             Assert.That(result.Patches.Select(c => c.Mod + ":" + c.Path.Text), Is.EqualTo(new[] { "alpha:z", "omega:x", "omega:y" }));
         }
@@ -70,8 +70,8 @@ namespace Kesa.Engine.Tests.Loading
         public void ADisabledModLeavesNoPatchCalls()
         {
             Core("A");
-            Mod("bad", defs: "patch.set(\"A\", \"b\", 1)\nNope()\n", extra: CoreDep);
-            Mod("good", defs: "patch.set(\"A\", \"c\", 1)\n", extra: CoreDep);
+            Mod("bad", defs: "patch.set(\"core:A\", \"b\", 1)\nNope()\n", extra: CoreDep);
+            Mod("good", defs: "patch.set(\"core:A\", \"c\", 1)\n", extra: CoreDep);
             var result = Load(out var diags);
             Assert.That(diags.Single().Code, Is.EqualTo(Codes.EvlUnknownName));
             Assert.That(result.Patches.Select(c => c.Path.Text), Is.EqualTo(new[] { "c" }));
@@ -82,24 +82,24 @@ namespace Kesa.Engine.Tests.Loading
         {
             Mod("core", schema: "component(\"Morale\", value=field(int, default=5))\ndeftype(\"Unit\")\n",
                 defs: "Unit(\"Scout\")\n");
-            Mod("compat", defs: "patch.set(\"Scout\", \"Morale\", Morale(value=7))\n", extra: ", dependencies=[\"core\"]");
+            Mod("compat", defs: "patch.set(\"core:Scout\", \"Morale\", Morale(value=7))\n", extra: ", dependencies=[\"core\"]");
             var result = LoadClean();
             var value = (ComponentValue)result.Patches.Single().Value!;
             Assert.That(value.Component.Name, Is.EqualTo("Morale"));
         }
 
-        [TestCase("patch.set(\"A\", \"b\")", Codes.EvlArguments)]
-        [TestCase("patch.set(\"A\", \"b\", 1, 2)", Codes.EvlArguments)]
-        [TestCase("patch.set(\"A\", \"b\", value=1)", Codes.EvlArguments)]
-        [TestCase("patch.add(\"A\")", Codes.EvlArguments)]
-        [TestCase("patch.remove(\"A\")", Codes.EvlArguments)]
-        [TestCase("patch.remove(\"A\", \"b\", 1, 2)", Codes.EvlArguments)]
+        [TestCase("patch.set(\"core:A\", \"b\")", Codes.EvlArguments)]
+        [TestCase("patch.set(\"core:A\", \"b\", 1, 2)", Codes.EvlArguments)]
+        [TestCase("patch.set(\"core:A\", \"b\", value=1)", Codes.EvlArguments)]
+        [TestCase("patch.add(\"core:A\")", Codes.EvlArguments)]
+        [TestCase("patch.remove(\"core:A\")", Codes.EvlArguments)]
+        [TestCase("patch.remove(\"core:A\", \"b\", 1, 2)", Codes.EvlArguments)]
         [TestCase("patch.set(1, \"b\", 1)", Codes.EvlType)]
         [TestCase("patch.set(\"\", \"b\", 1)", Codes.EvlArguments)]
-        [TestCase("patch.set(\"A\", 1, 1)", Codes.EvlType)]
-        [TestCase("patch.set(\"A\", \"a..b\", 1)", Codes.PatBadPath)]
-        [TestCase("patch.set(\"A\", \"\", 1)", Codes.PatBadPath)]
-        [TestCase("patch.set(\"A\", \"b\", patch.add)", Codes.DefBadValue)]
+        [TestCase("patch.set(\"core:A\", 1, 1)", Codes.EvlType)]
+        [TestCase("patch.set(\"core:A\", \"a..b\", 1)", Codes.PatBadPath)]
+        [TestCase("patch.set(\"core:A\", \"\", 1)", Codes.PatBadPath)]
+        [TestCase("patch.set(\"core:A\", \"b\", patch.add)", Codes.DefBadValue)]
         public void BadPatchCalls(string call, string code)
         {
             Mod("compat", defs: call + "\n");
@@ -123,7 +123,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void PatchCallsAreNotAllowedInSchemaFiles()
         {
-            Mod("core", schema: "patch.set(\"A\", \"b\", 1)\n");
+            Mod("core", schema: "patch.set(\"core:A\", \"b\", 1)\n");
             Load(out var diags);
             Assert.That(diags.Single().Code, Is.EqualTo(Codes.SchDefInSchemaFile));
         }
@@ -132,7 +132,7 @@ namespace Kesa.Engine.Tests.Loading
         public void PatchCanBeShadowed()
         {
             // 엔진이 주는 이름은 덮어쓸 수 있는 내장이다 (G112). 덮어쓴 뒤의 patch.set은 모드의 값에 대한 속성 접근이다
-            Mod("core", defs: "patch = 1\npatch.set(\"X\", \"n\", 1)\n");
+            Mod("core", defs: "patch = 1\npatch.set(\"core:X\", \"n\", 1)\n");
             var result = Load(out var diags);
             Assert.That(diags.Single().Code, Is.EqualTo(Codes.EvlUnsupported), string.Join("\n", diags));
             Assert.That(result.Patches, Is.Empty);

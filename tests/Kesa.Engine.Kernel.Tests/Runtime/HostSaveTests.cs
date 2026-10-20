@@ -71,7 +71,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("core", schema: Schema, defs: Defs + Pick);
             var world = new World(Content(Host()));
-            tile = world.Create("Grass");
+            tile = world.Create("core:Grass");
             var r = world.Submit("host", "core.Later", new Dictionary<string, Value> { ["at"] = new EntityValue(tile) });
             Assert.That(r.Succeeded, Is.True, r.Error?.ToString());
             return world.Save();

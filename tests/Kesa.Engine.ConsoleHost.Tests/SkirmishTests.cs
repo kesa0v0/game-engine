@@ -56,7 +56,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
             private static int Gain(string block, string move)
             {
                 // 모드의 units 패널(ui/console.txt)을 읽는다. 자리마다 한 번씩 보이므로 같은 유닛이 두 번 나온다
-                var units = Regex.Matches(block, @"^  \{unit: #(\d+) \w+, x: (\d+), y: (\d+), .*party: #(\d+)", RegexOptions.Multiline)
+                var units = Regex.Matches(block, @"^  \{unit: #(\d+) [\w:]+, x: (\d+), y: (\d+), .*party: #(\d+)", RegexOptions.Multiline)
                     .GroupBy(m => m.Groups[1].Value).Select(g => g.First())
                     .ToDictionary(m => m.Groups[1].Value,
                         m => (x: int.Parse(m.Groups[2].Value), y: int.Parse(m.Groups[3].Value), party: m.Groups[4].Value));
@@ -74,7 +74,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             var screen = new StringWriter();
             var errors = new StringWriter();
-            int code = Play.Run(new[] { Samples(), "--seat", "red=Red", "--seat", "blue=Blue", "--seed", seed.ToString() },
+            int code = Play.Run(new[] { Samples(), "--seat", "red=skirmish:Red", "--seat", "blue=skirmish:Blue", "--seed", seed.ToString() },
                 new Bot(screen, limit), screen, errors);
             Assert.That(code, Is.EqualTo(0), errors.ToString());
             return screen.ToString();
@@ -90,11 +90,11 @@ namespace Kesa.Engine.ConsoleHost.Tests
                 new StringReader("1\n9\n2\n1\n:q\n"), screen, errors);
             Assert.That(code, Is.EqualTo(0), errors.ToString());
             string text = screen.ToString();
-            Assert.That(text, Does.Contain("앉을 자리: 1) #1 Red  2) #2 Blue"));
-            Assert.That(text, Does.Contain("[red] #2 Blue에 앉음"));
-            Assert.That(text, Does.Contain("앉을 자리: 1) #1 Red\n").Or.Contain("앉을 자리: 1) #1 Red\r\n"));
-            Assert.That(text, Does.Contain("[blue] #1 Red에 앉음"));
-            Assert.That(text, Does.Contain("[blue] skirmish.EndTurn(party=#1 Red)"));
+            Assert.That(text, Does.Contain("앉을 자리: 1) #1 skirmish:Red  2) #2 skirmish:Blue"));
+            Assert.That(text, Does.Contain("[red] #2 skirmish:Blue에 앉음"));
+            Assert.That(text, Does.Contain("앉을 자리: 1) #1 skirmish:Red\n").Or.Contain("앉을 자리: 1) #1 skirmish:Red\r\n"));
+            Assert.That(text, Does.Contain("[blue] #1 skirmish:Red에 앉음"));
+            Assert.That(text, Does.Contain("[blue] skirmish.EndTurn(party=#1 skirmish:Red)"));
         }
 
         [Test]
@@ -102,7 +102,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             string screen = PlayOut(seed: 1);
             Assert.That(screen, Does.EndWith("낼 수 있는 것이 없다. 끝.\n").Or.EndWith("낼 수 있는 것이 없다. 끝.\r\n"));
-            Assert.That(screen, Does.Match(@"winner: #\d \w+"));
+            Assert.That(screen, Does.Match(@"winner: #\d [\w:]+"));
         }
 
         [Test]
@@ -110,7 +110,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             // 빨강이 공격해 명중하면 질문은 파랑 진영에게 가고, 파랑에 앉은 연결이 답한다(배정 표, G236)
             string screen = PlayOut(seed: 1);
-            var asked = Regex.Match(screen, @"질문 \d+: hit → #2 Blue[^\n]*\n(?:  \d+\)[^\n]*\n)+> (\[\w+\])");
+            var asked = Regex.Match(screen, @"질문 \d+: hit → #2 skirmish:Blue[^\n]*\n(?:  \d+\)[^\n]*\n)+> (\[\w+\])");
             Assert.That(asked.Success, Is.True);
             Assert.That(asked.Groups[1].Value, Is.EqualTo("[blue]"));
         }
@@ -142,7 +142,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         public void AWrongNumberAsksAgain()
         {
             var screen = new StringWriter();
-            Play.Run(new[] { Samples(), "--seat", "red=Red" }, new StringReader("9\nx\n:q\n"), screen, new StringWriter());
+            Play.Run(new[] { Samples(), "--seat", "red=skirmish:Red" }, new StringReader("9\nx\n:q\n"), screen, new StringWriter());
             Assert.That(Regex.Matches(screen.ToString(), "1부터 1 사이의 번호").Count, Is.EqualTo(2));
         }
 

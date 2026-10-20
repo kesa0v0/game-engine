@@ -32,7 +32,7 @@ namespace Kesa.Engine.Tests.Runtime
         private World Make(string logic, int maxSignalDepth = World.DefaultMaxSignalDepth)
         {
             var world = new World(Content(logic), maxSignalDepth: maxSignalDepth);
-            _u = world.Create("Scout");
+            _u = world.Create("combat:Scout");
             world.Seat(_u, "host");
             return world;
         }

@@ -255,7 +255,8 @@ namespace Kesa.Engine.Loading
                 if (builtin == PureBuiltins.SpawnName)
                 {
                     DefType? type = null;
-                    if (call.Arguments.Count > 0 && call.Arguments[0].Value is StringLiteral id && _defs.TryGet(id.Value, out var record))
+                    if (call.Arguments.Count > 0 && call.Arguments[0].Value is StringLiteral id &&
+                        _defs.TryGet(DefIds.Resolve(id.Value, _mod), out var record))
                         type = record.Type;
                     return new EntityType(type);
                 }

@@ -103,7 +103,7 @@ namespace Kesa.Engine.Loading
                 {
                     _stage.Error(record.Mod, Codes.InhParentNotFound,
                         "Def '" + record.Id + "' has parent '" + parentRef.Name + "', which does not exist", parentRef.Span,
-                        hint: Suggest.Hint(parentRef.Name, _defs.Ids));
+                        hint: DefIds.Hint(parentRef.Name, _defs.Ids));
                     return null;
                 }
                 var original = parentRecord;
@@ -173,7 +173,8 @@ namespace Kesa.Engine.Loading
             foreach (var k in record.Type.Consts)
             {
                 if (k.Name != field.Name) continue;
-                var value = Evaluated(field.Value, evaluator);
+                // inherit 식이 새로 적은 Def id도 이 Def의 모드 기준이다 (G261)
+                var value = DefIds.Normalize(Evaluated(field.Value, evaluator), k.Spec.Type, record.Mod);
                 // inherit 식이 읽은 부모 값의 패치는 이 값에도 영향을 줬다 (덤프, G76)
                 var patches = evaluator.ReadPatches;
                 // inherit 식의 결과는 부모 값을 이미 포함한 전체 값이다 (G59)
@@ -242,10 +243,11 @@ namespace Kesa.Engine.Loading
                         "each value of '" + field.Name + "' must be " + component.Name + "(...), not " + rowValue.KindName,
                         item.Span);
                 }
-                if (!target.Rows.TryGet(key.Value, out var resolvedRow))
+                string rowKey = DefIds.Resolve(key.Value, record.Mod);
+                if (!target.Rows.TryGet(rowKey, out var resolvedRow))
                 {
                     resolvedRow = new ResolvedRow();
-                    target.Rows.Set(key.Value, resolvedRow);
+                    target.Rows.Set(rowKey, resolvedRow);
                 }
                 SetMembers(resolvedRow.Members, row, record, evaluator);
             }
@@ -257,6 +259,8 @@ namespace Kesa.Engine.Loading
             foreach (var f in source.Fields)
             {
                 var value = Evaluated(f.Value, evaluator);
+                if (f.Value is DeferredValue && source.Component.TryGetMember(f.Name, out var member))
+                    value = DefIds.Normalize(value, member.Spec.Type, record.Mod);
                 members.Set(f.Name, new ResolvedValue(value, ValueOrigin.Own, record, f.Span, patches: evaluator.ReadPatches));
             }
         }

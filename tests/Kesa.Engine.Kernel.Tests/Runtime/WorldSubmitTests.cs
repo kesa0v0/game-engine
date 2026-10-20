@@ -55,11 +55,11 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Commands);
             _world = new World(LoadClean());
-            _red = _world.Create("Red");
+            _red = _world.Create("banking:Red");
             _world.Seat(_red, "alice");
-            _blue = _world.Create("Blue");
+            _blue = _world.Create("banking:Blue");
             _world.Seat(_blue, "bob");
-            _scout = _world.Create("Scout");
+            _scout = _world.Create("banking:Scout");
             _world.Set(_scout, _world.Member("Owner", "party"), new EntityValue(_red));
         }
 
@@ -196,9 +196,9 @@ namespace Kesa.Engine.Tests.Runtime
                 "def Quit(party: Ref[Party]):\n" +
                 "    destroy(party)\n");
             _world = new World(LoadClean());
-            _red = _world.Create("Red");
-            _blue = _world.Create("Blue");
-            _scout = _world.Create("Scout");
+            _red = _world.Create("banking:Red");
+            _blue = _world.Create("banking:Blue");
+            _scout = _world.Create("banking:Scout");
             _world.Set(_scout, _world.Member("Owner", "party"), new EntityValue(_red));
         }
 

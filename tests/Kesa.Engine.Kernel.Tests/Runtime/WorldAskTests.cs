@@ -91,9 +91,9 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             _world = new World(LoadClean());
-            _red = _world.Create("Red");
-            _blue = _world.Create("Blue");
-            _green = _world.Create("Green");
+            _red = _world.Create("banking:Red");
+            _blue = _world.Create("banking:Blue");
+            _green = _world.Create("banking:Green");
             foreach (var p in new[] { _red, _blue, _green }) _world.Seat(p, "host");
             _v = _world.Member("Score", "v");
         }
@@ -183,7 +183,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: Schema, defs: "Party(\"Red\")\n@command(free=True, acts_for=None)\ndef Late(p: Ref[Party]):\n" +
                 "    k = lambda: n\n    n = 1\n    r = ask(p, \"Q\", choices=[\"a\"])\n    n = 2\n    p.Score.v = k()\n");
             var world = new World(LoadClean());
-            var red = world.Create("Red");
+            var red = world.Create("banking:Red");
             world.Seat(red, "host");
             var q = world.Submit("host", "banking.Late", new Dictionary<string, Value> { ["p"] = new EntityValue(red) }).OpenedRequest!;
             Assert.That(world.Answer("host", q.Id, red, 0).Succeeded, Is.True);
@@ -196,7 +196,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "def make(h):\n    k = lambda: h()\n    return k\n" +
                 "@command(free=True, acts_for=None)\ndef Late(p: Ref[Party]):\n" + body);
             var world = new World(LoadClean());
-            var red = world.Create("Red");
+            var red = world.Create("banking:Red");
             world.Seat(red, "host");
             var s = world.Submit("host", "banking.Late", new Dictionary<string, Value> { ["p"] = new EntityValue(red) });
             Assert.That(s.Succeeded, Is.True, s.Error?.ToString());
@@ -289,7 +289,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             var world = new World(LoadClean());
-            var red = world.Create("Red");
+            var red = world.Create("banking:Red");
             world.Seat(red, "host");
             var q = world.Submit("host", "banking.Branch",
                 new Dictionary<string, Value> { ["p"] = new EntityValue(red) }).OpenedRequest!;
@@ -383,7 +383,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Command(body));
             var world = new World(LoadClean());
-            var red = world.Create("Red");
+            var red = world.Create("banking:Red");
             world.Seat(red, "host");
             return world.Submit("host", "banking.C", new Dictionary<string, Value> { ["p"] = new EntityValue(red) });
         }
@@ -410,7 +410,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Command("    r = ask(p, \"Q\", choices=[\"a\"])\n    n = r.nope\n"));
             var world = new World(LoadClean());
-            var red = world.Create("Red");
+            var red = world.Create("banking:Red");
             world.Seat(red, "host");
             var q = world.Submit("host", "banking.C", new Dictionary<string, Value> { ["p"] = new EntityValue(red) }).OpenedRequest!;
             var a = world.Answer("host", q.Id, red, 0);

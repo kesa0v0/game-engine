@@ -33,12 +33,12 @@ namespace Kesa.Engine.Tests.Loading
                 "    names=const(dict[str, int]),\n" +
                 "    table=const(dict[int, str]),\n" +
                 ")\n",
-                defs: "Resource(\"Wood\")\nResource(\"core.Iron\")\nUnit(\"Scout\")\n");
+                defs: "Resource(\"Wood\")\nResource(\"Iron\")\nUnit(\"Scout\")\n");
         }
 
         private ContentLoadResult Patch(string path, string value = "1")
         {
-            Mod("compat", defs: "patch.set(\"Scout\", \"" + path + "\", " + value + ")\n", extra: CoreDep);
+            Mod("compat", defs: "patch.set(\"core:Scout\", \"" + path + "\", " + value + ")\n", extra: CoreDep);
             return Load(out _);
         }
 
@@ -54,7 +54,7 @@ namespace Kesa.Engine.Tests.Loading
         private Diagnostic Rejected(string path)
         {
             Core();
-            Mod("compat", defs: "patch.set(\"Scout\", \"" + path + "\", 1)\n", extra: CoreDep);
+            Mod("compat", defs: "patch.set(\"core:Scout\", \"" + path + "\", 1)\n", extra: CoreDep);
             var result = Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Mod, Is.EqualTo("compat"));
@@ -81,9 +81,8 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(Resolved("tags", "[]").ValueType!.Display, Is.EqualTo("list[str]"));
         }
 
-        [TestCase("cost.Wood", "Wood")]
-        [TestCase("cost['Wood']", "Wood")]
-        [TestCase("cost['core.Iron']", "core.Iron")]
+        [TestCase("cost['core:Wood']", "core:Wood")]
+        [TestCase("cost['core:Iron']", "core:Iron")]
         public void AMapEntryKeepsItsMapAndKey(string path, string key)
         {
             var t = Resolved(path);
@@ -132,25 +131,40 @@ namespace Kesa.Engine.Tests.Loading
             // 붙어 있는지는 ④가 판정한다. ③은 컴포넌트와 값 이름이 스키마에 있는지만 본다
             Core();
             Mod("compat",
-                defs: "patch.set(\"Scout\", \"Morale\", Morale(value=1))\npatch.set(\"Scout\", \"Morale.value\", 2)\n",
+                defs: "patch.set(\"core:Scout\", \"Morale\", Morale(value=1))\npatch.set(\"core:Scout\", \"Morale.value\", 2)\n",
                 extra: CoreDep);
             var t = Load(out _).Resolved[1].Target;
             Assert.That((t.Kind, t.IsTypeSlot), Is.EqualTo((PatchTargetKind.Member, false)));
         }
 
+        /// <summary>Def id 키 조각은 패치하는 모드 기준으로 풀린다: <c>cost.Wood</c>는 <c>compat:Wood</c>이고 <c>core:Wood</c>가 아니다 (G261).</summary>
+        [Test]
+        public void AShortKeyIsTheIdOfThePatchingMod()
+        {
+            Core();
+            Mod("compat", defs: "Resource(\"Wood\")\npatch.set(\"core:Scout\", \"cost.Wood\", 1)\n" +
+                                "patch.set(\"core:Scout\", \"Skill.Wood\", Skill(level=1))\n", extra: CoreDep);
+            var result = Load(out var diags);
+            Assert.That(diags, Is.Empty, string.Join("\n", diags));
+            var targets = result.Resolved.Select(p => p.Target).ToList();
+            Assert.That(targets[0].EntryKey!.Value.Text, Is.EqualTo("compat:Wood"));
+            Assert.That(targets[1].RowKey, Is.EqualTo("compat:Wood"));
+            Assert.That(result.Resolved[0].Call.Path.Canonical, Is.EqualTo("cost['compat:Wood']"));
+        }
+
         [Test]
         public void ARowOfAKeyedComponentNamesTheKeyDef()
         {
-            var t = Resolved("Skill.Wood", "Skill(level=1)");
-            Assert.That((t.Kind, t.RowKey, t.IsTypeSlot), Is.EqualTo((PatchTargetKind.Row, "Wood", true)));
+            var t = Resolved("Skill['core:Wood']", "Skill(level=1)");
+            Assert.That((t.Kind, t.RowKey, t.IsTypeSlot), Is.EqualTo((PatchTargetKind.Row, "core:Wood", true)));
             Assert.That(t.RowDef!.Type.Name, Is.EqualTo("Resource"));
         }
 
         [Test]
-        public void KeysWithDotsNeedBrackets()
+        public void KeysOfAnotherModNeedBrackets()
         {
-            var t = Resolved("Stock['core.Iron'].amount");
-            Assert.That((t.Kind, t.RowKey), Is.EqualTo((PatchTargetKind.RowMember, "core.Iron")));
+            var t = Resolved("Stock['core:Iron'].amount");
+            Assert.That((t.Kind, t.RowKey), Is.EqualTo((PatchTargetKind.RowMember, "core:Iron")));
             Assert.That(t.Member!.Name, Is.EqualTo("amount"));
         }
 
@@ -241,7 +255,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void ANameFromAModThatIsNotADependencyIsNotVisible()
         {
-            WithExtraMod(CoreDep, "patch.set(\"Scout\", \"bonus\", 1)\n");
+            WithExtraMod(CoreDep, "patch.set(\"core:Scout\", \"bonus\", 1)\n");
             Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.SchNotVisible));
@@ -251,7 +265,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void ANameFromAnOptionalModNeedsItsGuard()
         {
-            WithExtraMod(CoreDep + ", optional=[\"extra\"]", "patch.set(\"Scout\", \"bonus\", 1)\n");
+            WithExtraMod(CoreDep + ", optional=[\"extra\"]", "patch.set(\"core:Scout\", \"bonus\", 1)\n");
             Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.PatNeedsGuard));
@@ -262,7 +276,7 @@ namespace Kesa.Engine.Tests.Loading
         public void TheGuardOpensTheNamesOfTheOptionalMod()
         {
             WithExtraMod(CoreDep + ", optional=[\"extra\"]",
-                "if mod_loaded(\"extra\"):\n    patch.set(\"Scout\", \"bonus\", 1)\n");
+                "if mod_loaded(\"extra\"):\n    patch.set(\"core:Scout\", \"bonus\", 1)\n");
             var result = LoadClean();
             Assert.That(result.Resolved.Single().Target.Member!.Mod, Is.EqualTo("extra"));
         }
@@ -272,7 +286,7 @@ namespace Kesa.Engine.Tests.Loading
         {
             Core();
             Mod("compat",
-                defs: "patch.set(\"Scout\", \"move\", 1)\npatch.set(\"Scout\", \"nope\", 1)\npatch.set(\"Scout\", \"tags\", [])\n",
+                defs: "patch.set(\"core:Scout\", \"move\", 1)\npatch.set(\"core:Scout\", \"nope\", 1)\npatch.set(\"core:Scout\", \"tags\", [])\n",
                 extra: CoreDep);
             var result = Load(out var diags);
             Assert.That(diags.Select(d => (d.Code, d.Line)), Is.EqualTo(new[] { (Codes.PatBadField, 2) }));

@@ -55,26 +55,26 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void EveryDefIsExpandedInRegistrationOrder()
         {
-            var defs = ExpandClean("Unit(\"Base\", abstract=True)\nUnit(\"Scout\", parent=\"Base\")\n");
-            Assert.That(defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "Wood", "Iron", "Base", "Scout" }));
-            Assert.That(defs.TryGet("Base", out var b), Is.True);
+            var defs = ExpandClean("Unit(\"Base\", abstract=True)\nUnit(\"Scout\", parent=\"core:Base\")\n");
+            Assert.That(defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "core:Wood", "core:Iron", "core:Base", "core:Scout" }));
+            Assert.That(defs.TryGet("core:Base", out var b), Is.True);
             Assert.That(b.IsAbstract, Is.True);
-            Assert.That(defs.TryGet("Scout", out var s), Is.True);
+            Assert.That(defs.TryGet("core:Scout", out var s), Is.True);
             Assert.That(s.Parent, Is.SameAs(b));
         }
 
         [Test]
         public void AChildInheritsWhatItDoesNotWrite()
         {
-            var defs = ExpandClean("Unit(\"Base\", move=3, label=\"b\")\nUnit(\"Scout\", parent=\"Base\", label=\"s\")\n");
-            var move = Const(defs, "Scout", "move");
+            var defs = ExpandClean("Unit(\"Base\", move=3, label=\"b\")\nUnit(\"Scout\", parent=\"core:Base\", label=\"s\")\n");
+            var move = Const(defs, "core:Scout", "move");
             Assert.That(Int(move), Is.EqualTo(3));
             Assert.That(move.Origin, Is.EqualTo(ValueOrigin.Inherited));
-            Assert.That(move.Source.Id, Is.EqualTo("Base"));
-            var label = Const(defs, "Scout", "label");
+            Assert.That(move.Source.Id, Is.EqualTo("core:Base"));
+            var label = Const(defs, "core:Scout", "label");
             Assert.That(((StrValue)label.Value).Value, Is.EqualTo("s"));
             Assert.That(label.Origin, Is.EqualTo(ValueOrigin.Own));
-            Assert.That(Const(defs, "Base", "move").Origin, Is.EqualTo(ValueOrigin.Own));
+            Assert.That(Const(defs, "core:Base", "move").Origin, Is.EqualTo(ValueOrigin.Own));
         }
 
         [Test]
@@ -82,13 +82,13 @@ namespace Kesa.Engine.Tests.Loading
         {
             var defs = ExpandClean(
                 "Unit(\"Base\", tags=[\"a\"], names=[\"x\"])\n" +
-                "Unit(\"Scout\", parent=\"Base\", tags=[\"b\"], names=[\"y\"])\n" +
-                "Unit(\"Archer\", parent=\"Scout\", tags=[\"c\"])\n");
+                "Unit(\"Scout\", parent=\"core:Base\", tags=[\"b\"], names=[\"y\"])\n" +
+                "Unit(\"Archer\", parent=\"core:Scout\", tags=[\"c\"])\n");
             string Items(ResolvedValue v) => string.Join(",", ((ListValue)v.Value).Items.Select(i => ((StrValue)i).Value));
-            Assert.That(Items(Const(defs, "Scout", "tags")), Is.EqualTo("a,b"));
-            Assert.That(Items(Const(defs, "Scout", "names")), Is.EqualTo("y"));
-            Assert.That(Items(Const(defs, "Archer", "tags")), Is.EqualTo("a,b,c"));
-            Assert.That(Items(Const(defs, "Archer", "names")), Is.EqualTo("y"));
+            Assert.That(Items(Const(defs, "core:Scout", "tags")), Is.EqualTo("a,b"));
+            Assert.That(Items(Const(defs, "core:Scout", "names")), Is.EqualTo("y"));
+            Assert.That(Items(Const(defs, "core:Archer", "tags")), Is.EqualTo("a,b,c"));
+            Assert.That(Items(Const(defs, "core:Archer", "names")), Is.EqualTo("y"));
         }
 
         [Test]
@@ -96,12 +96,12 @@ namespace Kesa.Engine.Tests.Loading
         {
             var defs = ExpandClean(
                 "Unit(\"Base\", tags=[\"a\"])\n" +
-                "Unit(\"Scout\", parent=\"Base\", tags=inherit.tags + [\"fast\"])\n" +
-                "Unit(\"Archer\", parent=\"Base\", tags=[\"z\"] + inherit.tags)\n");
+                "Unit(\"Scout\", parent=\"core:Base\", tags=inherit.tags + [\"fast\"])\n" +
+                "Unit(\"Archer\", parent=\"core:Base\", tags=[\"z\"] + inherit.tags)\n");
             string Items(string id) =>
                 string.Join(",", ((ListValue)Const(defs, id, "tags").Value).Items.Select(i => ((StrValue)i).Value));
-            Assert.That(Items("Scout"), Is.EqualTo("a,fast"));
-            Assert.That(Items("Archer"), Is.EqualTo("z,a"));
+            Assert.That(Items("core:Scout"), Is.EqualTo("a,fast"));
+            Assert.That(Items("core:Archer"), Is.EqualTo("z,a"));
         }
 
         [Test]
@@ -109,8 +109,8 @@ namespace Kesa.Engine.Tests.Loading
         {
             var defs = ExpandClean(
                 "Unit(\"Base\", Health=Health(base_max=10, regen=2))\n" +
-                "Unit(\"Scout\", parent=\"Base\", Health=Health(base_max=12))\n");
-            Assert.That(defs.TryGet("Scout", out var scout), Is.True);
+                "Unit(\"Scout\", parent=\"core:Base\", Health=Health(base_max=12))\n");
+            Assert.That(defs.TryGet("core:Scout", out var scout), Is.True);
             Assert.That(scout.Components.TryGet("Health", out var health), Is.True);
             Assert.That(health.Members.Keys, Is.EquivalentTo(new[] { "base_max", "regen" }));
             health.Members.TryGet("base_max", out var baseMax);
@@ -122,8 +122,8 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AComponentTheChildDoesNotWriteIsInherited()
         {
-            var defs = ExpandClean("Unit(\"Base\", Health=Health())\nUnit(\"Scout\", parent=\"Base\")\n");
-            Assert.That(defs.TryGet("Scout", out var scout), Is.True);
+            var defs = ExpandClean("Unit(\"Base\", Health=Health())\nUnit(\"Scout\", parent=\"core:Base\")\n");
+            Assert.That(defs.TryGet("core:Scout", out var scout), Is.True);
             Assert.That(scout.Components.Contains("Health"), Is.True);
             Assert.That(scout.Components.Contains("Stock"), Is.False);
         }
@@ -134,15 +134,15 @@ namespace Kesa.Engine.Tests.Loading
             var defs = ExpandClean(
                 "Resource(\"Gold\")\n" +
                 "Unit(\"Base\", Stock={\"Wood\": Stock(amount=1.5), \"Iron\": Stock(amount=2.0)})\n" +
-                "Unit(\"Scout\", parent=\"Base\", Stock={\"Wood\": Stock(amount=3.0), \"Gold\": Stock()})\n");
-            Assert.That(defs.TryGet("Scout", out var scout), Is.True);
+                "Unit(\"Scout\", parent=\"core:Base\", Stock={\"Wood\": Stock(amount=3.0), \"Gold\": Stock()})\n");
+            Assert.That(defs.TryGet("core:Scout", out var scout), Is.True);
             scout.Components.TryGet("Stock", out var stock);
-            Assert.That(stock.Rows.Keys, Is.EqualTo(new[] { "Wood", "Iron", "Gold" }));
-            stock.Rows.TryGet("Wood", out var wood);
+            Assert.That(stock.Rows.Keys, Is.EqualTo(new[] { "core:Wood", "core:Iron", "core:Gold" }));
+            stock.Rows.TryGet("core:Wood", out var wood);
             wood.Members.TryGet("amount", out var amount);
             Assert.That(((FixedValue)amount.Value).Value.Raw, Is.EqualTo(3_000_000L));
             Assert.That(amount.Origin, Is.EqualTo(ValueOrigin.Own));
-            stock.Rows.TryGet("Iron", out var iron);
+            stock.Rows.TryGet("core:Iron", out var iron);
             iron.Members.TryGet("amount", out var ironAmount);
             Assert.That(ironAmount.Origin, Is.EqualTo(ValueOrigin.Inherited));
         }
@@ -154,11 +154,11 @@ namespace Kesa.Engine.Tests.Loading
         {
             var defs = ExpandClean(
                 "Unit(\"Base\", move=2)\n" +
-                "Unit(\"Scout\", parent=\"Base\", move=inherit.move + 1)\n" +
-                "Unit(\"Archer\", parent=\"Scout\", move=inherit.move * 2)\n");
-            Assert.That(Int(Const(defs, "Scout", "move")), Is.EqualTo(3));
-            Assert.That(Int(Const(defs, "Archer", "move")), Is.EqualTo(6));
-            Assert.That(Const(defs, "Archer", "move").Origin, Is.EqualTo(ValueOrigin.Own));
+                "Unit(\"Scout\", parent=\"core:Base\", move=inherit.move + 1)\n" +
+                "Unit(\"Archer\", parent=\"core:Scout\", move=inherit.move * 2)\n");
+            Assert.That(Int(Const(defs, "core:Scout", "move")), Is.EqualTo(3));
+            Assert.That(Int(Const(defs, "core:Archer", "move")), Is.EqualTo(6));
+            Assert.That(Const(defs, "core:Archer", "move").Origin, Is.EqualTo(ValueOrigin.Own));
         }
 
         [Test]
@@ -166,11 +166,11 @@ namespace Kesa.Engine.Tests.Loading
         {
             var defs = ExpandClean(
                 "Unit(\"Base\", Health=Health())\n" +
-                "Unit(\"Scout\", parent=\"Base\", move=inherit.move + 4,Health=Health(base_max=inherit.Health.base_max + 2))\n" +
+                "Unit(\"Scout\", parent=\"core:Base\", move=inherit.move + 4,Health=Health(base_max=inherit.Health.base_max + 2))\n" +
                 "Unit(\"Plain\", Health=Health())\n" +
-                "Unit(\"Tough\", parent=\"Plain\", Health=Health(base_max=inherit.Health.base_max * 3))\n");
-            Assert.That(Int(Const(defs, "Scout", "move")), Is.EqualTo(5));
-            defs.TryGet("Tough", out var tough);
+                "Unit(\"Tough\", parent=\"core:Plain\", Health=Health(base_max=inherit.Health.base_max * 3))\n");
+            Assert.That(Int(Const(defs, "core:Scout", "move")), Is.EqualTo(5));
+            defs.TryGet("core:Tough", out var tough);
             tough.Components.TryGet("Health", out var health);
             health.Members.TryGet("base_max", out var baseMax);
             Assert.That(Int(baseMax), Is.EqualTo(30));
@@ -181,16 +181,16 @@ namespace Kesa.Engine.Tests.Loading
         {
             var defs = ExpandClean(
                 "Unit(\"Base\", names=[\"a\"])\n" +
-                "Unit(\"Scout\", parent=\"Base\", names=inherit.names + [\"b\", \"c\"])\n");
-            var items = ((ListValue)Const(defs, "Scout", "names").Value).Items.Select(i => ((StrValue)i).Value);
+                "Unit(\"Scout\", parent=\"core:Base\", names=inherit.names + [\"b\", \"c\"])\n");
+            var items = ((ListValue)Const(defs, "core:Scout", "names").Value).Items.Select(i => ((StrValue)i).Value);
             Assert.That(items, Is.EqualTo(new[] { "a", "b", "c" }));
         }
 
         [Test]
         public void InheritExpressionsCanUseNamesFromTheSameFile()
         {
-            var defs = ExpandClean("bonus = 5\nUnit(\"Base\", move=1)\nUnit(\"Scout\", parent=\"Base\", move=inherit.move + bonus)\n");
-            Assert.That(Int(Const(defs, "Scout", "move")), Is.EqualTo(6));
+            var defs = ExpandClean("bonus = 5\nUnit(\"Base\", move=1)\nUnit(\"Scout\", parent=\"core:Base\", move=inherit.move + bonus)\n");
+            Assert.That(Int(Const(defs, "core:Scout", "move")), Is.EqualTo(6));
         }
 
         [Test]
@@ -198,10 +198,10 @@ namespace Kesa.Engine.Tests.Loading
         {
             var defs = ExpandClean(
                 "Unit(\"Base\", cost={\"Wood\": 2})\n" +
-                "Unit(\"Scout\", parent=\"Base\", cost={\"Wood\": inherit.move + 2, \"Iron\": inherit.move * 6})\n");
-            var cost = (DictValue)Const(defs, "Scout", "cost").Value;
+                "Unit(\"Scout\", parent=\"core:Base\", cost={\"Wood\": inherit.move + 2, \"Iron\": inherit.move * 6})\n");
+            var cost = (DictValue)Const(defs, "core:Scout", "cost").Value;
             Assert.That(cost.Items.Select(i => ((IntValue)i.Value).Value), Is.EqualTo(new[] { 3L, 6L }));
-            Expand("Unit(\"Base\", cost={\"Wood\": 2})\nUnit(\"Scout\", parent=\"Base\", cost={\"Wood\": inherit.cost[\"Wood\"]})\n",
+            Expand("Unit(\"Base\", cost={\"Wood\": 2})\nUnit(\"Scout\", parent=\"core:Base\", cost={\"Wood\": inherit.cost[\"Wood\"]})\n",
                 out var diags);
             Assert.That(diags.Single().Code, Is.EqualTo(Codes.EvlUnsupported));
         }
@@ -211,17 +211,17 @@ namespace Kesa.Engine.Tests.Loading
         {
             var defs = ExpandClean(
                 "Unit(\"Base\", ratio=1.5)\n" +
-                "Unit(\"A\", parent=\"Base\", ratio=inherit.ratio * 1.5)\n" +
-                "Unit(\"B\", parent=\"Base\", ratio=inherit.ratio * 3)\n" +
-                "Unit(\"C\", parent=\"Base\", ratio=inherit.ratio + 1)\n" +
-                "Unit(\"D\", parent=\"Base\", ratio=inherit.ratio - 2)\n" +
-                "Unit(\"E\", parent=\"Base\", ratio=-inherit.ratio)\n");
+                "Unit(\"A\", parent=\"core:Base\", ratio=inherit.ratio * 1.5)\n" +
+                "Unit(\"B\", parent=\"core:Base\", ratio=inherit.ratio * 3)\n" +
+                "Unit(\"C\", parent=\"core:Base\", ratio=inherit.ratio + 1)\n" +
+                "Unit(\"D\", parent=\"core:Base\", ratio=inherit.ratio - 2)\n" +
+                "Unit(\"E\", parent=\"core:Base\", ratio=-inherit.ratio)\n");
             long Raw(string id) => ((FixedValue)Const(defs, id, "ratio").Value).Value.Raw;
-            Assert.That(Raw("A"), Is.EqualTo(2_250_000L));
-            Assert.That(Raw("B"), Is.EqualTo(4_500_000L));
-            Assert.That(Raw("C"), Is.EqualTo(2_500_000L));
-            Assert.That(Raw("D"), Is.EqualTo(-500_000L));
-            Assert.That(Raw("E"), Is.EqualTo(-1_500_000L));
+            Assert.That(Raw("core:A"), Is.EqualTo(2_250_000L));
+            Assert.That(Raw("core:B"), Is.EqualTo(4_500_000L));
+            Assert.That(Raw("core:C"), Is.EqualTo(2_500_000L));
+            Assert.That(Raw("core:D"), Is.EqualTo(-500_000L));
+            Assert.That(Raw("core:E"), Is.EqualTo(-1_500_000L));
         }
 
         [TestCase(1, 500_000, 1)]
@@ -246,19 +246,19 @@ namespace Kesa.Engine.Tests.Loading
         // ---- inherit 오류 ----
 
         [TestCase("Unit(\"Scout\", move=inherit.move)\n", Codes.InhNoParent)]
-        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", names=inherit.names + [\"x\"])\n", Codes.InhNoValue)]
-        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", Health=Health(current=inherit.Health.current))\n",
+        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"core:Base\", names=inherit.names + [\"x\"])\n", Codes.InhNoValue)]
+        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"core:Base\", Health=Health(current=inherit.Health.current))\n",
             Codes.InhNoValue)]
-        [TestCase("Unit(\"Base\", Health=Health())\nUnit(\"Scout\", parent=\"Base\", move=inherit.mvoe + 1)\n", Codes.DefUnknownField)]
-        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", move=inherit.Health + 1)\n", Codes.EvlUnsupported)]
-        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", move=inherit.move / 2)\n", Codes.EvlUnsupported)]
-        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", move=inherit.move ** 2)\n", Codes.EvlUnsupported)]
-        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", move=inherit.Health.base_max.x)\n", Codes.EvlUnsupported)]
-        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", move=inherit.move.x)\n", Codes.DefUnknownField)]
-        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", move=inherit.move + \"a\")\n", Codes.EvlType)]
-        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", move=inherit.move + nope)\n", Codes.EvlUnknownName)]
-        [TestCase("Unit(\"Base\", move=9223372036854775807)\nUnit(\"Scout\", parent=\"Base\", move=inherit.move + 1)\n", Codes.EvlType)]
-        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", move=Unit(\"X\") + inherit.move)\n", Codes.EvlUnsupported)]
+        [TestCase("Unit(\"Base\", Health=Health())\nUnit(\"Scout\", parent=\"core:Base\", move=inherit.mvoe + 1)\n", Codes.DefUnknownField)]
+        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"core:Base\", move=inherit.Health + 1)\n", Codes.EvlUnsupported)]
+        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"core:Base\", move=inherit.move / 2)\n", Codes.EvlUnsupported)]
+        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"core:Base\", move=inherit.move ** 2)\n", Codes.EvlUnsupported)]
+        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"core:Base\", move=inherit.Health.base_max.x)\n", Codes.EvlUnsupported)]
+        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"core:Base\", move=inherit.move.x)\n", Codes.DefUnknownField)]
+        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"core:Base\", move=inherit.move + \"a\")\n", Codes.EvlType)]
+        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"core:Base\", move=inherit.move + nope)\n", Codes.EvlUnknownName)]
+        [TestCase("Unit(\"Base\", move=9223372036854775807)\nUnit(\"Scout\", parent=\"core:Base\", move=inherit.move + 1)\n", Codes.EvlType)]
+        [TestCase("Unit(\"Base\")\nUnit(\"Scout\", parent=\"core:Base\", move=Unit(\"X\") + inherit.move)\n", Codes.EvlUnsupported)]
         public void BadInheritExpressions(string defs, string code)
         {
             Expand(defs, out var diags);
@@ -271,7 +271,7 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("label=inherit.label + str")]
         public void AnInheritResultMustBeData(string field)
         {
-            Expand("Unit(\"Base\", names=[\"a\"], label=\"x\")\nUnit(\"Scout\", parent=\"Base\", " + field + ")\n", out var diags);
+            Expand("Unit(\"Base\", names=[\"a\"], label=\"x\")\nUnit(\"Scout\", parent=\"core:Base\", " + field + ")\n", out var diags);
             Assert.That(diags, Is.Not.Empty);
             Assert.That(diags.Select(d => d.Code), Has.None.EqualTo(Codes.InhNoValue));
         }
@@ -279,7 +279,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void ABuiltInNameInsideAnInheritResultIsRejected()
         {
-            Expand("Unit(\"Base\", names=[\"a\"])\nUnit(\"Scout\", parent=\"Base\", names=inherit.names + [Unit])\n", out var diags);
+            Expand("Unit(\"Base\", names=[\"a\"])\nUnit(\"Scout\", parent=\"core:Base\", names=inherit.names + [Unit])\n", out var diags);
             var d = diags.Single();
             Assert.That((d.Code, d.Line), Is.EqualTo((Codes.DefBadValue, 4)));
         }
@@ -287,7 +287,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void ABadInheritExpressionDisablesTheModAndPointsAtTheExpression()
         {
-            Mod("core", schema: Schema, defs: Resources + "Unit(\"Base\")\nUnit(\"Scout\", parent=\"Base\", move=inherit.move / 2)\n");
+            Mod("core", schema: Schema, defs: Resources + "Unit(\"Base\")\nUnit(\"Scout\", parent=\"core:Base\", move=inherit.move / 2)\n");
             var result = Load(out var diags);
             var d = diags.Single();
             Assert.That((d.Code, d.Line, d.Mod), Is.EqualTo((Codes.EvlUnsupported, 4, "core")));
@@ -300,16 +300,16 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AMissingParentIsAnErrorWithASuggestion()
         {
-            Expand("Unit(\"Base\")\nUnit(\"Scout\", parent=\"Bse\")\n", out var diags);
+            Expand("Unit(\"Base\")\nUnit(\"Scout\", parent=\"core:Bse\")\n", out var diags);
             var d = diags.Single();
             Assert.That((d.Code, d.Line), Is.EqualTo((Codes.InhParentNotFound, 4)));
-            Assert.That(d.Hint, Is.EqualTo("did you mean 'Base'?"));
+            Assert.That(d.Hint, Is.EqualTo("did you mean 'core:Base'?"));
         }
 
         [Test]
         public void AParentOfAnotherTypeIsAnError()
         {
-            Expand("Building(\"Hut\")\nUnit(\"Scout\", parent=\"Hut\")\n", out var diags);
+            Expand("Building(\"Hut\")\nUnit(\"Scout\", parent=\"core:Hut\")\n", out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.InhParentType));
             Assert.That(d.Related, Has.Count.EqualTo(1));
@@ -319,22 +319,22 @@ namespace Kesa.Engine.Tests.Loading
         public void AParentFromADependencyModIsFine()
         {
             Mod("core", schema: Schema, defs: Resources + "Unit(\"Base\")\n");
-            Mod("addon", defs: "Unit(\"Scout\", parent=\"Base\")\n", extra: ", dependencies=[\"core\"]");
-            Assert.That(LoadClean().Expanded.TryGet("Scout", out _), Is.True);
+            Mod("addon", defs: "Unit(\"Scout\", parent=\"core:Base\")\n", extra: ", dependencies=[\"core\"]");
+            Assert.That(LoadClean().Expanded.TryGet("addon:Scout", out _), Is.True);
         }
 
         [Test]
         public void AModThatDoesNotDependOnTheParentsModCannotUseIt()
         {
             Mod("core", schema: Schema, defs: Resources + "Unit(\"Base\")\n");
-            Mod("lone", defs: "Unit(\"Other\", parent=\"Base\")\n");
+            Mod("lone", defs: "Unit(\"Other\", parent=\"core:Base\")\n");
             Load(out var diags);
             Assert.That(diags.Select(d => d.Code), Does.Contain(Codes.SchNotVisible), string.Join("\n", diags));
         }
 
-        [TestCase("Unit(\"A\", parent=\"A\")\n", 1)]
-        [TestCase("Unit(\"A\", parent=\"B\")\nUnit(\"B\", parent=\"A\")\n", 2)]
-        [TestCase("Unit(\"A\", parent=\"B\")\nUnit(\"B\", parent=\"C\")\nUnit(\"C\", parent=\"A\")\n", 3)]
+        [TestCase("Unit(\"A\", parent=\"core:A\")\n", 1)]
+        [TestCase("Unit(\"A\", parent=\"core:B\")\nUnit(\"B\", parent=\"core:A\")\n", 2)]
+        [TestCase("Unit(\"A\", parent=\"core:B\")\nUnit(\"B\", parent=\"core:C\")\nUnit(\"C\", parent=\"core:A\")\n", 3)]
         public void ACycleIsReportedOncePerDef(string defs, int count)
         {
             Expand(defs, out var diags);
@@ -346,9 +346,9 @@ namespace Kesa.Engine.Tests.Loading
         public void ChildrenOfAFailedDefAreSkippedWithoutFollowUpErrors()
         {
             Expand(
-                "Unit(\"Base\", parent=\"Nope\")\n" +
-                "Unit(\"Scout\", parent=\"Base\", move=inherit.move + 1)\n" +
-                "Unit(\"Archer\", parent=\"Scout\")\n", out var diags);
+                "Unit(\"Base\", parent=\"core:Nope\")\n" +
+                "Unit(\"Scout\", parent=\"core:Base\", move=inherit.move + 1)\n" +
+                "Unit(\"Archer\", parent=\"core:Scout\")\n", out var diags);
             Assert.That(diags.Select(d => d.Code), Is.EqualTo(new[] { Codes.InhParentNotFound }));
         }
 
@@ -356,21 +356,21 @@ namespace Kesa.Engine.Tests.Loading
         public void ADefWhoseExpansionFailsIsMissingFromTheResult()
         {
             Mod("core", schema: Schema, defs: Resources + "Unit(\"Base\")\n");
-            Mod("addon", defs: "Unit(\"Scout\", parent=\"Nope\")\n", extra: ", dependencies=[\"core\"]");
+            Mod("addon", defs: "Unit(\"Scout\", parent=\"core:Nope\")\n", extra: ", dependencies=[\"core\"]");
             var result = Load(out var diags);
             Assert.That(diags.Single().Mod, Is.EqualTo("addon"));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "addon" }));
-            Assert.That(result.Expanded.Defs.Select(d => d.Id), Is.EqualTo(new[] { "Wood", "Iron", "Base" }));
+            Assert.That(result.Expanded.Defs.Select(d => d.Id), Is.EqualTo(new[] { "core:Wood", "core:Iron", "core:Base" }));
         }
 
         [Test]
         public void AnOverridingDefDoesNotInheritFromTheDefItReplaces()
         {
             Mod("core", schema: Schema, defs: Resources + "Unit(\"Base\", move=5, label=\"core\")\n");
-            Mod("addon", defs: "Unit(\"Base\", override=True, move=7)\n", extra: ", dependencies=[\"core\"]");
+            Mod("addon", defs: "Unit(\"core:Base\", override=True, move=7)\n", extra: ", dependencies=[\"core\"]");
             var result = LoadClean();
-            Assert.That(Int(Const(result.Expanded, "Base", "move")), Is.EqualTo(7));
-            Assert.That(result.Expanded.TryGet("Base", out var def), Is.True);
+            Assert.That(Int(Const(result.Expanded, "core:Base", "move")), Is.EqualTo(7));
+            Assert.That(result.Expanded.TryGet("core:Base", out var def), Is.True);
             Assert.That(def.Consts.Contains("label"), Is.False);
             Assert.That(def.Mod, Is.EqualTo("addon"));
         }

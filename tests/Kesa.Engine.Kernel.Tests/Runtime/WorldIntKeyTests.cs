@@ -67,7 +67,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             _world = new World(LoadClean());
-            _node = _world.Create("Roll");
+            _node = _world.Create("banking:Roll");
             _value = _world.Member("Die", "value");
             _bonus = _world.Member("Die", "bonus");
         }
@@ -178,7 +178,7 @@ namespace Kesa.Engine.Tests.Runtime
             _world.AddRow(_node, "Die", 0, new Init(_value, new IntValue(4)));
             Assert.That(((IntValue)_world.GetRow(_node, _value, 0)).Value, Is.EqualTo(4));
             Assert.That(_world.HasRow(_node, "Die", 1), Is.False);
-            var e = Assert.Throws<WorldException>(() => _world.GetRow(_node, _value, "Cooking"));
+            var e = Assert.Throws<WorldException>(() => _world.GetRow(_node, _value, "banking:Cooking"));
             Assert.That(e!.Message, Does.Contain("keyed by int, not Def ids"));
         }
 

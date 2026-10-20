@@ -179,11 +179,11 @@ namespace Kesa.Engine.Runtime
                 name + "() takes the rows of a keyed component (entity.Component), not " + value.KindName);
         }
 
-        private static RowKey RowKeyArg(ComponentType component, Value key)
+        private RowKey RowKeyArg(ComponentType component, Value key)
         {
             switch (key)
             {
-                case StrValue s when component.KeyKind == KeyKind.Def: return RowKey.Def(s.Value);
+                case StrValue s when component.KeyKind == KeyKind.Def: return RowKey.Def(ScriptDefId(s.Value));
                 case IEntityReference r when component.KeyKind == KeyKind.Entity: return RowKey.Entity(r.EntityId);
                 case IntValue n when component.KeyKind == KeyKind.Int: return RowKey.Int(n.Value);
             }

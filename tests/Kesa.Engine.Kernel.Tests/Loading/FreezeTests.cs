@@ -24,7 +24,7 @@ namespace Kesa.Engine.Tests.Loading
         private const string Defs =
             "Resource(\"Wood\")\n" +
             "Unit(\"Base\", abstract=True, move=2)\n" +
-            "Unit(\"Scout\", parent=\"Base\", tags=[\"a\"], Health=Health(base_max=12, current=9))\n";
+            "Unit(\"Scout\", parent=\"core:Base\", tags=[\"a\"], Health=Health(base_max=12, current=9))\n";
 
         private DefSet Frozen(string defs = Defs)
         {
@@ -42,19 +42,19 @@ namespace Kesa.Engine.Tests.Loading
         public void OnlyConcreteDefsAreFrozenInRegistrationOrder()
         {
             var set = Frozen();
-            Assert.That(set.Defs.Select(d => d.Id), Is.EqualTo(new[] { "Wood", "Scout" }));
-            Assert.That(set.TryGet("Base", out _), Is.False);
-            Assert.That(set.TryGet("Scout", out var scout), Is.True);
-            Assert.That(scout.ParentId, Is.EqualTo("Base"));
-            Assert.That(set.OfType("Unit").Select(d => d.Id), Is.EqualTo(new[] { "Scout" }));
-            Assert.That(set.OfType("Resource").Select(d => d.Id), Is.EqualTo(new[] { "Wood" }));
+            Assert.That(set.Defs.Select(d => d.Id), Is.EqualTo(new[] { "core:Wood", "core:Scout" }));
+            Assert.That(set.TryGet("core:Base", out _), Is.False);
+            Assert.That(set.TryGet("core:Scout", out var scout), Is.True);
+            Assert.That(scout.ParentId, Is.EqualTo("core:Base"));
+            Assert.That(set.OfType("Unit").Select(d => d.Id), Is.EqualTo(new[] { "core:Scout" }));
+            Assert.That(set.OfType("Resource").Select(d => d.Id), Is.EqualTo(new[] { "core:Wood" }));
         }
 
         [Test]
         public void ConstsAreFilledWithDefaultsAndMarkedAsSuch()
         {
             var set = Frozen();
-            set.TryGet("Scout", out var scout);
+            set.TryGet("core:Scout", out var scout);
 
             var move = Const(scout, "move");
             Assert.That(((IntValue)move.Value).Value, Is.EqualTo(2));
@@ -71,7 +71,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void EmptyCollectionsAreFilledIn()
         {
-            Frozen().TryGet("Scout", out var scout);
+            Frozen().TryGet("core:Scout", out var scout);
             var costs = Const(scout, "costs");
             Assert.That(((DictValue)costs.Value).Items, Is.Empty);
             Assert.That(costs.Origin, Is.EqualTo(ValueOrigin.Default));
@@ -80,7 +80,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void ComponentsOfTheTypeAreAlwaysThereWithTheirConstsFilled()
         {
-            Frozen().TryGet("Scout", out var scout);
+            Frozen().TryGet("core:Scout", out var scout);
             Assert.That(scout.Components.Keys, Is.EquivalentTo(new[] { "Health", "Skill" }));
 
             scout.Components.TryGet("Health", out var health);
@@ -95,12 +95,12 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void FieldsAppearOnlyWhenTheyWereWritten()
         {
-            Frozen().TryGet("Scout", out var scout);
+            Frozen().TryGet("core:Scout", out var scout);
             scout.Components.TryGet("Health", out var health);
             Assert.That(health.Members.Contains("current"), Is.True);
 
-            var other = Frozen(Defs + "Unit(\"Archer\", parent=\"Base\")\n");
-            other.TryGet("Archer", out var archer);
+            var other = Frozen(Defs + "Unit(\"Archer\", parent=\"core:Base\")\n");
+            other.TryGet("core:Archer", out var archer);
             archer.Components.TryGet("Health", out var archerHealth);
             Assert.That(archerHealth.Members.Contains("current"), Is.False);
             Assert.That(archerHealth.Members.Contains("base_max"), Is.True);
@@ -109,16 +109,16 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void KeyedRowsAreFilledButNotInvented()
         {
-            Mod("core", schema: Schema, defs: Defs + "Unit(\"Archer\", parent=\"Base\", Skill={\"Wood\": Skill()})\n");
+            Mod("core", schema: Schema, defs: Defs + "Unit(\"Archer\", parent=\"core:Base\", Skill={\"Wood\": Skill()})\n");
             var set = LoadClean().Frozen;
-            set.TryGet("Archer", out var archer);
+            set.TryGet("core:Archer", out var archer);
             archer.Components.TryGet("Skill", out var skill);
-            Assert.That(skill.Rows.Keys, Is.EqualTo(new[] { "Wood" }));
-            skill.Rows.TryGet("Wood", out var row);
+            Assert.That(skill.Rows.Keys, Is.EqualTo(new[] { "core:Wood" }));
+            skill.Rows.TryGet("core:Wood", out var row);
             row.Members.TryGet("level", out var level);
             Assert.That((((IntValue)level.Value).Value, level.Origin), Is.EqualTo((1L, ValueOrigin.Default)));
 
-            set.TryGet("Scout", out var scout);
+            set.TryGet("core:Scout", out var scout);
             scout.Components.TryGet("Skill", out var none);
             Assert.That(none.Rows.Keys, Is.Empty);
         }
@@ -141,29 +141,29 @@ namespace Kesa.Engine.Tests.Loading
         {
             Mod("core", schema: AllSchema, defs: AllDefs);
             var set = LoadClean().Frozen;
-            set.TryGet("Scout", out var scout);
+            set.TryGet("core:Scout", out var scout);
 
-            Assert.That(scout.TryGetRow("Stock", "Iron", out var written), Is.True);
+            Assert.That(scout.TryGetRow("Stock", "core:Iron", out var written), Is.True);
             written.Members.TryGet("amount", out var two);
             Assert.That((((IntValue)two.Value).Value, two.Origin), Is.EqualTo((2L, ValueOrigin.Own)));
 
-            Assert.That(scout.TryGetRow("Stock", "Wood", out var implicitRow), Is.True);
+            Assert.That(scout.TryGetRow("Stock", "core:Wood", out var implicitRow), Is.True);
             implicitRow.Members.TryGet("amount", out var seven);
             Assert.That((((IntValue)seven.Value).Value, seven.Origin), Is.EqualTo((7L, ValueOrigin.Default)));
             Assert.That(implicitRow.Members.Contains("note"), Is.False);
 
             // 저장은 적힌 줄뿐이다
             scout.Components.TryGet("Stock", out var stock);
-            Assert.That(stock.Rows.Keys, Is.EqualTo(new[] { "Iron" }));
+            Assert.That(stock.Rows.Keys, Is.EqualTo(new[] { "core:Iron" }));
         }
 
-        [TestCase("Gem")]    // abstract는 가리킬 수 없다
-        [TestCase("Axe")]    // 다른 타입
+        [TestCase("core:Gem")]    // abstract는 가리킬 수 없다
+        [TestCase("core:Axe")]    // 다른 타입
         [TestCase("Nope")]   // 없는 Def
         public void OnlyAConcreteDefOfTheKeyTypeHasAnImplicitRow(string key)
         {
             Mod("core", schema: AllSchema, defs: AllDefs);
-            LoadClean().Frozen.TryGet("Scout", out var scout);
+            LoadClean().Frozen.TryGet("core:Scout", out var scout);
             Assert.That(scout.TryGetRow("Stock", key, out _), Is.False);
         }
 
@@ -171,10 +171,10 @@ namespace Kesa.Engine.Tests.Loading
         public void AKeysListedRowThatWasNotWrittenIsAbsent()
         {
             Mod("core", schema: AllSchema, defs: AllDefs);
-            LoadClean().Frozen.TryGet("Scout", out var scout);
-            Assert.That(scout.TryGetRow("Skill", "Wood", out _), Is.True);
-            Assert.That(scout.TryGetRow("Skill", "Iron", out _), Is.False);
-            Assert.That(scout.TryGetRow("Nope", "Wood", out _), Is.False);
+            LoadClean().Frozen.TryGet("core:Scout", out var scout);
+            Assert.That(scout.TryGetRow("Skill", "core:Wood", out _), Is.True);
+            Assert.That(scout.TryGetRow("Skill", "core:Iron", out _), Is.False);
+            Assert.That(scout.TryGetRow("Nope", "core:Wood", out _), Is.False);
         }
 
         [Test]
@@ -203,9 +203,9 @@ namespace Kesa.Engine.Tests.Loading
         public void AComponentAttachedByAPatchIsFrozenWithItsDefaults()
         {
             Mod("core", schema: Schema, defs: Defs);
-            Mod("addon", defs: "patch.set(\"Scout\", \"Morale\", Morale())\n", extra: ", dependencies=[\"core\"]");
+            Mod("addon", defs: "patch.set(\"core:Scout\", \"Morale\", Morale())\n", extra: ", dependencies=[\"core\"]");
             var set = LoadClean().Frozen;
-            set.TryGet("Scout", out var scout);
+            set.TryGet("core:Scout", out var scout);
             Assert.That(scout.Components.TryGet("Morale", out var morale), Is.True);
             morale.Members.TryGet("value", out var value);
             Assert.That(((IntValue)value.Value).Value, Is.EqualTo(3));
@@ -216,9 +216,9 @@ namespace Kesa.Engine.Tests.Loading
         public void PatchedValuesKeepTheirOrigin()
         {
             Mod("core", schema: Schema, defs: Defs);
-            Mod("addon", defs: "patch.add(\"Scout\", \"move\", 5)\n", extra: ", dependencies=[\"core\"]");
+            Mod("addon", defs: "patch.add(\"core:Scout\", \"move\", 5)\n", extra: ", dependencies=[\"core\"]");
             var set = LoadClean().Frozen;
-            set.TryGet("Scout", out var scout);
+            set.TryGet("core:Scout", out var scout);
             var move = Const(scout, "move");
             Assert.That(((IntValue)move.Value).Value, Is.EqualTo(7));
             Assert.That((move.Origin, move.Patch!.Mod), Is.EqualTo((ValueOrigin.Patched, "addon")));
@@ -228,9 +228,9 @@ namespace Kesa.Engine.Tests.Loading
         public void TheFrozenSetKeepsTheExpandedSourceForTheDump()
         {
             var result = LoadWithResult();
-            result.Frozen.TryGet("Scout", out var scout);
-            Assert.That(scout.Source, Is.SameAs(result.Expanded.Defs.Single(d => d.Id == "Scout")));
-            Assert.That(result.Expanded.TryGet("Base", out var template), Is.True);
+            result.Frozen.TryGet("core:Scout", out var scout);
+            Assert.That(scout.Source, Is.SameAs(result.Expanded.Defs.Single(d => d.Id == "core:Scout")));
+            Assert.That(result.Expanded.TryGet("core:Base", out var template), Is.True);
             Assert.That(template.IsAbstract, Is.True);
         }
 

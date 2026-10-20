@@ -19,7 +19,7 @@ namespace Kesa.Engine.Tests.Runtime
                       "    r = ask(u, \"q\", responses=[\"Bump\"])\n    u.S.n += 10\n" +
                       "@command(acts_for=lambda u: u)\ndef Bump(u: Ref[Unit]):\n    u.S.n += 1\n");
             var w = new World(LoadClean());
-            var u = w.Create("Scout");
+            var u = w.Create("core:Scout");
             w.Seat(u, "h");
             var args = new Dictionary<string, Value> { ["u"] = new EntityValue(u) };
             var q = w.Submit("h", "core.Go", args).OpenedRequest!;

@@ -318,7 +318,7 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(((IntValue)ps[0].Default!).Value, Is.EqualTo(-2));
             Assert.That(ps[1].Default, Is.InstanceOf<FixedValue>()); // G95: fixed 자리의 int는 올린다
             Assert.That(((FixedValue)ps[1].Default!).Value.Raw, Is.EqualTo(3 * Kesa.Engine.Numerics.Fixed.Scale));
-            Assert.That(((StrValue)ps[3].Default!).Value, Is.EqualTo("Iron"));
+            Assert.That(((StrValue)ps[3].Default!).Value, Is.EqualTo("core:Iron"));
             Assert.That(((ListValue)ps[4].Default!).Items, Has.Count.EqualTo(2));
             Assert.That(ps[6].Default, Is.SameAs(NoneValue.Instance));
         }
@@ -342,9 +342,9 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
         }
 
-        [TestCase("\"Irom\"", Codes.LnkNotFound, "there is no Resource 'Irom'")]
-        [TestCase("\"Scout\"", Codes.LnkWrongType, "'Scout' is a Unit, but a Resource is expected here")]
-        [TestCase("\"Ore\"", Codes.LnkAbstract, "'Ore' is abstract: a template cannot be referenced")]
+        [TestCase("\"Irom\"", Codes.LnkNotFound, "there is no Resource 'core:Irom'")]
+        [TestCase("\"Scout\"", Codes.LnkWrongType, "'core:Scout' is a Unit, but a Resource is expected here")]
+        [TestCase("\"Ore\"", Codes.LnkAbstract, "'core:Ore' is abstract: a template cannot be referenced")]
         public void DefIdDefaultsAreLinkedLikeDefValues(string id, string code, string message)
         {
             Mod("core", schema: TypesSchema,

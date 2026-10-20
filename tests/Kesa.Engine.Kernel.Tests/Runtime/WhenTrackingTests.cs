@@ -152,9 +152,9 @@ namespace Kesa.Engine.Tests.Runtime
             var full = new World(content) { WhenFullScan = true };
             foreach (var w in new[] { tracked, full })
             {
-                w.Create("Town");
-                w.Create("Town");
-                for (int i = 0; i < 4; i++) w.Create("Scout");
+                w.Create("core:Town");
+                w.Create("core:Town");
+                for (int i = 0; i < 4; i++) w.Create("core:Scout");
             }
             var bonus = tracked.Member("Pop", "bonus");
             var a = new Steps(seed);
@@ -182,9 +182,9 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("core", schema: Schema, defs: Defs);
             var content = LoadClean();
             var world = new World(content);
-            world.Create("Town");
-            world.Create("Town");
-            for (int i = 0; i < 4; i++) world.Create("Scout");
+            world.Create("core:Town");
+            world.Create("core:Town");
+            for (int i = 0; i < 4; i++) world.Create("core:Scout");
             var bonus = world.Member("Pop", "bonus");
             var r = new Steps(7);
             var seen = new SortedSet<string>();

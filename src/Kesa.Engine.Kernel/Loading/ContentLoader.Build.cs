@@ -199,7 +199,7 @@ namespace Kesa.Engine.Loading
 
         /// <summary>
         /// Def 하나를 등록한다. 중복 id는 오류이고, 의도적 교체는 <c>override=True</c> (spec S1).
-        /// Def id는 타입과 무관하게 전역에서 하나다 (spec-gaps G19).
+        /// Def id는 타입과 무관하게 전역에서 하나다 (spec-gaps G19). 다른 모드의 Def는 전체 이름과 <c>override=True</c>로만 쓴다(G261).
         /// </summary>
         private static void Register(DefRegistry registry, DefRecord record, ModVisibility visibility, LoadOrder order,
             StageDiagnostics stage)
@@ -215,7 +215,7 @@ namespace Kesa.Engine.Loading
                 if (record.IsOverride)
                 {
                     Error(record, Codes.DefBadOverride, "override=True but there is no Def '" + record.Id + "' to replace",
-                        hint: Suggest.Hint(record.Id, registry.Ids) ?? "remove override=True to define a new Def");
+                        hint: DefIds.Hint(record.Id, registry.Ids) ?? "remove override=True to define a new Def");
                     return;
                 }
                 registry.Add(record);
@@ -229,21 +229,11 @@ namespace Kesa.Engine.Loading
             while (original.Replaced != null) original = original.Replaced;
             bool ownDef = original.Mod == record.Mod || existing.Mod == record.Mod;
 
+            // 새 Def의 id는 늘 자기 모드의 것이므로(G261) 겹치는 것은 같은 모드 안의 중복뿐이다
             if (!record.IsOverride)
             {
-                bool canReplace = !ownDef && visibility.CanSee(record.Mod, original.Mod);
-                string message = "Def id '" + record.Id + "' is already defined" +
-                                 (ownDef ? "" : " by mod '" + original.Mod + "'");
-                if (ownDef || canReplace)
-                {
-                    Error(record, Codes.DefDuplicateId, message, hint: canReplace ? "add override=True to replace it" : null,
-                        related: new[] { original.Span });
-                    return;
-                }
-                // 서로 의존하지 않는 두 모드: 어느 쪽이 맞는지 근거가 없으므로 둘 다 오류
-                ConflictError(record, Codes.DefDuplicateId, message, related: new[] { original.Span });
-                ConflictError(original, Codes.DefDuplicateId,
-                    "Def id '" + record.Id + "' is also defined by mod '" + record.Mod + "'", related: new[] { record.Span });
+                Error(record, Codes.DefDuplicateId, "Def id '" + record.Id + "' is already defined",
+                    related: new[] { original.Span });
                 return;
             }
 

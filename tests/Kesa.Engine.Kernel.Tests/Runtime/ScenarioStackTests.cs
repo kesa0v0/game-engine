@@ -93,9 +93,9 @@ namespace Kesa.Engine.Tests.Runtime
         private World NewGame()
         {
             var w = new World(_content, seed: 1);
-            _a = w.Create("Player");
-            _b = w.Create("Player");
-            _c = w.Create("Player");
+            _a = w.Create("core:Player");
+            _b = w.Create("core:Player");
+            _c = w.Create("core:Player");
             foreach (var p in new[] { _a, _b, _c }) w.Seat(p, "host");
             Next(w, _a, _b);
             Next(w, _b, _c);
@@ -138,8 +138,8 @@ namespace Kesa.Engine.Tests.Runtime
         public void EveryonePassingInTurnResolvesTheTop()
         {
             var w = NewGame();
-            Cast(w, _a, "Bolt", _b);
-            Assert.That(Stack(w), Is.EqualTo(new[] { "Bolt" }));
+            Cast(w, _a, "core:Bolt", _b);
+            Assert.That(Stack(w), Is.EqualTo(new[] { "core:Bolt" }));
             Assert.That(Asked(w), Is.EqualTo(_b), "priority starts at the next seat");
             Reply(w, "Pass");
             Assert.That(Asked(w), Is.EqualTo(_c));
@@ -156,9 +156,9 @@ namespace Kesa.Engine.Tests.Runtime
         public void AResponseGoesOnTopAndResolvesFirst()
         {
             var w = NewGame();
-            Cast(w, _a, "Bolt", _b);
+            Cast(w, _a, "core:Bolt", _b);
             Reply(w, "Zap", ("target", _a)); // b가 반응: a에게 3
-            Assert.That(Stack(w), Is.EqualTo(new[] { "Bolt", "Bolt" }));
+            Assert.That(Stack(w), Is.EqualTo(new[] { "core:Bolt", "core:Bolt" }));
             Assert.That(Asked(w), Is.EqualTo(_c), "a response resets the passes and moves on");
             Reply(w, "Pass");
             Reply(w, "Pass");
@@ -178,7 +178,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void AnEffectCanCancelAnotherPendingEffect()
         {
             var w = NewGame();
-            Cast(w, _a, "Bolt", _b);
+            Cast(w, _a, "core:Bolt", _b);
             var bolt = w.Query("Spell").Single();
             Reply(w, "Negate", ("victim", bolt)); // b가 a의 Bolt를 취소
             Reply(w, "Pass");
@@ -219,7 +219,7 @@ namespace Kesa.Engine.Tests.Runtime
                 return r.World!;
             }
 
-            Cast(w, _a, "Charm", _c);
+            Cast(w, _a, "core:Charm", _c);
             w = Maybe(w);
             Reply(w, "Pass");                 // b
             w = Maybe(w);
@@ -235,7 +235,7 @@ namespace Kesa.Engine.Tests.Runtime
             var q = Open(w);
             Assert.That(((StrValue)q.Title).Value, Is.EqualTo("charm"));
             Assert.That(q.Who.Single(), Is.EqualTo(_a));
-            Assert.That(Stack(w), Is.EqualTo(new[] { "Charm" }), "the charm is still on the stack while it asks");
+            Assert.That(Stack(w), Is.EqualTo(new[] { "core:Charm" }), "the charm is still on the stack while it asks");
             // 멈춘 자리는 Def의 Action 함수 안이다: 저장에 커맨드 프레임 위로 charm 프레임이 있다
             Assert.That(System.Text.Encoding.UTF8.GetString(w.Save()), Does.Contain("\"function\": \"charm\""));
             w = Maybe(w);

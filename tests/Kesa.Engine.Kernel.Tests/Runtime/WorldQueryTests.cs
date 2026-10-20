@@ -51,10 +51,10 @@ namespace Kesa.Engine.Tests.Runtime
         public void ATypeAComponentOrBothSelectEntitiesInIdOrder()
         {
             var w = Make();
-            var a = w.Create("Scout");
-            var t = w.Create("Town");
-            var b = w.Create("Scout");
-            var main = w.Create("Main");
+            var a = w.Create("core:Scout");
+            var t = w.Create("core:Town");
+            var b = w.Create("core:Scout");
+            var main = w.Create("core:Main");
             w.Add(b, "Wounded");
             w.Add(main, "Wounded");
             Assert.That(Ids(w.Query("Unit")), Is.EqualTo(new[] { a.Value, b.Value }));
@@ -76,10 +76,10 @@ namespace Kesa.Engine.Tests.Runtime
                 "    b = board()\n" +
                 "    b.Out.n = len(unhappy) * 100 + sum(1 for u in query(\"Unit\", \"Wounded\"))\n" +
                 "    b.Out.s = \"yes\" if any(s.Mood.value > 90 for s in query(\"Settlement\")) else \"no\"\n");
-            var main = w.Create("Main");
-            foreach (int mood in new[] { 10, 50, 5, 95 }) w.Set(w.Create("Town"), w.Member("Mood", "value"), new IntValue(mood));
-            var u = w.Create("Scout");
-            w.Create("Scout");
+            var main = w.Create("core:Main");
+            foreach (int mood in new[] { 10, 50, 5, 95 }) w.Set(w.Create("core:Town"), w.Member("Mood", "value"), new IntValue(mood));
+            var u = w.Create("core:Scout");
+            w.Create("core:Scout");
             w.Add(u, "Wounded");
             Assert.That(Run(w, "Count").Succeeded, Is.True);
             Assert.That(((IntValue)w.Get(main, w.Member("Out", "n"))).Value, Is.EqualTo(201));
@@ -90,7 +90,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ANameMadeAtRunTimeIsCheckedWhenItRuns()
         {
             var w = Make("@command(free=True, acts_for=None)\ndef Look(name: str):\n    board().Out.n = len(query(name))\n");
-            w.Create("Main");
+            w.Create("core:Main");
             var r = Run(w, "Look", ("name", new StrValue("Setlement")));
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
             Assert.That(r.Error!.Code, Is.EqualTo(Codes.RunUnknownName));
@@ -114,10 +114,10 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var w = Make(Watch);
             w.WhenFullScan = fullScan;
-            var main = w.Create("Main");
-            w.Create("Town");
-            var u1 = w.Create("Scout");
-            var u2 = w.Create("Scout");
+            var main = w.Create("core:Main");
+            w.Create("core:Town");
+            var u1 = w.Create("core:Scout");
+            var u2 = w.Create("core:Scout");
             Assert.That(Run(w, "Found", ("mood", new IntValue(60))).Succeeded, Is.True);
             Assert.That(Log(w, main), Is.EqualTo(""));
 
@@ -147,9 +147,9 @@ namespace Kesa.Engine.Tests.Runtime
         public void ExplainShowsTheListAQueryRead()
         {
             var w = Make();
-            var main = w.Create("Main");
-            var a = w.Create("Town");
-            var b = w.Create("Town");
+            var main = w.Create("core:Main");
+            var a = w.Create("core:Town");
+            var b = w.Create("core:Town");
             var node = w.Explain(main, w.Member("Census", "towns"));
             Assert.That(node.Reads.Single().Kind, Is.EqualTo(ExplainKind.Query));
             Assert.That(node.Render(), Is.EqualTo("Census.towns of " + main + " = 2\n  query(\"Settlement\") = [" + a + ", " + b + "]"));
@@ -170,10 +170,10 @@ namespace Kesa.Engine.Tests.Runtime
             foreach (bool reload in new[] { false, true })
             {
                 var world = new World(content);
-                var u = world.Create("Scout");
+                var u = world.Create("core:Scout");
                 world.Seat(u, "host");
-                world.Create("Town");
-                world.Create("Town");
+                world.Create("core:Town");
+                world.Create("core:Town");
                 Assert.That(world.Submit("host", "core.Poll", new Dictionary<string, Value> { ["u"] = new EntityValue(u) }).Succeeded, Is.True);
                 if (reload)
                 {

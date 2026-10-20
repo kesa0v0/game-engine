@@ -45,7 +45,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             _world = new World(LoadClean());
-            return _world.Create("Scout");
+            return _world.Create("banking:Scout");
         }
 
         private MemberHandle M(string owner, string member) => _world.Member(owner, member);
@@ -98,8 +98,8 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var scout = NewScout();
             var max = M("Health", "max");
-            var wall = _world.Create("Stone");
-            var other = _world.Create("Scout");
+            var wall = _world.Create("banking:Stone");
+            var other = _world.Create("banking:Scout");
             _world.AddContribution(scout, max, "add", new IntValue(5), wall);
             _world.AddContribution(other, max, "add", new IntValue(7), wall);
             Assert.That(Int(_world.Get(scout, max)), Is.EqualTo(17));
@@ -108,7 +108,7 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(Int(_world.Get(scout, max)), Is.EqualTo(12));
             Assert.That(Int(_world.Get(other, max)), Is.EqualTo(12));
 
-            var tower = _world.Create("Stone");
+            var tower = _world.Create("banking:Stone");
             _world.AddContribution(scout, max, "add", new IntValue(1), tower);
             Assert.That(_world.RemoveBySource(tower), Is.EqualTo(1));
             Assert.That(_world.RemoveBySource(tower), Is.EqualTo(0));
@@ -120,7 +120,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var scout = NewScout();
             Assert.That(Int(_world.Get(scout, M("Health", "src"))), Is.EqualTo(0));
-            var wall = _world.Create("Stone");
+            var wall = _world.Create("banking:Stone");
             _world.AddContribution(scout, M("Health", "max"), "add", new IntValue(1), wall);
             Assert.That(Int(_world.Get(scout, M("Health", "src"))), Is.EqualTo(1));
             _world.AddContribution(scout, M("Health", "max"), "add", new IntValue(1)); // 출처 없음
@@ -133,16 +133,16 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var scout = NewScout();
             var eff = M("Skill", "eff");
-            Assert.That(Int(_world.GetRow(scout, eff, "Cooking")), Is.EqualTo(4));
-            _world.AddContribution(scout, eff, "Cooking", "add", new IntValue(2));
-            Assert.That(Int(_world.GetRow(scout, eff, "Cooking")), Is.EqualTo(6));
+            Assert.That(Int(_world.GetRow(scout, eff, "banking:Cooking")), Is.EqualTo(4));
+            _world.AddContribution(scout, eff, "banking:Cooking", "add", new IntValue(2));
+            Assert.That(Int(_world.GetRow(scout, eff, "banking:Cooking")), Is.EqualTo(6));
         }
 
         [Test]
         public void ExplainListsTheValuesAndContributionsThatWereActuallyRead()
         {
             var scout = NewScout();
-            var wall = _world.Create("Stone");
+            var wall = _world.Create("banking:Stone");
             var max = M("Health", "max");
             _world.AddContribution(scout, max, "add", new IntValue(3), wall);
             _world.AddContribution(scout, max, "pct", new IntValue(10));
@@ -177,10 +177,10 @@ namespace Kesa.Engine.Tests.Runtime
         public void ExplainOfAKeyedRowNamesTheKey()
         {
             var scout = NewScout();
-            var node = _world.Explain(scout, M("Skill", "eff"), "Cooking");
-            Assert.That(node.Key, Is.EqualTo("Cooking"));
+            var node = _world.Explain(scout, M("Skill", "eff"), "banking:Cooking");
+            Assert.That(node.Key, Is.EqualTo("banking:Cooking"));
             Assert.That(Int(node.Value), Is.EqualTo(4));
-            Assert.That(node.Render(), Does.Contain("Skill.eff[Cooking]"));
+            Assert.That(node.Render(), Does.Contain("Skill.eff[banking:Cooking]"));
         }
 
         [Test]

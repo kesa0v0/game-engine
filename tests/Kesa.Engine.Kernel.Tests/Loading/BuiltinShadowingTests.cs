@@ -17,7 +17,7 @@ namespace Kesa.Engine.Tests.Loading
                                 "deftype(\"U\", components=[\"C\"])\n",
                 defs: "U(\"A\")\n");
             var world = new World(LoadClean());
-            var id = world.Create("A");
+            var id = world.Create("core:A");
             Assert.That(((IntValue)world.Get(id, world.Member("C", "total"))).Value, Is.EqualTo(7));
         }
 
@@ -46,7 +46,7 @@ namespace Kesa.Engine.Tests.Loading
                                 "deftype(\"U\", components=[\"C\"])\n",
                 defs: "U(\"A\")\n");
             var world = new World(LoadClean());
-            var id = world.Create("A");
+            var id = world.Create("core:A");
             Assert.That(((IntValue)world.Get(id, world.Member("C", "total"))).Value, Is.EqualTo(2));
         }
 

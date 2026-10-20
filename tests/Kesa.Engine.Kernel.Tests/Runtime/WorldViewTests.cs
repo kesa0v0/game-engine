@@ -56,16 +56,16 @@ namespace Kesa.Engine.Tests.Runtime
             _w = new World(LoadClean(), requireViewPolicy: requireView);
             _a = Party("A", 3);
             _b = Party("B", 5);
-            _scout = _w.Create("Scout", new Init(M("Owner", "party"), new EntityValue(_a)));
+            _scout = _w.Create("banking:Scout", new Init(M("Owner", "party"), new EntityValue(_a)));
             _w.Set(_scout, M("Owner", "party"), new EntityValue(_a));
             _w.Set(_scout, M("Fog", "hidden"), BoolValue.True);
-            _field = _w.Create("Plain", new Init(M("Battle", "attacker"), new EntityValue(_scout)));
+            _field = _w.Create("banking:Plain", new Init(M("Battle", "attacker"), new EntityValue(_scout)));
             _w.Set(_field, M("Battle", "attacker"), new EntityValue(_scout));
         }
 
         private EntityId Party(string conn, int cards)
         {
-            var p = _w.Create("Side");
+            var p = _w.Create("banking:Side");
             _w.Seat(p, conn);
             _w.Set(p, M("Hand", "cards"), new IntValue(cards));
             return p;
@@ -83,7 +83,7 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(b.Has(_a, "Crest"), Is.True);
             var e = Assert.Throws<WorldException>(() => b.Get(_a, M("Hand", "cards")))!;
             Assert.That(e.Code, Is.EqualTo(Codes.RunNoComponent));
-            Assert.That(e.Message, Is.EqualTo(_a + " (Side) has no 'Hand'"));
+            Assert.That(e.Message, Is.EqualTo(_a + " (banking:Side) has no 'Hand'"));
             Assert.That(b.Query("Hand"), Is.EqualTo(new[] { _b }), "attachment does not leak through a query");
             Assert.That(b.Query("Party"), Is.EqualTo(new[] { _a, _b }));
             Assert.That(b.Diagnostics, Is.Empty);
@@ -93,7 +93,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void AHiddenEntityAnswersExactlyLikeADestroyedOne()
         {
             NewWorld();
-            var dead = _w.Create("Scout", new Init(M("Owner", "party"), new EntityValue(_a)));
+            var dead = _w.Create("banking:Scout", new Init(M("Owner", "party"), new EntityValue(_a)));
             _w.Set(dead, M("Owner", "party"), new EntityValue(_a));
             _w.Destroy(dead);
             var b = _w.ViewAs("B");
@@ -107,7 +107,7 @@ namespace Kesa.Engine.Tests.Runtime
 
             var a = _w.ViewAs("A");
             Assert.That(a.All("Unit"), Is.EqualTo(new[] { _scout }), "the owner sees its own scout");
-            Assert.That(a.DefOf(_scout), Is.EqualTo("Scout"));
+            Assert.That(a.DefOf(_scout), Is.EqualTo("banking:Scout"));
         }
 
         [Test]
@@ -275,12 +275,12 @@ namespace Kesa.Engine.Tests.Runtime
                       "@view_policy\ndef may_see(viewer, entity, component):\n" +
                       "    return entity.Fog is None or not entity.Fog.hidden or (viewer is not None and entity.Side.conn == viewer.Side.conn)\n");
             var w = new World(LoadClean());
-            var castle = w.Create("Keep");
+            var castle = w.Create("scouts:Keep");
             w.Set(castle, w.Member("Side", "conn"), new StrValue("B"));
             w.Seat(castle, "B");
             foreach (var (atk, hidden) in units)
             {
-                var u = w.Create("Raider");
+                var u = w.Create("scouts:Raider");
                 w.Set(u, w.Member("Side", "conn"), new StrValue("A"));
                 w.Seat(u, "A"); // 한 연결이 여러 엔티티에 앉으면 보는 것은 합이다 (G238)
                 w.Set(u, w.Member("Combat", "atk"), new IntValue(atk));
@@ -352,7 +352,7 @@ namespace Kesa.Engine.Tests.Runtime
             NewWorld(MoveDefs);
             EntityId Unit(bool hidden)
             {
-                var u = _w.Create("Scout", new Init(M("Owner", "party"), new EntityValue(_a)));
+                var u = _w.Create("banking:Scout", new Init(M("Owner", "party"), new EntityValue(_a)));
                 _w.Set(u, M("Fog", "hidden"), hidden ? BoolValue.True : BoolValue.False);
                 return u;
             }
@@ -440,7 +440,7 @@ namespace Kesa.Engine.Tests.Runtime
             var w = new World(LoadClean());
             EntityId P(string conn)
             {
-                var p = w.Create("Side");
+                var p = w.Create("banking:Side");
                 w.Set(p, w.Member("Label", "name"), new StrValue(conn));
                 w.Seat(p, conn);
                 return p;
@@ -448,7 +448,7 @@ namespace Kesa.Engine.Tests.Runtime
             var a = P("A");
             var b = P("B");
             w.Add(a, "Tricks");
-            w.AddRow(a, "Tricks", "Ace");
+            w.AddRow(a, "Tricks", "banking:Ace");
             w.Add(a, "Moods");
             var ghost = P("ghost");
             var dead = P("x");
@@ -465,12 +465,12 @@ namespace Kesa.Engine.Tests.Runtime
                 Assert.That(h.Code, Is.EqualTo(r.Code));
                 Assert.That(h.Message.Replace(hiddenId.ToString(), "#"), Is.EqualTo(r.Message.Replace(realId.ToString(), "#")));
             }
-            Same(() => view.GetRow(a, w.Member("Tricks", "n"), "Ace"), () => w.GetRow(b, w.Member("Tricks", "n"), "Ace"), a, b);
-            Same(() => view.GetRow(a, w.Member("Moods", "n"), "Ace"), () => w.GetRow(b, w.Member("Moods", "n"), "Ace"), a, b);
+            Same(() => view.GetRow(a, w.Member("Tricks", "n"), "banking:Ace"), () => w.GetRow(b, w.Member("Tricks", "n"), "banking:Ace"), a, b);
+            Same(() => view.GetRow(a, w.Member("Moods", "n"), "banking:Ace"), () => w.GetRow(b, w.Member("Moods", "n"), "banking:Ace"), a, b);
             Same(() => view.RowKeys(a, "Tricks"), () => w.RowKeys(b, "Tricks"), a, b);
             Same(() => view.RowKeys(a, "Moods"), () => w.RowKeys(b, "Moods"), a, b);
-            Assert.That(view.HasRow(a, "Tricks", "Ace"), Is.EqualTo(w.HasRow(b, "Tricks", "Ace")));
-            Assert.That(view.HasRow(a, "Moods", "Ace"), Is.EqualTo(w.HasRow(b, "Moods", "Ace")));
+            Assert.That(view.HasRow(a, "Tricks", "banking:Ace"), Is.EqualTo(w.HasRow(b, "Tricks", "banking:Ace")));
+            Assert.That(view.HasRow(a, "Moods", "banking:Ace"), Is.EqualTo(w.HasRow(b, "Moods", "banking:Ace")));
 
             // 못 보는 ghost가 키인 줄 ↔ 죽은 dead가 키인 줄
             Same(() => view.GetRow(b, w.Member("Known", "n"), ghost), () => w.GetRow(b, w.Member("Known", "n"), dead), ghost, dead);
@@ -479,8 +479,8 @@ namespace Kesa.Engine.Tests.Runtime
 
             // 자기 것은 그대로 보인다
             var own = w.ViewAs("A");
-            Assert.That(((IntValue)own.GetRow(a, w.Member("Moods", "n"), "Ace")).Value, Is.EqualTo(0));
-            Assert.That(own.RowKeys(a, "Tricks"), Is.EqualTo(new[] { "Ace" }));
+            Assert.That(((IntValue)own.GetRow(a, w.Member("Moods", "n"), "banking:Ace")).Value, Is.EqualTo(0));
+            Assert.That(own.RowKeys(a, "Tricks"), Is.EqualTo(new[] { "banking:Ace" }));
         }
 
         [Test]

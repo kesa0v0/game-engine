@@ -49,6 +49,7 @@ namespace Kesa.Engine.Loading
                             ok = false;
                             continue;
                         }
+                        @default = DefIds.Normalize(@default, type, command.Mod);
                     }
                     parameters.Add(new CommandParameter(p.Name, type, p.Span, @default));
                 }

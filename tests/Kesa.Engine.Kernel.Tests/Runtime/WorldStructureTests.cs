@@ -100,8 +100,8 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             _world = new World(LoadClean());
-            _town = _world.Create("Town");
-            _scout = _world.Create("Scout");
+            _town = _world.Create("banking:Town");
+            _scout = _world.Create("banking:Scout");
         }
 
         private SubmitResult Submit(string command, string param, Value arg, Dictionary<string, Value>? extra = null)
@@ -128,7 +128,7 @@ namespace Kesa.Engine.Tests.Runtime
             var units = _world.All("Unit");
             Assert.That(units, Has.Count.EqualTo(2));
             Assert.That(Int(units[1], "Health", "current"), Is.EqualTo(4)); // 3 + 1
-            Assert.That(_world.DefOf(units[1]), Is.EqualTo("Scout"));
+            Assert.That(_world.DefOf(units[1]), Is.EqualTo("banking:Scout"));
         }
 
         [Test]
@@ -185,31 +185,31 @@ namespace Kesa.Engine.Tests.Runtime
         public void AddAndRemoveARow()
         {
             var level = _world.Member("Skill", "level");
-            Assert.That(OnScout("Learn", Skill("Mining")).Succeeded, Is.True);
-            Assert.That(((IntValue)_world.GetRow(_scout, level, "Mining")).Value, Is.EqualTo(4));
-            Assert.That(OnScout("Forget", Skill("Mining")).Succeeded, Is.True);
-            Assert.That(_world.HasRow(_scout, "Skill", "Mining"), Is.False);
+            Assert.That(OnScout("Learn", Skill("banking:Mining")).Succeeded, Is.True);
+            Assert.That(((IntValue)_world.GetRow(_scout, level, "banking:Mining")).Value, Is.EqualTo(4));
+            Assert.That(OnScout("Forget", Skill("banking:Mining")).Succeeded, Is.True);
+            Assert.That(_world.HasRow(_scout, "Skill", "banking:Mining"), Is.False);
         }
 
         [Test]
         public void AddRowWithoutAValueUsesTheDefaults()
         {
-            Assert.That(OnScout("LearnPlain", Skill("Mining")).Succeeded, Is.True);
-            Assert.That(((IntValue)_world.GetRow(_scout, _world.Member("Skill", "level"), "Mining")).Value, Is.EqualTo(0));
+            Assert.That(OnScout("LearnPlain", Skill("banking:Mining")).Succeeded, Is.True);
+            Assert.That(((IntValue)_world.GetRow(_scout, _world.Member("Skill", "level"), "banking:Mining")).Value, Is.EqualTo(0));
         }
 
         [Test]
         public void ARowFromTheDefCannotBeRemoved()
         {
-            var r = OnScout("Forget", Skill("Cooking"));
+            var r = OnScout("Forget", Skill("banking:Cooking"));
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
-            Assert.That(_world.HasRow(_scout, "Skill", "Cooking"), Is.True);
+            Assert.That(_world.HasRow(_scout, "Skill", "banking:Cooking"), Is.True);
         }
 
         [Test]
         public void AnEntityKeyedRowIsAddedAfterAttachingTheComponent()
         {
-            var other = _world.Create("Scout");
+            var other = _world.Create("banking:Scout");
             var r = OnScout("Befriend", new Dictionary<string, Value> { ["other"] = new EntityValue(other) });
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.Succeeded), r.Error?.Message);
             Assert.That(((IntValue)_world.GetRow(_scout, _world.Member("Opinion", "score"), other)).Value, Is.EqualTo(7));
@@ -308,7 +308,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ASpawnedDefIdTypoIsALoadErrorWithASuggestion()
         {
             var d = LoadWithLogic("def f():\n    spawn(\"Scoutt\")\n").Single(x => x.Code == Codes.LnkNotFound);
-            Assert.That(d.Message, Is.EqualTo("there is no Def 'Scoutt'"));
+            Assert.That(d.Message, Is.EqualTo("there is no Def 'banking:Scoutt'"));
             Assert.That(d.Hint, Does.Contain("Scout"));
             Assert.That(d.Span.Line, Is.GreaterThan(0));
         }
@@ -331,7 +331,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ASpawnedDefOfAModThatIsNotADependencyIsNotVisible()
         {
             Mod("banking", schema: Schema, defs: Defs);
-            Mod("scouts", defs: "def f():\n    spawn(\"Scout\")\n");
+            Mod("scouts", defs: "def f():\n    spawn(\"banking:Scout\")\n");
             Load(out var diagnostics);
             Assert.That(diagnostics.Any(x => x.Code == Codes.LnkNotVisible && x.Mod == "scouts"), Is.True,
                 string.Join("\n", diagnostics));

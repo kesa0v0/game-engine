@@ -86,6 +86,9 @@ namespace Kesa.Engine.Loading
             }
         }
 
+        /// <summary>같은 글로 적힌 경로의 조각을 바꾼 것 (Def id 키를 전체 이름으로, G261).</summary>
+        internal PatchPath WithSegments(IReadOnlyList<PathSegment> segments) => new PatchPath(Text, segments);
+
         public bool SameAs(PatchPath other)
         {
             if (Segments.Count != other.Segments.Count) return false;
@@ -227,13 +230,16 @@ namespace Kesa.Engine.Loading
         /// <summary>그 모드 안에서 호출한 순서 (0부터). 모드 순서와 함께 적용 순서를 이룬다 (G41·G50).</summary>
         public int Index { get; }
 
+        /// <summary>대상 Def의 전체 이름 (패치한 모드 기준으로 풂, G261).</summary>
         public string TargetId { get; }
         public SourceSpan TargetSpan { get; }
-        public PatchPath Path { get; }
+
+        /// <summary>③을 지나면 Def id 키 조각이 전체 이름인 정규형이다 (G261). 적힌 글은 <see cref="PatchPath.Text"/>.</summary>
+        public PatchPath Path { get; internal set; }
         public SourceSpan PathSpan { get; }
 
-        /// <summary><c>remove</c>의 2인자 형(컴포넌트 떼기)이면 null.</summary>
-        public Value? Value { get; }
+        /// <summary><c>remove</c>의 2인자 형(컴포넌트 떼기)이면 null. ③을 지나면 Def id가 전체 이름이다.</summary>
+        public Value? Value { get; internal set; }
 
         public SourceSpan ValueSpan { get; }
 

@@ -44,7 +44,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ADerivedSourceAndFunctionDefaultsAreStoredOnce()
         {
             NewWorld();
-            var scout = _world.Create("Scout");
+            var scout = _world.Create("banking:Scout");
             Assert.That(Int(_world.Get(scout, M("Health", "current"))), Is.EqualTo(24)); // max = 12 * 2
             Assert.That(Int(_world.Get(scout, M("Health", "half"))), Is.EqualTo(12));    // 앞 칸 current를 읽는다
             _world.Set(scout, M("Health", "current"), new IntValue(1));
@@ -55,17 +55,17 @@ namespace Kesa.Engine.Tests.Runtime
         public void KeyedRowFunctionDefaultsAreComputedWhenTheRowIsCreated()
         {
             NewWorld();
-            var scout = _world.Create("Scout");
-            Assert.That(Int(_world.GetRow(scout, M("Skill", "level"), "Cooking")), Is.EqualTo(5));
-            _world.AddRow(scout, "Skill", "Medicine");
-            Assert.That(Int(_world.GetRow(scout, M("Skill", "level"), "Medicine")), Is.EqualTo(5));
+            var scout = _world.Create("banking:Scout");
+            Assert.That(Int(_world.GetRow(scout, M("Skill", "level"), "banking:Cooking")), Is.EqualTo(5));
+            _world.AddRow(scout, "Skill", "banking:Medicine");
+            Assert.That(Int(_world.GetRow(scout, M("Skill", "level"), "banking:Medicine")), Is.EqualTo(5));
         }
 
         [Test]
         public void ARuntimeAttachedComponentComputesItsDefaultsToo()
         {
             NewWorld();
-            var rock = _world.Create("Rock");
+            var rock = _world.Create("banking:Rock");
             _world.Add(rock, "Health", new Init(M("Health", "current"), new IntValue(8)));
             Assert.That(Int(_world.Get(rock, M("Health", "half"))), Is.EqualTo(4));
         }
@@ -77,12 +77,12 @@ namespace Kesa.Engine.Tests.Runtime
                 "component(\"Z\", n=field(int, default=lambda z: 1 / 2))\n" +
                 "deftype(\"Zed\", components=[\"Z\"])\n", defs: "Zed(\"zed\")\n");
             _world = new World(LoadClean());
-            var first = _world.Create("zed", new Init(M("Z", "n"), new IntValue(1)));
-            var failure = Assert.Throws<WorldException>(() => _world.Create("zed"))!;
+            var first = _world.Create("banking:zed", new Init(M("Z", "n"), new IntValue(1)));
+            var failure = Assert.Throws<WorldException>(() => _world.Create("banking:zed"))!;
             Assert.That(failure.Code, Is.EqualTo(Codes.RunType));
             Assert.That(failure.Message, Does.Contain("default of Z.n"));
             Assert.That(_world.All("Zed").Count, Is.EqualTo(1));
-            Assert.That(_world.Create("zed", new Init(M("Z", "n"), new IntValue(2))).Value, Is.EqualTo(first.Value + 1));
+            Assert.That(_world.Create("banking:zed", new Init(M("Z", "n"), new IntValue(2))).Value, Is.EqualTo(first.Value + 1));
         }
 
         [Test]
@@ -93,7 +93,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "component(\"Mark\", n=field(int, default=0))\n" +
                 "deftype(\"Rock\", components=[\"Mark\"])\n", defs: "Rock(\"rock\")\n");
             _world = new World(LoadClean());
-            var rock = _world.Create("rock");
+            var rock = _world.Create("banking:rock");
             var e = Assert.Throws<WorldException>(() => _world.Add(rock, "Bad"))!;
             Assert.That(e.Code, Is.EqualTo(Codes.RunType));
             Assert.That(_world.Has(rock, "Bad"), Is.False);
@@ -106,7 +106,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "component(\"P\", a=field(int, default=lambda p: p.b), b=field(int, default=lambda p: 1))\n" +
                 "deftype(\"Pt\", components=[\"P\"])\n", defs: "Pt(\"pt\")\n");
             _world = new World(LoadClean());
-            var e = Assert.Throws<WorldException>(() => _world.Create("pt"))!;
+            var e = Assert.Throws<WorldException>(() => _world.Create("banking:pt"))!;
             Assert.That(e.Code, Is.EqualTo(Codes.RunMissingValue));
             Assert.That(e.Message, Does.Contain("P.b").And.Contain("no value yet"));
             Assert.That(_world.All("Pt"), Is.Empty);

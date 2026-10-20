@@ -76,7 +76,7 @@ namespace Kesa.Engine.Tests.Loading
                 "    Health: Health | None\n" +
                 "    Skill: _Skill_rows | None\n" +
                 "    Resource: _Resource_consts\n" +
-                "    def __init__(self, id: str, /, *, parent: Literal[\"Wood\", \"Iron\"] | None = None, abstract: bool = False, " +
+                "    def __init__(self, id: str, /, *, parent: Literal[\"Wood\", \"Iron\", \"core:Wood\", \"core:Iron\"] | None = None, abstract: bool = False, " +
                 "override: bool = False) -> None: ...\n" +
                 "\n" +
                 "class _Unit_consts:\n" +
@@ -84,29 +84,29 @@ namespace Kesa.Engine.Tests.Loading
                 "    @property\n    def ratio(self) -> fixed: ...\n" +
                 "    @property\n    def label(self) -> TextKey: ...\n" +
                 "    @property\n    def tags(self) -> list[str]: ...\n" +
-                "    @property\n    def cost(self) -> dict[Literal[\"Wood\", \"Iron\"], int]: ...\n" +
+                "    @property\n    def cost(self) -> dict[Literal[\"Wood\", \"Iron\", \"core:Wood\", \"core:Iron\"], int]: ...\n" +
                 "\n" +
                 "class Unit:\n" +
                 "    Health: Health\n" +
                 "    Skill: _Skill_rows\n" +
                 "    Seatable: Seatable | None\n" +
                 "    Unit: _Unit_consts\n" +
-                "    def __init__(self, id: str, /, *, parent: Literal[\"Base\", \"Scout\"] | None = None, abstract: bool = False, " +
+                "    def __init__(self, id: str, /, *, parent: Literal[\"Base\", \"Scout\", \"core:Base\", \"core:Scout\"] | None = None, abstract: bool = False, " +
                 "override: bool = False, move: int = ..., ratio: fixed = ..., label: TextKey = ..., tags: list[str] = ..., " +
-                "cost: dict[Literal[\"Wood\", \"Iron\"], int] = ..., Health: Health = ..., " +
-                "Skill: dict[Literal[\"Wood\", \"Iron\"], Skill] = ...) -> None: ...\n" +
+                "cost: dict[Literal[\"Wood\", \"Iron\", \"core:Wood\", \"core:Iron\"], int] = ..., Health: Health = ..., " +
+                "Skill: dict[Literal[\"Wood\", \"Iron\", \"core:Wood\", \"core:Iron\"], Skill] = ...) -> None: ...\n" +
                 "\n" +
                 "class Tick: ...  # sent by the engine; handle it with @on(Tick)\n" +
                 "\n" +
                 "class patch:\n" +
                 "    @staticmethod\n" +
-                "    def set(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\"], path: str, value: Any) -> None: ...\n" +
+                "    def set(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any) -> None: ...\n" +
                 "    @staticmethod\n" +
-                "    def add(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\"], path: str, value: Any) -> None: ...\n" +
+                "    def add(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any) -> None: ...\n" +
                 "    @staticmethod\n" +
-                "    def append(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\"], path: str, value: Any) -> None: ...\n" +
+                "    def append(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any) -> None: ...\n" +
                 "    @staticmethod\n" +
-                "    def remove(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\"], path: str, value: Any = ...) -> None: ...\n" +
+                "    def remove(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any = ...) -> None: ...\n" +
                 "\n" +
                 "def mod_loaded(mod: Never) -> bool: ...\n" +
                 "\n" +
@@ -122,9 +122,9 @@ namespace Kesa.Engine.Tests.Loading
                 "@overload\n" +
                 "def query(name: str, /, *more: str) -> list[Any]: ...\n" +
                 "@overload\n" +
-                "def spawn(def_id: Literal[\"Wood\", \"Iron\"], /, **components: Any) -> Resource: ...\n" +
+                "def spawn(def_id: Literal[\"Wood\", \"Iron\", \"core:Wood\", \"core:Iron\"], /, **components: Any) -> Resource: ...\n" +
                 "@overload\n" +
-                "def spawn(def_id: Literal[\"Scout\"], /, **components: Any) -> Unit: ...\n" +
+                "def spawn(def_id: Literal[\"Scout\", \"core:Scout\"], /, **components: Any) -> Unit: ...\n" +
                 "@overload\n" +
                 "def spawn(def_id: str, /, **components: Any) -> Any: ...\n" +
                 "\n" +
@@ -178,7 +178,7 @@ namespace Kesa.Engine.Tests.Loading
             var stub = StubGenerator.Generate("core", result);
             Assert.That(stub, Does.Contain("\n# the mod failed to load (see engine check); these declarations come from before it was disabled.\n"));
             Assert.That(stub, Does.Contain("class Unit:"));
-            Assert.That(stub, Does.Contain("cost: dict[Literal[\"Wood\"], int] = ..."));
+            Assert.That(stub, Does.Contain("cost: dict[Literal[\"Wood\", \"core:Wood\"], int] = ..."));
         }
 
         [Test]
@@ -262,7 +262,7 @@ namespace Kesa.Engine.Tests.Loading
         {
             Mod("core", schema: Schema, defs: Defs + "Unit(\"Tower\", abstract=True)\n");
             var stub = StubFor("core", LoadClean());
-            Assert.That(stub, Does.Contain("parent: Literal[\"Base\", \"Scout\", \"Tower\"] | None"));
+            Assert.That(stub, Does.Contain("parent: Literal[\"Base\", \"Scout\", \"Tower\", \"core:Base\", \"core:Scout\", \"core:Tower\"] | None"));
             Assert.That(stub, Does.Not.Contain("Literal[\"Wood\", \"Iron\", \"Base\"]"));
         }
 
@@ -310,11 +310,18 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(stub, Does.Contain("class _Owner_rows:\n    def __getitem__(self, key: Any, /) -> Owner | None: ...\n"));
         }
 
+        // 내 모드의 짧은 이름이 먼저, 그 뒤에 보이는 모든 전체 이름 (G265). 다른 모드의 것은 전체 이름으로만
         [Test]
-        public void IdsWithQuotesAndBackslashesAreEscaped()
+        public void MyShortNamesComeFirstThenEveryVisibleFullName()
         {
-            Mod("core", schema: "deftype(\"Resource\")\n", defs: "Resource(\"a\\\"b\")\n");
-            Assert.That(StubFor("core", LoadClean()), Does.Contain("Literal[\"a\\\"b\"]"));
+            Mod("core", schema: "component(\"Skill\", key=\"Resource\", level=const(int, default=1))\n" +
+                                "deftype(\"Resource\")\ndeftype(\"Unit\", components=[\"Skill\"])\n",
+                defs: "Resource(\"Wood\")\n");
+            Mod("addon", defs: "Resource(\"ores/Iron\")\nResource(\"Coal\")\n", extra: ", dependencies=[\"core\"]");
+            var stub = StubFor("addon", LoadClean());
+            Assert.That(stub, Does.Contain("def spawn(def_id: Literal[\"ores/Iron\", \"Coal\", \"core:Wood\", \"addon:ores/Iron\", \"addon:Coal\"]"));
+            // 속성으로 읽는 줄 키는 내 모드의 식별자 이름만 (u.Skill.Coal)
+            Assert.That(stub, Does.Contain("class _Skill_rows:\n    @property\n    def Coal(self) -> Skill: ...\n    def __getitem__"));
         }
 
         [Test]
@@ -334,7 +341,7 @@ namespace Kesa.Engine.Tests.Loading
                 defs: "Unit(\"Grunt\", id=3)\n");
             var stub = StubFor("core", LoadClean());
             Assert.That(stub, Does.Contain("    def __init__(_self, /, *, self: int = ...) -> None: ...\n"));
-            Assert.That(stub, Does.Contain("    def __init__(self, _id: str, /, *, parent: Literal[\"Grunt\"] | None = None, " +
+            Assert.That(stub, Does.Contain("    def __init__(self, _id: str, /, *, parent: Literal[\"Grunt\", \"core:Grunt\"] | None = None, " +
                                            "abstract: bool = False, override: bool = False, id: int = ..., Life: Life = ...) -> None: ...\n"));
         }
 

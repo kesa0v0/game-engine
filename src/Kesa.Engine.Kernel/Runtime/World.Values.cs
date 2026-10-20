@@ -135,13 +135,15 @@ namespace Kesa.Engine.Runtime
             if (problem != null) throw new WorldException(Codes.RunType, "'" + display + "': " + problem);
             if (spec.Type is DefIdTypeRef defIdType)
             {
-                string id = ((StrValue)value).Value;
+                var str = (StrValue)value;
+                string id = ScriptDefId(str.Value);
                 if (!_defs.TryGet(id, out var def) || def.Type.Name != defIdType.Target.Name)
                 {
                     var ids = new List<string>();
                     foreach (var d in _defs.OfType(defIdType.Target.Name)) ids.Add(d.Id);
-                    throw Unknown("'" + display + "': there is no " + defIdType.Target.Name + " '" + id + "'", id, ids);
+                    throw UnknownDef("'" + display + "': there is no " + defIdType.Target.Name + " '" + id + "'", id, ids);
                 }
+                if (id != str.Value) value = new StrValue(id, str.Origin);
             }
             var normalized = Normalize(spec.Type, value);
             if (spec.Min != null && CompareValues(normalized, spec.Min) < 0)

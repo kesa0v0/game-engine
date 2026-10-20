@@ -50,7 +50,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             var screen = new StringWriter();
             var errors = new StringWriter();
-            int code = ConsoleHost.Play.Run(new[] { _root, "--seat", "red=Vault" }, new StringReader(input), screen, errors);
+            int code = ConsoleHost.Play.Run(new[] { _root, "--seat", "red=banking:Vault" }, new StringReader(input), screen, errors);
             return (code, screen.ToString().Replace("\r\n", "\n"), errors.ToString());
         }
 
@@ -60,8 +60,8 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Ui("# 내 금고\nbanking.gold\n\nbanking.coins  # 목록은 한 줄씩\n");
             var (code, screen, errors) = Play("1\n1\n:q\n"); // Open, 그다음 Earn
             Assert.That(code, Is.EqualTo(0), errors);
-            Assert.That(screen, Does.Contain("[red] #1 Vault\n  0\n  gold\n  0\n"));
-            Assert.That(screen, Does.Contain("[red] #1 Vault\n  5\n  gold\n  5\n"));
+            Assert.That(screen, Does.Contain("[red] #1 banking:Vault\n  0\n  gold\n  0\n"));
+            Assert.That(screen, Does.Contain("[red] #1 banking:Vault\n  5\n  gold\n  5\n"));
             Assert.That(screen, Does.Not.Contain("Purse(gold="));
         }
 
@@ -82,7 +82,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Ui("banking.broken\nbanking.gold\n");
             var (code, screen, errors) = Play("1\n1\n:q\n");
             Assert.That(code, Is.EqualTo(0), errors);
-            Assert.That(screen, Does.Contain("[red] #1 Vault\n  banking/ui/console.txt:1: "));
+            Assert.That(screen, Does.Contain("[red] #1 banking:Vault\n  banking/ui/console.txt:1: "));
             Assert.That(screen, Does.Contain("\n  5\n"));
         }
 
@@ -91,7 +91,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             var (code, screen, errors) = Play("1\n:q\n");
             Assert.That(code, Is.EqualTo(0), errors);
-            Assert.That(screen, Does.Contain("#1 Vault  Seatable() Purse(gold=0) Worth(total=1)"));
+            Assert.That(screen, Does.Contain("#1 banking:Vault  Seatable() Purse(gold=0) Worth(total=1)"));
         }
 
         [Test]
@@ -100,7 +100,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
             // 동전을 닦으면 금고의 도장은 그대로지만 Worth.total은 바뀐다 (G251)
             var (code, screen, errors) = Play("1\n2\n:q\n"); // Open, 그다음 Polish
             Assert.That(code, Is.EqualTo(0), errors);
-            Assert.That(screen, Does.Contain("#1 Vault  Seatable() Purse(gold=0) Worth(total=2)"));
+            Assert.That(screen, Does.Contain("#1 banking:Vault  Seatable() Purse(gold=0) Worth(total=2)"));
         }
     }
 }

@@ -7,7 +7,7 @@ namespace Kesa.Engine.Tests.Loading
     /// <summary><c>if mod_loaded("m"):</c> 가드 (spec-gaps G46)와 건너뛴 패치 알림 (G38).</summary>
     public class GuardTests : LoaderTestBase
     {
-        private static string PatchLine(string path) => "    patch.set(\"A\", \"" + path + "\", 1)\n";
+        private static string PatchLine(string path) => "    patch.set(\"core:A\", \"" + path + "\", 1)\n";
 
         // 이름이 서로 비슷하면 ModSorter가 "혹시 …?" 경고를 내므로(G9) 일부러 다른 이름을 쓴다
         private static string ThreeWay =>
@@ -17,7 +17,7 @@ namespace Kesa.Engine.Tests.Loading
 
         private const string Both = ", optional=[\"banking\", \"scouts\"]";
 
-        // 패치 대상 Def "A"를 가진 모드. 패치하는 모드는 이 모드에 의존한다 (③이 대상을 검사한다)
+        // 패치 대상 Def "core:A"를 가진 모드. 패치하는 모드는 이 모드에 의존한다 (③이 대상을 검사한다)
         private const string CoreDep = ", dependencies=[\"core\"]";
 
         // 패치 경로 b, c, d가 있는 타입 (③이 경로를 스키마에서 검사한다)
@@ -110,10 +110,10 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void RequiredDependencyIsAlwaysLoadedInsideAGuard()
         {
-            Mod("base", schema: UnitSchema, defs: "Unit(\"A\")\n");
-            Mod("compat", defs: "if mod_loaded(\"base\"):\n" + PatchLine("b"), extra: ", dependencies=[\"base\"]");
+            Core();
+            Mod("compat", defs: "if mod_loaded(\"core\"):\n" + PatchLine("b"), extra: ", dependencies=[\"core\"]");
             var result = LoadClean();
-            Assert.That(result.Patches.Single().Guards, Is.EqualTo(new[] { "base" }));
+            Assert.That(result.Patches.Single().Guards, Is.EqualTo(new[] { "core" }));
         }
 
         [Test]
@@ -197,7 +197,7 @@ namespace Kesa.Engine.Tests.Loading
             // 엔진이 주는 이름은 덮어쓸 수 있는 내장이다 (G112). 덮어쓴 뒤의 if는 가드가 아니라 평범한 조건이다
             Mod("core", defs: "mod_loaded = 1\n");
             LoadClean();
-            Mod("other", defs: "def mod_loaded(x):\n    return True\nif mod_loaded(\"core\"):\n    patch.set(\"X\", \"n\", 1)\n");
+            Mod("other", defs: "def mod_loaded(x):\n    return True\nif mod_loaded(\"core\"):\n    patch.set(\"core:X\", \"n\", 1)\n");
             Load(out var diags);
             Assert.That(diags.Select(d => d.Code), Does.Not.Contain(Codes.EvlGuardBody));
             Assert.That(diags.Select(d => d.Code), Does.Not.Contain(Codes.EvlModNotDeclared));

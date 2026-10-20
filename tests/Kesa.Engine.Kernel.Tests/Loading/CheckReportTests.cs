@@ -43,12 +43,12 @@ namespace Kesa.Engine.Tests.Loading
                 "    {\n" +
                 "      \"code\": \"LNK001\",\n" +
                 "      \"severity\": \"error\",\n" +
-                "      \"message\": \"there is no Resource 'Wod'\",\n" +
+                "      \"message\": \"there is no Resource 'core:Wod'\",\n" +
                 "      \"mod\": \"core\",\n" +
                 "      \"file\": \"core/defs/defs.py\",\n" +
                 "      \"line\": 2,\n" +
                 "      \"col\": 21,\n" +
-                "      \"hint\": \"did you mean 'Wood'?\",\n" +
+                "      \"hint\": \"did you mean 'core:Wood'?\",\n" +
                 "      \"related\": []\n" +
                 "    }\n" +
                 "  ]\n" +
@@ -100,8 +100,8 @@ namespace Kesa.Engine.Tests.Loading
         public void LoadedModsAreInLoadOrderAndDisabledOnesInIdOrder()
         {
             Mod("core", schema: Schema, defs: "Resource(\"Wood\")\n");
-            Mod("zeta", defs: "Resource(\"Wood\")\n", extra: ", dependencies=[\"core\"]");
-            Mod("alpha", defs: "Resource(\"Wood\")\n", extra: ", dependencies=[\"core\"]");
+            Mod("zeta", defs: "Resource(\"Wood\")\nResource(\"Wood\")\n", extra: ", dependencies=[\"core\"]");
+            Mod("alpha", defs: "Resource(\"Wood\")\nResource(\"Wood\")\n", extra: ", dependencies=[\"core\"]");
             var result = Load(out var diags);
             var json = CheckReport.ToJson(diags, result);
             Assert.That(json, Does.Contain("\"mods\": {\"loaded\": [\"core\"], \"disabled\": [\"alpha\", \"zeta\"]}"));
@@ -125,8 +125,8 @@ namespace Kesa.Engine.Tests.Loading
             Mod("core", schema: Schema, defs: "Resource(\"Wood\")\nUnit(\"Scout\", cost={\"Wod\": 1})\n");
             var result = Load(out var diags);
             const string expected =
-                "mods/core/defs/defs.py:2:21: error LNK001: there is no Resource 'Wod'\n" +
-                "    hint: did you mean 'Wood'?\n" +
+                "mods/core/defs/defs.py:2:21: error LNK001: there is no Resource 'core:Wod'\n" +
+                "    hint: did you mean 'core:Wood'?\n" +
                 "\n" +
                 "errors: 1, warnings: 0, info: 0; mods loaded: 0, disabled: 1 (core)\n";
             Assert.That(CheckReport.ToText(diags, result, "mods/"), Is.EqualTo(expected));

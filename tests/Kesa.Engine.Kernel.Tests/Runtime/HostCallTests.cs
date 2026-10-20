@@ -137,7 +137,7 @@ namespace Kesa.Engine.Tests.Runtime
                 var cost = a.Member("Terrain", "cost");
                 a.Set(at, cost, new IntValue(((IntValue)a.Get(at, cost)).Value + by));
             });
-            core.Writes("def terrain.build() -> None", "", (HostAccess a) => { _built = a.Create("Grass"); });
+            core.Writes("def terrain.build() -> None", "", (HostAccess a) => { _built = a.Create("core:Grass"); });
             core.Writes("def terrain.roll(at: Ref[Tile]) -> None", "", (HostAccess a, EntityId at) =>
                 a.Set(at, a.Member("Terrain", "cost"), new IntValue(a.RandInt(100, 105))));
             core.Writes("def debug.sneak(at: Ref[Tile]) -> None", "", (HostAccess a, EntityId at) =>
@@ -155,9 +155,9 @@ namespace Kesa.Engine.Tests.Runtime
             var loaded = ContentLoader.Load(_root, order, bag, host);
             Assert.That(bag.ToSortedList(), Is.Empty, string.Join("\n", bag.ToSortedList()));
             _world = new World(loaded);
-            _a = _world.Create("Grass");
-            _b = _world.Create("Grass");
-            _dead = _world.Create("Grass");
+            _a = _world.Create("core:Grass");
+            _b = _world.Create("core:Grass");
+            _dead = _world.Create("core:Grass");
             _world.Destroy(_dead);
             _cost = _world.Member("Terrain", "cost");
         }

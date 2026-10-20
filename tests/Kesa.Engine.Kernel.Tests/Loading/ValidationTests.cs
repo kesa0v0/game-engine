@@ -57,7 +57,7 @@ namespace Kesa.Engine.Tests.Loading
         public void AScalarWithoutDefaultMustHaveAValue()
         {
             var d = Single("Unit(\"Scout\", Health=Health(regen=1))\n", Codes.ValMissing);
-            Assert.That(d.Message, Does.Contain("'move'").And.Contain("Scout"));
+            Assert.That(d.Message, Does.Contain("'move'").And.Contain("core:Scout"));
             Assert.That(d.Hint, Does.Contain("default="));
             Assert.That((d.Mod, d.Line), Is.EqualTo(("core", 2)));
         }
@@ -79,17 +79,17 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AnAbstractDefIsExemptButItsChildrenAreNot()
         {
-            Run("Unit(\"Base\", abstract=True)\nUnit(\"Scout\", parent=\"Base\", move=1, Health=Health(regen=0))\n", out var diags);
+            Run("Unit(\"Base\", abstract=True)\nUnit(\"Scout\", parent=\"core:Base\", move=1, Health=Health(regen=0))\n", out var diags);
             Assert.That(diags, Is.Empty, string.Join("\n", diags));
 
-            Run("Unit(\"Base\", abstract=True, move=2)\nUnit(\"Scout\", parent=\"Base\")\n", out var missing);
+            Run("Unit(\"Base\", abstract=True, move=2)\nUnit(\"Scout\", parent=\"core:Base\")\n", out var missing);
             Assert.That(missing.Single().Message, Does.Contain("'regen'"));
         }
 
         [Test]
         public void AValueInheritedFromTheParentCounts()
         {
-            Run("Unit(\"Base\", abstract=True, move=2, Health=Health(regen=1))\nUnit(\"Scout\", parent=\"Base\")\n", out var diags);
+            Run("Unit(\"Base\", abstract=True, move=2, Health=Health(regen=1))\nUnit(\"Scout\", parent=\"core:Base\")\n", out var diags);
             Assert.That(diags, Is.Empty, string.Join("\n", diags));
         }
 
@@ -97,7 +97,7 @@ namespace Kesa.Engine.Tests.Loading
         public void AComponentAttachedByAPatchNeedsItsRequiredValuesAndThePatchModIsBlamed()
         {
             Mod("core", schema: Schema, defs: Wood + ScoutOk);
-            Mod("addon", defs: "patch.set(\"Scout\", \"Morale\", Morale())\n", extra: CoreDep);
+            Mod("addon", defs: "patch.set(\"core:Scout\", \"Morale\", Morale())\n", extra: CoreDep);
             var result = Load(out var diags);
             var d = diags.Single();
             Assert.That((d.Code, d.Mod, d.Line), Is.EqualTo((Codes.ValMissing, "addon", 1)));
@@ -114,7 +114,7 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(diags, Is.Empty, string.Join("\n", diags));
             Assert.That(result.Disabled, Is.Empty);
             // 동결본에는 core의 Scout에도 weight가 기본값으로 채워진다 (G69·G74)
-            result.Frozen.TryGet("Scout", out var scout);
+            result.Frozen.TryGet("core:Scout", out var scout);
             scout.Consts.TryGet("weight", out var weight);
             Assert.That(((Kesa.Engine.Script.IntValue)weight.Value).Value, Is.EqualTo(4));
         }
@@ -236,7 +236,7 @@ namespace Kesa.Engine.Tests.Loading
         public void AKeyedRowsValuesAreCheckedToo()
         {
             Mod("core", schema: Schema, defs: Wood + ScoutOk);
-            Mod("addon", defs: "patch.set(\"Scout\", \"Skill.Wood\", Skill(level=30))\n", extra: CoreDep);
+            Mod("addon", defs: "patch.set(\"core:Scout\", \"Skill['core:Wood']\", Skill(level=30))\n", extra: CoreDep);
             Load(out var diags);
             var d = diags.Single();
             Assert.That((d.Code, d.Mod), Is.EqualTo((Codes.ValRange, "addon")));
@@ -248,7 +248,7 @@ namespace Kesa.Engine.Tests.Loading
         public void ARangeBrokenByAPatchIsBlamedOnThePatchingMod()
         {
             Mod("core", schema: Schema, defs: Wood + ScoutOk);
-            Mod("addon", defs: "patch.add(\"Scout\", \"move\", -10)\n", extra: CoreDep);
+            Mod("addon", defs: "patch.add(\"core:Scout\", \"move\", -10)\n", extra: CoreDep);
             var result = Load(out var diags);
             var d = diags.Single();
             Assert.That((d.Code, d.Mod, d.Line), Is.EqualTo((Codes.ValRange, "addon", 1)));
@@ -259,7 +259,7 @@ namespace Kesa.Engine.Tests.Loading
         public void AnInheritedBadValueIsBlamedOnTheParentsMod()
         {
             Mod("core", schema: Schema, defs: Wood + "Unit(\"Base\", abstract=True, move=-5, Health=Health(regen=1))\n");
-            Mod("addon", defs: "Unit(\"Scout\", parent=\"Base\")\nUnit(\"Archer\", parent=\"Base\")\n", extra: CoreDep);
+            Mod("addon", defs: "Unit(\"Scout\", parent=\"core:Base\")\nUnit(\"Archer\", parent=\"core:Base\")\n", extra: CoreDep);
             var result = Load(out var diags);
             Assert.That(diags.Where(d => d.Code == Codes.ValRange).Select(d => d.Mod), Is.EqualTo(new[] { "core" }));
             Assert.That(result.Disabled, Does.Contain("core"));
@@ -271,10 +271,10 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("n=const(int, default=500, max=100)", Codes.ValRange)]
         [TestCase("n=const(int, default=-1, min=0)", Codes.ValRange)]
         [TestCase("n=const(list[int], default=[1, 99], max=9)", Codes.ValRange)]
-        [TestCase("home=const(DefId[\"Building\"], default=\"Nope\")", Codes.LnkNotFound)]
-        [TestCase("home=const(DefId[\"Building\"], default=\"Wall\")", Codes.LnkAbstract)]
-        [TestCase("home=const(DefId[\"Building\"], default=\"Wood\")", Codes.LnkWrongType)]
-        [TestCase("homes=const(list[DefId[\"Building\"]], default=[\"Hut\", \"Nope\"])", Codes.LnkNotFound)]
+        [TestCase("home=const(DefId[\"Building\"], default=\"core:Nope\")", Codes.LnkNotFound)]
+        [TestCase("home=const(DefId[\"Building\"], default=\"core:Wall\")", Codes.LnkAbstract)]
+        [TestCase("home=const(DefId[\"Building\"], default=\"core:Wood\")", Codes.LnkWrongType)]
+        [TestCase("homes=const(list[DefId[\"Building\"]], default=[\"core:Hut\", \"core:Nope\"])", Codes.LnkNotFound)]
         public void ASchemaDefaultIsCheckedLikeAValueAndBlamesTheDeclaringMod(string member, string code)
         {
             Mod("core", schema: "deftype(\"Resource\")\ndeftype(\"Building\")\n", defs: "Resource(\"Wood\")\nBuilding(\"Hut\")\nBuilding(\"Wall\", abstract=True)\n");

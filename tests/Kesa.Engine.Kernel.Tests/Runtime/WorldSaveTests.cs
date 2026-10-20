@@ -49,10 +49,10 @@ namespace Kesa.Engine.Tests.Runtime
         /// </summary>
         private void BuildNastyWorld()
         {
-            _town = _world.Create("Town");
-            _a = _world.Create("Scout");
-            _b = _world.Create("Scout");
-            _c = _world.Create("Scout");
+            _town = _world.Create("banking:Town");
+            _a = _world.Create("banking:Scout");
+            _b = _world.Create("banking:Scout");
+            _c = _world.Create("banking:Scout");
             _world.Destroy(_b);
 
             _world.Set(_a, M("Health", "current"), new IntValue(5)); // 기본값과 같아도 쓴 값이다
@@ -60,8 +60,8 @@ namespace Kesa.Engine.Tests.Runtime
             _world.Set(_a, M("Name", "text"), new StrValue("검은 늑대 \"대장\"\n\\"));
             _world.Set(_a, M("Name", "calm"), BoolValue.False);
             _world.Set(_a, M("Home", "city"), new EntityValue(_town));
-            _world.SetRow(_a, M("Skill", "level"), "Cooking", new IntValue(3)); // Def에서 온 줄
-            _world.AddRow(_a, "Skill", "Mining");                               // 붙인 줄, 값 없음
+            _world.SetRow(_a, M("Skill", "level"), "banking:Cooking", new IntValue(3)); // Def에서 온 줄
+            _world.AddRow(_a, "Skill", "banking:Mining");                               // 붙인 줄, 값 없음
             _world.Add(_a, "Opinion");
             _world.AddRow(_a, "Opinion", _c, new Init(M("Opinion", "score"), new IntValue(-2)));
             _world.Add(_a, "Wounded", new Init(M("Wounded", "turns"), new IntValue(3)));
@@ -70,8 +70,8 @@ namespace Kesa.Engine.Tests.Runtime
             _world.AddRow(_c, "Die", -1, new Init(M("Die", "value"), new IntValue(6)));
             _world.AddContribution(_a, M("Power", "total"), "add", new IntValue(2), _c);
             _world.AddContribution(_c, M("Power", "total"), "add", new FixedValue(Fixed.FromRaw(250_000)));
-            _world.SetRow(_a, M("Mood", "v"), "Mining", new IntValue(4)); // keys="all": 처음 쓸 때 기록이 생긴다
-            var ruin = _world.Create("Town");
+            _world.SetRow(_a, M("Mood", "v"), "banking:Mining", new IntValue(4)); // keys="all": 처음 쓸 때 기록이 생긴다
+            var ruin = _world.Create("banking:Town");
             _world.Set(_c, M("Home", "city"), new EntityValue(ruin));
             _world.Destroy(ruin); // _c의 칸은 죽은 #5를 가리킨 채 남는다 (G91)
         }
@@ -121,9 +121,9 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(((EntityValue)w.Get(_a, H("Home", "city"))).Id, Is.EqualTo(_town));
             Assert.That(w.Inverse(_town, H("Home", "city")), Is.EqualTo(new[] { _a }));
 
-            Assert.That(w.RowKeys(_a, "Skill"), Is.EqualTo(new[] { "Cooking", "Mining" }));
-            Assert.That(((IntValue)w.GetRow(_a, H("Skill", "level"), "Cooking")).Value, Is.EqualTo(3));
-            Assert.That(((IntValue)w.GetRow(_a, H("Skill", "level"), "Mining")).Value, Is.EqualTo(0));
+            Assert.That(w.RowKeys(_a, "Skill"), Is.EqualTo(new[] { "banking:Cooking", "banking:Mining" }));
+            Assert.That(((IntValue)w.GetRow(_a, H("Skill", "level"), "banking:Cooking")).Value, Is.EqualTo(3));
+            Assert.That(((IntValue)w.GetRow(_a, H("Skill", "level"), "banking:Mining")).Value, Is.EqualTo(0));
             Assert.That(w.RowEntities(_a, "Opinion"), Is.EqualTo(new[] { _c }));
             Assert.That(((IntValue)w.GetRow(_a, H("Opinion", "score"), _c)).Value, Is.EqualTo(-2));
             Assert.That(w.RowInts(_c, "Die"), Is.EqualTo(new long[] { -1, 3 }));
@@ -131,13 +131,13 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(w.Has(_a, "Wounded"), Is.True);
             Assert.That(w.Has(_c, "Wounded"), Is.False);
             Assert.That(((IntValue)w.Get(_a, H("Power", "total"))).Value, Is.EqualTo(2));
-            Assert.That(((IntValue)w.GetRow(_a, H("Mood", "v"), "Mining")).Value, Is.EqualTo(4));
-            Assert.That(((IntValue)w.GetRow(_a, H("Mood", "v"), "Cooking")).Value, Is.EqualTo(0));
+            Assert.That(((IntValue)w.GetRow(_a, H("Mood", "v"), "banking:Mining")).Value, Is.EqualTo(4));
+            Assert.That(((IntValue)w.GetRow(_a, H("Mood", "v"), "banking:Cooking")).Value, Is.EqualTo(0));
             Assert.That(w.Get(_c, H("Home", "city")), Is.InstanceOf<NoneValue>()); // 죽은 대상은 선택적 Ref에서 None
 
             // Def에서 온 줄은 여전히 뗄 수 없고, 붙인 줄은 뗄 수 있다
-            Assert.Throws<WorldException>(() => w.RemoveRow(_a, "Skill", "Cooking"));
-            w.RemoveRow(_a, "Skill", "Mining");
+            Assert.Throws<WorldException>(() => w.RemoveRow(_a, "Skill", "banking:Cooking"));
+            w.RemoveRow(_a, "Skill", "banking:Mining");
         }
 
         [Test]
@@ -145,7 +145,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             BuildNastyWorld();
             var w = Reload(_world.Save());
-            Assert.That(w.Create("Scout"), Is.EqualTo(new EntityId(6)));
+            Assert.That(w.Create("banking:Scout"), Is.EqualTo(new EntityId(6)));
             Assert.That(w.AddContribution(_a, w.Member("Power", "total"), "add", new IntValue(1)), Is.EqualTo(3));
         }
 
@@ -164,9 +164,9 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void TheFormatIsFixed()
         {
-            var town = _world.Create("Town");
+            var town = _world.Create("banking:Town");
             _world.Set(town, M("Health", "regen"), new FixedValue(Fixed.FromRaw(1_500_000)));
-            _world.Create("Scout");
+            _world.Create("banking:Scout");
             _world.Destroy(_world.All("Unit")[0]);
             _world.Add(town, "Die");
             _world.AddRow(town, "Die", 2);
@@ -214,7 +214,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "  \"entities\": [\n" +
                 "    {\n" +
                 "      \"id\": 1,\n" +
-                "      \"def\": \"Town\",\n" +
+                "      \"def\": \"banking:Town\",\n" +
                 "      \"runtime\": [\n" +
                 "        \"Die\"\n" +
                 "      ],\n" +
@@ -263,10 +263,10 @@ namespace Kesa.Engine.Tests.Runtime
             var messages = result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList();
             Assert.That(messages, Is.EquivalentTo(new[]
             {
-                "SAV002 #2 (Scout): the component 'Wounded' no longer exists",
-                "SAV002 #2 (Scout) Name.calm: the member no longer exists",
-                "SAV002 #2 (Scout) Mood: there is no SkillDef 'Mining' to key a row by any more",
-                "SAV002 #2 (Scout) Skill: there is no SkillDef 'Mining' to key a row by any more",
+                "SAV002 #2 (banking:Scout): the component 'Wounded' no longer exists",
+                "SAV002 #2 (banking:Scout) Name.calm: the member no longer exists",
+                "SAV002 #2 (banking:Scout) Mood: there is no SkillDef 'banking:Mining' to key a row by any more",
+                "SAV002 #2 (banking:Scout) Skill: there is no SkillDef 'banking:Mining' to key a row by any more",
             }));
         }
 
@@ -285,17 +285,17 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(result.Succeeded, Is.True, string.Join("\n", result.Diagnostics));
             Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Severity + " " + d.Message).ToList(), Is.EquivalentTo(new[]
             {
-                "SAV005 Warning #2 (Scout): the component 'Wounded' no longer exists; its saved value was dropped",
-                "SAV005 Warning #2 (Scout) Name.calm: the member no longer exists; its saved value was dropped",
-                "SAV005 Warning #2 (Scout) Mood: there is no SkillDef 'Mining' to key a row by any more; its saved value was dropped",
-                "SAV005 Warning #2 (Scout) Skill: there is no SkillDef 'Mining' to key a row by any more; its saved value was dropped",
+                "SAV005 Warning #2 (banking:Scout): the component 'Wounded' no longer exists; its saved value was dropped",
+                "SAV005 Warning #2 (banking:Scout) Name.calm: the member no longer exists; its saved value was dropped",
+                "SAV005 Warning #2 (banking:Scout) Mood: there is no SkillDef 'banking:Mining' to key a row by any more; its saved value was dropped",
+                "SAV005 Warning #2 (banking:Scout) Skill: there is no SkillDef 'banking:Mining' to key a row by any more; its saved value was dropped",
             }));
 
             // 버리지 않은 값은 그대로다
             var w = result.World!;
             Assert.That(((StrValue)w.Get(_a, w.Member("Name", "text"))).Value, Is.EqualTo("검은 늑대 \"대장\"\n\\"));
-            Assert.That(w.RowKeys(_a, "Skill"), Is.EqualTo(new[] { "Cooking" }));
-            Assert.That(((IntValue)w.GetRow(_a, w.Member("Skill", "level"), "Cooking")).Value, Is.EqualTo(3));
+            Assert.That(w.RowKeys(_a, "Skill"), Is.EqualTo(new[] { "banking:Cooking" }));
+            Assert.That(((IntValue)w.GetRow(_a, w.Member("Skill", "level"), "banking:Cooking")).Value, Is.EqualTo(3));
             Assert.That(((IntValue)w.Get(_a, w.Member("Power", "total"))).Value, Is.EqualTo(2));
 
             // 버린 뒤의 저장은 지금 내용과 맞는다: 경고 없이 다시 불러오고 바이트가 같다
@@ -322,7 +322,7 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(result.Succeeded, Is.True, string.Join("\n", result.Diagnostics));
             var messages = result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList();
             Assert.That(messages, Is.EquivalentTo(rejected.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => "SAV005 " + d.Message + "; its saved value was dropped")));
-            Assert.That(messages, Has.Some.Contains("#2 (Scout): the entity no longer has 'Home'"));
+            Assert.That(messages, Has.Some.Contains("#2 (banking:Scout): the entity no longer has 'Home'"));
             Assert.That(messages, Has.Some.Contains("to #2: the entity no longer has 'Power'"));
             Assert.That(messages, Has.Some.Contains("to #4: the entity no longer has 'Power'"));
 
@@ -348,7 +348,7 @@ namespace Kesa.Engine.Tests.Runtime
             var codes = result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Severity).ToList();
             Assert.That(codes, Does.Contain("SAV005 Warning"));
             Assert.That(result.Diagnostics.Where(d => d.Severity == Severity.Error).Select(d => d.Message).Single(),
-                Does.StartWith("#2 (Scout) Name.text:"));
+                Does.StartWith("#2 (banking:Scout) Name.text:"));
         }
 
         [Test]
@@ -356,13 +356,13 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs + "Unit(\"Ranger\")\n", extra: ", version=\"1.0\"");
             _world = new World(LoadClean());
-            var a = _world.Create("Scout");
-            var ranger = _world.Create("Ranger");
+            var a = _world.Create("banking:Scout");
+            var ranger = _world.Create("banking:Ranger");
             _world.Add(a, "Opinion");
             _world.AddRow(a, "Opinion", ranger);
             _world.AddContribution(a, M("Power", "total"), "add", new IntValue(1), ranger);
             _world.AddContribution(ranger, M("Power", "total"), "add", new IntValue(1));
-            _world.Set(a, M("Home", "city"), new EntityValue(_world.Create("Town")));
+            _world.Set(a, M("Home", "city"), new EntityValue(_world.Create("banking:Town")));
             var save = _world.Save();
 
             Mod("banking", schema: Schema, defs: Defs, extra: ", version=\"1.0\"");
@@ -370,7 +370,7 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(result.Succeeded, Is.False);
             Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
             {
-                "SAV002 #2 (Ranger): the Def 'Ranger' no longer exists",
+                "SAV002 #2 (banking:Ranger): the Def 'banking:Ranger' no longer exists",
             }));
         }
 
@@ -388,8 +388,8 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: RefSchema, defs: Defs + "Unit(\"Ranger\")\n" + Brew, extra: ", version=\"1.0\"");
             _world = new World(LoadClean());
-            var a = _world.Create("Scout");
-            var ranger = _world.Create("Ranger");
+            var a = _world.Create("banking:Scout");
+            var ranger = _world.Create("banking:Ranger");
             _world.Add(a, "Opinion");
             _world.AddRow(a, "Opinion", ranger);
             _world.AddContribution(a, M("Power", "total"), "add", new IntValue(1), ranger);
@@ -404,15 +404,15 @@ namespace Kesa.Engine.Tests.Runtime
             var rejected = World.Load(LoadClean(), save);
             Assert.That(rejected.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
             {
-                "SAV002 #2 (Ranger): the Def 'Ranger' no longer exists",
+                "SAV002 #2 (banking:Ranger): the Def 'banking:Ranger' no longer exists",
             }), "by default nothing changes");
 
             var result = World.Load(LoadClean(), save, dropRemoved: true);
             Assert.That(result.Succeeded, Is.True, string.Join("\n", result.Diagnostics));
             Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Severity + " " + d.Message).ToList(), Is.EquivalentTo(new[]
             {
-                "SAV005 Warning #2 (Ranger): the Def 'Ranger' no longer exists; its saved value was dropped",
-                "SAV005 Warning #1 (Scout) Opinion: the row keyed by #2 went with its entity",
+                "SAV005 Warning #2 (banking:Ranger): the Def 'banking:Ranger' no longer exists; its saved value was dropped",
+                "SAV005 Warning #1 (banking:Scout) Opinion: the row keyed by #2 went with its entity",
                 "SAV005 Warning contribution 1 to #1 from #2 went with its entity",
                 "SAV005 Warning contribution 2 to #2 went with its entity",
                 "SAV005 Warning flow 1 (banking.Brew) was canceled: its subject #2 was destroyed",
@@ -441,8 +441,8 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: RefSchema, defs: Defs + "Unit(\"Ranger\")\n", extra: ", version=\"1.0\"");
             _world = new World(LoadClean());
-            var a = _world.Create("Scout");
-            var ranger = _world.Create("Ranger");
+            var a = _world.Create("banking:Scout");
+            var ranger = _world.Create("banking:Ranger");
             _world.Add(a, "Leash", new Init(M("Leash", "target"), new EntityValue(ranger)));
             var save = _world.Save();
 
@@ -451,16 +451,16 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(result.Succeeded, Is.False);
             Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
             {
-                "SAV005 #2 (Ranger): the Def 'Ranger' no longer exists; its saved value was dropped",
-                "SAV002 #1 (Scout) Leash.target: the required ref points at #2, whose Def no longer exists",
+                "SAV005 #2 (banking:Ranger): the Def 'banking:Ranger' no longer exists; its saved value was dropped",
+                "SAV002 #1 (banking:Scout) Leash.target: the required ref points at #2, whose Def no longer exists",
             }));
         }
 
         [Test]
         public void AMemberAddedWithoutAStaticDefaultIsRejected()
         {
-            var town = _world.Create("Town");
-            _world.Create("Scout");
+            var town = _world.Create("banking:Town");
+            _world.Create("banking:Scout");
             var save = _world.Save();
             Mod("banking",
                 schema: Schema.Replace("calm=field(bool, default=True)", "calm=field(bool, default=True), age=field(int)")
@@ -472,8 +472,8 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(result.Succeeded, Is.False, result.Succeeded ? "loaded; reading gives: " + ReadOrError(result.World!, town) : "");
             Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
             {
-                "SAV002 #1 (Town) Fresh.m: the member is new and has no default to fill the saved entity with",
-                "SAV002 #2 (Scout) Name.age: the member is new and has no default to fill the saved entity with",
+                "SAV002 #1 (banking:Town) Fresh.m: the member is new and has no default to fill the saved entity with",
+                "SAV002 #2 (banking:Scout) Name.age: the member is new and has no default to fill the saved entity with",
             }));
         }
 
@@ -492,7 +492,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void AValueOutsideATightenedRangeIsRejected()
         {
-            var town = _world.Create("Town");
+            var town = _world.Create("banking:Town");
             _world.Set(town, M("Health", "current"), new IntValue(8));
             _world.Set(town, M("Health", "regen"), new FixedValue(Fixed.FromRaw(1_500_000)));
             var save = _world.Save();
@@ -505,8 +505,8 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(result.Succeeded, Is.False);
             Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message).ToList(), Is.EqualTo(new[]
             {
-                "SAV002 #1 (Town) Health.current: 8 is above max 6",
-                "SAV002 #1 (Town) Health.regen: 1.5 is below min 2",
+                "SAV002 #1 (banking:Town) Health.current: 8 is above max 6",
+                "SAV002 #1 (banking:Town) Health.regen: 1.5 is below min 2",
             }));
         }
 
@@ -602,7 +602,7 @@ namespace Kesa.Engine.Tests.Runtime
         [TestCase("{\n      \"entity\": 1,\n      \"issuer\": \"bob\",\n      \"kind\": \"robot\"\n    }", "a seat kind must be \"human\" or \"ai\"")]
         public void ABrokenSeatIsCorrupt(string seats, string expected)
         {
-            var town = _world.Create("Town");
+            var town = _world.Create("banking:Town");
             _world.Seat(town, "bob");
             string save = Encoding.UTF8.GetString(_world.Save());
             string seated = "{\n      \"entity\": " + town.Value + ",\n      \"issuer\": \"bob\"" + Human;
@@ -617,7 +617,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void ANumberBeyondDoublePrecisionSurvives()
         {
-            var town = _world.Create("Town");
+            var town = _world.Create("banking:Town");
             const long big = 9_007_199_254_740_993; // 2^53 + 1: double로 거치면 깨진다
             _world.Set(town, M("Health", "current"), new IntValue(big));
             var w = Reload(_world.Save());

@@ -22,6 +22,9 @@ namespace Kesa.Engine.Script
             _meter = meter!;
         }
 
+        /// <summary>맨 위 프레임의 함수가 속한 모드 id. 프레임이 없으면 빈 문자열.</summary>
+        public string TopMod => _stack.Count == 0 ? "" : _stack[_stack.Count - 1].Function.Mod;
+
         /// <summary>다시 쓰는 세션의 새 실행을 시작한다.</summary>
         public void Begin(StepMeter meter) => _meter = meter;
 

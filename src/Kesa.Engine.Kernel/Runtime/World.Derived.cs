@@ -663,7 +663,7 @@ namespace Kesa.Engine.Runtime
             public override string KindName => _component.Name + " rows";
 
             public Value GetAttribute(string name) =>
-                Guard(() => _world.RowOrNone(_id, _component, RowKey.Def(name)));
+                Guard(() => _world.RowOrNone(_id, _component, RowKey.Def(_world.ScriptDefId(name))));
 
             public Value GetItem(Value key) => Guard(() => _world.RowOrNone(_id, _component, KeyOf(key)));
 
@@ -683,7 +683,7 @@ namespace Kesa.Engine.Runtime
             {
                 switch (key)
                 {
-                    case StrValue s: return RowKey.Def(s.Value);
+                    case StrValue s: return RowKey.Def(_world.ScriptDefId(s.Value));
                     case IEntityReference r: return RowKey.Entity(r.EntityId);
                     case IntValue n: return RowKey.Int(n.Value);
                 }

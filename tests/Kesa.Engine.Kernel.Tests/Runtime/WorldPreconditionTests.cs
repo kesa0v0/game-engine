@@ -85,12 +85,12 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             _world = new World(LoadClean(), actionStepBudget: World.DefaultStepBudget); // spin()이 넘도록 작게
-            _scout = _world.Create("Scout");
+            _scout = _world.Create("banking:Scout");
         }
 
         private EntityId PutInTown(int walls)
         {
-            var town = _world.Create("Town");
+            var town = _world.Create("banking:Town");
             _world.Set(town, _world.Member("Walls", "walls"), new IntValue(walls));
             _world.Set(_scout, _world.Member("Location", "city"), new EntityValue(town));
             return town;
@@ -206,8 +206,8 @@ namespace Kesa.Engine.Tests.Runtime
             ["unit"] = new EntityValue(_scout),
             ["goods"] = new DictValue(new[]
             {
-                new DictItem(new StrValue("Iron"), new IntValue(3), SourceSpan.None),
-                new DictItem(new StrValue("Wood"), new IntValue(1), SourceSpan.None),
+                new DictItem(new StrValue("banking:Iron"), new IntValue(3), SourceSpan.None),
+                new DictItem(new StrValue("banking:Wood"), new IntValue(1), SourceSpan.None),
             }),
             ["rate"] = new IntValue(2),
             ["path"] = new ListValue(new Value[] { new EntityValue(town) }),
@@ -222,7 +222,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void GoodArgumentsPassAndIntIsRaisedToFixed()
         {
             // rate=2(int)가 fixed로 올라가 rate > 0이 평가된다 (G95)
-            var report = Trade(TradeArgs(_world.Create("Town")));
+            var report = Trade(TradeArgs(_world.Create("banking:Town")));
             Assert.That(report.Arguments, Is.Empty);
             Assert.That(report.Passed, Is.True);
             Assert.That(Statuses(report), Is.EqualTo(new[] { RequireStatus.Passed }));
@@ -231,7 +231,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void MissingAndUnexpectedArgumentsAreRejectedTogether()
         {
-            var args = TradeArgs(_world.Create("Town"));
+            var args = TradeArgs(_world.Create("banking:Town"));
             args.Remove("rate");
             args["rat"] = new IntValue(1);
             var report = Trade(args);
@@ -249,8 +249,8 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void ADeadEntityIsRejectedNotAnError()
         {
-            var args = TradeArgs(_world.Create("Town"));
-            var ghost = _world.Create("Scout");
+            var args = TradeArgs(_world.Create("banking:Town"));
+            var ghost = _world.Create("banking:Scout");
             _world.Destroy(ghost);
             args["escort"] = new EntityValue(ghost);
             var r = Rejections(Trade(args)).Single();
@@ -262,14 +262,14 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void ProblemsInsideCollectionsCarryTheirPosition()
         {
-            var town = _world.Create("Town");
+            var town = _world.Create("banking:Town");
             var args = TradeArgs(town);
             args["path"] = new ListValue(new Value[] { new EntityValue(town), new EntityValue(_scout) });
             args["goods"] = new DictValue(new[]
             {
                 new DictItem(new StrValue("Irom"), new IntValue(3), SourceSpan.None),
-                new DictItem(new StrValue("Town"), new IntValue(1), SourceSpan.None),
-                new DictItem(new StrValue("Wood"), new FixedValue(Kesa.Engine.Numerics.Fixed.FromRaw(1)), SourceSpan.None),
+                new DictItem(new StrValue("banking:Town"), new IntValue(1), SourceSpan.None),
+                new DictItem(new StrValue("banking:Wood"), new FixedValue(Kesa.Engine.Numerics.Fixed.FromRaw(1)), SourceSpan.None),
             });
             var r = Rejections(Trade(args));
             Assert.That(r.Select(x => x.Problem), Is.EqualTo(new[]
@@ -279,10 +279,10 @@ namespace Kesa.Engine.Tests.Runtime
             }));
             Assert.That(r.Select(x => x.Path), Is.EqualTo(new[]
             {
-                "goods key \"Irom\"", "goods key \"Town\"", "goods[\"Wood\"]", "path[1]",
+                "goods key \"Irom\"", "goods key \"banking:Town\"", "goods[\"banking:Wood\"]", "path[1]",
             }));
-            Assert.That(r[0].Message, Is.EqualTo("'goods key \"Irom\"' is 'Irom', which is not a Def; did you mean 'Iron'?"));
-            Assert.That(r[2].Message, Is.EqualTo("'goods[\"Wood\"]' must be int, not fixed (a fixed value is not turned into an int)"));
+            Assert.That(r[0].Message, Is.EqualTo("'goods key \"Irom\"' is 'Irom', which is not a Def; did you mean 'banking:Iron'?"));
+            Assert.That(r[2].Message, Is.EqualTo("'goods[\"banking:Wood\"]' must be int, not fixed (a fixed value is not turned into an int)"));
             Assert.That(r[3].Message, Does.EndWith("a Unit, not a City"));
             Assert.That(r.All(x => x.Parameter == "goods" || x.Parameter == "path"));
         }
@@ -303,7 +303,7 @@ namespace Kesa.Engine.Tests.Runtime
         [TestCase("path", "str")]
         public void WrongKindsOfValuesAreRejected(string parameter, string kind)
         {
-            var args = TradeArgs(_world.Create("Town"));
+            var args = TradeArgs(_world.Create("banking:Town"));
             args[parameter] = kind == "bool" ? BoolValue.True : kind == "int" ? new IntValue(1) : (Value)new StrValue("x");
             var r = Rejections(Trade(args)).Single();
             Assert.That(r.Problem, Is.EqualTo(ArgumentProblem.WrongType));

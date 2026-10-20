@@ -36,8 +36,8 @@ namespace Kesa.Engine.Tests.Runtime
             var content = Load();
             var early = new World(content);
             var late = new World(content);
-            var a = early.Create("Pocket");
-            var b = late.Create("Pocket");
+            var a = early.Create("core:Pocket");
+            var b = late.Create("core:Pocket");
             late.Advance(3);
 
             Assert.That(Read(early, a, "seen"), Is.EqualTo(1));
@@ -51,7 +51,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ALocalWithABuiltinNameStillHidesItAfterTheSiteWasFilled()
         {
             var world = new World(Load());
-            var id = world.Create("Pocket");
+            var id = world.Create("core:Pocket");
             world.Set(id, world.Member("Clock", "base"), new IntValue(7));
             // floor는 이 함수의 지역 변수라(어디선가 대입한다) 내장으로 넘어가지 않는다 (G104)
             var e = Assert.Throws<WorldException>(() => Read(world, id, "half"))!;

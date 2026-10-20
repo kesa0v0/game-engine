@@ -107,6 +107,7 @@ namespace Kesa.Engine.Host
                             ok = false;
                             continue;
                         }
+                        @default = Loading.DefIds.Normalize(@default, type, context.Mod);
                     }
                     parameters.Add(new CommandParameter(p.Name, type, p.Span, @default));
                 }

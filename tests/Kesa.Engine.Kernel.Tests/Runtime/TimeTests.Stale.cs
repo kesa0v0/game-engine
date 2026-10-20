@@ -43,7 +43,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var world = Make(Kill + "@command(free=True, acts_for=None)\ndef Swap(u: Ref[Unit], v: Ref[Unit]):\n" +
                              "    u = v\n    wait(ticks=1)\n    u.Out.s = \"woke\"\n");
-            var other = world.Create("Scout");
+            var other = world.Create("core:Scout");
             world.Submit("host", "core.Swap",
                 new Dictionary<string, Value> { ["u"] = new EntityValue(_u), ["v"] = new EntityValue(other) });
             Assert.That(Destroy(world, _u).Reactions.Single().Outcome, Is.EqualTo(ReactionOutcome.Canceled),
@@ -127,7 +127,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ASaveWithAStaleFlowIsRejected()
         {
             var world = Make(Waiter + Kill);
-            var gone = world.Create("Scout");
+            var gone = world.Create("core:Scout");
             Destroy(world, gone);
             Brew(world);
             var text = Encoding.UTF8.GetString(world.Save());
@@ -149,8 +149,8 @@ namespace Kesa.Engine.Tests.Runtime
                                 Schema.Replace("components=[\"Out\", \"Life\"]", "components=[\"Out\", \"Life\", \"Rule\"]"),
                 defs: "Unit(\"Scout\")\n" + Kill + "@command(free=True, acts_for=None)\ndef Go(town: Ref[Unit]):\n" + body);
             var world = new World(LoadClean());
-            _ruler = world.Create("Scout");
-            _u = world.Create("Scout", new Init(world.Member("Rule", "ruler"), new EntityValue(_ruler)));
+            _ruler = world.Create("core:Scout");
+            _u = world.Create("core:Scout", new Init(world.Member("Rule", "ruler"), new EntityValue(_ruler)));
             world.Submit("host", "core.Go", new Dictionary<string, Value> { ["town"] = new EntityValue(_u) });
             return world;
         }
@@ -212,7 +212,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("core", schema: Schema, defs: "Unit(\"Scout\")\n@command(free=True, acts_for=None)\ndef Go(town: Ref[Unit]):\n" +
                                               "    wait(ticks=1, " + arg + ")\n");
             var world = new World(LoadClean());
-            _u = world.Create("Scout");
+            _u = world.Create("core:Scout");
             var r = world.Submit("host", "core.Go", new Dictionary<string, Value> { ["town"] = new EntityValue(_u) });
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
             Assert.That(r.Error!.Message, Does.Contain(message));
@@ -331,7 +331,7 @@ namespace Kesa.Engine.Tests.Runtime
                 defs: "Unit(\"Scout\")\n@on(Ring)\ndef later(u):\n    advance(1)\n" +
                       "@command(free=True, acts_for=None)\ndef Go(u: Ref[Unit]):\n    emit(Ring(u=u))\n");
             var world = new World(LoadClean());
-            _u = world.Create("Scout");
+            _u = world.Create("core:Scout");
             var failed = Go(world).Reactions.Single();
             Assert.That(failed.Error!.Message, Does.Contain("advance() cannot be called from a signal handler"));
             Assert.That(world.Tick, Is.EqualTo(0));
@@ -373,7 +373,7 @@ namespace Kesa.Engine.Tests.Runtime
         private World Limited(string defs, int limit)
         {
             var world = new World(Content(defs), maxAdvancePerCall: limit);
-            _u = world.Create("Scout");
+            _u = world.Create("core:Scout");
             return world;
         }
 

@@ -119,7 +119,7 @@ namespace Kesa.Engine.Cli.Tests
             Mod("Resource(\"Wood\")\n");
             Assert.That(Dump(_root), Is.EqualTo(0), _err.ToString());
             Assert.That(_out.ToString(), Does.StartWith("{\n  \"version\": 1,"));
-            Assert.That(_out.ToString(), Does.Contain("\"Wood\""));
+            Assert.That(_out.ToString(), Does.Contain("\"core:Wood\""));
             Assert.That(_err.ToString(), Is.EqualTo("errors: 0, warnings: 0, info: 0; mods loaded: 1, disabled: 0\n"));
         }
 
@@ -329,7 +329,7 @@ namespace Kesa.Engine.Cli.Tests
                 "class core:\n" +
                 "    class stock:\n" +
                 "        @staticmethod\n" +
-                "        def count(resource: Literal[\"Wood\"]) -> int:\n" +
+                "        def count(resource: Literal[\"Wood\", \"core:Wood\"]) -> int:\n" +
                 "            \"\"\"창고의 개수.\"\"\"\n" +
                 "            ...\n";
             Assert.That(Read("core/__builtins__.pyi"), Does.Contain(expected));

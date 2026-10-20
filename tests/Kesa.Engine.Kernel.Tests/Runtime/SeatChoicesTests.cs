@@ -34,9 +34,9 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             var world = new World(LoadClean());
-            red = world.Create("Red");
-            rebels = world.Create("Rebels");
-            blue = world.Create("Blue");
+            red = world.Create("banking:Red");
+            rebels = world.Create("banking:Rebels");
+            blue = world.Create("banking:Blue");
             return world;
         }
 
@@ -112,7 +112,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: Schema);
             Mod("scouts", schema: "deftype(\"Band\", components=[\"Seatable\"])\n", defs: "Band(\"Wolves\")\n");
             var world = new World(LoadClean());
-            var wolves = world.Create("Wolves");
+            var wolves = world.Create("scouts:Wolves");
             Assert.That(world.SeatChoices(), Is.EqualTo(new[] { wolves }));
         }
 

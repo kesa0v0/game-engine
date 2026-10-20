@@ -31,9 +31,9 @@ namespace Kesa.Engine.Tests.Runtime
         private World Make(string defs, int maxSettleRounds = World.DefaultMaxSettleRounds)
         {
             var world = new World(Content(defs), maxSettleRounds: maxSettleRounds);
-            _a = world.Create("Scout");
+            _a = world.Create("core:Scout");
             world.Seat(_a, "host");
-            _b = world.Create("Scout");
+            _b = world.Create("core:Scout");
             return world;
         }
 
@@ -114,7 +114,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "@when(lambda u: u.Out.n >= 5)\ndef c(u: Ref[Unit]):\n    u.Out.s = u.Out.s + \"c\"\n" +
                 "@when(lambda u: u.Out.n >= 5, stage=\"core.first\")\ndef a(u: Ref[Unit]):\n    u.Out.s = u.Out.s + \"a\"\n");
             var world = new World(LoadClean());
-            _a = world.Create("Scout");
+            _a = world.Create("core:Scout");
             world.Seat(_a, "host");
             Set(world, _a, 5);
             Assert.That(S(world, _a), Is.EqualTo("abc"), "stages first, then reactions without a stage (S5)");
@@ -261,7 +261,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var content = Content(Cool);
             var world = new World(content);
-            _a = world.Create("Scout");
+            _a = world.Create("core:Scout");
             world.Seat(_a, "host");
             Set(world, _a, 5);
             Set(world, _a, 0);
@@ -303,7 +303,7 @@ namespace Kesa.Engine.Tests.Runtime
             var content = Content("@when(lambda u: u.Out.n >= 5, once=True)\ndef riot(u: Ref[Unit]):\n    u.Out.s = u.Out.s + \"!\"\n" +
                                   "@when(lambda: now() >= 1, once=\"game\")\ndef dawn():\n    pass\n");
             var world = new World(content);
-            _a = world.Create("Scout");
+            _a = world.Create("core:Scout");
             world.Seat(_a, "host");
             Set(world, _a, 5);
             Set(world, _a, 0);
@@ -370,7 +370,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var content = Content(Mark);
             var world = new World(content);
-            _a = world.Create("Scout");
+            _a = world.Create("core:Scout");
             world.Seat(_a, "host");
             Set(world, _a, 5);
             var save = world.Save();
@@ -444,8 +444,8 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("core", schema: ClampSchema, defs: ClampDefs);
             var world = new World(LoadClean());
-            var u = world.Create("Scout");
-            var ring = world.Create("Ring");
+            var u = world.Create("core:Scout");
+            var ring = world.Create("core:Ring");
             var max = world.Member("Health", "max");
             var current = world.Member("Health", "current");
             long Int(Value v) => ((IntValue)v).Value;

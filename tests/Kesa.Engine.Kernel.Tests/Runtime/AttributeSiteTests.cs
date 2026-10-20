@@ -57,7 +57,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("core", schema: Schema, defs: Defs);
             _world = new World(LoadClean());
-            _unit = _world.Create("Scout");
+            _unit = _world.Create("core:Scout");
         }
 
         private SubmitResult Submit(string command) =>

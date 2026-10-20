@@ -118,8 +118,8 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             _world = new World(LoadClean());
-            _scout = _world.Create("Scout");
-            _red = _world.Create("Red");
+            _scout = _world.Create("banking:Scout");
+            _red = _world.Create("banking:Red");
             _left = _world.Member("Moves", "left");
         }
 
@@ -196,8 +196,8 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(Left, Is.EqualTo(2));
             Assert.That(_world.Get(_scout, party), Is.SameAs(NoneValue.Instance));
             Assert.That(_world.Inverse(_red, party), Is.Empty);
-            Assert.That(((IntValue)_world.GetRow(_scout, _world.Member("Skill", "level"), "Cooking")).Value, Is.EqualTo(0));
-            Assert.That(_world.GetRow(_scout, _world.Member("Need", "met"), "Food"), Is.SameAs(BoolValue.False));
+            Assert.That(((IntValue)_world.GetRow(_scout, _world.Member("Skill", "level"), "banking:Cooking")).Value, Is.EqualTo(0));
+            Assert.That(_world.GetRow(_scout, _world.Member("Need", "met"), "banking:Food"), Is.SameAs(BoolValue.False));
         }
 
         [Test]
@@ -205,7 +205,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             // 원래 Red를 가리키던 Ref를 바꾼 뒤 실패: 역방향 색인이 원래대로 돌아와야 한다
             var party = _world.Member("Owner", "party");
-            var blue = _world.Create("Red");
+            var blue = _world.Create("banking:Red");
             _world.Set(_scout, party, new EntityValue(_red));
             Submit("Partial", new Dictionary<string, Value> { ["party"] = new EntityValue(blue) });
             Assert.That(((EntityValue)_world.Get(_scout, party)).Id, Is.EqualTo(_red));
@@ -247,21 +247,21 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void AKeyedRowCanBeWritten()
         {
-            Assert.That(Submit("Train", new Dictionary<string, Value> { ["skill"] = new StrValue("Cooking") }).Succeeded, Is.True);
-            Assert.That(((IntValue)_world.GetRow(_scout, _world.Member("Skill", "level"), "Cooking")).Value, Is.EqualTo(3));
+            Assert.That(Submit("Train", new Dictionary<string, Value> { ["skill"] = new StrValue("banking:Cooking") }).Succeeded, Is.True);
+            Assert.That(((IntValue)_world.GetRow(_scout, _world.Member("Skill", "level"), "banking:Cooking")).Value, Is.EqualTo(3));
         }
 
         [Test]
         public void AListedRowThatExistsCanBeWritten()
         {
-            Assert.That(Submit("Satisfy", new Dictionary<string, Value> { ["need"] = new StrValue("Food") }).Succeeded, Is.True);
-            Assert.That(_world.GetRow(_scout, _world.Member("Need", "met"), "Food"), Is.SameAs(BoolValue.True));
+            Assert.That(Submit("Satisfy", new Dictionary<string, Value> { ["need"] = new StrValue("banking:Food") }).Succeeded, Is.True);
+            Assert.That(_world.GetRow(_scout, _world.Member("Need", "met"), "banking:Food"), Is.SameAs(BoolValue.True));
         }
 
         [Test]
         public void AMissingRowCannotBeWritten()
         {
-            var r = Submit("Satisfy", new Dictionary<string, Value> { ["need"] = new StrValue("Luxury") });
+            var r = Submit("Satisfy", new Dictionary<string, Value> { ["need"] = new StrValue("banking:Luxury") });
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
             Assert.That(r.Error!.Message, Does.Contain("cannot set 'met' on None"));
             Assert.That(r.Error.Hint, Does.Contain("is not None"));

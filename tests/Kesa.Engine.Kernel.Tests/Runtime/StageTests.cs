@@ -192,7 +192,7 @@ namespace Kesa.Engine.Tests.Runtime
                       "@on(Pulse, stage=\"core.admin\")\ndef bribe(target):\n    target.Out.s = target.Out.s + \"b\"\n",
                 extra: Dep);
             var world = new World(LoadClean());
-            var u = world.Create("Scout");
+            var u = world.Create("core:Scout");
             var r = world.Submit("host", "core.Go", new Dictionary<string, Value> { ["u"] = new EntityValue(u) });
             Assert.That(r.Succeeded, Is.True, r.Error?.ToString());
             // admin(core의 census·tax → smuggling의 bribe) → market → politics → 단계 없음(core → smuggling)

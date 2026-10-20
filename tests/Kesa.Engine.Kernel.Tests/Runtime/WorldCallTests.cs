@@ -44,8 +44,8 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("ranks", schema: Schema, defs: Defs);
             var world = new World(LoadClean(), stepBudget);
-            var red = world.Create("Red");
-            unit = world.Create("Soldier", new Init(world.Member("Owner", "party"), new EntityValue(red)));
+            var red = world.Create("ranks:Red");
+            unit = world.Create("ranks:Soldier", new Init(world.Member("Owner", "party"), new EntityValue(red)));
             world.Set(unit, world.Member("Life", "hp"), new IntValue(4));
             return world;
         }
@@ -144,7 +144,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ChangedWhenAReadEntityChanges()
         {
             var world = Make(out var unit);
-            var other = world.Create("Soldier");
+            var other = world.Create("ranks:Soldier");
             var r = world.Call("ranks.hp", new EntityValue(unit));
             Assert.That(r.Changed(world), Is.False);
             world.Set(other, world.Member("Life", "hp"), new IntValue(9));
@@ -174,7 +174,7 @@ namespace Kesa.Engine.Tests.Runtime
             var r = world.Call("ranks.units");
             world.Set(unit, world.Member("Life", "hp"), new IntValue(1));
             Assert.That(r.Changed(world), Is.False, "the list did not change and no member was read");
-            var other = world.Create("Soldier");
+            var other = world.Create("ranks:Soldier");
             Assert.That(r.Changed(world), Is.True);
             r = world.Call("ranks.units");
             world.Destroy(other);

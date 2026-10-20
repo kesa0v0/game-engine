@@ -41,7 +41,7 @@ namespace Kesa.Engine.Tests.Runtime
         private World Make(ContentLoadResult content, long seed = 0)
         {
             var world = new World(content, seed: seed);
-            _u = world.Create("Scout");
+            _u = world.Create("core:Scout");
             return world;
         }
 
@@ -314,7 +314,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "deftype(\"Unit\", act=const(Action[\"Unit\"]), components=[\"Roll\"])\n";
             Mod("core", schema: schema, defs: "Unit(\"Scout\", act=lambda u: random.randint(1, 6))\n");
             var world = new World(LoadClean());
-            var u = world.Create("Scout");
+            var u = world.Create("core:Scout");
             var e = Assert.Throws<WorldException>(() => world.Get(u, world.Member("Roll", "luck")))!;
             Assert.That(e.Code, Is.EqualTo(Codes.RunNotWritable));
             Assert.That(e.Message, Does.Contain("random.randint() draws a random number, so it cannot be called here"));

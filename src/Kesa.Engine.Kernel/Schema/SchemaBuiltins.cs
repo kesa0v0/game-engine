@@ -464,7 +464,8 @@ namespace Kesa.Engine.Schema
         private static void ReadDefaultMinMax(CallContext ctx, ArgReader r, MemberSpec spec)
         {
             var d = r.Take("default");
-            if (d != null) spec.Default = d.Value;
+            // DefId 기본값도 선언한 모드 기준 전체 이름이다 (G261)
+            if (d != null) spec.Default = Loading.DefIds.Normalize(d.Value, spec.Type, ctx.Mod);
             spec.Min = ReadBound(ctx, r, spec, "min");
             spec.Max = ReadBound(ctx, r, spec, "max");
         }

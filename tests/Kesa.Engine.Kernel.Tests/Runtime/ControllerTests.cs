@@ -41,7 +41,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             _world = new World(LoadClean());
-            _red = _world.Create("Red");
+            _red = _world.Create("banking:Red");
         }
 
         private string Look()

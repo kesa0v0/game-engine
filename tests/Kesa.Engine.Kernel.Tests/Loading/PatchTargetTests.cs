@@ -26,24 +26,24 @@ namespace Kesa.Engine.Tests.Loading
         {
             Core();
             Mod("mid", defs: "Unit(\"Mid\")\n", extra: CoreDep);
-            Mod("top", defs: "Unit(\"Top\")\n" + Patch("Top") + Patch("Mid") + Patch("Scout"), extra: ", dependencies=[\"mid\"]");
+            Mod("top", defs: "Unit(\"Top\")\n" + Patch("Top") + Patch("mid:Mid") + Patch("core:Scout"), extra: ", dependencies=[\"mid\"]");
             var result = LoadClean();
-            Assert.That(result.Patches.Select(p => p.TargetId), Is.EqualTo(new[] { "Top", "Mid", "Scout" }));
+            Assert.That(result.Patches.Select(p => p.TargetId), Is.EqualTo(new[] { "top:Top", "mid:Mid", "core:Scout" }));
         }
 
         [Test]
         public void AbstractDefsCanBePatched()
         {
             Core();
-            Mod("compat", defs: Patch("Base"), extra: CoreDep);
-            Assert.That(LoadClean().Patches.Single().TargetId, Is.EqualTo("Base"));
+            Mod("compat", defs: Patch("core:Base"), extra: CoreDep);
+            Assert.That(LoadClean().Patches.Single().TargetId, Is.EqualTo("core:Base"));
         }
 
         [Test]
         public void MissingTargetIsAnErrorWithASuggestion()
         {
             Core();
-            Mod("compat", defs: Patch("Scoot"), extra: CoreDep);
+            Mod("compat", defs: Patch("core:Scoot"), extra: CoreDep);
             var result = Load(out var diags);
             var d = diags.Single();
             Assert.That((d.Code, d.Mod, d.File, d.Line), Is.EqualTo((Codes.PatTargetNotFound, "compat", "compat/defs/defs.py", 1)));
@@ -56,7 +56,7 @@ namespace Kesa.Engine.Tests.Loading
         public void ADefOfAModThatIsNotADependencyIsNotVisible()
         {
             Core();
-            Mod("compat", defs: Patch("Scout"));
+            Mod("compat", defs: Patch("core:Scout"));
             Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.PatTargetNotVisible));
@@ -68,7 +68,7 @@ namespace Kesa.Engine.Tests.Loading
         public void LoadAfterDoesNotMakeADefVisible()
         {
             Core();
-            Mod("compat", defs: Patch("Scout"), extra: ", loadAfter=[\"core\"]");
+            Mod("compat", defs: Patch("core:Scout"), extra: ", loadAfter=[\"core\"]");
             Load(out var diags);
             Assert.That(diags.Single().Code, Is.EqualTo(Codes.PatTargetNotVisible));
         }
@@ -77,7 +77,7 @@ namespace Kesa.Engine.Tests.Loading
         public void DefsOfAnOptionalModNeedItsGuard()
         {
             Core();
-            Mod("compat", defs: Patch("Scout"), extra: ", optional=[\"core\"]");
+            Mod("compat", defs: Patch("core:Scout"), extra: ", optional=[\"core\"]");
             Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.PatNeedsGuard));
@@ -88,7 +88,7 @@ namespace Kesa.Engine.Tests.Loading
         public void GuardedPatchOfAnOptionalModDefIsAllowed()
         {
             Core();
-            Mod("compat", defs: "if mod_loaded(\"core\"):\n    " + Patch("Scout"), extra: ", optional=[\"core\"]");
+            Mod("compat", defs: "if mod_loaded(\"core\"):\n    " + Patch("core:Scout"), extra: ", optional=[\"core\"]");
             var result = LoadClean();
             Assert.That(result.Patches.Single().Guards, Is.EqualTo(new[] { "core" }));
         }
@@ -98,7 +98,7 @@ namespace Kesa.Engine.Tests.Loading
         {
             Core();
             Mod("scouts", defs: "\n");
-            Mod("compat", defs: "if mod_loaded(\"scouts\"):\n    " + Patch("Scout"), extra: ", optional=[\"core\", \"scouts\"]");
+            Mod("compat", defs: "if mod_loaded(\"scouts\"):\n    " + Patch("core:Scout"), extra: ", optional=[\"core\", \"scouts\"]");
             Load(out var diags);
             Assert.That(diags.Single().Code, Is.EqualTo(Codes.PatNeedsGuard));
         }
@@ -109,11 +109,11 @@ namespace Kesa.Engine.Tests.Loading
         public void ReplacedDefIsPatchedThroughEitherOwner()
         {
             Core();
-            Mod("tweak", defs: "Unit(\"Scout\", override=True)\n", extra: CoreDep);
-            Mod("compat", defs: Patch("Scout"), extra: CoreDep);
+            Mod("tweak", defs: "Unit(\"core:Scout\", override=True)\n", extra: CoreDep);
+            Mod("compat", defs: Patch("core:Scout"), extra: CoreDep);
             var result = Load(out var diags);
             Assert.That(diags, Is.Empty, string.Join("\n", diags));
-            Assert.That(result.Defs.TryGet("Scout", out var scout), Is.True);
+            Assert.That(result.Defs.TryGet("core:Scout", out var scout), Is.True);
             Assert.That(scout.Mod, Is.EqualTo("tweak"));
             Assert.That(result.Patches.Single().Mod, Is.EqualTo("compat"));
         }
@@ -125,7 +125,7 @@ namespace Kesa.Engine.Tests.Loading
         {
             Core();
             Mod("banking", defs: Patch("Zzz"), extra: CoreDep);
-            Mod("compat", defs: "if mod_loaded(\"banking\"):\n    " + Patch("Scout"),
+            Mod("compat", defs: "if mod_loaded(\"banking\"):\n    " + Patch("core:Scout"),
                 extra: ", dependencies=[\"core\"], optional=[\"banking\"]");
             var result = Load(out var diags);
             Assert.That(result.Disabled, Is.EqualTo(new[] { "banking" }));
@@ -157,7 +157,7 @@ namespace Kesa.Engine.Tests.Loading
             Core();
             Mod("morale", defs: Patch("Zzz"), extra: CoreDep);
             Mod("dep", defs: "Unit(\"Dep\")\n", extra: ", dependencies=[\"core\", \"morale\"]");
-            Mod("fine", defs: Patch("Scout"), extra: CoreDep);
+            Mod("fine", defs: Patch("core:Scout"), extra: CoreDep);
             var result = Load(out var diags);
             Assert.That(result.Disabled, Is.EqualTo(new[] { "dep", "morale" }));
             Assert.That(result.Mods.Select(m => m.Id), Is.EqualTo(new[] { "core", "fine" }));
@@ -182,7 +182,7 @@ namespace Kesa.Engine.Tests.Loading
             Core();
             Mod("early", defs: "Nope()\n", extra: CoreDep);
             Mod("late", defs: Patch("Zzz"), extra: CoreDep);
-            Mod("fine", defs: Patch("Scout"), extra: CoreDep);
+            Mod("fine", defs: Patch("core:Scout"), extra: CoreDep);
             var result = Load(out var diags);
             Assert.That(result.Disabled, Is.EqualTo(new[] { "early", "late" }));
             Assert.That(diags.Select(d => (d.Code, d.Mod)),
@@ -198,7 +198,7 @@ namespace Kesa.Engine.Tests.Loading
             Mod("morale",
                 schema: "component(\"Morale\", value=field(int, default=5))\nextend(\"Unit\", components=[\"Morale\"])\n",
                 defs: Patch("Zzz"), extra: CoreDep);
-            Mod("fine", defs: "if mod_loaded(\"morale\"):\n    " + Patch("Scout") + "    " + Patch("Scout"),
+            Mod("fine", defs: "if mod_loaded(\"morale\"):\n    " + Patch("core:Scout") + "    " + Patch("core:Scout"),
                 extra: ", dependencies=[\"core\"], optional=[\"morale\"]");
             var withFailed = Load(out var diagsWith);
 

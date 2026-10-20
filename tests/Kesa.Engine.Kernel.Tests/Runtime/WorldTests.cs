@@ -48,14 +48,14 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("core", schema: Schema, defs: Defs);
             _world = new World(LoadClean());
-            _paris = _world.Create("Paris");
-            _rome = _world.Create("Rome");
+            _paris = _world.Create("core:Paris");
+            _rome = _world.Create("core:Rome");
             return _world;
         }
 
         private MemberHandle M(string owner, string member) => _world.Member(owner, member);
 
-        private EntityId Unit(string def = "Scout", EntityId? city = null) =>
+        private EntityId Unit(string def = "core:Scout", EntityId? city = null) =>
             _world.Create(def, new Init(M("Location", "city"), new EntityValue(city ?? _paris)));
 
         private static long Int(Value v) => ((IntValue)v).Value;
@@ -80,15 +80,15 @@ namespace Kesa.Engine.Tests.Runtime
 
             _world.Set(scout, M("Wealth", "amount"), new IntValue(9));
             Assert.That(((FixedValue)_world.Get(scout, M("Wealth", "amount"))).Value, Is.EqualTo(Fixed.FromRaw(9_000_000)));
-            Assert.That(_world.DefOf(scout), Is.EqualTo("Scout"));
+            Assert.That(_world.DefOf(scout), Is.EqualTo("core:Scout"));
         }
 
         [Test]
         public void DefaultFromIsComputedOnceAtCreation()
         {
             NewWorld();
-            Assert.That(Int(_world.Get(Unit("Scout"), M("Health", "current"))), Is.EqualTo(12)); // base_max에서
-            Assert.That(Int(_world.Get(Unit("Guard"), M("Health", "current"))), Is.EqualTo(7));  // Def가 준 값
+            Assert.That(Int(_world.Get(Unit("core:Scout"), M("Health", "current"))), Is.EqualTo(12)); // base_max에서
+            Assert.That(Int(_world.Get(Unit("core:Guard"), M("Health", "current"))), Is.EqualTo(7));  // Def가 준 값
         }
 
         [Test]
@@ -150,7 +150,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void AFailedCreateLeavesNoTrace()
         {
             NewWorld();
-            Fails(() => _world.Create("Scout"), Codes.RunMissingValue); // 필수 Ref 없음
+            Fails(() => _world.Create("core:Scout"), Codes.RunMissingValue); // 필수 Ref 없음
             var scout = Unit();
             Assert.That(scout.Value, Is.EqualTo(3L));
             Assert.That(_world.All("Unit"), Is.EqualTo(new[] { scout }));
@@ -162,8 +162,8 @@ namespace Kesa.Engine.Tests.Runtime
             NewWorld();
             Assert.That(Fails(() => _world.Member("Helth", "current"), Codes.RunUnknownName).Hint, Is.EqualTo("did you mean 'Health'?"));
             Assert.That(Fails(() => _world.Member("Health", "curent"), Codes.RunUnknownName).Hint, Is.EqualTo("did you mean 'current'?"));
-            Assert.That(Fails(() => _world.Create("Scot"), Codes.RunUnknownName).Hint, Is.EqualTo("did you mean 'Scout'?"));
-            Fails(() => _world.Create("Medicine"), Codes.RunNotEntity);
+            Assert.That(Fails(() => _world.Create("core:Scot"), Codes.RunUnknownName).Hint, Is.EqualTo("did you mean 'core:Scout'?"));
+            Fails(() => _world.Create("core:Medicine"), Codes.RunNotEntity);
             Fails(() => _world.All("Unt"), Codes.RunUnknownName);
         }
 
@@ -173,9 +173,9 @@ namespace Kesa.Engine.Tests.Runtime
         public void AFieldWithoutADefaultMustBeGivenAtCreation()
         {
             NewWorld();
-            var e = Fails(() => _world.Create("Gaul"), Codes.RunMissingValue);
+            var e = Fails(() => _world.Create("core:Gaul"), Codes.RunMissingValue);
             Assert.That(e.Message, Does.Contain("'Tax.rate' has no value"));
-            var gaul = _world.Create("Gaul", new Init(M("Tax", "rate"), new IntValue(2)));
+            var gaul = _world.Create("core:Gaul", new Init(M("Tax", "rate"), new IntValue(2)));
             Assert.That(((FixedValue)_world.Get(gaul, M("Tax", "rate"))).Value, Is.EqualTo(Fixed.FromRaw(2_000_000)));
         }
 
@@ -184,11 +184,11 @@ namespace Kesa.Engine.Tests.Runtime
         {
             NewWorld();
             var city = new Init(M("Location", "city"), new EntityValue(_paris));
-            Fails(() => _world.Create("Scout", city, new Init(M("Health", "current"), new IntValue(-5))), Codes.RunRange);
-            Fails(() => _world.Create("Scout", city, city), Codes.RunType);                                  // 두 번
-            Fails(() => _world.Create("Scout", city, new Init(M("Tax", "rate"), new IntValue(1))), Codes.RunNoComponent);
-            Fails(() => _world.Create("Scout", city, new Init(M("Skill", "level"), new IntValue(1))), Codes.RunNoComponent);
-            var scout = _world.Create("Scout", city, new Init(M("Health", "current"), new IntValue(3)));
+            Fails(() => _world.Create("core:Scout", city, new Init(M("Health", "current"), new IntValue(-5))), Codes.RunRange);
+            Fails(() => _world.Create("core:Scout", city, city), Codes.RunType);                                  // 두 번
+            Fails(() => _world.Create("core:Scout", city, new Init(M("Tax", "rate"), new IntValue(1))), Codes.RunNoComponent);
+            Fails(() => _world.Create("core:Scout", city, new Init(M("Skill", "level"), new IntValue(1))), Codes.RunNoComponent);
+            var scout = _world.Create("core:Scout", city, new Init(M("Health", "current"), new IntValue(3)));
             Assert.That(Int(_world.Get(scout, M("Health", "current"))), Is.EqualTo(3));
         }
 
@@ -237,11 +237,11 @@ namespace Kesa.Engine.Tests.Runtime
                 "deftype(\"Pile\", components=[\"Size\"])\ndeftype(\"Card\", components=[\"Slot\"])\n",
                 defs: "Pile(\"Deck\")\nCard(\"Ace\")\n");
             _world = new World(LoadClean());
-            var deck = _world.Create("Deck");
+            var deck = _world.Create("core:Deck");
             var pile = M("Slot", "pile");
             var pos = M("Slot", "pos");
             EntityId Card(int p) =>
-                _world.Create("Ace", new Init(pile, new EntityValue(deck)), new Init(pos, new IntValue(p)));
+                _world.Create("core:Ace", new Init(pile, new EntityValue(deck)), new Init(pos, new IntValue(p)));
             var a = Card(5);
             var b = Card(1);
             var c = Card(5);
@@ -259,11 +259,11 @@ namespace Kesa.Engine.Tests.Runtime
                 "deftype(\"X\", components=[\"A\"])\ndeftype(\"Y\", components=[\"B\"])\n",
                 defs: "X(\"x\")\nY(\"y\")\n");
             _world = new World(LoadClean());
-            var x = _world.Create("x");
+            var x = _world.Create("core:x");
             Assert.That(Int(_world.Get(x, M("A", "cur"))), Is.EqualTo(7));
-            var y = _world.Create("y");
+            var y = _world.Create("core:y");
             Assert.That(Int(_world.Get(y, M("B", "cur"))), Is.EqualTo(2));
-            var z = _world.Create("y", new Init(M("B", "cur"), new IntValue(4)));       // 직접 주면 그 값
+            var z = _world.Create("core:y", new Init(M("B", "cur"), new IntValue(4)));       // 직접 주면 그 값
             Assert.That(Int(_world.Get(z, M("B", "cur"))), Is.EqualTo(4));
         }
 
@@ -296,7 +296,7 @@ namespace Kesa.Engine.Tests.Runtime
             Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.ValMissing));
-            Assert.That(d.Message, Does.Contain("row 'Medicine' of 'Post' on 'Doc'"));   // 물려받은 줄도, abstract는 면제
+            Assert.That(d.Message, Does.Contain("row 'core:Medicine' of 'Post' on 'core:Doc'"));   // 물려받은 줄도, abstract는 면제
             Assert.That(d.Message, Does.Contain(problem));
         }
 
@@ -310,9 +310,9 @@ namespace Kesa.Engine.Tests.Runtime
                 "deftype(\"Unit\", components=[\"Post\"])\n",
                 defs: "SkillDef(\"Medicine\")\nUnit(\"Doc\", Post={\"Medicine\": Post(note=\"x\")})\n");
             _world = new World(LoadClean());
-            var doc = _world.Create("Doc");
-            Assert.That(((StrValue)_world.GetRow(doc, M("Post", "note"), "Medicine")).Value, Is.EqualTo("x"));
-            Assert.That(_world.GetRow(doc, M("Post", "at"), "Medicine"), Is.SameAs(NoneValue.Instance));
+            var doc = _world.Create("core:Doc");
+            Assert.That(((StrValue)_world.GetRow(doc, M("Post", "note"), "core:Medicine")).Value, Is.EqualTo("x"));
+            Assert.That(_world.GetRow(doc, M("Post", "at"), "core:Medicine"), Is.SameAs(NoneValue.Instance));
         }
 
         [Test]
@@ -359,18 +359,18 @@ namespace Kesa.Engine.Tests.Runtime
             NewWorld();
             var scout = Unit();
             var level = M("Skill", "level");
-            Assert.That(Int(_world.GetRow(scout, level, "Cooking")), Is.EqualTo(4));   // Def 줄
-            Assert.That(Int(_world.GetRow(scout, level, "Medicine")), Is.EqualTo(0));  // 기본 줄
-            Assert.That(Int(_world.GetRow(scout, M("Skill", "cap"), "Medicine")), Is.EqualTo(20));
-            _world.SetRow(scout, level, "Medicine", new IntValue(8));
-            Assert.That(Int(_world.GetRow(scout, level, "Medicine")), Is.EqualTo(8));
-            Fails(() => _world.SetRow(scout, level, "Medicine", new IntValue(21)), Codes.RunRange);
+            Assert.That(Int(_world.GetRow(scout, level, "core:Cooking")), Is.EqualTo(4));   // Def 줄
+            Assert.That(Int(_world.GetRow(scout, level, "core:Medicine")), Is.EqualTo(0));  // 기본 줄
+            Assert.That(Int(_world.GetRow(scout, M("Skill", "cap"), "core:Medicine")), Is.EqualTo(20));
+            _world.SetRow(scout, level, "core:Medicine", new IntValue(8));
+            Assert.That(Int(_world.GetRow(scout, level, "core:Medicine")), Is.EqualTo(8));
+            Fails(() => _world.SetRow(scout, level, "core:Medicine", new IntValue(21)), Codes.RunRange);
 
-            Assert.That(_world.RowKeys(scout, "Skill"), Is.EqualTo(new[] { "Cooking", "Medicine" }));
-            Assert.That(Fails(() => _world.GetRow(scout, level, "Medicin"), Codes.RunUnknownName).Hint, Is.EqualTo("did you mean 'Medicine'?"));
-            Fails(() => _world.GetRow(scout, level, "Base"), Codes.RunUnknownName); // abstract
-            Fails(() => _world.AddRow(scout, "Skill", "Medicine"), Codes.RunNoRow);
-            Assert.That(Fails(() => _world.RemoveRow(scout, "Skill", "Cooking"), Codes.RunNoRow).Message, Does.Contain("keys=\"all\""));
+            Assert.That(_world.RowKeys(scout, "Skill"), Is.EqualTo(new[] { "core:Cooking", "core:Medicine" }));
+            Assert.That(Fails(() => _world.GetRow(scout, level, "Medicin"), Codes.RunUnknownName).Hint, Is.EqualTo("did you mean 'core:Medicine'?"));
+            Fails(() => _world.GetRow(scout, level, "core:Base"), Codes.RunUnknownName); // abstract
+            Fails(() => _world.AddRow(scout, "Skill", "core:Medicine"), Codes.RunNoRow);
+            Assert.That(Fails(() => _world.RemoveRow(scout, "Skill", "core:Cooking"), Codes.RunNoRow).Message, Does.Contain("keys=\"all\""));
             Fails(() => _world.Get(scout, level), Codes.RunNoRow);
         }
 
@@ -380,18 +380,18 @@ namespace Kesa.Engine.Tests.Runtime
             NewWorld();
             var scout = Unit();
             var met = M("Need", "met");
-            Assert.That(_world.RowKeys(scout, "Need"), Is.EqualTo(new[] { "Food" }));
-            Assert.That(_world.HasRow(scout, "Need", "Luxury"), Is.False);
-            Fails(() => _world.GetRow(scout, met, "Luxury"), Codes.RunNoRow);
+            Assert.That(_world.RowKeys(scout, "Need"), Is.EqualTo(new[] { "core:Food" }));
+            Assert.That(_world.HasRow(scout, "Need", "core:Luxury"), Is.False);
+            Fails(() => _world.GetRow(scout, met, "core:Luxury"), Codes.RunNoRow);
 
-            _world.AddRow(scout, "Need", "Luxury", new Init(met, BoolValue.True));
-            Assert.That(_world.GetRow(scout, met, "Luxury"), Is.SameAs(BoolValue.True));
-            Assert.That(Int(_world.GetRow(scout, M("Need", "weight"), "Luxury")), Is.EqualTo(1));
-            Assert.That(_world.RowKeys(scout, "Need"), Is.EqualTo(new[] { "Food", "Luxury" }));
+            _world.AddRow(scout, "Need", "core:Luxury", new Init(met, BoolValue.True));
+            Assert.That(_world.GetRow(scout, met, "core:Luxury"), Is.SameAs(BoolValue.True));
+            Assert.That(Int(_world.GetRow(scout, M("Need", "weight"), "core:Luxury")), Is.EqualTo(1));
+            Assert.That(_world.RowKeys(scout, "Need"), Is.EqualTo(new[] { "core:Food", "core:Luxury" }));
 
-            _world.RemoveRow(scout, "Need", "Luxury");
-            Assert.That(_world.HasRow(scout, "Need", "Luxury"), Is.False);
-            Fails(() => _world.RemoveRow(scout, "Need", "Food"), Codes.RunNoRow); // Def에서 온 줄
+            _world.RemoveRow(scout, "Need", "core:Luxury");
+            Assert.That(_world.HasRow(scout, "Need", "core:Luxury"), Is.False);
+            Fails(() => _world.RemoveRow(scout, "Need", "core:Food"), Codes.RunNoRow); // Def에서 온 줄
         }
 
         [Test]
@@ -408,7 +408,7 @@ namespace Kesa.Engine.Tests.Runtime
             _world.Destroy(_rome);
             Assert.That(_world.RowEntities(scout, "Opinion"), Is.EqualTo(new[] { _paris }));
             Fails(() => _world.AddRow(scout, "Opinion", scout), Codes.RunType); // Unit은 City가 아님
-            Fails(() => _world.AddRow(scout, "Opinion", "Paris"), Codes.RunType); // Def id가 아니라 엔티티 키
+            Fails(() => _world.AddRow(scout, "Opinion", "core:Paris"), Codes.RunType); // Def id가 아니라 엔티티 키
         }
     }
 }

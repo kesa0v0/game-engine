@@ -42,8 +42,8 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             _w = new World(Load(out _), seed: 7);
             Assert.That(_w.Submit("host", "harbor.Open", new Dictionary<string, Value>()).Succeeded, Is.True);
-            _gull = _w.All("House").Single(h => _w.DefOf(h) == "Gull");
-            _crane = _w.All("House").Single(h => _w.DefOf(h) == "Crane");
+            _gull = _w.All("House").Single(h => _w.DefOf(h) == "harbor:Gull");
+            _crane = _w.All("House").Single(h => _w.DefOf(h) == "harbor:Crane");
             _w.Seat(_gull, "gull");
             _w.Seat(_crane, "crane");
         }
@@ -127,7 +127,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
             _w.Answer("crane", q.Id, _crane, 0); // accept
             Assert.That(Int(_crane, "Purse", "gold"), Is.EqualTo(25));
             _w.Advance(2);
-            Assert.That(((IntValue)_w.GetRow(_crane, M("Stock", "amount"), "Fish")).Value, Is.EqualTo(3));
+            Assert.That(((IntValue)_w.GetRow(_crane, M("Stock", "amount"), "harbor:Fish")).Value, Is.EqualTo(3));
             Assert.That(Int(_w.All("Harbor").Single(), "Port", "day"), Is.EqualTo(2));
         }
 
@@ -156,10 +156,10 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             var screen = new StringWriter();
             var errors = new StringWriter();
-            int code = Play.Run(new[] { Root(), "--seat", "gull=Gull", "--seat", "crane=Crane" },
+            int code = Play.Run(new[] { Root(), "--seat", "gull=harbor:Gull", "--seat", "crane=harbor:Crane" },
                 new StringReader("1\n:q\n"), screen, errors);
             Assert.That(code, Is.EqualTo(0), errors.ToString());
-            Assert.That(screen.ToString(), Does.Contain("[gull] #2 Gull").And.Contain("{gold: 20, fleet: 0, day: 0}"));
+            Assert.That(screen.ToString(), Does.Contain("[gull] #2 harbor:Gull").And.Contain("{gold: 20, fleet: 0, day: 0}"));
         }
     }
 }

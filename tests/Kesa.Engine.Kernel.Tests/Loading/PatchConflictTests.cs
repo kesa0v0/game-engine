@@ -27,7 +27,7 @@ namespace Kesa.Engine.Tests.Loading
                 "    cost=const(dict[DefId[\"Resource\"], int]),\n" +
                 ")\n",
                 defs: "Resource(\"Wood\")\nResource(\"Iron\")\n" +
-                      "Unit(\"Scout\", tags=[\"a\", \"b\"], cost={\"Wood\": 1, \"Iron\": 1})\nUnit(\"Archer\")\n");
+                      "Unit(\"Scout\", tags=[\"a\", \"b\"], cost={\"core:Wood\": 1, \"Iron\": 1})\nUnit(\"Archer\")\n");
         }
 
         private void Alpha(string defs) => Mod("alpha", defs: defs, extra: ", " + CoreDep);
@@ -36,7 +36,7 @@ namespace Kesa.Engine.Tests.Loading
             Mod("omega", defs: defs, extra: ", " + CoreDep + (afterAlpha ? ", loadAfter=[\"alpha\"]" : ""));
 
         private static string Call(string op, string path, string value, string target = "Scout") =>
-            "patch." + op + "(\"" + target + "\", \"" + path + "\", " + value + ")\n";
+            "patch." + op + "(\"" + DefIds.Resolve(target, "core") + "\", \"" + path + "\", " + value + ")\n";
 
         private ContentLoadResult LoadWith(out System.Collections.Generic.IReadOnlyList<Diagnostic> diags)
         {
@@ -50,8 +50,8 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("add", "move", "1", "set", "move", "2")]
         [TestCase("remove", "tags", "'a'", "remove", "tags", "'b'")]
         [TestCase("append", "tags", "['a']", "remove", "tags", "'a'")]
-        [TestCase("append", "cost", "{'Wood': 1}", "add", "cost.Wood", "1")]
-        [TestCase("set", "cost", "{}", "add", "cost.Wood", "1")]
+        [TestCase("append", "cost", "{'core:Wood': 1}", "add", "cost['core:Wood']", "1")]
+        [TestCase("set", "cost", "{}", "add", "cost['core:Wood']", "1")]
         [TestCase("add", "Health.base_max", "1", "set", "Health.base_max", "5")]
         [TestCase("set", "Morale", "Morale(value=1)", "set", "Morale.value", "2")]
         public void UnorderedModsThatOverlapAreBothErrors(string op1, string path1, string v1, string op2, string path2, string v2)
@@ -68,9 +68,9 @@ namespace Kesa.Engine.Tests.Loading
 
         [TestCase("add", "move", "1", "add", "move", "2")]
         [TestCase("append", "tags", "['a']", "append", "tags", "['b']")]
-        [TestCase("add", "cost.Wood", "1", "add", "cost.Iron", "1")]
+        [TestCase("add", "cost['core:Wood']", "1", "add", "cost['core:Iron']", "1")]
         [TestCase("set", "move", "1", "set", "Health.base_max", "2")]
-        [TestCase("set", "cost.Wood", "1", "set", "cost.Iron", "2")]
+        [TestCase("set", "cost['core:Wood']", "1", "set", "cost['core:Iron']", "2")]
         public void UnorderedModsThatCommuteAreFine(string op1, string path1, string v1, string op2, string path2, string v2)
         {
             Core();
@@ -135,10 +135,10 @@ namespace Kesa.Engine.Tests.Loading
 
         [TestCase("add", "move", "1", "set", "move", "2", true)]
         [TestCase("append", "tags", "['a']", "set", "tags", "[]", true)]
-        [TestCase("set", "cost.Wood", "1", "set", "cost", "{}", true)]
-        [TestCase("add", "cost.Wood", "1", "set", "cost", "{}", true)]
+        [TestCase("set", "cost['core:Wood']", "1", "set", "cost", "{}", true)]
+        [TestCase("add", "cost['core:Wood']", "1", "set", "cost", "{}", true)]
         [TestCase("set", "move", "1", "add", "move", "2", false)]
-        [TestCase("set", "cost", "{}", "set", "cost.Wood", "1", false)]
+        [TestCase("set", "cost", "{}", "set", "cost['core:Wood']", "1", false)]
         [TestCase("remove", "tags", "'a'", "set", "tags", "[]", false)]
         [TestCase("set", "tags", "['a']", "remove", "tags", "'a'", false)]
         [TestCase("add", "move", "1", "add", "move", "2", false)]
@@ -201,8 +201,8 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(log.Entries.Select(e => e.Mod + ":" + e.Path.Text),
                 Is.EqualTo(new[] { "alpha:move", "alpha:Health.base_max", "omega:move", "omega:move" }));
             Assert.That(log.Entries.Select(e => e.Status), Has.All.EqualTo(PatchStatus.Applied));
-            Assert.That(log.ForDef("Scout").Select(e => e.Sequence), Is.EqualTo(new[] { 0, 1, 2 }));
-            Assert.That(log.ForDef("Archer").Select(e => e.Mod), Is.EqualTo(new[] { "omega" }));
+            Assert.That(log.ForDef("core:Scout").Select(e => e.Sequence), Is.EqualTo(new[] { 0, 1, 2 }));
+            Assert.That(log.ForDef("core:Archer").Select(e => e.Mod), Is.EqualTo(new[] { "omega" }));
             Assert.That(log.ForDef("Nothing"), Is.Empty);
         }
 
@@ -210,14 +210,14 @@ namespace Kesa.Engine.Tests.Loading
         public void TheLogFindsEntriesWhosePathsOverlap()
         {
             Core();
-            Alpha(Call("set", "cost.Wood", "1") + Call("set", "cost.Iron", "1") + Call("set", "move", "1"));
+            Alpha(Call("set", "cost['core:Wood']", "1") + Call("set", "cost['core:Iron']", "1") + Call("set", "move", "1"));
             Omega(Call("set", "cost", "{}"), afterAlpha: true);
             var log = LoadWith(out _).PatchLog;
-            Assert.That(PatchPath.TryParse("cost['Wood']", out var wood, out _), Is.True);
-            Assert.That(log.ForField("Scout", wood).Select(e => e.Mod + ":" + e.Path.Text),
-                Is.EqualTo(new[] { "alpha:cost.Wood", "omega:cost" }));
+            Assert.That(PatchPath.TryParse("cost['core:Wood']", out var wood, out _), Is.True);
+            Assert.That(log.ForField("core:Scout", wood).Select(e => e.Mod + ":" + e.Path.Text),
+                Is.EqualTo(new[] { "alpha:cost['core:Wood']", "omega:cost" }));
             Assert.That(PatchPath.TryParse("move", out var move, out _), Is.True);
-            Assert.That(log.ForField("Scout", move).Count(), Is.EqualTo(1));
+            Assert.That(log.ForField("core:Scout", move).Count(), Is.EqualTo(1));
         }
 
         [Test]

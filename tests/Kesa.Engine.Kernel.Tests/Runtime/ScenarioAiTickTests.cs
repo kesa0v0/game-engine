@@ -67,11 +67,11 @@ namespace Kesa.Engine.Tests.Runtime
         private World NewGame()
         {
             var w = new World(_content, seed: 7);
-            _player = w.Create("Side");
-            _ai = w.Create("Side");
-            _a = w.Create("Town");
-            _b = w.Create("Town");
-            _c = w.Create("Town");
+            _player = w.Create("core:Side");
+            _ai = w.Create("core:Side");
+            _a = w.Create("core:Town");
+            _b = w.Create("core:Town");
+            _c = w.Create("core:Town");
             Link(w, _a, "east", _b);
             Link(w, _b, "west", _a);
             Link(w, _b, "east", _c);
@@ -90,7 +90,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private static EntityId Unit(World w, EntityId party, EntityId city)
         {
-            var u = w.Create("Soldier");
+            var u = w.Create("core:Soldier");
             w.Set(u, w.Member("Owner", "party"), new EntityValue(party));
             w.Set(u, w.Member("Place", "city"), new EntityValue(city));
             return u;

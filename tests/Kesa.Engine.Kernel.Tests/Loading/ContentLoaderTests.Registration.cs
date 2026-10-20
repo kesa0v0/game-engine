@@ -124,8 +124,8 @@ namespace Kesa.Engine.Tests.Loading
             var result = Load(out var diags);
             Assert.That(result.Disabled, Is.EqualTo(new[] { "a" }));
             Assert.That(diags.Select(d => d.Mod), Has.All.EqualTo("a"));
-            Assert.That(result.Defs.TryGet("Gold", out var gold), Is.True);
-            Assert.That(gold.Mod, Is.EqualTo("b"));
+            Assert.That(result.Defs.TryGet("b:Gold", out var gold), Is.True);
+            Assert.That(result.Defs.TryGet("a:Gold", out _), Is.False);
         }
 
         [Test]
@@ -342,10 +342,10 @@ namespace Kesa.Engine.Tests.Loading
                 defs: "Unit(\"Base\", abstract=True, tags=[\"a\"])\n" +
                       "Unit(\"Scout\", parent=\"Base\", tags=inherit.tags + [\"fast\"])\n");
             var result = LoadClean();
-            Assert.That(result.Defs.TryGet("Base", out var b), Is.True);
+            Assert.That(result.Defs.TryGet("core:Base", out var b), Is.True);
             Assert.That(b.IsAbstract, Is.True);
-            Assert.That(result.Defs.TryGet("Scout", out var s), Is.True);
-            Assert.That(s.Parent!.Value.Name, Is.EqualTo("Base"));
+            Assert.That(result.Defs.TryGet("core:Scout", out var s), Is.True);
+            Assert.That(s.Parent!.Value.Name, Is.EqualTo("core:Base"));
             Assert.That(s.TryGetField("tags", out var tags), Is.True);
             Assert.That(tags.Value, Is.InstanceOf<DeferredValue>());
             Assert.That(s.TryGetField("parent", out _), Is.False);
@@ -370,58 +370,55 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(diags.Single().Code, Is.EqualTo(Codes.DefDuplicateId));
         }
 
+        // 같은 이름도 모드가 다르면 다른 Def다 (G258)
         [Test]
-        public void RedefiningADependencysDefSuggestsOverride()
+        public void TheSameNameInAnotherModIsAnotherDef()
         {
             Mod("core", schema: UnitSchema, defs: "Unit(\"Scout\")\n");
-            Mod("rebalance", defs: "Unit(\"Scout\", label=\"x\")\n", extra: ", dependencies=[\"core\"]");
+            Mod("a", defs: "Unit(\"Scout\")\n", extra: ", dependencies=[\"core\"]");
+            Mod("b", defs: "Unit(\"Scout\")\n", extra: ", dependencies=[\"core\"]");
+            var result = LoadClean();
+            Assert.That(result.Defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "core:Scout", "a:Scout", "b:Scout" }));
+        }
+
+        [Test]
+        public void WritingAnotherModsFullIdWithoutOverrideSuggestsOverride()
+        {
+            Mod("core", schema: UnitSchema, defs: "Unit(\"Scout\")\n");
+            Mod("rebalance", defs: "Unit(\"core:Scout\", label=\"x\")\n", extra: ", dependencies=[\"core\"]");
             var result = Load(out var diags);
             var d = diags.Single();
-            Assert.That((d.Code, d.Mod), Is.EqualTo((Codes.DefDuplicateId, "rebalance")));
-            Assert.That(d.Hint, Is.EqualTo("add override=True to replace it"));
+            Assert.That((d.Code, d.Mod), Is.EqualTo((Codes.DefBadId, "rebalance")));
+            Assert.That(d.Hint, Does.Contain("override=True"));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "rebalance" }));
         }
 
         [Test]
-        public void RedefiningAnOverriddenDefIsJudgedAgainstTheOriginalOwner()
+        public void OverrideNeedsTheFullId()
         {
-            // c는 core만 보므로 b의 교체와 무관하게 c 자신의 실수다: b는 살아남는다
             Mod("core", schema: UnitSchema, defs: "Unit(\"Scout\")\n");
-            Mod("b", defs: "Unit(\"Scout\", override=True)\n", extra: ", dependencies=[\"core\"]");
-            Mod("c", defs: "Unit(\"Scout\")\n", extra: ", dependencies=[\"core\"], loadAfter=[\"b\"]");
-            var result = Load(out var diags);
+            Mod("rebalance", defs: "Unit(\"Scout\", override=True)\n", extra: ", dependencies=[\"core\"]");
+            Load(out var diags);
             var d = diags.Single();
-            Assert.That((d.Code, d.Mod), Is.EqualTo((Codes.DefDuplicateId, "c")));
-            Assert.That(d.Message, Does.Contain("mod 'core'"));
-            Assert.That(d.Hint, Is.EqualTo("add override=True to replace it"));
-            Assert.That(result.Disabled, Is.EqualTo(new[] { "c" }));
-        }
-
-        [Test]
-        public void IndependentModsDefiningTheSameIdAreBothDisabled()
-        {
-            Mod("core", schema: UnitSchema);
-            Mod("a", defs: "Unit(\"Scout\")\n", extra: ", dependencies=[\"core\"]");
-            Mod("b", defs: "Unit(\"Scout\")\n", extra: ", dependencies=[\"core\"]");
-            var result = Load(out var diags);
-            Assert.That(diags.Select(d => d.Mod), Is.EquivalentTo(new[] { "a", "b" }));
-            Assert.That(result.Disabled, Is.EqualTo(new[] { "a", "b" }));
+            Assert.That(d.Code, Is.EqualTo(Codes.DefBadOverride));
+            Assert.That(d.Hint, Does.Contain("\"mod:Scout\""));
         }
 
         [Test]
         public void OverrideReplacesTheDefInPlace()
         {
             Mod("core", schema: UnitSchema, defs: "Unit(\"Scout\", label=\"a\")\nUnit(\"Tank\")\n");
-            Mod("rebalance", defs: "Unit(\"Scout\", override=True, label=\"b\")\n", extra: ", dependencies=[\"core\"]");
+            Mod("rebalance", defs: "Unit(\"core:Scout\", override=True, label=\"b\")\n", extra: ", dependencies=[\"core\"]");
             var result = LoadClean();
-            Assert.That(result.Defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "Scout", "Tank" }));
+            Assert.That(result.Defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "core:Scout", "core:Tank" }));
             var scout = result.Defs.Defs[0];
             Assert.That(scout.Mod, Is.EqualTo("rebalance"));
             Assert.That(scout.Replaced!.Mod, Is.EqualTo("core"));
         }
 
-        [TestCase("Unit(\"Scuot\", override=True)\n", Codes.DefBadOverride)]
-        [TestCase("Building(\"Scout\", override=True)\n", Codes.DefBadOverride)]
+        [TestCase("Unit(\"core:Scuot\", override=True)\n", Codes.DefBadOverride)]
+        [TestCase("Building(\"core:Scout\", override=True)\n", Codes.DefBadOverride)]
+        [TestCase("Unit(\"rebalance:Scout\", override=True)\n", Codes.DefBadOverride)]
         public void BadOverrides(string defs, string code)
         {
             Mod("core", schema: UnitSchema + "deftype(\"Building\")\n", defs: "Unit(\"Scout\")\n");
@@ -434,8 +431,8 @@ namespace Kesa.Engine.Tests.Loading
         public void UnorderedDoubleOverrideIsAnErrorButOrderedOneWins()
         {
             Mod("core", schema: UnitSchema, defs: "Unit(\"Scout\")\n");
-            Mod("a", defs: "Unit(\"Scout\", override=True, label=\"a\")\n", extra: ", dependencies=[\"core\"]");
-            Mod("b", defs: "Unit(\"Scout\", override=True, label=\"b\")\n", extra: ", dependencies=[\"core\"]");
+            Mod("a", defs: "Unit(\"core:Scout\", override=True, label=\"a\")\n", extra: ", dependencies=[\"core\"]");
+            Mod("b", defs: "Unit(\"core:Scout\", override=True, label=\"b\")\n", extra: ", dependencies=[\"core\"]");
             var result = Load(out var diags);
             Assert.That(diags.Select(d => d.Code), Has.All.EqualTo(Codes.DefBadOverride));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "a", "b" }));
@@ -486,7 +483,7 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(result.Schema.TryGetType("Unit", out var unit), Is.True);
             Assert.That(ComponentsOf(unit), Is.EqualTo(new[] { "Health", "Skill" }));
             Assert.That(result.Schema.TryGetComponent("Morale", out _), Is.False);
-            Assert.That(result.Defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "Scout" }));
+            Assert.That(result.Defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "core:Scout" }));
 
             // 남은 Def는 최종 스키마의 객체를 가리켜야 한다 (실패한 모드의 확장이 남은 옛 객체가 아니라)
             var scout = result.Defs.Defs.Single();

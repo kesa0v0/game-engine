@@ -147,11 +147,12 @@ namespace Kesa.Engine.Runtime
         public EntityId Create(string defId, params Init[] inits)
         {
             NoHostWrites("Create");
+            defId = ScriptDefId(defId);
             if (!_defs.TryGet(defId, out var def))
             {
                 var ids = new List<string>();
                 foreach (var d in _defs.Defs) ids.Add(d.Id);
-                throw Unknown("there is no Def '" + defId + "' (abstract Defs cannot be created)", defId, ids);
+                throw UnknownDef("there is no Def '" + defId + "' (abstract Defs cannot be created)", defId, ids);
             }
             if (def.Type.IsDataOnly)
                 throw new WorldException(Codes.RunNotEntity,
@@ -534,5 +535,19 @@ namespace Kesa.Engine.Runtime
 
         private static WorldException Unknown(string message, string input, IEnumerable<string> candidates) =>
             new WorldException(Codes.RunUnknownName, message, Suggest.Hint(input, candidates));
+
+        /// <summary>없는 Def id. 짧은 이름이면 같은 경로의 전체 이름을 먼저 권한다 (G264).</summary>
+        private static WorldException UnknownDef(string message, string input, IEnumerable<string> candidates) =>
+            new WorldException(Codes.RunUnknownName, message, DefIds.Hint(input, candidates));
+
+        /// <summary>
+        /// 스크립트 함수가 내장을 부르거나 칸에 쓰는 중이면 그 모드 기준으로 짧은 Def id를 푼다 (G261). 호스트가 부르면 그대로라서
+        /// 전체 이름이어야 한다 (G264).
+        /// </summary>
+        private string ScriptDefId(string id)
+        {
+            string mod = _evaluator?.ScriptMod ?? "";
+            return mod.Length == 0 || id.Length == 0 ? id : DefIds.Resolve(id, mod);
+        }
     }
 }

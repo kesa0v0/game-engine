@@ -69,7 +69,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: Schema, defs: Defs + handlers);
             _world = new World(LoadClean(), stepBudget: 300, actionStepBudget: 20_000);
             _units.Clear();
-            for (int i = 0; i < units; i++) _units.Add(_world.Create("Soldier"));
+            for (int i = 0; i < units; i++) _units.Add(_world.Create("banking:Soldier"));
             foreach (var u in _units) _world.Seat(u, "host");
         }
 
@@ -114,7 +114,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ADerivedReadKeepsTheSmallReadBudget()
         {
             NewWorld();
-            var office = _world.Create("Bureau");
+            var office = _world.Create("banking:Bureau");
             var e = Assert.Throws<WorldException>(() => _world.Get(office, _world.Member("Census", "total")))!;
             Assert.That(e.Code, Is.EqualTo(Codes.RunBudget));
         }

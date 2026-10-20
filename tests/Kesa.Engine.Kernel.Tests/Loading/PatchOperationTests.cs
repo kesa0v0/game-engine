@@ -33,8 +33,8 @@ namespace Kesa.Engine.Tests.Loading
                 "    cost=const(dict[DefId[\"Resource\"], int]),\n" +
                 "    table=const(dict[int, str]),\n" +
                 ")\n",
-                defs: "Resource(\"Wood\")\nResource(\"core.Iron\")\n" +
-                      "Unit(\"Scout\", tags=[\"slow\"], cost={\"Wood\": 2}, table={1: \"x\"})\n");
+                defs: "Resource(\"Wood\")\nResource(\"Iron\")\n" +
+                      "Unit(\"Scout\", tags=[\"slow\"], cost={\"core:Wood\": 2}, table={1: \"x\"})\n");
         }
 
         private ContentLoadResult Run(string call)
@@ -46,33 +46,33 @@ namespace Kesa.Engine.Tests.Loading
 
         // ---- 허용되는 연산 ----
 
-        [TestCase("patch.set(\"Scout\", \"move\", 4)")]
-        [TestCase("patch.set(\"Scout\", \"speed\", 2)")]
-        [TestCase("patch.set(\"Scout\", \"speed\", 1.5)")]
-        [TestCase("patch.set(\"Scout\", \"flag\", True)")]
-        [TestCase("patch.set(\"Scout\", \"name\", \"x\")")]
-        [TestCase("patch.set(\"Scout\", \"label\", \"unit.scout\")")]
-        [TestCase("patch.add(\"Scout\", \"move\", 2)")]
-        [TestCase("patch.add(\"Scout\", \"move\", -1)")]
-        [TestCase("patch.add(\"Scout\", \"speed\", 1)")]
-        [TestCase("patch.add(\"Scout\", \"speed\", 0.5)")]
-        [TestCase("patch.set(\"Scout\", \"tags\", [\"a\", \"b\"])")]
-        [TestCase("patch.append(\"Scout\", \"tags\", [\"fast\"])")]
-        [TestCase("patch.remove(\"Scout\", \"tags\", \"slow\")")]
-        [TestCase("patch.set(\"Scout\", \"cost\", {\"Wood\": 1})")]
-        [TestCase("patch.append(\"Scout\", \"cost\", {\"core.Iron\": 1})")]
-        [TestCase("patch.remove(\"Scout\", \"cost\", \"Wood\")")]
-        [TestCase("patch.set(\"Scout\", \"cost.Wood\", 3)")]
-        [TestCase("patch.add(\"Scout\", \"cost.Wood\", 1)")]
-        [TestCase("patch.set(\"Scout\", \"table[3]\", \"x\")")]
-        [TestCase("patch.append(\"Scout\", \"table\", {2: \"a\"})")]
-        [TestCase("patch.remove(\"Scout\", \"table\", 1)")]
-        [TestCase("patch.set(\"Scout\", \"Health.base_max\", 5)")]
-        [TestCase("patch.add(\"Scout\", \"Health.base_max\", 1)")]
-        [TestCase("patch.add(\"Scout\", \"Health.current\", 1)")]
-        [TestCase("patch.set(\"Scout\", \"Morale\", Morale(value=7))")]
-        [TestCase("patch.set(\"Scout\", \"Skill.Wood\", Skill(level=1))")]
-        [TestCase("patch.add(\"Scout\", \"Stock['core.Iron'].amount\", 1)")]
+        [TestCase("patch.set(\"core:Scout\", \"move\", 4)")]
+        [TestCase("patch.set(\"core:Scout\", \"speed\", 2)")]
+        [TestCase("patch.set(\"core:Scout\", \"speed\", 1.5)")]
+        [TestCase("patch.set(\"core:Scout\", \"flag\", True)")]
+        [TestCase("patch.set(\"core:Scout\", \"name\", \"x\")")]
+        [TestCase("patch.set(\"core:Scout\", \"label\", \"unit.scout\")")]
+        [TestCase("patch.add(\"core:Scout\", \"move\", 2)")]
+        [TestCase("patch.add(\"core:Scout\", \"move\", -1)")]
+        [TestCase("patch.add(\"core:Scout\", \"speed\", 1)")]
+        [TestCase("patch.add(\"core:Scout\", \"speed\", 0.5)")]
+        [TestCase("patch.set(\"core:Scout\", \"tags\", [\"a\", \"b\"])")]
+        [TestCase("patch.append(\"core:Scout\", \"tags\", [\"fast\"])")]
+        [TestCase("patch.remove(\"core:Scout\", \"tags\", \"slow\")")]
+        [TestCase("patch.set(\"core:Scout\", \"cost\", {\"core:Wood\": 1})")]
+        [TestCase("patch.append(\"core:Scout\", \"cost\", {\"core:Iron\": 1})")]
+        [TestCase("patch.remove(\"core:Scout\", \"cost\", \"core:Wood\")")]
+        [TestCase("patch.set(\"core:Scout\", \"cost['core:Wood']\", 3)")]
+        [TestCase("patch.add(\"core:Scout\", \"cost['core:Wood']\", 1)")]
+        [TestCase("patch.set(\"core:Scout\", \"table[3]\", \"x\")")]
+        [TestCase("patch.append(\"core:Scout\", \"table\", {2: \"a\"})")]
+        [TestCase("patch.remove(\"core:Scout\", \"table\", 1)")]
+        [TestCase("patch.set(\"core:Scout\", \"Health.base_max\", 5)")]
+        [TestCase("patch.add(\"core:Scout\", \"Health.base_max\", 1)")]
+        [TestCase("patch.add(\"core:Scout\", \"Health.current\", 1)")]
+        [TestCase("patch.set(\"core:Scout\", \"Morale\", Morale(value=7))")]
+        [TestCase("patch.set(\"core:Scout\", \"Skill['core:Wood']\", Skill(level=1))")]
+        [TestCase("patch.add(\"core:Scout\", \"Stock['core:Iron'].amount\", 1)")]
         public void AllowedOperation(string call)
         {
             var result = Run(call);
@@ -80,27 +80,27 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(result.Disabled, Is.Empty);
         }
 
-        [TestCase("patch.remove(\"Scout\", \"Morale\")")]
-        [TestCase("patch.set(\"Scout\", \"Morale.value\", 1)")]
-        [TestCase("patch.remove(\"Scout\", \"Skill.Wood\")")]
+        [TestCase("patch.remove(\"core:Scout\", \"Morale\")")]
+        [TestCase("patch.set(\"core:Scout\", \"Morale.value\", 1)")]
+        [TestCase("patch.remove(\"core:Scout\", \"Skill['core:Wood']\")")]
         public void AllowedOperationOnAComponentAttachedBefore(string call)
         {
             // 떼거나 그 안의 값을 바꾸려면 먼저 붙어 있어야 한다 (④가 본다, G44)
-            var result = Run("patch.set(\"Scout\", \"Morale\", Morale(value=3))\n" +
-                             "patch.set(\"Scout\", \"Skill.Wood\", Skill(level=1))\n" + call);
+            var result = Run("patch.set(\"core:Scout\", \"Morale\", Morale(value=3))\n" +
+                             "patch.set(\"core:Scout\", \"Skill['core:Wood']\", Skill(level=1))\n" + call);
             Assert.That(result.Resolved, Has.Count.EqualTo(3), string.Join("\n", result.Disabled));
             Assert.That(result.Disabled, Is.Empty);
         }
 
         // ---- 허용되지 않는 연산 ----
 
-        [TestCase("patch.add(\"Scout\", \"tags\", [\"a\"])", "patch.set, patch.append, patch.remove")]
-        [TestCase("patch.append(\"Scout\", \"move\", [1])", "patch.set, patch.add")]
-        [TestCase("patch.remove(\"Scout\", \"move\", 1)", "patch.set, patch.add")]
-        [TestCase("patch.add(\"Scout\", \"name\", \"x\")", "patch.set")]
-        [TestCase("patch.add(\"Scout\", \"flag\", 1)", "patch.set")]
-        [TestCase("patch.append(\"Scout\", \"cost.Wood\", 1)", "patch.set, patch.add")]
-        [TestCase("patch.remove(\"Scout\", \"Health.base_max\", 1)", "patch.set, patch.add")]
+        [TestCase("patch.add(\"core:Scout\", \"tags\", [\"a\"])", "patch.set, patch.append, patch.remove")]
+        [TestCase("patch.append(\"core:Scout\", \"move\", [1])", "patch.set, patch.add")]
+        [TestCase("patch.remove(\"core:Scout\", \"move\", 1)", "patch.set, patch.add")]
+        [TestCase("patch.add(\"core:Scout\", \"name\", \"x\")", "patch.set")]
+        [TestCase("patch.add(\"core:Scout\", \"flag\", 1)", "patch.set")]
+        [TestCase("patch.append(\"core:Scout\", \"cost['core:Wood']\", 1)", "patch.set, patch.add")]
+        [TestCase("patch.remove(\"core:Scout\", \"Health.base_max\", 1)", "patch.set, patch.add")]
         public void OperationThatTheValueDoesNotSupport(string call, string hint)
         {
             var result = Run(call);
@@ -121,7 +121,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void RemovingFromAListNeedsTheElement()
         {
-            var d = Diagnostics(Run("patch.remove(\"Scout\", \"tags\")"));
+            var d = Diagnostics(Run("patch.remove(\"core:Scout\", \"tags\")"));
             Assert.That(d.Code, Is.EqualTo(Codes.PatBadOp));
             Assert.That(d.Message, Does.Contain("element"));
         }
@@ -129,24 +129,24 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void RemovingFromAMapNeedsTheKey()
         {
-            var d = Diagnostics(Run("patch.remove(\"Scout\", \"cost\")"));
+            var d = Diagnostics(Run("patch.remove(\"core:Scout\", \"cost\")"));
             Assert.That(d.Code, Is.EqualTo(Codes.PatBadOp));
             Assert.That(d.Message, Does.Contain("key"));
         }
 
-        [TestCase("cost.Wood", "patch.remove(\"Scout\", \"cost\", \"Wood\")")]
-        [TestCase("cost['core.Iron']", "patch.remove(\"Scout\", \"cost\", \"core.Iron\")")]
-        [TestCase("table[3]", "patch.remove(\"Scout\", \"table\", 3)")]
+        [TestCase("cost['core:Wood']", "patch.remove(\"core:Scout\", \"cost\", \"core:Wood\")")]
+        [TestCase("cost['core:Iron']", "patch.remove(\"core:Scout\", \"cost\", \"core:Iron\")")]
+        [TestCase("table[3]", "patch.remove(\"core:Scout\", \"table\", 3)")]
         public void AMapEntryIsRemovedByKeyNotByPath(string path, string hint)
         {
-            var d = Diagnostics(Run("patch.remove(\"Scout\", \"" + path + "\")"));
+            var d = Diagnostics(Run("patch.remove(\"core:Scout\", \"" + path + "\")"));
             Assert.That(d.Code, Is.EqualTo(Codes.PatBadOp));
             Assert.That(d.Hint, Does.Contain(hint));
         }
 
-        [TestCase("patch.add(\"Scout\", \"Morale\", 1)")]
-        [TestCase("patch.append(\"Scout\", \"Morale\", Morale(value=1))")]
-        [TestCase("patch.add(\"Scout\", \"Skill.Wood\", 1)")]
+        [TestCase("patch.add(\"core:Scout\", \"Morale\", 1)")]
+        [TestCase("patch.append(\"core:Scout\", \"Morale\", Morale(value=1))")]
+        [TestCase("patch.add(\"core:Scout\", \"Skill['core:Wood']\", 1)")]
         public void ComponentsCanOnlyBeAttachedOrDetached(string call)
         {
             var d = Diagnostics(Run(call));
@@ -154,10 +154,10 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(d.Hint, Does.Contain("patch.set"));
         }
 
-        [TestCase("patch.set(\"Scout\", \"Health\", Health(base_max=1))")]
-        [TestCase("patch.remove(\"Scout\", \"Health\")")]
-        [TestCase("patch.set(\"Scout\", \"Stock.Wood\", Stock(amount=1))")]
-        [TestCase("patch.remove(\"Scout\", \"Stock.Wood\")")]
+        [TestCase("patch.set(\"core:Scout\", \"Health\", Health(base_max=1))")]
+        [TestCase("patch.remove(\"core:Scout\", \"Health\")")]
+        [TestCase("patch.set(\"core:Scout\", \"Stock['core:Wood']\", Stock(amount=1))")]
+        [TestCase("patch.remove(\"core:Scout\", \"Stock['core:Wood']\")")]
         public void WhatEveryDefHasCannotBeAttachedOrDetached(string call)
         {
             var d = Diagnostics(Run(call));
@@ -168,36 +168,36 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void DetachingTakesNoThirdArgument()
         {
-            var d = Diagnostics(Run("patch.remove(\"Scout\", \"Morale\", 1)"));
+            var d = Diagnostics(Run("patch.remove(\"core:Scout\", \"Morale\", 1)"));
             Assert.That(d.Code, Is.EqualTo(Codes.PatBadOp));
             Assert.That(d.Message, Does.Contain("third argument"));
         }
 
         // ---- 값의 모양 ----
 
-        [TestCase("patch.set(\"Scout\", \"move\", 1.5)", "int field")]
-        [TestCase("patch.add(\"Scout\", \"move\", 0.5)", "int field")]
-        [TestCase("patch.set(\"Scout\", \"move\", \"x\")", null)]
-        [TestCase("patch.set(\"Scout\", \"move\", True)", null)]
-        [TestCase("patch.set(\"Scout\", \"speed\", \"fast\")", null)]
-        [TestCase("patch.set(\"Scout\", \"flag\", 1)", null)]
-        [TestCase("patch.set(\"Scout\", \"name\", 1)", null)]
-        [TestCase("patch.set(\"Scout\", \"tags\", \"x\")", null)]
-        [TestCase("patch.set(\"Scout\", \"tags\", [1])", null)]
-        [TestCase("patch.append(\"Scout\", \"tags\", \"fast\")", "write [value]")]
-        [TestCase("patch.append(\"Scout\", \"tags\", [1])", null)]
-        [TestCase("patch.remove(\"Scout\", \"tags\", 1)", null)]
-        [TestCase("patch.set(\"Scout\", \"cost\", {1: 2})", null)]
-        [TestCase("patch.set(\"Scout\", \"cost\", {\"Wood\": \"x\"})", null)]
-        [TestCase("patch.append(\"Scout\", \"cost\", [1])", null)]
-        [TestCase("patch.remove(\"Scout\", \"cost\", 3)", null)]
-        [TestCase("patch.set(\"Scout\", \"cost.Wood\", 1.5)", null)]
-        [TestCase("patch.set(\"Scout\", \"table[3]\", 5)", null)]
-        [TestCase("patch.set(\"Scout\", \"Health.base_max\", \"x\")", null)]
-        [TestCase("patch.set(\"Scout\", \"Morale\", 5)", "Morale(...)")]
-        [TestCase("patch.set(\"Scout\", \"Morale\", Health(base_max=1))", "Health(...)")]
-        [TestCase("patch.set(\"Scout\", \"Skill.Wood\", 5)", "Skill(...)")]
-        [TestCase("patch.set(\"Scout\", \"move\", Morale(value=1))", null)]
+        [TestCase("patch.set(\"core:Scout\", \"move\", 1.5)", "int field")]
+        [TestCase("patch.add(\"core:Scout\", \"move\", 0.5)", "int field")]
+        [TestCase("patch.set(\"core:Scout\", \"move\", \"x\")", null)]
+        [TestCase("patch.set(\"core:Scout\", \"move\", True)", null)]
+        [TestCase("patch.set(\"core:Scout\", \"speed\", \"fast\")", null)]
+        [TestCase("patch.set(\"core:Scout\", \"flag\", 1)", null)]
+        [TestCase("patch.set(\"core:Scout\", \"name\", 1)", null)]
+        [TestCase("patch.set(\"core:Scout\", \"tags\", \"x\")", null)]
+        [TestCase("patch.set(\"core:Scout\", \"tags\", [1])", null)]
+        [TestCase("patch.append(\"core:Scout\", \"tags\", \"fast\")", "write [value]")]
+        [TestCase("patch.append(\"core:Scout\", \"tags\", [1])", null)]
+        [TestCase("patch.remove(\"core:Scout\", \"tags\", 1)", null)]
+        [TestCase("patch.set(\"core:Scout\", \"cost\", {1: 2})", null)]
+        [TestCase("patch.set(\"core:Scout\", \"cost\", {\"core:Wood\": \"x\"})", null)]
+        [TestCase("patch.append(\"core:Scout\", \"cost\", [1])", null)]
+        [TestCase("patch.remove(\"core:Scout\", \"cost\", 3)", null)]
+        [TestCase("patch.set(\"core:Scout\", \"cost['core:Wood']\", 1.5)", null)]
+        [TestCase("patch.set(\"core:Scout\", \"table[3]\", 5)", null)]
+        [TestCase("patch.set(\"core:Scout\", \"Health.base_max\", \"x\")", null)]
+        [TestCase("patch.set(\"core:Scout\", \"Morale\", 5)", "Morale(...)")]
+        [TestCase("patch.set(\"core:Scout\", \"Morale\", Health(base_max=1))", "Health(...)")]
+        [TestCase("patch.set(\"core:Scout\", \"Skill['core:Wood']\", 5)", "Skill(...)")]
+        [TestCase("patch.set(\"core:Scout\", \"move\", Morale(value=1))", null)]
         public void ValueOfTheWrongShape(string call, string? contains)
         {
             var d = Diagnostics(Run(call));
@@ -209,8 +209,8 @@ namespace Kesa.Engine.Tests.Loading
         public void AnIntegerFitsAFixedValueButNotTheOtherWayAround()
         {
             // spec-gaps G48
-            Assert.That(Run("patch.set(\"Scout\", \"speed\", 2)").Resolved, Has.Count.EqualTo(1));
-            var d = Diagnostics(Run("patch.set(\"Scout\", \"move\", 2.0)"));
+            Assert.That(Run("patch.set(\"core:Scout\", \"speed\", 2)").Resolved, Has.Count.EqualTo(1));
+            var d = Diagnostics(Run("patch.set(\"core:Scout\", \"move\", 2.0)"));
             Assert.That(d.Code, Is.EqualTo(Codes.PatBadValue));
         }
 
@@ -218,7 +218,7 @@ namespace Kesa.Engine.Tests.Loading
         public void TheErrorPointsAtTheValue()
         {
             Core();
-            Mod("compat", defs: "patch.set(\"Scout\", \"move\",\n    \"x\")\n", extra: CoreDep);
+            Mod("compat", defs: "patch.set(\"core:Scout\", \"move\",\n    \"x\")\n", extra: CoreDep);
             Load(out var diags);
             var d = diags.Single();
             Assert.That((d.Code, d.Line), Is.EqualTo((Codes.PatBadValue, 2)));
@@ -229,7 +229,7 @@ namespace Kesa.Engine.Tests.Loading
         {
             Core();
             Mod("compat",
-                defs: "patch.set(\"Scout\", \"move\", 1)\npatch.add(\"Scout\", \"tags\", [])\npatch.set(\"Scout\", \"move\", \"x\")\n",
+                defs: "patch.set(\"core:Scout\", \"move\", 1)\npatch.add(\"core:Scout\", \"tags\", [])\npatch.set(\"core:Scout\", \"move\", \"x\")\n",
                 extra: CoreDep);
             var result = Load(out var diags);
             Assert.That(diags.Select(d => (d.Code, d.Line)),

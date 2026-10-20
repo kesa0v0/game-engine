@@ -49,7 +49,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             _world = new World(LoadClean());
-            return _world.Create("Scout");
+            return _world.Create("banking:Scout");
         }
 
         private MemberHandle M(string owner, string member) => _world.Member(owner, member);
@@ -88,7 +88,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var scout = NewScout();
             Assert.That(Int(_world.Get(scout, M("Ally", "friend_hp"))), Is.EqualTo(-1)); // 빈 Ref는 None
-            var flag = _world.Create("Flag");
+            var flag = _world.Create("banking:Flag");
             _world.Set(scout, M("Ally", "friend"), new EntityValue(flag));
             Assert.That(Int(_world.Get(scout, M("Ally", "friend_hp"))), Is.EqualTo(5));
         }
@@ -97,9 +97,9 @@ namespace Kesa.Engine.Tests.Runtime
         public void KeyedRowsGetTheirOwnRowAndCanReachTheEntityAndKey()
         {
             var scout = NewScout();
-            Assert.That(Int(_world.GetRow(scout, M("Skill", "eff"), "Cooking")), Is.EqualTo(16)); // 4 + 12
-            Assert.That(Int(_world.GetRow(scout, M("Skill", "eff"), "Medicine")), Is.EqualTo(13));
-            Assert.That(((StrValue)_world.GetRow(scout, M("Skill", "label"), "Cooking")).Value, Is.EqualTo("Cooking"));
+            Assert.That(Int(_world.GetRow(scout, M("Skill", "eff"), "banking:Cooking")), Is.EqualTo(16)); // 4 + 12
+            Assert.That(Int(_world.GetRow(scout, M("Skill", "eff"), "banking:Medicine")), Is.EqualTo(13));
+            Assert.That(((StrValue)_world.GetRow(scout, M("Skill", "label"), "banking:Cooking")).Value, Is.EqualTo("banking:Cooking"));
         }
 
         [Test]
@@ -133,11 +133,11 @@ namespace Kesa.Engine.Tests.Runtime
             var loaded = LoadClean();
 
             var roomy = new World(loaded);
-            Assert.That(Int(roomy.Get(roomy.Create("Dig"), roomy.Member("Work", "outer"))), Is.EqualTo(200));
+            Assert.That(Int(roomy.Get(roomy.Create("banking:Dig"), roomy.Member("Work", "outer"))), Is.EqualTo(200));
 
             // 안쪽 계산 하나는 300단계 안에 들지만 그것을 열 번 읽는 바깥 읽기는 넘는다
             _world = new World(loaded, stepBudget: 300);
-            var dig = _world.Create("Dig");
+            var dig = _world.Create("banking:Dig");
             Assert.That(Int(_world.Get(dig, M("Work", "inner"))), Is.EqualTo(20));
             var e = Fails(() => _world.Get(dig, M("Work", "outer")), Codes.RunBudget);
             Assert.That(e.Message, Does.Contain("Work.outer"));
@@ -152,7 +152,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: WorkSchema, defs: "Job(\"Dig\")\n");
             // 계량기는 읽기마다 비워서 다시 쓴다: 앞 읽기들의 단계가 쌓이면 몇 번째 읽기에서 넘는다
             _world = new World(LoadClean(), stepBudget: 300);
-            var dig = _world.Create("Dig");
+            var dig = _world.Create("banking:Dig");
             for (int i = 0; i < 30; i++) Assert.That(Int(_world.Get(dig, M("Work", "inner"))), Is.EqualTo(20));
         }
 
@@ -169,7 +169,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: ChainSchema, defs: "Job(\"Dig\")\n");
             _world = new World(LoadClean());
-            var dig = _world.Create("Dig");
+            var dig = _world.Create("banking:Dig");
             var e = Fails(() => _world.Get(dig, M("Chain", "outer")), Codes.RunArithmetic);
             var lines = e.Message.Split('\n');
             Assert.That(lines[0], Does.StartWith("computing Chain.outer of " + dig + ": division by zero (at "));
@@ -185,7 +185,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: ChainSchema, defs: "Job(\"Dig\")\n");
             _world = new World(LoadClean());
-            var dig = _world.Create("Dig");
+            var dig = _world.Create("banking:Dig");
             // 실행 세션은 다시 쓴다: 실패한 읽기의 프레임이 남으면 다음 읽기가 같은 함수를 "재귀"로 보거나 흔적이 섞인다
             for (int i = 0; i < 3; i++)
             {
@@ -201,7 +201,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: ChainSchema, defs: "Job(\"Dig\")\n");
             _world = new World(LoadClean());
-            var dig = _world.Create("Dig");
+            var dig = _world.Create("banking:Dig");
             var e = Fails(() => _world.Get(dig, M("Chain", "plus")), Codes.RunType);
             var lines = e.Message.Split('\n');
             Assert.That(lines[0], Does.Contain("'Chain.half' is declared int").And.Contain(":8")); // plus의 람다가 c.half를 읽은 줄
@@ -233,12 +233,12 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: RowsSchema,
                 defs: "NeedDef(\"Food\")\nNeedDef(\"Rest\")\nSkillDef(\"Cooking\")\nSkillDef(\"Mining\")\nUnit(\"Scout\")\n");
             _world = new World(LoadClean());
-            var scout = _world.Create("Scout");
+            var scout = _world.Create("banking:Scout");
             long Q(string member) => Int(_world.Get(scout, M("Q", member)));
 
             // keys="listed": 줄이 없으면 0개이고 거짓
             Assert.That(new[] { Q("needs"), Q("any_need"), Q("has_food") }, Is.EqualTo(new long[] { 0, 0, 0 }));
-            _world.AddRow(scout, "Need", "Food");
+            _world.AddRow(scout, "Need", "banking:Food");
             Assert.That(new[] { Q("needs"), Q("any_need"), Q("has_food") }, Is.EqualTo(new long[] { 1, 1, 1 }));
 
             // keys="all": 키 타입의 모든 Def가 줄이다
@@ -250,7 +250,7 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(new[] { Q("opinions"), Q("knows_self") }, Is.EqualTo(new long[] { 1, 1 }));
 
             // 없는 Def id는 조용한 False가 아니라 h.Need["Fod"]와 같은 "혹시 …?" 오류, 키 종류가 틀리면 타입 오류
-            Assert.That(Fails(() => Q("typo"), Codes.RunUnknownName).Hint, Is.EqualTo("did you mean 'Food'?"));
+            Assert.That(Fails(() => Q("typo"), Codes.RunUnknownName).Hint, Is.EqualTo("did you mean 'banking:Food'?"));
             Fails(() => Q("wrong_kind"), Codes.RunType);
         }
 

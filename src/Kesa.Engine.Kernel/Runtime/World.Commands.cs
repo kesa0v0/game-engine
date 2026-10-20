@@ -187,7 +187,7 @@ namespace Kesa.Engine.Runtime
                         var ids = new List<string>();
                         foreach (var d in _defs.Defs)
                             if (d.Type.Name == defId.Target.Name) ids.Add(d.Id);
-                        string? hint = Suggest.Hint(id.Value, ids);
+                        string? hint = Loading.DefIds.Hint(id.Value, ids);
                         return Reject(ArgumentProblem.UnknownDef,
                             "is '" + id.Value + "', which is not a Def" + (hint == null ? "" : "; " + hint));
                     }

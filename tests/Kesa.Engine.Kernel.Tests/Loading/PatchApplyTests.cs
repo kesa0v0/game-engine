@@ -31,14 +31,14 @@ namespace Kesa.Engine.Tests.Loading
 
         private const string DefaultDefs =
             "Resource(\"Wood\")\nResource(\"Iron\")\n" +
-            "Unit(\"Scout\", move=4, tags=[\"a\", \"b\"], cost={\"Wood\": 2}, table={1: \"x\"}, Health=Health(base_max=12))\n";
+            "Unit(\"Scout\", move=4, tags=[\"a\", \"b\"], cost={\"core:Wood\": 2}, table={1: \"x\"}, Health=Health(base_max=12))\n";
 
         // ratio에 default가 없는 스키마: add의 기준값이 없는 경우를 만든다. 필수 값이 비어도 되도록 Def는 abstract
         private static readonly string NoRatioDefault = Schema.Replace("ratio=const(fixed, default=0)", "ratio=const(fixed)");
 
         private const string TemplateDefs =
             "Resource(\"Wood\")\nResource(\"Iron\")\n" +
-            "Unit(\"Scout\", abstract=True, move=4, tags=[\"a\", \"b\"], cost={\"Wood\": 2}, table={1: \"x\"})\n";
+            "Unit(\"Scout\", abstract=True, move=4, tags=[\"a\", \"b\"], cost={\"core:Wood\": 2}, table={1: \"x\"})\n";
 
         private ContentLoadResult Run(string patches, out IReadOnlyList<Diagnostic> diags, string defs = DefaultDefs,
             string? schema = null)
@@ -56,11 +56,11 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         private static string P(string op, string path, string value = "", string target = "Scout") =>
-            "patch." + op + "(\"" + target + "\", \"" + path + "\"" + (value.Length == 0 ? "" : ", " + value) + ")\n";
+            "patch." + op + "(\"" + DefIds.Resolve(target, "core") + "\", \"" + path + "\"" + (value.Length == 0 ? "" : ", " + value) + ")\n";
 
         private static ResolvedValue Const(ContentLoadResult r, string id, string name, string target = "Scout")
         {
-            Assert.That(r.Expanded.TryGet(id, out var def), Is.True);
+            Assert.That(r.Expanded.TryGet(DefIds.Resolve(id, "core"), out var def), Is.True);
             Assert.That(def.Consts.TryGet(name, out var v), Is.True, id + "." + name);
             return v;
         }
@@ -72,7 +72,7 @@ namespace Kesa.Engine.Tests.Loading
 
         private static ResolvedValue Member(ContentLoadResult r, string id, string component, string member)
         {
-            Assert.That(r.Expanded.TryGet(id, out var def), Is.True);
+            Assert.That(r.Expanded.TryGet(DefIds.Resolve(id, "core"), out var def), Is.True);
             Assert.That(def.Components.TryGet(component, out var c), Is.True, component);
             Assert.That(c.Members.TryGet(member, out var v), Is.True, component + "." + member);
             return v;
@@ -136,7 +136,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AddToAMissingMapEntryIsAnError()
         {
-            Run(P("add", "cost.Iron", "1"), out var diags);
+            Run(P("add", "cost['core:Iron']", "1"), out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.PatNoBase));
             Assert.That(d.Message, Does.Contain("no such map entry"));
@@ -154,10 +154,10 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void SetCreatesAMissingMapKeyAndChangesAnExistingOne()
         {
-            var r = RunClean(P("set", "cost.Iron", "3") + P("set", "cost.Wood", "7") + P("set", "table[2]", "\"y\""));
+            var r = RunClean(P("set", "cost['core:Iron']", "3") + P("set", "cost['core:Wood']", "7") + P("set", "table[2]", "\"y\""));
             var cost = (DictValue)Const(r, "Scout", "cost").Value;
             Assert.That(cost.Items.Select(i => ((StrValue)i.Key).Value + "=" + ((IntValue)i.Value).Value),
-                Is.EqualTo(new[] { "Wood=7", "Iron=3" }));
+                Is.EqualTo(new[] { "core:Wood=7", "core:Iron=3" }));
             var table = (DictValue)Const(r, "Scout", "table").Value;
             Assert.That(table.Items.Select(i => ((IntValue)i.Key).Value), Is.EqualTo(new long[] { 1, 2 }));
         }
@@ -165,14 +165,14 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void SetOfAMapEntryWorksWhenTheMapHasNoValueYet()
         {
-            var r = RunClean(P("set", "cost.Wood", "5"), "Resource(\"Wood\")\nUnit(\"Scout\")\n");
+            var r = RunClean(P("set", "cost['core:Wood']", "5"), "Resource(\"Wood\")\nUnit(\"Scout\")\n");
             Assert.That(((DictValue)Const(r, "Scout", "cost").Value).Items, Has.Count.EqualTo(1));
         }
 
         [Test]
         public void AddToAnExistingMapEntry()
         {
-            var r = RunClean(P("add", "cost.Wood", "3"));
+            var r = RunClean(P("add", "cost['core:Wood']", "3"));
             var cost = (DictValue)Const(r, "Scout", "cost").Value;
             Assert.That(((IntValue)cost.Items.Single().Value).Value, Is.EqualTo(5));
         }
@@ -191,10 +191,10 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AppendToAMapRejectsAnExistingKey()
         {
-            var ok = RunClean(P("append", "cost", "{\"Iron\": 1}"));
+            var ok = RunClean(P("append", "cost", "{\"core:Iron\": 1}"));
             Assert.That(((DictValue)Const(ok, "Scout", "cost").Value).Items, Has.Count.EqualTo(2));
 
-            Run(P("append", "cost", "{\"Wood\": 1}"), out var diags);
+            Run(P("append", "cost", "{\"core:Wood\": 1}"), out var diags);
             var d = diags.Single();
             Assert.That((d.Code, d.Mod), Is.EqualTo((Codes.PatKeyExists, "compat")));
             Assert.That(d.Hint, Does.Contain("patch.set"));
@@ -203,14 +203,14 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void RemoveTakesTheFirstEqualElementOrTheKey()
         {
-            var r = RunClean(P("remove", "tags", "\"a\"") + P("remove", "cost", "\"Wood\"") + P("remove", "table", "1"));
+            var r = RunClean(P("remove", "tags", "\"a\"") + P("remove", "cost", "\"core:Wood\"") + P("remove", "table", "1"));
             Assert.That(Strings(Const(r, "Scout", "tags")), Is.EqualTo("b"));
             Assert.That(((DictValue)Const(r, "Scout", "cost").Value).Items, Is.Empty);
             Assert.That(((DictValue)Const(r, "Scout", "table").Value).Items, Is.Empty);
         }
 
         [TestCase("remove", "tags", "\"zzz\"")]
-        [TestCase("remove", "cost", "\"Iron\"")]
+        [TestCase("remove", "cost", "\"core:Iron\"")]
         [TestCase("remove", "table", "7")]
         public void RemovingSomethingThatIsNotThereIsAnError(string op, string path, string value)
         {
@@ -240,7 +240,7 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(Int(Member(changed, "Scout", "Morale", "value")), Is.EqualTo(8));
 
             var detached = RunClean(P("set", "Morale", "Morale(value=7)") + P("remove", "Morale"));
-            Assert.That(detached.Expanded.TryGet("Scout", out var def), Is.True);
+            Assert.That(detached.Expanded.TryGet("core:Scout", out var def), Is.True);
             Assert.That(def.Components.Contains("Morale"), Is.False);
         }
 
@@ -279,37 +279,37 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void RowsOfAListedKeyedComponentAreAttachedChangedAndDetached()
         {
-            var r = RunClean(P("set", "Skill.Wood", "Skill(level=1)") + P("add", "Skill.Wood.level", "2"));
-            Assert.That(r.Expanded.TryGet("Scout", out var def), Is.True);
+            var r = RunClean(P("set", "Skill['core:Wood']", "Skill(level=1)") + P("add", "Skill['core:Wood'].level", "2"));
+            Assert.That(r.Expanded.TryGet("core:Scout", out var def), Is.True);
             def.Components.TryGet("Skill", out var skill);
-            skill.Rows.TryGet("Wood", out var row);
+            skill.Rows.TryGet("core:Wood", out var row);
             row.Members.TryGet("level", out var level);
             Assert.That(Int(level), Is.EqualTo(3));
 
-            var gone = RunClean(P("set", "Skill.Wood", "Skill(level=1)") + P("remove", "Skill.Wood"));
-            gone.Expanded.TryGet("Scout", out var def2);
+            var gone = RunClean(P("set", "Skill['core:Wood']", "Skill(level=1)") + P("remove", "Skill['core:Wood']"));
+            gone.Expanded.TryGet("core:Scout", out var def2);
             def2.Components.TryGet("Skill", out var skill2);
-            Assert.That(skill2.Rows.Contains("Wood"), Is.False);
+            Assert.That(skill2.Rows.Contains("core:Wood"), Is.False);
         }
 
         [Test]
         public void ARowThatIsNotThereCannotBePatchedOrDetachedOrAttachedTwice()
         {
-            Run(P("set", "Skill.Wood.level", "3"), out var d1);
+            Run(P("set", "Skill['core:Wood'].level", "3"), out var d1);
             Assert.That(d1.Single().Code, Is.EqualTo(Codes.PatNoComponent));
-            Run(P("remove", "Skill.Wood"), out var d2);
+            Run(P("remove", "Skill['core:Wood']"), out var d2);
             Assert.That(d2.Single().Code, Is.EqualTo(Codes.PatNoComponent));
-            Run(P("set", "Skill.Wood", "Skill(level=1)") + P("set", "Skill.Wood", "Skill(level=2)"), out var d3);
+            Run(P("set", "Skill['core:Wood']", "Skill(level=1)") + P("set", "Skill['core:Wood']", "Skill(level=2)"), out var d3);
             Assert.That(d3.Single(x => x.Severity == Severity.Error).Code, Is.EqualTo(Codes.PatAlreadyThere));
         }
 
         [Test]
         public void EveryRowOfAKeysAllComponentExistsImplicitly()
         {
-            var r = RunClean(P("set", "Stock.Wood.amount", "2.5"));
-            r.Expanded.TryGet("Scout", out var def);
+            var r = RunClean(P("set", "Stock['core:Wood'].amount", "2.5"));
+            r.Expanded.TryGet("core:Scout", out var def);
             def.Components.TryGet("Stock", out var stock);
-            stock.Rows.TryGet("Wood", out var row);
+            stock.Rows.TryGet("core:Wood", out var row);
             row.Members.TryGet("amount", out var amount);
             Assert.That(((FixedValue)amount.Value).Value.Raw, Is.EqualTo(2_500_000L));
         }
@@ -359,10 +359,10 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(Int(Const(r, "Base", "move")), Is.EqualTo(5));
         }
 
-        [TestCase("patch.set(\"Scout\", \"Morale\", Morale(value=inherit.move))\n")]
-        [TestCase("patch.set(\"Scout\", \"Skill.Wood\", Skill(level=inherit.move + 1))\n")]
-        [TestCase("patch.append(\"Scout\", \"tags\", [inherit.tags])\n")]
-        [TestCase("patch.set(\"Scout\", \"move\", inherit.move)\n")]
+        [TestCase("patch.set(\"core:Scout\", \"Morale\", Morale(value=inherit.move))\n")]
+        [TestCase("patch.set(\"core:Scout\", \"Skill['core:Wood']\", Skill(level=inherit.move + 1))\n")]
+        [TestCase("patch.append(\"core:Scout\", \"tags\", [inherit.tags])\n")]
+        [TestCase("patch.set(\"core:Scout\", \"move\", inherit.move)\n")]
         public void InheritIsRejectedInAPatchValue(string call)
         {
             var result = Run(call, out var diags);
@@ -387,7 +387,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void SeveralFailuresInOneDefAreAllReported()
         {
-            Run(P("remove", "tags", "\"zzz\"") + P("remove", "cost", "\"Iron\"") + P("add", "ratio", "1"), out var diags, TemplateDefs,
+            Run(P("remove", "tags", "\"zzz\"") + P("remove", "cost", "\"core:Iron\"") + P("add", "ratio", "1"), out var diags, TemplateDefs,
                 NoRatioDefault);
             Assert.That(diags.Select(d => d.Code), Is.EquivalentTo(new[] { Codes.PatNoTarget, Codes.PatNoTarget, Codes.PatNoBase }));
         }
@@ -424,7 +424,7 @@ namespace Kesa.Engine.Tests.Loading
             // alpha가 cost를 통째로 비우고 omega가 그 위에 add: omega의 add 실패는 충돌 탓이므로 PAT010 하나만 알린다
             Mod("core", schema: Schema, defs: DefaultDefs);
             Mod("alpha", defs: P("set", "cost", "{}"), extra: CoreDep);
-            Mod("omega", defs: P("add", "cost.Wood", "1"), extra: CoreDep);
+            Mod("omega", defs: P("add", "cost['core:Wood']", "1"), extra: CoreDep);
             var result = Load(out var diags);
             Assert.That(diags.Select(d => (d.Code, d.Mod)),
                 Is.EquivalentTo(new[] { (Codes.PatConflict, "alpha"), (Codes.PatConflict, "omega") }));

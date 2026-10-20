@@ -25,8 +25,8 @@ namespace Kesa.Engine.Tests.Loading
                 defs: "Walker(\"Guide\")\n" +
                       "@command(free=True, acts_for=None)\ndef Roll(w: Ref[Walker]):\n    w.Steps.left = random.randint(5, 5)\n");
             var world = new World(LoadClean(), seed: 1);
-            var u = world.Create("Clerk");
-            var w = world.Create("Guide");
+            var u = world.Create("banking:Clerk");
+            var w = world.Create("scouts:Guide");
             Assert.That(world.Submit("host", "banking.Count", new Dictionary<string, Value> { ["u"] = new EntityValue(u) }).Succeeded,
                 Is.True);
             Assert.That(((IntValue)world.Get(u, world.Member("Moves", "left"))).Value, Is.EqualTo(4));
@@ -44,7 +44,7 @@ namespace Kesa.Engine.Tests.Loading
                                 "deftype(\"U\", components=[\"C\"])\n",
                 defs: "U(\"A\")\n");
             var world = new World(LoadClean());
-            var id = world.Create("A");
+            var id = world.Create("core:A");
             Assert.That(((IntValue)world.Get(id, world.Member("C", "total"))).Value, Is.EqualTo(7));
         }
 
@@ -120,7 +120,7 @@ namespace Kesa.Engine.Tests.Loading
                 defs: "Unit(\"Clerk\")\n@command(free=True, acts_for=None)\ndef Roll(u: Ref[Unit]):\n" +
                       "    u.Moves.left = [random][0].randint(1, 6)\n");
             var world = new World(LoadClean(), seed: 1);
-            var u = world.Create("Clerk");
+            var u = world.Create("core:Clerk");
             var r = world.Submit("host", "core.Roll", new Dictionary<string, Value> { ["u"] = new EntityValue(u) });
             Assert.That(r.Succeeded, Is.False);
             Assert.That(r.Error!.Message, Does.Contain("'component constructor random' has no attribute 'randint'"));

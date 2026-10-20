@@ -27,7 +27,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private World _world = null!;
 
-        private EntityId NewScout(string def = "Scout")
+        private EntityId NewScout(string def = "banking:Scout")
         {
             Mod("banking", schema: Schema, defs: Defs);
             _world = new World(LoadClean());

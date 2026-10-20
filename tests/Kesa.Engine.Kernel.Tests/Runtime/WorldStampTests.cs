@@ -34,9 +34,9 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             _w = new World(LoadClean());
-            _u1 = _w.Create("Scout");
-            _u2 = _w.Create("Scout");
-            _city = _w.Create("Town");
+            _u1 = _w.Create("banking:Scout");
+            _u2 = _w.Create("banking:Scout");
+            _city = _w.Create("banking:Town");
         }
 
         private MemberHandle M(string owner, string member) => _w.Member(owner, member);

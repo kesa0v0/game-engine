@@ -31,6 +31,18 @@ namespace Kesa.Engine.Script
         private readonly IReadOnlyDictionary<string, Value> _builtins;
         private readonly int _budget;
 
+        // 지금 도는 실행들 (바깥부터). derived 읽기처럼 실행 안에서 다른 실행이 열린다
+        private readonly List<Session> _active = new List<Session>();
+
+        /// <summary>
+        /// 지금 도는 스크립트 함수(가장 안쪽 실행의 맨 위 프레임)의 모드 id. 스크립트 밖(호스트)이면 빈 문자열이다. 월드는 이것으로
+        /// <c>DefId</c> 자리에 들어오는 짧은 이름을 푼다: 스크립트 안은 그 모드 기준, 바깥은 전체 이름만 (spec-gaps G261·G264).
+        /// </summary>
+        public string ScriptMod => _active.Count == 0 ? "" : _active[_active.Count - 1].TopMod;
+
+        private void Enter(Session session) => _active.Add(session);
+        private void Leave() => _active.RemoveAt(_active.Count - 1);
+
         /// <summary>
         /// <see cref="Run"/>이 다 쓰고 돌려준 세션. <c>derived</c> 읽기마다 세션과 그 목록들을 새로 만들지 않는다(규모 벤치).
         /// 실행 중에 다시 불린 <see cref="Run"/>(다른 <c>derived</c> 읽기)은 다른 세션을 꺼내므로 겹치지 않는다.
@@ -53,6 +65,7 @@ namespace Kesa.Engine.Script
         {
             var session = _spareSessions.Count > 0 ? _spareSessions.Pop() : new Session(this, null);
             session.Begin(meter ?? new StepMeter(_budget));
+            Enter(session);
             try
             {
                 return session.Invoke(function, args, EmptyKeywords, callSite);
@@ -64,6 +77,7 @@ namespace Kesa.Engine.Script
             }
             finally
             {
+                Leave();
                 session.Clear();
                 _spareSessions.Push(session);
             }
@@ -77,6 +91,7 @@ namespace Kesa.Engine.Script
             SourceSpan callSite = default, StepMeter? meter = null)
         {
             var session = new Session(this, meter ?? new StepMeter(_budget));
+            Enter(session);
             try
             {
                 return session.Preconditions(command, args, callSite);
@@ -85,6 +100,10 @@ namespace Kesa.Engine.Script
             {
                 e.Span = callSite;
                 throw;
+            }
+            finally
+            {
+                Leave();
             }
         }
 
@@ -97,6 +116,7 @@ namespace Kesa.Engine.Script
             SourceSpan callSite = default, StepMeter? meter = null)
         {
             var session = new Session(this, meter ?? new StepMeter(_budget));
+            Enter(session);
             try
             {
                 return session.ChooseOption(command, args, choose, callSite);
@@ -105,6 +125,10 @@ namespace Kesa.Engine.Script
             {
                 e.Span = callSite;
                 throw;
+            }
+            finally
+            {
+                Leave();
             }
         }
 
@@ -124,6 +148,7 @@ namespace Kesa.Engine.Script
             out Suspended? suspended, SourceSpan callSite = default, StepMeter? meter = null, Action? bodyStarts = null)
         {
             var session = new Session(this, meter ?? new StepMeter(_budget));
+            Enter(session);
             try
             {
                 var results = session.Command(command, args, callSite, runBody: true, bodyStarts);
@@ -135,6 +160,10 @@ namespace Kesa.Engine.Script
                 e.Span = callSite;
                 throw;
             }
+            finally
+            {
+                Leave();
+            }
         }
 
         /// <summary>
@@ -145,7 +174,15 @@ namespace Kesa.Engine.Script
         {
             var session = new Session(this, meter ?? new StepMeter(_budget));
             session.Restore(from, answer);
-            session.RunToEnd();
+            Enter(session);
+            try
+            {
+                session.RunToEnd();
+            }
+            finally
+            {
+                Leave();
+            }
             return session.TakeSuspended();
         }
 

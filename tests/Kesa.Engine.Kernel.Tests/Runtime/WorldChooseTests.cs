@@ -64,11 +64,11 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("core", schema: Schema, defs: Defs);
             _world = new World(LoadClean());
-            _red = _world.Create("Red");
-            _blue = _world.Create("Red");
-            _rome = _world.Create("Rome");
-            _ostia = _world.Create("Rome");
-            _scout = _world.Create("Scout");
+            _red = _world.Create("core:Red");
+            _blue = _world.Create("core:Red");
+            _rome = _world.Create("core:Rome");
+            _ostia = _world.Create("core:Rome");
+            _scout = _world.Create("core:Scout");
             _world.Set(_scout, _world.Member("Owner", "party"), new EntityValue(_red));
             _world.Set(_scout, _world.Member("Place", "city"), new EntityValue(_rome));
             _world.Set(_scout, _world.Member("Place", "next"), new EntityValue(_ostia));
@@ -153,7 +153,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private EntityId SecondUnit(long moves)
         {
-            var other = _world.Create("Scout");
+            var other = _world.Create("core:Scout");
             _world.Set(other, _world.Member("Owner", "party"), new EntityValue(_red));
             _world.Set(other, _world.Member("Place", "city"), new EntityValue(_ostia));
             _world.Set(other, _world.Member("Place", "next"), new EntityValue(_rome));
@@ -166,7 +166,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void WhereCandidatesAreTheLiveEntitiesOfTheTypeThatPassInIdOrder()
         {
             var other = SecondUnit(0);
-            var blues = _world.Create("Scout"); // 주인 없음
+            var blues = _world.Create("core:Scout"); // 주인 없음
             var list = _world.Candidates("core.Move", Args(E("party", _red)), "unit");
             Assert.That(list.Ready, Is.True);
             Assert.That(list.Values.Select(Show), Is.EqualTo(new[] { _scout.ToString(), other.ToString() }));

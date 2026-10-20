@@ -28,7 +28,7 @@ namespace Kesa.Engine.Tests.Loading
 
             var result = LoadClean();
             Assert.That(result.Mods.Select(m => m.Id), Is.EqualTo(new[] { "core", "aaa_scouts", "morale" }));
-            Assert.That(result.Defs.TryGet("Scout", out var scout), Is.True);
+            Assert.That(result.Defs.TryGet("aaa_scouts:Scout", out var scout), Is.True);
             Assert.That(ComponentsOf(scout.Type), Is.EqualTo(new[] { "Health", "Morale" }));
             Assert.That(scout.Type.Components[1].Mod, Is.EqualTo("morale"));
         }
@@ -94,8 +94,8 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(pop.Consts[2].Spec.Type.Display, Is.EqualTo("dict[DefId[\"Need\"], fixed]"));
             Assert.That(pop.Consts[3].Spec.Merge, Is.EqualTo(MergeMode.Append));
 
-            Assert.That(result.Defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "Hunger", "Food", "SlumLaborers" }));
-            Assert.That(result.Defs.TryGet("SlumLaborers", out var slum), Is.True);
+            Assert.That(result.Defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "eco:Hunger", "eco:Food", "eco:SlumLaborers" }));
+            Assert.That(result.Defs.TryGet("eco:SlumLaborers", out var slum), Is.True);
             Assert.That(slum.Fields.Select(f => f.Name),
                 Is.EqualTo(new[] { "label", "needs", "Wealth", "Health", "Stock" }));
             Assert.That(slum.TryGetField("Health", out var h), Is.True);
@@ -131,7 +131,7 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(max.Spec.Function!.Name, Is.EqualTo(FunctionValue.LambdaName));
             Assert.That(health.TryGetMember("current", out var current), Is.True);
             Assert.That(current.Spec.Default, Is.InstanceOf<FunctionValue>());
-            Assert.That(result.Defs.TryGet("InfluenceSlot", out var goal), Is.True);
+            Assert.That(result.Defs.TryGet("goals:InfluenceSlot", out var goal), Is.True);
             Assert.That(goal.TryGetField("succeeded", out var succeeded), Is.True);
             Assert.That(((FunctionValue)succeeded.Value).Parameters.Single().Name, Is.EqualTo("g"));
         }
@@ -265,7 +265,7 @@ namespace Kesa.Engine.Tests.Loading
             var inverse = pile.Inverses.Single();
             Assert.That(inverse.Name, Is.EqualTo("cards"));
             Assert.That(inverse.Source.Name, Is.EqualTo("InPile"));
-            Assert.That(result.Defs.TryGet("Win", out var win), Is.True);
+            Assert.That(result.Defs.TryGet("cards:Win", out var win), Is.True);
             Assert.That(win.TryGetField("succeeded", out var cond), Is.True);
             Assert.That(((FunctionValue)cond.Value).Name, Is.EqualTo("done"));
         }
@@ -298,7 +298,7 @@ namespace Kesa.Engine.Tests.Loading
             Write("core/schema/types.py", "deftype(\"Unit\")\n");
             Write("core/mod.py", "Mod(id=\"core\")\nuse(\"units.py\")\nuse_all(\"schema/\")\n");
             var result = LoadClean();
-            Assert.That(result.Defs.TryGet("Scout", out _), Is.True);
+            Assert.That(result.Defs.TryGet("core:Scout", out _), Is.True);
         }
 
         [Test]
@@ -312,7 +312,7 @@ namespace Kesa.Engine.Tests.Loading
             Write("core/defs/z.py", "T(\"A\", ok=y)\n");
             Write("core/mod.py", "Mod(id=\"core\")\nuse(\"schema/base.py\")\nuse_all(\"schema/\")\nuse_all(\"defs/\")\n");
             var result = LoadClean();
-            Assert.That(result.Defs.TryGet("A", out _), Is.True);
+            Assert.That(result.Defs.TryGet("core:A", out _), Is.True);
         }
 
         // ---- 유니코드 정규화 (G213): macOS에서 온 자모 분리형(NFD) 이름도 완성형(NFC)으로 적은 use로 찾는다 ----
@@ -328,7 +328,7 @@ namespace Kesa.Engine.Tests.Loading
             Write("core/defs/" + Nfd + ".py", "Unit(\"Scout\")\n");
             Write("core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse(\"defs/" + Nfc + ".py\")\n");
             var loaded = LoadClean();
-            Assert.That(loaded.Defs.TryGet("Scout", out _), Is.True);
+            Assert.That(loaded.Defs.TryGet("core:Scout", out _), Is.True);
             // 내용 지문의 경로도 NFC다 (G212)
             Assert.That(loaded.Contents["core"].Files.Select(f => f.Path), Does.Contain("defs/" + Nfc + ".py"));
 
@@ -346,8 +346,8 @@ namespace Kesa.Engine.Tests.Loading
             Write("core/defs/" + Nfc + ".py", "Unit(\"Ranger\")\n");
             Write("core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse_all(\"" + Nfc + "/\")\nuse(\"defs/" + Nfd + ".py\")\n");
             var result = LoadClean();
-            Assert.That(result.Defs.TryGet("Scout", out _), Is.True);
-            Assert.That(result.Defs.TryGet("Ranger", out _), Is.True);
+            Assert.That(result.Defs.TryGet("core:Scout", out _), Is.True);
+            Assert.That(result.Defs.TryGet("core:Ranger", out _), Is.True);
         }
 
         [Test]

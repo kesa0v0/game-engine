@@ -128,7 +128,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("banking", schema: Schema, defs: Defs);
             _world = new World(LoadClean());
-            _red = _world.Create("Red");
+            _red = _world.Create("banking:Red");
         }
 
         private SubmitResult Submit(string command, params (string, Value)[] extra)
@@ -207,7 +207,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void CostsOfDifferentEntitiesAreNotAddedUp()
         {
-            var blue = _world.Create("Red");
+            var blue = _world.Create("banking:Red");
             var gold = _world.Member("Treasury", "gold");
             _world.Set(blue, gold, new IntValue(1));
             Assert.That(Submit("Buy", N("n", 4)).Succeeded, Is.True);
@@ -248,10 +248,10 @@ namespace Kesa.Engine.Tests.Runtime
         public void ACostCanTakeFromARowOfAKeyedComponent()
         {
             var amount = _world.Member("Stock", "amount");
-            Assert.That(Check("Wood").Failures.Select(Row), Is.EqualTo(new[] { "Cost Failed #1.Stock['Wood'].amount 0 2" }));
-            _world.SetRow(_red, amount, "Wood", new IntValue(3));
+            Assert.That(Check("Wood").Failures.Select(Row), Is.EqualTo(new[] { "Cost Failed #1.Stock['banking:Wood'].amount 0 2" }));
+            _world.SetRow(_red, amount, "banking:Wood", new IntValue(3));
             Assert.That(Submit("Wood").Succeeded, Is.True);
-            Assert.That(((IntValue)_world.GetRow(_red, amount, "Wood")).Value, Is.EqualTo(1));
+            Assert.That(((IntValue)_world.GetRow(_red, amount, "banking:Wood")).Value, Is.EqualTo(1));
         }
 
         [Test]

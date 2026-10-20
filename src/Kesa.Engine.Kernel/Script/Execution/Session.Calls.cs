@@ -36,8 +36,7 @@ namespace Kesa.Engine.Script
                             "random numbers can only be drawn in a @command, @on or @when body and the functions it calls; " +
                             "derived values, conditions and preconditions must give the same answer every time (spec-gaps G178)");
                     }
-                    if (b.CallerBody != null)
-                        return b.CallerBody(_stack.Count == 0 ? "" : _stack[_stack.Count - 1].Function.Mod, positional, keywords);
+                    if (b.CallerBody != null) return b.CallerBody(TopMod, positional, keywords);
                     if (b.KeywordBody != null) return b.KeywordBody(positional, keywords);
                     if (keywords.Count > 0) throw Fail(Codes.RunScript, b.Name + "() does not take keyword arguments");
                     return b.Body(positional);

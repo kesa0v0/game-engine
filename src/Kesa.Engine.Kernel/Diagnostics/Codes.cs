@@ -62,6 +62,7 @@ namespace Kesa.Engine.Diagnostics
         public const string DefUnknownField = "DEF002";
         public const string DefBadValue = "DEF003";
         public const string DefBadOverride = "DEF004";
+        public const string DefBadId = "DEF005";
 
         // 패치 (spec S1 ③)
         public const string PatBadPath = "PAT001";

@@ -90,9 +90,9 @@ namespace Kesa.Engine.Tests.Runtime
         public void NewWorld()
         {
             _world = new World(Content());
-            _red = _world.Create("Red");
-            _blue = _world.Create("Blue");
-            _green = _world.Create("Green");
+            _red = _world.Create("banking:Red");
+            _blue = _world.Create("banking:Blue");
+            _green = _world.Create("banking:Green");
             _world.Seat(_red, "host");
             _world.Seat(_blue, "host");
         }
@@ -263,9 +263,9 @@ namespace Kesa.Engine.Tests.Runtime
         public void AResponseBodyWhoseOuterIsGoneFinishesOnItsOwn()
         {
             var w = new World(Content());
-            var red = w.Create("Red");
-            var blue = w.Create("Blue");
-            var green = w.Create("Green");
+            var red = w.Create("banking:Red");
+            var blue = w.Create("banking:Blue");
+            var green = w.Create("banking:Green");
             foreach (var p in new[] { red, blue, green }) w.Seat(p, "host");
             var turn = w.Submit("host", "banking.Round",
                 new Dictionary<string, Value> { ["a"] = new EntityValue(red), ["b"] = new EntityValue(green) }).OpenedRequest!;
@@ -339,8 +339,8 @@ namespace Kesa.Engine.Tests.Runtime
         private (List<string> Log, string Final) Run(int saveBefore)
         {
             var world = new World(Content());
-            var red = world.Create("Red");
-            var blue = world.Create("Blue");
+            var red = world.Create("banking:Red");
+            var blue = world.Create("banking:Blue");
             world.Seat(red, "host");
             world.Seat(blue, "host");
             var log = new List<string>();

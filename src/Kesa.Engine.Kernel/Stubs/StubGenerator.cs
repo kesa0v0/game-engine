@@ -429,9 +429,10 @@ namespace Kesa.Engine.Stubs
             {
                 string row = component.Name + (component.Keys == KeysMode.Listed ? " | None" : "");
                 Line("class " + RowsName(component) + ":");
+                // 속성으로 읽는 키는 내 모드 기준으로 풀리므로 내 모드의 짧은 이름만 (G261·G265)
                 if (component.KeyKind == KeyKind.Def && component.Key != null)
                     foreach (var id in ConcreteIds(component.Key.Name))
-                        if (IsIdentifier(id)) ReadOnly(id, row);
+                        if (DefIds.ModOf(id) == _mod.Id && IsIdentifier(DefIds.PathOf(id))) ReadOnly(DefIds.PathOf(id), row);
                 Line("    def __getitem__(self, key: Any, /) -> " + row + ": ...");
                 Line("    def __iter__(self) -> Iterator[Any]: ...");
                 Line("    def __len__(self) -> int: ...");
@@ -554,7 +555,20 @@ namespace Kesa.Engine.Stubs
                 var ids = new List<string>();
                 foreach (var d in _defs.Defs)
                     if (d.Type == type && VisibleDef(d)) ids.Add(d.Id);
-                return ids.Count == 0 ? "None" : Literal(ids) + " | None";
+                return ids.Count == 0 ? "None" : Literal(Spellings(ids)) + " | None";
+            }
+
+            /// <summary>
+            /// 스크립트가 쓸 수 있는 표기 (spec-gaps G265): 내 모드 Def의 짧은 이름을 먼저, 그 뒤에 보이는 모든 Def의 전체 이름.
+            /// 짧은 이름은 내 모드 기준으로 풀리므로(G261) 다른 모드의 것은 전체 이름으로만 낸다.
+            /// </summary>
+            private List<string> Spellings(List<string> ids)
+            {
+                var all = new List<string>();
+                foreach (var id in ids)
+                    if (DefIds.ModOf(id) == _mod.Id) all.Add(DefIds.PathOf(id));
+                all.AddRange(ids);
+                return all;
             }
 
             // ---- 타입 표기 ----
@@ -588,7 +602,7 @@ namespace Kesa.Engine.Stubs
             private string DefIdLiteral(string typeName)
             {
                 var ids = ConcreteIds(typeName);
-                return ids.Count == 0 ? "Never" : Literal(ids);
+                return ids.Count == 0 ? "Never" : Literal(Spellings(ids));
             }
 
             private List<string> ConcreteIds(string typeName)
@@ -669,7 +683,7 @@ namespace Kesa.Engine.Stubs
                 var ids = new List<string>();
                 foreach (var d in _defs.Defs)
                     if (VisibleDef(d)) ids.Add(d.Id);
-                string target = ids.Count == 0 ? "str" : Literal(ids);
+                string target = ids.Count == 0 ? "str" : Literal(Spellings(ids));
 
                 Line("class patch:");
                 foreach (var op in new[] { "set", "add", "append" })

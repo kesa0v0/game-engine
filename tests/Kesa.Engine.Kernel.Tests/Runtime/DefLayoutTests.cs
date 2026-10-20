@@ -27,7 +27,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "deftype(\"Unit\", components=[\"Food\", \"Health\"])\n", defs: Defs);
             var second = new World(LoadClean());
 
-            var unit = second.Create("Soldier");
+            var unit = second.Create("banking:Soldier");
             var food = first.Member("Food", "amount"); // 첫 로드의 핸들
             Assert.That(((IntValue)second.Get(unit, food)).Value, Is.EqualTo(5));
             Assert.That(((IntValue)second.Get(unit, second.Member("Health", "hp"))).Value, Is.EqualTo(7));

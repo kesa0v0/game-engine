@@ -74,7 +74,7 @@ namespace Kesa.Engine.Tests.Loading
             long Play(bool reload)
             {
                 var world = new World(content);
-                var u = world.Create("Scout");
+                var u = world.Create("core:Scout");
                 world.Seat(u, "host");
                 Assert.That(world.Submit("host", "core.Plan", new Dictionary<string, Value> { ["u"] = new EntityValue(u) }).Succeeded,
                     Is.True);
@@ -105,7 +105,7 @@ namespace Kesa.Engine.Tests.Loading
                 "    rolls = [random.randint(1, 6) for i in range(3)]\n" +
                 "    u.Moves.left = sum(r for r in rolls if r > 0) + len({r: 1 for r in rolls}) * 0\n");
             var world = new World(LoadClean(), seed: 3);
-            var u = world.Create("Scout");
+            var u = world.Create("core:Scout");
             world.Seat(u, "host");
             Assert.That(world.Submit("host", "core.Roll", new Dictionary<string, Value> { ["u"] = new EntityValue(u) }).Succeeded,
                 Is.True);

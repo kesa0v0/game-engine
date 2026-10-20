@@ -69,8 +69,8 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var w = new World(_content, seed: 3, requireViewPolicy: true);
             foreach (var conn in Conns)
-                w.Seat(w.Create("Player"), conn);
-            w.Create("Match");
+                w.Seat(w.Create("core:Player"), conn);
+            w.Create("core:Match");
             var s = w.Submit("host", "core.Start", new Dictionary<string, Value>());
             Assert.That(s.Succeeded, Is.True, s.Error?.ToString());
             return w;

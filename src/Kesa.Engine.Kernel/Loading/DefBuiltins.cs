@@ -92,6 +92,7 @@ namespace Kesa.Engine.Loading
             var idArg = r.Positional[0];
             string id = r.String(idArg, "the Def id");
             if (id.Length == 0) throw ctx.Fail(Codes.EvlArguments, "the Def id must not be empty", idArg.Span);
+            id = DefIds.Resolve(DefConstructor.DefId(ctx, id, ArgReader.SpanOf(idArg), callee + "()"), _mod);
 
             var pathArg = r.Positional[1];
             string pathText = r.String(pathArg, "the path");
@@ -305,24 +306,87 @@ namespace Kesa.Engine.Loading
 
                 NameRef? parent = null;
                 var parentArg = r.Take("parent");
-                if (parentArg != null) parent = new NameRef(r.String(parentArg, "parent"), ArgReader.SpanOf(parentArg));
+                if (parentArg != null)
+                {
+                    var parentSpan = ArgReader.SpanOf(parentArg);
+                    parent = new NameRef(DefIds.Resolve(DefId(ctx, r.String(parentArg, "parent"), parentSpan, "parent"), ctx.Mod),
+                        parentSpan);
+                }
                 var abstractArg = r.Take("abstract");
                 bool isAbstract = abstractArg != null && r.Bool(abstractArg, "abstract");
                 var overrideArg = r.Take("override");
                 bool isOverride = overrideArg != null && r.Bool(overrideArg, "override");
+                string id = DefinedId(ctx, idValue.Value, idSpan, isOverride);
 
                 var fields = new List<DefField>();
                 bool failed = false;
                 foreach (var arg in r.Rest())
                 {
                     if (!CheckField(ctx, arg)) failed = true;
-                    else fields.Add(new DefField(arg.Name!, arg.Value, arg.Span));
+                    else fields.Add(new DefField(arg.Name!, NormalizeField(ctx, arg), arg.Span));
                 }
                 if (failed) throw new ScriptError();
 
-                var record = new DefRecord(_type, idValue.Value, ctx.Mod, idSpan, parent, isAbstract, isOverride, fields);
+                var record = new DefRecord(_type, id, ctx.Mod, idSpan, parent, isAbstract, isOverride, fields);
                 _owner._sink.Add(record);
                 return new DefHandleValue(record);
+            }
+
+            /// <summary>Def id 문자열의 글자 검사 (G259·G261). 틀리면 이 호출이 실패한다.</summary>
+            internal static string DefId(CallContext ctx, string id, SourceSpan span, string what)
+            {
+                string? problem = DefIds.Problem(id);
+                if (problem != null) throw ctx.Fail(Codes.DefBadId, "invalid Def id \"" + id + "\" in " + what + ": " + problem, span);
+                return id;
+            }
+
+            /// <summary>
+            /// 정의하는 Def의 전체 이름 (G258·G261). 새 Def는 내 모드의 이름 공간에만 만들고 <c>:</c> 없이 적는다.
+            /// <c>override=True</c>는 남의 Def를 전체 이름으로 가리킨다.
+            /// </summary>
+            private static string DefinedId(CallContext ctx, string id, SourceSpan span, bool isOverride)
+            {
+                DefId(ctx, id, span, "a Def definition");
+                if (isOverride)
+                {
+                    if (!DefIds.IsFull(id))
+                        throw ctx.Fail(Codes.DefBadOverride, "override=True needs the full id of the Def to replace", span,
+                            hint: "write \"mod:" + id + "\" with the id of the mod that defines it");
+                    return id;
+                }
+                if (DefIds.IsFull(id))
+                {
+                    string owner = DefIds.ModOf(id);
+                    throw ctx.Fail(Codes.DefBadId,
+                        owner == ctx.Mod
+                            ? "a new Def is written without its mod id: \"" + id + "\" is defined as \"" + DefIds.PathOf(id) + "\""
+                            : "a new Def belongs to the mod that defines it; mod '" + ctx.Mod + "' cannot define \"" + id + "\"",
+                        span,
+                        hint: owner == ctx.Mod ? "write \"" + DefIds.PathOf(id) + "\""
+                            : "to replace that Def of mod '" + owner + "', add override=True");
+                }
+                return DefIds.Resolve(id, ctx.Mod);
+            }
+
+            /// <summary>const 값과 키 컴포넌트의 줄 키에서 Def id를 이 모드 기준 전체 이름으로 (G261). 컴포넌트 값은 만들 때 바꿨다.</summary>
+            private Value NormalizeField(CallContext ctx, ArgValue arg)
+            {
+                if (arg.Value is DeferredValue) return arg.Value;
+                foreach (var k in _type.Consts)
+                    if (k.Name == arg.Name) return DefIds.Normalize(arg.Value, k.Spec.Type, ctx.Mod);
+                if (arg.Value is DictValue dict)
+                {
+                    var items = new List<DictItem>(dict.Items.Count);
+                    foreach (var item in dict.Items)
+                    {
+                        var key = item.Key is StrValue s && s.Value.Length > 0
+                            ? new StrValue(DefIds.Resolve(s.Value, ctx.Mod), s.Origin)
+                            : item.Key;
+                        items.Add(new DictItem(key, item.Value, item.Span));
+                    }
+                    return new DictValue(items);
+                }
+                return arg.Value;
             }
 
             /// <summary>키워드 인자가 이 모드에 보이는 const 또는 컴포넌트인지, 값의 모양이 맞는지.</summary>
@@ -468,7 +532,8 @@ namespace Kesa.Engine.Loading
                     }
                     else
                     {
-                        fields.Add(new DefField(arg.Name!, arg.Value, arg.Span));
+                        var value = arg.Value is DeferredValue ? arg.Value : DefIds.Normalize(arg.Value, member.Spec.Type, ctx.Mod);
+                        fields.Add(new DefField(arg.Name!, value, arg.Span));
                     }
                 }
                 if (failed) throw new ScriptError();

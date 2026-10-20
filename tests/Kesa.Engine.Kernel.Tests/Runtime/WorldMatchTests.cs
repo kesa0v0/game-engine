@@ -56,7 +56,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: Schema, defs: Defs);
             _content = LoadClean();
             _world = new World(_content);
-            _red = _world.Create("Red");
+            _red = _world.Create("banking:Red");
             _world.Seat(_red, "host");
         }
 
@@ -98,7 +98,7 @@ namespace Kesa.Engine.Tests.Runtime
         private World Fresh()
         {
             var w = new World(_content);
-            w.Seat(w.Create("Red"), "host");
+            w.Seat(w.Create("banking:Red"), "host");
             return w;
         }
 
