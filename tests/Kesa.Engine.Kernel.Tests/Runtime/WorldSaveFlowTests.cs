@@ -70,7 +70,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    mk = make(lam)\n" +
             "    pg = pair()\n" +
             "    cv = Score(v=lam)\n" +
-            "    tv = text(\"k\", f=lam)\n" +
+            "    tv = text(\"k\", f=p)\n" +
             "    sg = Hit(who=p, n=2)\n" +
             "    r0 = ask(p, \"Start\", choices=[\"go\", \"rush\"])\n" +
             "    bonus = 5\n" +
@@ -94,7 +94,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    hv.log = hv.log + (\"W\" if w == wc(turns=2) else \"-\")\n" +
             "    hv.v = hv.v + lam(1) + mk() + pg()\n" +
             "    hv.log = hv.log + (\"L\" if lam == same else \"-\") + (\"N\" if lam != mk else \"-\")\n" +
-            "    hv.log = hv.log + (\"C\" if cv == Score(v=lam) else \"-\") + (\"T\" if tv == text(\"k\", f=lam) else \"-\")\n" +
+            "    hv.log = hv.log + (\"C\" if cv == Score(v=lam) else \"-\") + (\"T\" if tv == text(\"k\", f=p) else \"-\")\n" +
             "    hv.log = hv.log + (\"E\" if each == same else \"-\")\n" +
             "    hv.log = hv.log + (\"G\" if sg == Hit(n=2, who=p) and sg.who == p and sg.n == 2 else \"-\")\n";
 

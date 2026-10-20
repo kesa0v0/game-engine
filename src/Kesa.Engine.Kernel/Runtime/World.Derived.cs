@@ -213,6 +213,12 @@ namespace Kesa.Engine.Runtime
             }
         }
 
+        /// <summary><c>text()</c>의 런타임 인자 (G267): 엔티티는 그 Def id(이미 없는 엔티티는 빈 문자열), 숨김 값은 빈 문자열, 그 밖은 받지 않는다.</summary>
+        private string? TextArgument(Value value) =>
+            value is IEntityReference e ? (IsAlive(e.EntityId) ? DefOf(e.EntityId) : "")
+            : value is HiddenValue ? ""
+            : null;
+
         private IReadOnlyDictionary<string, Value> RuntimeBuiltins()
         {
             var table = PureBuiltins.Create();
@@ -220,6 +226,8 @@ namespace Kesa.Engine.Runtime
             table.Add(PureBuiltins.NowName, new PureBuiltin(PureBuiltins.NowName, NowBuiltin));
             table.Add(PureBuiltins.QueryName, new PureBuiltin(PureBuiltins.QueryName, QueryBuiltin));
             table.Add(PureBuiltins.ControllerName, new PureBuiltin(PureBuiltins.ControllerName, ControllerBuiltin));
+            // text(): 엔티티 인자는 부르는 때의 Def를 적어 둔다 (G267)
+            table[PureBuiltins.TextName] = new PureBuiltin(PureBuiltins.TextName, (p, k) => PureBuiltins.MakeText(p, k, TextArgument));
             table.Add(PureBuiltins.DefIdName,
                 new PureBuiltin(PureBuiltins.DefIdName, (p, k) => DefIdBuiltin(_evaluator?.ScriptMod ?? "", p, k))
                 {

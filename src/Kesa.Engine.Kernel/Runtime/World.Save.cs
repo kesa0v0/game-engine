@@ -180,15 +180,49 @@ namespace Kesa.Engine.Runtime
                     foreach (var item in d.Items) pairs.Add(new JsonArray().Add(SaveValue(item.Key)).Add(SaveValue(item.Value)));
                     return new JsonObject().Add("dict", pairs);
                 case TextValue t:
-                    var names = new SortedSet<string>(StringComparer.Ordinal);
-                    foreach (var pair in t.Args) names.Add(pair.Key);
-                    var args = new JsonObject();
-                    foreach (var name in names) args.Add(name, SaveValue(t.Args[name]));
-                    return new JsonObject().Add("text", new JsonString(t.Key)).Add("args", args);
+                    return SaveText(t, SaveValue);
                 case OptionValue o:
                     return SaveOption(o, SaveValue);
             }
             throw new InvalidOperationException("a " + value.KindName + " value cannot be saved yet");
+        }
+
+        /// <summary>
+        /// 메시지: <c>{"text": 키, "args": {...}}</c>, 엔티티 인자의 Def를 적어 두었으면 그 뒤에 <c>"defs": {인자: Def id}</c> (G267).
+        /// 적은 것이 없으면 칸을 두지 않아 예전 저장과 모양이 같다.
+        /// </summary>
+        private static JsonObject SaveText(TextValue t, Func<Value, JsonNode> save)
+        {
+            var names = new SortedSet<string>(StringComparer.Ordinal);
+            foreach (var pair in t.Args) names.Add(pair.Key);
+            var args = new JsonObject();
+            foreach (var name in names) args.Add(name, save(t.Args[name]));
+            var node = new JsonObject().Add("text", new JsonString(t.Key)).Add("args", args);
+            if (t.EntityDefs.Count == 0) return node;
+            var defs = new JsonObject();
+            foreach (var name in new SortedSet<string>(t.EntityDefs.Keys, StringComparer.Ordinal)) defs.Add(name, new JsonString(t.EntityDefs[name]));
+            return node.Add("defs", defs);
+        }
+
+        private static bool IsTextNode(JsonObject o) =>
+            (o.Members.Count == 2 || (o.Members.Count == 3 && o.Members[2].Key == "defs")) &&
+            o.Members[0].Key == "text" && o.Members[1].Key == "args";
+
+        private static TextValue LoadText(JsonObject o, Func<JsonNode, Value> load)
+        {
+            var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+            foreach (var arg in AsObject(o.Members[1].Value, "text arguments").Members) args[arg.Key] = load(arg.Value);
+            SortedDictionary<string, string>? defs = null;
+            if (o.Members.Count == 3)
+            {
+                defs = new SortedDictionary<string, string>(StringComparer.Ordinal);
+                foreach (var d in AsObject(o.Members[2].Value, "text defs").Members)
+                {
+                    if (!args.ContainsKey(d.Key)) throw new JsonFormatException("text defs name '" + d.Key + "', which is not among its arguments");
+                    defs[d.Key] = Text(d.Value, "a Def id");
+                }
+            }
+            return new TextValue(Text(o.Members[0].Value, "a text key"), args, defs);
         }
 
         /// <summary>선택지 (G271): <c>{"option": 값, "label": …, "desc": …, "style": …, "data": …}</c>, 적지 않은 칸은 null.</summary>
@@ -791,12 +825,7 @@ namespace Kesa.Engine.Runtime
                                 return new DictValue(pairs);
                         }
                     }
-                    else if (o.Members.Count == 2 && o.Members[0].Key == "text" && o.Members[1].Key == "args")
-                    {
-                        var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
-                        foreach (var arg in AsObject(o.Members[1].Value, "text arguments").Members) args[arg.Key] = LoadValue(arg.Value);
-                        return new TextValue(Text(o.Members[0].Value, "a text key"), args);
-                    }
+                    else if (IsTextNode(o)) return LoadText(o, LoadValue);
                     else if (IsOptionNode(o)) return LoadOption(o, LoadValue);
                     throw new JsonFormatException("unknown value tag {" + string.Join(", ", KeysOf(o)) + "}");
             }

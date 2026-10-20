@@ -604,11 +604,8 @@ namespace Kesa.Engine.Runtime
                         }
                     }
                     break;
-                case JsonObject o when o.Members.Count == 2 && o.Members[0].Key == "text" && o.Members[1].Key == "args":
-                    var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
-                    foreach (var arg in AsObject(o.Members[1].Value, "text arguments").Members)
-                        args[arg.Key] = LoadScriptValue(arg.Value, where, problems);
-                    return new TextValue(Text(o.Members[0].Value, "a text key"), args);
+                case JsonObject o when IsTextNode(o):
+                    return LoadText(o, n => LoadScriptValue(n, where, problems));
                 case JsonObject o when IsOptionNode(o):
                     return LoadOption(o, n => LoadScriptValue(n, where, problems));
             }

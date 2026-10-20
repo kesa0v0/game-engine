@@ -326,7 +326,7 @@ namespace Kesa.Engine.Runtime
                 case TextValue t:
                     var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
                     foreach (var pair in t.Args) args[pair.Key] = Savable(display, pair.Value);
-                    return new TextValue(t.Key, args);
+                    return new TextValue(t.Key, args, t.EntityDefs);
                 case ListValue list:
                     var items = new List<Value>(list.Items.Count);
                     foreach (var item in list.Items) items.Add(Savable(display, item));

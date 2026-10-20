@@ -269,16 +269,25 @@ namespace Kesa.Engine.Script
             return true;
         }
 
-        public TextValue(string key, IReadOnlyDictionary<string, Value> args)
+        public TextValue(string key, IReadOnlyDictionary<string, Value> args, IReadOnlyDictionary<string, string>? entityDefs = null)
         {
             Key = key;
             Args = args;
+            EntityDefs = entityDefs ?? NoDefs;
         }
+
+        private static readonly IReadOnlyDictionary<string, string> NoDefs = new SortedDictionary<string, string>(StringComparer.Ordinal);
 
         public string Key { get; }
 
         /// <summary>인자 (이름 서수 순).</summary>
         public IReadOnlyDictionary<string, Value> Args { get; }
+
+        /// <summary>
+        /// 엔티티 인자의 Def id, 인자 이름으로 (spec-gaps G267). <c>text()</c>를 부를 때 적어 두어 엔티티가 없어진 뒤에도 번역이 이름을 보인다.
+        /// 그때 이미 없던 엔티티와 화면에서 가려진 엔티티는 빠진다. 엔티티는 Def가 바뀌지 않으므로 같음(<see cref="ValueEquals"/>)에는 넣지 않는다.
+        /// </summary>
+        public IReadOnlyDictionary<string, string> EntityDefs { get; }
 
         public override string KindName => "text";
     }

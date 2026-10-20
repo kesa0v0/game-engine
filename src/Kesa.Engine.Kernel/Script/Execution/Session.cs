@@ -138,7 +138,10 @@ namespace Kesa.Engine.Script
                     case TextValue text:
                         var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
                         foreach (var pair in text.Args) args[pair.Key] = Remap(pair.Value);
-                        return new TextValue(text.Key, args);
+                        return new TextValue(text.Key, args, text.EntityDefs);
+                    case OptionValue o:
+                        return new OptionValue(Remap(o.Value), o.Label == null ? null : Remap(o.Label), o.Desc == null ? null : Remap(o.Desc),
+                            o.Style, o.Data == null ? null : Remap(o.Data));
                     case IValueContainer container:
                         return container.MapValues(Remap);
                 }

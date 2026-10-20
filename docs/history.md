@@ -719,3 +719,13 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **호스트 API(G269):** `Translations.Load`(불변) → `For(언어 목록)`의 `Translator`, 다시 읽기는 `Load`를 다시 불러 갈아 끼움(사용자 질문 "핫 리로드가 되나?"에서).
 - **선택지 이야기(G270~G273):** Def의 `.desc`를 어떻게 띄우나에서 사용자가 "호스트가 k.title·k.desc를 배치"를 내어 제목·선택지 자리의 `Label`·`Attr`로(G270, 잠정), 선택지의 보이는 모양("보라색으로 불탐")은 모드가 `option(…, style=)`으로(G271), "응답 커맨드(내용: 예)"는 호스트가 보는 목록과 내는 함수만 `kesa.pick(choice=번호)`로 합침(G272, 커널의 `Answer`는 그대로, 번호인 것은 숨김 값 때문). 모드 id `kesa` 예약은 확인 중 드러남(G273, 잠정). advisor 검토로 사용자가 답하지 않은 G270을 잠정으로 고침.
 - **커밋:** `f8fba32`, `7c9eec1`, `297dc21`, `cea3c56`과 이 정리. 문서만 바뀜, 테스트 2099개 통과.
+
+## 2026-10-20: X4 커널 쪽 구현 (G271~G273, G267의 인자)
+
+번역 어셈블리 앞에 커널이 할 몫을 네 커밋으로 나눔(`5575259`·`e9489b0`·`13ef1af`와 이 커밋).
+
+- **모드 id `engine` 예약(G273):** `ManifestReader.ReservedId`, 쓰면 `MOD005`.
+- **`option`(G271):** 새 `OptionValue`. 질문을 열 때 맨 값도 감싸 `Request.Choices`는 늘 option 목록, 답은 안의 값. 저장은 꾸밈 없는 선택지는 값만(앞의 모양 그대로), 꾸밈은 `{"option","label","desc","style","data"}`. 거른 읽기가 칸 안의 엔티티까지 가림. `data=`에 option은 실행 오류. 스텁에 `option`과 `Option`. `Session.CopyStack`의 `Remap`에 `OptionValue`를 더함(C1: `SaveScriptValue`와 같은 종류를 다뤄야 함). 테스트 `WorldAskOptionTests`.
+- **`engine.pick`(G272):** `LegalResponses`가 물은 엔티티마다 선택지 순서로 `engine.pick(by=, choice=번호)`를 먼저 내고 `max`에 셈. `Respond`가 `Answer`로 보냄. 번호인 까닭은 숨긴 엔티티가 커맨드 인자가 될 수 없어서. 콘솔 호스트는 이 한 길만 써 같은 선택지가 두 번 보이던 것을 임시 테스트로 재현하고 고침. 테스트 `PickMoveTests`, `SkirmishTests.EachChoiceIsListedOnceAsAPickMove`.
+- **`text()` 인자(G267):** `PureBuiltins.MakeText`가 수·str·bool·None·text만 바로 받고 나머지는 월드의 `TextArgument`에 물어 엔티티면 부른 때의 Def를 `TextValue.EntityDefs`에 적음(같음에는 들지 않음). 그 밖(list·dict·함수)은 `RUN015`와 힌트. 저장은 적은 것이 있을 때만 셋째 칸 `"defs"`, 불러올 때 없는 인자를 가리키면 거부. 거른 읽기는 숨긴 엔티티의 Def를 뺌(Def가 정체를 알려 주므로). 람다를 `text()`에 넣던 기존 테스트 두 곳은 엔티티 인자와 `option(data=)` 안의 람다로 바꿈. 테스트 `TextArgumentTests`.
+- **확인:** 테스트 2129개 통과(커널 2070, CLI 36, 콘솔 호스트 23).

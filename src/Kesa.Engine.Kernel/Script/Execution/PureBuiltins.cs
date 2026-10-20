@@ -163,14 +163,38 @@ namespace Kesa.Engine.Script
         public const string TextName = "text";
 
         /// <summary><c>text("키", 이름=값, ...)</c>: 위치 인자는 키 하나, 나머지는 이름 있는 인자다.</summary>
-        private static Value Text(IReadOnlyList<Value> args, IReadOnlyDictionary<string, Value> keywords)
+        private static Value Text(IReadOnlyList<Value> args, IReadOnlyDictionary<string, Value> keywords) => MakeText(args, keywords, null);
+
+        /// <summary>
+        /// <c>text()</c>의 몸체 (spec-gaps G267): 인자는 수·bool·None·문자열·<c>text(...)</c>이고, 그 밖의 값은 <paramref name="runtimeArg"/>가
+        /// 판정한다(월드: 엔티티는 그 Def id, 숨김 값은 빈 문자열, 받지 않으면 null). 리스트·dict 등은 번역문에 어떻게 보일지 정할 수 없어 오류다.
+        /// </summary>
+        internal static TextValue MakeText(IReadOnlyList<Value> args, IReadOnlyDictionary<string, Value> keywords,
+            Func<Value, string?>? runtimeArg)
         {
             Arity(TextName, args, 1);
             if (!(args[0] is StrValue key))
                 throw PureOps.TypeError("text() takes the text key as a str, not " + args[0].KindName);
             var copy = new SortedDictionary<string, Value>(StringComparer.Ordinal);
-            foreach (var pair in keywords) copy[pair.Key] = pair.Value;
-            return new TextValue(key.Value, copy);
+            SortedDictionary<string, string>? defs = null;
+            foreach (var pair in keywords)
+            {
+                var v = pair.Value;
+                if (!(v is NoneValue || v is BoolValue || v is IntValue || v is FixedValue || v is StrValue || v is TextValue))
+                {
+                    string? def = runtimeArg?.Invoke(v);
+                    if (def == null)
+                    {
+                        throw PureOps.TypeError("text() cannot show " + pair.Key + "=, which is a " + v.KindName,
+                            v is ListValue || v is DictValue
+                                ? "pass each value as its own argument, e.g. text(\"k\", first=xs[0], count=len(xs)) (spec-gaps G267)"
+                                : "pass numbers, str, bool, None, entities or text(...) (spec-gaps G267)");
+                    }
+                    if (def.Length > 0) (defs ??= new SortedDictionary<string, string>(StringComparer.Ordinal))[pair.Key] = def;
+                }
+                copy[pair.Key] = v;
+            }
+            return new TextValue(key.Value, copy, defs);
         }
 
         /// <summary>질문의 선택지에 보이는 모양을 싣는 내장 (spec-gaps G271).</summary>

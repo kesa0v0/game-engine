@@ -381,11 +381,7 @@ namespace Kesa.Engine.Runtime
                         pairs.Add(new JsonArray().Add(SaveScriptValue(item.Key, writer)).Add(SaveScriptValue(item.Value, writer)));
                     return Tag("dict", pairs);
                 case TextValue t:
-                    var names = new SortedSet<string>(StringComparer.Ordinal);
-                    foreach (var pair in t.Args) names.Add(pair.Key);
-                    var args = new JsonObject();
-                    foreach (var name in names) args.Add(name, SaveScriptValue(t.Args[name], writer));
-                    return new JsonObject().Add("text", new JsonString(t.Key)).Add("args", args);
+                    return SaveText(t, v => SaveScriptValue(v, writer));
                 case OptionValue o:
                     return SaveOption(o, v => SaveScriptValue(v, writer));
                 case ComponentView c:

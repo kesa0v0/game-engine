@@ -31,7 +31,7 @@ f-문자열, `**`·비트 연산, 연쇄 비교(`0 < x < 5`는 `0 < x and x < 5`
 |---|---|
 | 수 | `abs`, `min`, `max`, `clamp(x, lo, hi)`, `floor`, `ceil`, `round`, `sum`, `len`, `range` |
 | 참거짓 | `any`, `all` |
-| 글 | `text("키", 이름=값)`: 번역 키와 인자 (번역은 아직 없음). 키는 `harbor-charter`처럼 하이픈으로 잇고 점은 쓰지 않는다(번역 파일 Fluent의 이름 규칙, 점은 속성 `harbor-charter.tooltip`) |
+| 글 | `text("키", 이름=값)`: 번역 키와 인자 (번역은 아직 없음). 키는 `harbor-charter`처럼 하이픈으로 잇고 점은 쓰지 않는다(번역 파일 Fluent의 이름 규칙, 점은 속성 `harbor-charter.tooltip`). 인자는 수·문자열·`True`/`False`·`None`·엔티티·안쪽 `text(...)`만 되고 list·dict·함수는 실행 오류다. 엔티티는 `text()`를 부른 때의 Def를 같이 적어 두어, 그 뒤에 엔티티가 없어져도 이름을 보일 수 있다 |
 | 월드 읽기 | `query("타입", "컴포넌트"...)`, `contribs(h, "이름")`, `now()`(지금 틱), `controller(e)`(7장) |
 
 | 쓰는 곳(커맨드·핸들러·흐름의 본문)에서만, **문장으로만** | |

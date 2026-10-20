@@ -533,8 +533,14 @@ namespace Kesa.Engine.Runtime
         private TextValue MaskText(TextValue text)
         {
             var args = new SortedDictionary<string, Value>(System.StringComparer.Ordinal);
-            foreach (var pair in text.Args) args[pair.Key] = Mask(pair.Value);
-            return new TextValue(text.Key, args);
+            var defs = new SortedDictionary<string, string>(System.StringComparer.Ordinal);
+            foreach (var pair in text.Args)
+            {
+                args[pair.Key] = Mask(pair.Value);
+                // 가린 엔티티의 Def는 그 엔티티가 무엇인지 알려 주므로 함께 뺀다 (G267)
+                if (!(args[pair.Key] is HiddenValue) && text.EntityDefs.TryGetValue(pair.Key, out var def)) defs[pair.Key] = def;
+            }
+            return new TextValue(text.Key, args, defs);
         }
 
         private bool IsUnseenEntity(Value value) => value is EntityValue e && _world.IsAlive(e.Id) && !Sees(e.Id);
