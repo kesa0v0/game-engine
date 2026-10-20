@@ -80,7 +80,7 @@
 ## 남은 일 (2026-10-19 점검, 우선순위 순)
 
 1. ~~실행 중 이름 오류의 "혹시 …?" 후보가 모드 전역을 빼먹는다.~~ **고침(2026-10-21):** `IScriptGlobals.Names`로 모드 전역도 후보에 넣음. 함께 `Suggest.Distance`가 이웃 두 글자 맞바꾸기를 한 번으로 셈(`lfet` → `left`, 전에는 힌트 없음).
-2. **종료 코드 3(엔진 내부 예외) 경로의 테스트가 없다.**
+2. ~~종료 코드 3(엔진 내부 예외) 경로의 테스트가 없다.~~ **고침(2026-10-21):** `CommandsTests.AnEngineExceptionExitsThreeAndSaysItIsABug`(`LoadAndReport`를 internal로 열어 보고 단계에서 던짐).
 3. **단계 순서 덤프(S9 "왜?" 도구, G80).** 파생값 추적(`Explain`)·전제 조건 보고서(`CheckPreconditions`)·반응 추적(`Reactions`)은 API로 있다. CLI는 월드를 돌리지 않으므로 CLI 명령으로 남은 것은 단계 순서(`schema.StageOrder`·`HandlerStages`)를 보여 주는 덤프뿐이다. `dump`에서 특정 Def만 고르는 옵션도 미뤘다(G80).
 4. **파일 정리의 작은 나머지.** 새로 나눈 파일의 쓰지 않는 using, 같은 기준이 맞는 나머지 결과 타입(`LoadOrder`·`DiscoveryResult`·`ChooseInfo`·`ModFunctions` 등)을 제 파일로(원하면).
 
@@ -93,6 +93,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 2257개 통과(커널 2146, CLI 37, 콘솔 호스트 25, 번역 49)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
+1. `git pull` 후 `dotnet test`로 2258개 통과(커널 2146, CLI 38, 콘솔 호스트 25, 번역 49)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(색인, 고를 항목의 영역은 `docs/gaps/`의 그 파일), 고를 항목에 맞는 `docs/spine-spec.md` 절을 읽는다. 실행기 구조는 `Script/Execution/PureEvaluator.cs`(입구)·`Session.cs`(+`.Calls`·`.Preconditions`·`.Stepping`)·`Frame.cs`·`Block.cs`·`PureEvaluator.Nodes.cs`(식 노드)·`PureEvaluator.Statements.cs`(문장 노드)·`FrameLayout.cs`·`LocalTable.cs`다. 고른 영역의 지난 기록이 필요하면 `docs/history.md`에서 그 절만 찾아 읽는다(전부 읽을 필요 없음). 옛 커맨드 첫 슬라이스의 읽을 곳: 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`)·`Frame.cs`(`Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.

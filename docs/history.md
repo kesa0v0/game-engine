@@ -842,3 +842,9 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
   - `IScriptGlobals.Names(mod)`를 더했다(`ScopeGlobals`, `WorldGlobals`는 모드 이름과 보이는 컴포넌트·신호 생성자). `Session.LookupFree`가 이것을 후보에 넣는다.
 - **테스트:** `SuggestTests`(거리 표, 맞바꾼 오타의 힌트, 실행 중 전역 후보). 기존 테스트는 바뀐 것 없이 통과했다.
 - **확인:** 테스트 2257개 통과(커널 2146, 번역 49, CLI 37, 콘솔 호스트 25).
+
+## 2026-10-21: CLI 종료 코드 3 경로 테스트 (남은 일 2번)
+
+- 모드 내용으로는 엔진 예외에 닿으면 안 되므로(닿으면 그것이 버그), `Commands.LoadAndReport`를 internal로 열고 보고 콜백에서 예외를 던져 시험한다.
+- 확인하는 것: 종료 코드 3, stderr 첫 줄 `engine check: internal error (this is an engine bug, please report it)`, 예외 내용, stdout은 비어 있음.
+- **확인:** 테스트 2258개 통과(커널 2146, 번역 49, CLI 38, 콘솔 호스트 25).

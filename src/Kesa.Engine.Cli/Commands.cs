@@ -214,7 +214,7 @@ namespace Kesa.Engine.Cli
         /// 아니면 오류 진단이 있을 때 1. 엔진 예외는 3 (G78). <paramref name="warningsAsErrors"/>면 경고를 오류로 올린 진단을
         /// 넘기고 그것으로 종료 코드를 정한다 (G84).
         /// </summary>
-        private static int LoadAndReport(string command, string root, HostFunctions? host, TextWriter stderr,
+        internal static int LoadAndReport(string command, string root, HostFunctions? host, TextWriter stderr,
             Func<IReadOnlyList<Diagnostic>, ContentLoadResult, IReadOnlyList<ModManifest>, int> report,
             bool warningsAsErrors = false, bool translations = false)
         {

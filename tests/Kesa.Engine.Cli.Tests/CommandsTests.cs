@@ -84,6 +84,20 @@ namespace Kesa.Engine.Cli.Tests
             Assert.That(text, Does.EndWith("errors: 2, warnings: 1, info: 0; mods loaded: 1, disabled: 0\n"));
         }
 
+        // 엔진 안의 예외는 3이고 stderr에 버그라고 알린다 (G78). 모드 내용으로는 닿으면 안 되는 길이라 보고 단계에서 던진다
+        [Test]
+        public void AnEngineExceptionExitsThreeAndSaysItIsABug()
+        {
+            Mod("Resource(\"Wood\")\n");
+            int code = Commands.LoadAndReport("check", _root, null, _err,
+                (_, _, _) => throw new System.InvalidOperationException("broken on purpose"));
+            Assert.That(code, Is.EqualTo(Commands.ExitInternal));
+            string err = _err.ToString();
+            Assert.That(err, Does.StartWith("engine check: internal error (this is an engine bug, please report it)"));
+            Assert.That(err, Does.Contain("System.InvalidOperationException: broken on purpose"));
+            Assert.That(_out.ToString(), Is.Empty);
+        }
+
         [Test]
         public void ContentErrorsExitOneAndPrintPathsUnderTheGivenFolder()
         {
