@@ -7,6 +7,8 @@ namespace Kesa.Engine.Script
 {
     /// <summary>
     /// <c>@command</c>로 선언한 커맨드 (spec S6). id는 자동으로 <c>모드id.함수이름</c>이다 (spec-gaps G109).
+    /// <c>@ui_action</c>(G276·G280)도 이 모양이다: 매개변수와 사전 조건이 같고 <see cref="IsUiAction"/>이 참이며, 커맨드와 다른 목록
+    /// (<see cref="ModFunctions.UiActions"/>)에 든다. 그래서 제출 길에는 나타나지 않는다.
     /// </summary>
     public sealed class CommandDecl
     {
@@ -27,6 +29,9 @@ namespace Kesa.Engine.Script
 
         /// <summary><c>@command(free=True)</c>: Request 없이 제출할 수 있다 (자유 커맨드, spec S6).</summary>
         public bool Free { get; }
+
+        /// <summary><c>@ui_action</c>인가 (G280). 그러면 <see cref="Free"/>는 거짓이고 <see cref="ActsFor"/>는 없다(입구 검사가 없다).</summary>
+        public bool IsUiAction => Function.IsUiAction;
 
         /// <summary>
         /// 커맨드가 누구로서 행동하는지 고르는 람다 (<c>acts_for=lambda party: party</c>, spec-gaps G122·G130·G139).

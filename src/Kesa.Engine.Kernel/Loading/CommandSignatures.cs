@@ -28,7 +28,8 @@ namespace Kesa.Engine.Loading
                     if (p.Annotation == null)
                     {
                         context.Error(Codes.CmdParameterType,
-                            "parameter '" + p.Name + "' of command '" + command.Id + "' needs a type annotation", p.Span,
+                            "parameter '" + p.Name + "' of " + (command.IsUiAction ? "UI action '" : "command '") + command.Id +
+                            "' needs a type annotation", p.Span,
                             hint: "write " + p.Name + ": Ref[Unit], " + p.Name + ": int, ... (spec-gaps G114)");
                         ok = false;
                         continue;

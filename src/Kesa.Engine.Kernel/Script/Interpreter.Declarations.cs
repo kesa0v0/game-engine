@@ -12,6 +12,7 @@ namespace Kesa.Engine.Script
         public const string SubmitPolicyName = "submit_policy";
         public const string ViewPolicyName = "view_policy";
         public const string ActsForName = "acts_for";
+        public const string UiActionName = "ui_action";
 
         /// <summary>S5의 <c>on_stale=</c>. 이름만 예약했다: 지금은 기본 취소만 있다 (spec-gaps G166).</summary>
         public const string OnStaleName = "on_stale";
@@ -293,8 +294,8 @@ namespace Kesa.Engine.Script
             }
 
             string? name = def.DecoratorName;
-            if ((name == CommandName || name == SubmitPolicyName || name == ViewPolicyName || name == OnName || name == WhenName) &&
-                !IsBuiltin(name))
+            if ((name == CommandName || name == SubmitPolicyName || name == ViewPolicyName || name == OnName || name == WhenName ||
+                 name == UiActionName) && !IsBuiltin(name))
             {
                 bool schema = _scope.IsSchemaName(name);
                 _context.Error(Codes.CmdBadDecorator,
@@ -328,9 +329,15 @@ namespace Kesa.Engine.Script
                 DeclareWhen(def, function, decorator);
                 return;
             }
+            if (name == UiActionName)
+            {
+                DeclareUiAction(function, decorator);
+                return;
+            }
             if (name != CommandName)
             {
-                _context.Error(Codes.CmdBadDecorator, "unknown decorator; only @command, @on, @when and @view_policy are supported",
+                _context.Error(Codes.CmdBadDecorator,
+                    "unknown decorator; only @command, @on, @when, @ui_action and @view_policy are supported",
                     decorator.Span, hint: "write @command or @command(free=True, acts_for=...)");
                 return;
             }
@@ -402,6 +409,25 @@ namespace Kesa.Engine.Script
             if (actsFor != null && actsFor.Value is LambdaExpr)
                 chooser = (FunctionValue)Evaluate(actsFor.Value); // 람다 본문 검사와 함수 목록 등록 (G108·G117)
             _context.Functions.Commands.Add(new CommandDecl(_context.Mod, function, free, decorator.Span, chooser));
+        }
+
+        /// <summary>
+        /// <c>@ui_action</c> (spec S10 3항, spec-gaps G276·G280): 인자 없는 데코레이터. 매개변수는 커맨드처럼 타입을 적고 그 연결이 보는
+        /// 엔티티도 매개변수로 받는다(G278). 누구로서 행동하지 않으므로 <c>acts_for</c>가 없다.
+        /// </summary>
+        private void DeclareUiAction(FunctionValue function, Expr decorator)
+        {
+            if (decorator is CallExpr call)
+            {
+                var span = call.Arguments.Count > 0 ? call.Arguments[0].Span : call.Span;
+                bool actsFor = call.Arguments.Count > 0 && call.Arguments[0].Name == ActsForName;
+                _context.Error(Codes.CmdBadDecorator, actsFor
+                        ? "@ui_action has no acts_for: it changes only the screen it is called on, so there is no gate to check"
+                        : "@ui_action takes no arguments", span,
+                    hint: "write @ui_action, and take the entity the screen is looking at as a parameter (spec-gaps G278)");
+                return;
+            }
+            _context.Functions.UiActions.Add(new CommandDecl(_context.Mod, function, false, decorator.Span));
         }
 
         /// <summary>

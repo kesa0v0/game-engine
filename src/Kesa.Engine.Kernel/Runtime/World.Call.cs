@@ -187,6 +187,7 @@ namespace Kesa.Engine.Runtime
         /// <summary>호스트가 부르지 않는 함수면 그 이유, 아니면 null (G245).</summary>
         private static string? Refusal(FunctionValue fn)
         {
+            if (fn.IsUiAction) return "it is a @ui_action, which the host runs as an action, not as a value to show";
             if (fn.IsEntry) return "it is a " + fn.EntryKind + ", which runs only when submitted or triggered";
             if (fn.Writes) return "it changes the world (at " + fn.WriteWitness!.Value + ")";
             if (fn.Random) return "it uses random numbers (at " + fn.RandomWitness!.Value + ")";

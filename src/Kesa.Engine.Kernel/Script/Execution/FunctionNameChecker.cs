@@ -22,6 +22,9 @@ namespace Kesa.Engine.Script
         /// <summary><c>@command</c>로 선언한 커맨드, 정의된 순서대로 (spec-gaps G109).</summary>
         public List<CommandDecl> Commands { get; } = new List<CommandDecl>();
 
+        /// <summary><c>@ui_action</c>으로 선언한 UI 동작, 정의된 순서대로 (G280). 커맨드와 다른 목록이다.</summary>
+        public List<CommandDecl> UiActions { get; } = new List<CommandDecl>();
+
         /// <summary>
         /// <c>@view_policy</c>(G197)로 선언한 보기 정책 함수. 모드 안에서 둘 이상이면 로드 오류다.
         /// </summary>

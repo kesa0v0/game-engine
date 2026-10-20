@@ -35,11 +35,11 @@ namespace Kesa.Engine.Script
         /// </summary>
         public static void Check(FunctionDef def, CallContext context)
         {
-            var walker = new Walker(context, def.Name);
-            bool isCommand = def.IsCommand;
+            var walker = new Walker(context, def.Name) { UiAction = def.IsUiAction };
+            bool opens = def.IsCommand || def.IsUiAction; // UI 동작도 사전 조건을 연다 (G280)
             for (int i = 0; i < def.Body.Count; i++)
             {
-                if (i == 0 && isCommand && def.Body[0] is WithStmt with) walker.Preconditions(with, def.Parameters);
+                if (i == 0 && opens && def.Body[0] is WithStmt with) walker.Preconditions(with, def.Parameters);
                 else walker.Statement(def.Body[i]);
             }
         }
@@ -72,6 +72,9 @@ namespace Kesa.Engine.Script
                 _selfName = selfName;
             }
 
+            /// <summary><c>@ui_action</c>의 본문인가: 사전 조건에 <c>cost</c>가 없다 (G280).</summary>
+            public bool UiAction { get; set; }
+
             private void Report(string message, SourceSpan span, string? hint = null) =>
                 _context.Error(Codes.EvlUnsupported, message, span, hint);
 
@@ -98,6 +101,9 @@ namespace Kesa.Engine.Script
                         case ExprStmt es when IsPreconditionCall(es.Expr, out var name):
                             var call = (CallExpr)es.Expr;
                             if (name == RequireName) CheckRequire(call);
+                            else if (name == CostName && UiAction)
+                                _context.Error(Codes.CmdPreconditions, "a @ui_action pays nothing, so it has no cost()", call.Span,
+                                    "it only changes this screen; put cost() in the command it submits (spec-gaps G280)");
                             else if (name == CostName) CheckCost(call);
                             else CheckChoose(call, parameters, chosen);
                             foreach (var arg in call.Arguments) Expr(arg.Value);

@@ -417,7 +417,13 @@ namespace Kesa.Engine.Script
         /// 원인 오류 하나가 다른 오류로 번지지 않게 한다 (데코레이터 자체는 인터프리터가 검사).
         /// </summary>
         public bool IsCommand => Decorators.Count > 0 && DecoratorName != Interpreter.SubmitPolicyName &&
-                                 DecoratorName != Interpreter.ViewPolicyName && !IsHandler && !IsWhen;
+                                 DecoratorName != Interpreter.ViewPolicyName && !IsHandler && !IsWhen && !IsUiAction;
+
+        /// <summary>
+        /// <c>@ui_action</c>인가 (spec S10 3항, spec-gaps G276·G280). 커맨드처럼 <c>with preconditions:</c>를 열 수 있지만 커맨드가 아니다:
+        /// 호스트가 연결마다 부르고 UI 로컬 기록만 쓴다.
+        /// </summary>
+        public bool IsUiAction => Decorators.Count > 0 && DecoratorName == Interpreter.UiActionName;
 
         /// <summary><c>@on(신호)</c> 핸들러인가 (spec S5, spec-gaps G145). 본문은 커맨드처럼 Flow지만 사전 조건이 없다.</summary>
         public bool IsHandler => Decorators.Count > 0 && DecoratorName == Interpreter.OnName;

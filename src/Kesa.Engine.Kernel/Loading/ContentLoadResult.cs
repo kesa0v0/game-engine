@@ -72,6 +72,12 @@ namespace Kesa.Engine.Loading
         public IReadOnlyDictionary<string, CommandDecl> Commands { get; }
 
         /// <summary>
+        /// 살아남은 모드가 선언한 UI 동작 (id <c>모드id.함수이름</c> → 선언, id 서수 순, spec-gaps G280). 커맨드와 따로라 제출할 수 없다.
+        /// </summary>
+        public IReadOnlyDictionary<string, CommandDecl> UiActions { get; internal set; } =
+            new SortedDictionary<string, CommandDecl>(System.StringComparer.Ordinal);
+
+        /// <summary>
         /// 보기 정책 함수 <c>may_see(viewer, entity, component)</c> (spec-gaps G196·G197·G203·G238). 활성 모드 전체에서 최대 하나이고
         /// 교체됐으면 마지막 것이다. 없으면 null이고 그때 거른 읽기는 모두 보인다.
         /// </summary>
