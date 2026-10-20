@@ -142,7 +142,38 @@ namespace Kesa.Engine.Loading
             }
 
             private static StaticType? Element(StaticType? iterable) =>
-                iterable == null ? null : iterable is GroupType group ? group.Element : StaticType.Unknown;
+                iterable == null ? null : iterable is GroupType group ? group.Element :
+                iterable is DefIdMapType ? DefIdStatic.Instance : StaticType.Unknown;
+
+            /// <summary>
+            /// <c>:</c> 없는 문자열 리터럴을 DefId 값과 비교하거나 그것으로 찾는 곳 (G261): 값은 늘 전체 이름이라 맞지 않는다. 경고다.
+            /// </summary>
+            private void BareDefId(Expr literal)
+            {
+                if (!Reporting || !(literal is StringLiteral s) || s.Value.Length == 0 || DefIds.IsFull(s.Value)) return;
+                _stage!.Warning(_mod, Codes.LnkBareDefId,
+                    "a Def id value is always a full id like '" + DefIds.Resolve(s.Value, _mod) + "', so it never equals \"" + s.Value + "\"",
+                    s.Span, "write defid(\"" + s.Value + "\") or \"" + DefIds.Resolve(s.Value, _mod) + "\"");
+            }
+
+            /// <summary>비교·<c>in</c>에서 DefId 값과 맨 리터럴이 만나는가 (G261).</summary>
+            private void CheckDefIdComparison(BinaryExpr bin, StaticType? left, StaticType? right)
+            {
+                switch (bin.Op)
+                {
+                    case "==":
+                    case "!=":
+                        if (left is DefIdStatic) BareDefId(bin.Right);
+                        if (right is DefIdStatic) BareDefId(bin.Left);
+                        break;
+                    case "in":
+                    case "not in":
+                        if (right is DefIdMapType || right is GroupType g && g.Element is DefIdStatic) BareDefId(bin.Left);
+                        if (left is DefIdStatic && bin.Right is ListExpr list)
+                            foreach (var item in list.Items) BareDefId(item);
+                        break;
+                }
+            }
 
             /// <summary>이름이 지역 변수나 모드의 최상위 이름이라 내장을 가렸는가 (G112).</summary>
             private bool Shadowed(string name, SortedDictionary<string, StaticType?> scope) =>
@@ -172,11 +203,13 @@ namespace Kesa.Engine.Loading
                             case null: return null;
                             case RowsType rows: return new ComponentStatic(rows.Component, rows.Owner, true);
                             case GroupType group: return group.Element;
+                            case DefIdMapType _:
+                                if (index.Indices.Count == 1) BareDefId(index.Indices[0]);
+                                return StaticType.Unknown;
                         }
                         return StaticType.Unknown;
                     case BinaryExpr bin:
-                        Type(bin.Left, scope);
-                        Type(bin.Right, scope);
+                        CheckDefIdComparison(bin, Type(bin.Left, scope), Type(bin.Right, scope));
                         return StaticType.Unknown;
                     case UnaryExpr unary:
                         Type(unary.Operand, scope);

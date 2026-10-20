@@ -37,7 +37,9 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: Schema, defs: Ships + Command(
                 "    s.Mark.n = (1 if s.Mark.kind == defid(\"Sloop\") else 0) + (2 if s.Mark.kind == \"Sloop\" else 0) +" +
                 " (4 if defid(\"banking:Sloop\") == \"banking:Sloop\" else 0)\n"));
-            var world = new World(LoadClean());
+            var result = Load(out var diags);
+            Assert.That(diags.Select(d => d.Code), Is.EqualTo(new[] { Codes.LnkBareDefId })); // == "Sloop"
+            var world = new World(result);
             var sloop = world.Create("banking:Sloop");
             Assert.That(Check(world, sloop).Succeeded, Is.True);
             Assert.That(N(world, sloop), Is.EqualTo(5));

@@ -220,9 +220,13 @@ namespace Kesa.Engine.Loading
                     return new EntityType(schema.TryGetType(entity.Target.Name, out var t) ? t : null);
                 case OptionalTypeRef optional:
                     return FromType(optional.Inner, schema);
+                case DefIdTypeRef _:
+                    return DefIdStatic.Instance;
+                case DictTypeRef dict when dict.Key is DefIdTypeRef:
+                    return DefIdMapType.Instance;
                 case ListTypeRef list:
                     var element = FromType(list.Element, schema);
-                    return element is EntityType ? new GroupType(element) : StaticType.Unknown;
+                    return element is EntityType || element is DefIdStatic ? new GroupType(element!) : StaticType.Unknown;
             }
             return StaticType.Unknown;
         }
@@ -248,12 +252,15 @@ namespace Kesa.Engine.Loading
                         string? target = index.Index is NameExpr n ? n.Name : index.Index is StringLiteral l ? l.Value : null;
                         return target != null && schema.TryGetType(target, out var t) ? new EntityType(t) : StaticType.Unknown;
                     }
+                    if (generic.Name == "DefId") return DefIdStatic.Instance;
                     if (generic.Name == "list")
                     {
                         var element = Annotation(index.Index, schema);
-                        return element is EntityType ? new GroupType(element) : StaticType.Unknown;
+                        return element is EntityType || element is DefIdStatic ? new GroupType(element) : StaticType.Unknown;
                     }
                     return StaticType.Unknown;
+                case IndexExpr dict when dict.Target is NameExpr d && d.Name == "dict" && dict.Indices.Count == 2:
+                    return Annotation(dict.Indices[0], schema) is DefIdStatic ? DefIdMapType.Instance : StaticType.Unknown;
                 case BinaryExpr union when union.Op == "|":
                     if (union.Right is NoneLiteral) return Annotation(union.Left, schema);
                     if (union.Left is NoneLiteral) return Annotation(union.Right, schema);

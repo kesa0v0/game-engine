@@ -69,6 +69,33 @@ namespace Kesa.Engine.Loading
                         new ValueBlame(mod, literal.File.Length > 0 ? literal : fallback, Array.Empty<string>()),
                     p.Default, p.Type, p.Span);
             }
+            // DefId 매개변수의 choose(p, from_=[...])에 리터럴로 적은 후보도 같다 (G261)
+            foreach (var command in commands) linker.CheckChoiceLiterals(command);
+        }
+
+        private void CheckChoiceLiterals(CommandDecl command)
+        {
+            var body = command.Function.Definition?.Body;
+            if (body == null || body.Count == 0 || !(body[0] is WithStmt with)) return;
+            foreach (var stmt in with.Body)
+            {
+                if (!(stmt is ExprStmt es) || !FunctionChecker.IsPreconditionCall(es.Expr, out var name) ||
+                    name != FunctionChecker.ChooseName)
+                    continue;
+                var call = (CallExpr)es.Expr;
+                if (call.Arguments.Count != 2 || !(call.Arguments[0].Value is NameExpr target) ||
+                    call.Arguments[1].Name != FunctionChecker.FromName || !(call.Arguments[1].Value is ListExpr list))
+                    continue;
+                CommandParameter? parameter = null;
+                foreach (var p in command.Parameters)
+                    if (p.Name == target.Name) parameter = p;
+                var type = parameter?.Type is OptionalTypeRef optional ? optional.Inner : parameter?.Type;
+                if (!(type is DefIdTypeRef defId)) continue;
+                foreach (var item in list.Items)
+                    if (item is StringLiteral s)
+                        CheckId(new ValueBlame(command.Mod, s.Span, Array.Empty<string>()), DefIds.Resolve(s.Value, command.Mod),
+                            defId.Target.Name);
+            }
         }
 
         private void CheckDef(ResolvedDef def)

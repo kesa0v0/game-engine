@@ -97,6 +97,8 @@ namespace Kesa.Engine.Diagnostics
         public const string LnkWrongType = "LNK002";
         public const string LnkNotVisible = "LNK003";
         public const string LnkAbstract = "LNK004";
+        /// <summary>경고: DefId 값을 맨 문자열 리터럴과 비교하거나 그것으로 찾음 (값은 늘 전체 이름이라 맞지 않음, G261).</summary>
+        public const string LnkBareDefId = "LNK005";
 
         // 검증 (spec S1 ⑥)
         public const string ValMissing = "VAL001";

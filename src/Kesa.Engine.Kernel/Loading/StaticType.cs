@@ -131,7 +131,23 @@ namespace Kesa.Engine.Loading
         public override bool Same(StaticType other) => other is ConstructorType c && c.Name == Name;
     }
 
-    /// <summary>돌면 원소가 나오는 묶음: <c>query(...)</c>, 역방향 컬렉션, <c>list[Ref[X]]</c>, 리스트 컴프리헨션.</summary>
+    /// <summary>
+    /// <c>DefId</c> 값 (<c>u.Ship.kind</c>, <c>DefId</c> 매개변수). 값은 늘 전체 이름이라 맨 문자열 리터럴과 비교하면 경고한다 (G261).
+    /// </summary>
+    internal sealed class DefIdStatic : StaticType
+    {
+        public static readonly DefIdStatic Instance = new DefIdStatic();
+        public override bool Same(StaticType other) => other == this;
+    }
+
+    /// <summary><c>DefId</c>가 키인 맵 (<c>u.Unit.cost</c>). 돌면 키가 나오고, 맨 문자열 리터럴로 찾으면 경고한다 (G261).</summary>
+    internal sealed class DefIdMapType : StaticType
+    {
+        public static readonly DefIdMapType Instance = new DefIdMapType();
+        public override bool Same(StaticType other) => other == this;
+    }
+
+    /// <summary>돌면 원소가 나오는 묶음: <c>query(...)</c>, 역방향 컬렉션, <c>list[Ref[X]]</c>·<c>list[DefId[X]]</c>, 리스트 컴프리헨션.</summary>
     internal sealed class GroupType : StaticType
     {
         public GroupType(StaticType element) => Element = element;
