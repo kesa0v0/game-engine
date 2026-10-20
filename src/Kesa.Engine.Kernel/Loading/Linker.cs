@@ -53,6 +53,12 @@ namespace Kesa.Engine.Loading
                 foreach (var pair in functions)
                 foreach (var names in pair.Value.QueriedNames)
                     linker.CheckQuery(pair.Key, names);
+                // submit("커맨드", ...)에 리터럴로 적은 커맨드: 있고 보이고 넘긴 이름이 매개변수와 맞아야 한다 (G278)
+                var byId = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
+                foreach (var command in commands ?? Array.Empty<CommandDecl>()) byId[command.Id] = command;
+                foreach (var pair in functions)
+                foreach (var use in pair.Value.SubmitUses)
+                    linker.CheckSubmit(pair.Key, use, byId);
             }
             foreach (var def in resolved.Defs) linker.CheckDef(def);
             // 스키마가 선언한 기본값도 Def 값과 같은 규칙으로 본다. 책임은 선언한 모드다 (G73)
@@ -71,6 +77,47 @@ namespace Kesa.Engine.Loading
             }
             // DefId 매개변수의 choose(p, from_=[...])에 리터럴로 적은 후보도 같다 (G261)
             foreach (var command in commands) linker.CheckChoiceLiterals(command);
+        }
+
+        private void CheckSubmit(string mod, SubmitUse use, SortedDictionary<string, CommandDecl> commands)
+        {
+            string id = use.Command.IndexOf('.') >= 0 ? use.Command : mod + "." + use.Command;
+            if (!commands.TryGetValue(id, out var command) || command.IsUiAction)
+            {
+                var names = new List<string>();
+                foreach (var c in commands.Values)
+                    if (!c.IsUiAction) names.Add(c.Mod == mod ? c.Function.Name : c.Id);
+                _stage.Error(mod, Codes.CmdSubmit,
+                    command != null ? "'" + use.Command + "' is a @ui_action, so it cannot be submitted"
+                        : "submit() names '" + use.Command + "', but there is no command '" + id + "'",
+                    use.Span, command != null ? "a @ui_action runs on the screen; submit a @command (spec-gaps G278)"
+                        : Suggest.Hint(use.Command, names));
+                return;
+            }
+            if (!_visibility.CanSee(mod, command.Mod))
+            {
+                _stage.Error(mod, Codes.LnkNotVisible,
+                    "command '" + id + "' belongs to mod '" + command.Mod + "', which mod '" + mod + "' does not depend on", use.Span,
+                    "add \"" + command.Mod + "\" to dependencies in mod.py");
+                return;
+            }
+            var parameters = new List<string>();
+            foreach (var p in command.Parameters) parameters.Add(p.Name);
+            for (int i = 0; i < use.ArgumentNames.Count; i++)
+            {
+                string name = use.ArgumentNames[i];
+                if (parameters.Contains(name)) continue;
+                _stage.Error(mod, Codes.CmdSubmit, "command '" + id + "' has no parameter '" + name + "'", use.ArgumentSpans[i],
+                    Suggest.Hint(name, parameters) ?? (parameters.Count == 0 ? "it takes no arguments"
+                        : "its parameters are " + string.Join(", ", parameters)));
+            }
+            var passed = new HashSet<string>(use.ArgumentNames, StringComparer.Ordinal);
+            foreach (var p in command.Parameters)
+            {
+                if (p.Default != null || passed.Contains(p.Name)) continue;
+                _stage.Error(mod, Codes.CmdSubmit, "submit() of '" + id + "' does not pass '" + p.Name + "', which has no default",
+                    use.Span, "write " + p.Name + "=... (spec-gaps G278)");
+            }
         }
 
         private void CheckChoiceLiterals(CommandDecl command)

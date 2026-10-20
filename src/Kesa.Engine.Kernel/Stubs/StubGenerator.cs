@@ -96,6 +96,7 @@ namespace Kesa.Engine.Stubs
             "@overload\n" +
             "def command[F: Callable[..., Any]](*, free: bool = ..., acts_for: Any = ..., on_stale: Any = ...) -> Callable[[F], F]: ...\n" +
             "def ui_action[F: Callable[..., Any]](f: F, /) -> F: ...\n" +
+            "def submit(command: str, /, **args: Any) -> None: ...\n" +
             "@overload\n" +
             "def view_policy[F: Callable[..., Any]](f: F, /) -> F: ...\n" +
             "@overload\n" +
@@ -475,14 +476,13 @@ namespace Kesa.Engine.Stubs
 
             /// <summary>
             /// UI 로컬 기록 (G277): 보이는 기록마다 클래스 하나, 그리고 <c>ui.Selection.unit</c>으로 읽는 <c>ui</c>. 칸은 모두 쓸 수 있다
-            /// (쓰는 곳은 <c>@ui_action</c>뿐인 것은 로드가 본다).
+            /// (쓰는 곳이 <c>@ui_action</c>과 UI를 쓰는 함수뿐인 것은 로드가 본다, G282). 기록이 없어도 <c>ui</c>는 있다(엔진 이름, G207).
             /// </summary>
             private void WriteUiStates(HashSet<string> schemaNames)
             {
                 var visible = new List<UiStateType>();
                 foreach (var u in _schema.UiStates)
                     if (Sees(u.Mod)) visible.Add(u);
-                if (visible.Count == 0) return;
                 foreach (var state in visible)
                 {
                     Line("class " + state.Name + ":");
@@ -494,6 +494,7 @@ namespace Kesa.Engine.Stubs
                 }
                 Line("class _ui:");
                 foreach (var state in visible) Line("    " + state.Name + ": " + state.Name);
+                if (visible.Count == 0) Line("    ...");
                 Line();
                 Line("ui: _ui");
                 Line();

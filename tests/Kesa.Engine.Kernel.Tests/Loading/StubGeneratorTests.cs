@@ -98,6 +98,11 @@ namespace Kesa.Engine.Tests.Loading
                 "\n" +
                 "class Tick: ...  # sent by the engine; handle it with @on(Tick)\n" +
                 "\n" +
+                // UI 기록이 없어도 ui는 있다 (G207·G282)
+                "class _ui:\n    ...\n" +
+                "\n" +
+                "ui: _ui\n" +
+                "\n" +
                 "class patch:\n" +
                 "    @staticmethod\n" +
                 "    def set(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any) -> None: ...\n" +

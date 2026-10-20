@@ -64,6 +64,17 @@ namespace Kesa.Engine.Script
         public const string RandomName = "random";
 
         /// <summary>
+        /// UI 로컬 기록 <c>ui.Selection.unit</c> (spec-gaps G277·G279). 몸체는 호스트가 부를 때 넘기는 <c>UiState</c>다. 게임 쪽 코드는
+        /// 쓸 수 없다 (G282).
+        /// </summary>
+        public const string UiName = "ui";
+
+        /// <summary>
+        /// <c>@ui_action</c>에서 커맨드를 내 달라고 적어 두는 내장 (spec-gaps G278). UI 로컬 쓰기와 자리 규칙이 같다 (G282).
+        /// </summary>
+        public const string SubmitName = "submit";
+
+        /// <summary>
         /// 월드를 바꾸거나 멈추거나 신호를 내는 내장. 부르면 쓰기다 (G135·G136·G146). 이름 집합보다 먼저 초기화되어야 한다.
         /// </summary>
         private static readonly string[] WritingNameArray =
@@ -92,7 +103,7 @@ namespace Kesa.Engine.Script
 
         private static SortedSet<string> NameSet()
         {
-            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName };
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, UiName, SubmitName };
             set.UnionWith(WritingNameArray);
             return set;
         }

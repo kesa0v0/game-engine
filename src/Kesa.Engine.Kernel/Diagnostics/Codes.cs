@@ -201,5 +201,11 @@ namespace Kesa.Engine.Diagnostics
 
         // 보기 정책 함수: 모양·개수·교체 (spec-gaps G197·G203)
         public const string CmdViewPolicy = "CMD006";
+
+        // UI 로컬 효과의 자리 (spec-gaps G278·G282): 게임 쪽 코드가 ui를 읽거나 쓰고, @ui_action이 게임을 바꿈
+        public const string CmdUiEffect = "CMD007";
+
+        // submit("커맨드", ...)의 대상: 없는 커맨드, 보이지 않는 커맨드, 매개변수 이름 (spec-gaps G278)
+        public const string CmdSubmit = "CMD008";
     }
 }

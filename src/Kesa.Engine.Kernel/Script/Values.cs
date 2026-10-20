@@ -137,6 +137,22 @@ namespace Kesa.Engine.Script
 
         public bool Random => RandomWitness != null;
 
+        /// <summary>
+        /// <c>ui.…</c>를 읽거나 쓰는 곳 (G279·G282). 이 함수나 부르는 함수(문장이든 식이든)가 UI 로컬 기록을 건드리면 처음 그런 곳이고,
+        /// 게임 쪽 코드(커맨드·핸들러·반응·정책·<c>derived</c> 등)에서 쓸 수 없다. 아니면 null.
+        /// </summary>
+        public SourceSpan? UiTouchWitness { get; internal set; }
+
+        public bool TouchesUi => UiTouchWitness != null;
+
+        /// <summary>
+        /// UI 로컬 기록에 쓰거나 <c>submit</c>을 하는 곳 (G282). 그런 함수는 <c>@ui_action</c>이나 다른 UI를 쓰는 함수 안에서 문장으로만
+        /// 부른다(G117의 쓰기 함수와 같은 규칙). 아니면 null.
+        /// </summary>
+        public SourceSpan? UiWriteWitness { get; internal set; }
+
+        public bool WritesUi => UiWriteWitness != null;
+
         /// <summary><c>@command</c> 함수인가 (G109). 로직에서 쓸 수 없다 (G118).</summary>
         public bool IsCommand => Definition != null && Definition.IsCommand;
 

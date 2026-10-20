@@ -177,7 +177,9 @@ namespace Kesa.Engine.Loading
                 var hostNames = HostNamesFor(u, units, visibility, host);
                 CheckHostShadowing(u, hostNames);
                 CheckFunctionNames(u, builtins, hostNames);
-                FunctionEffects.Check(u.Functions, u.Scope, schema, new CallContext(u.Manifest.Id, u.Bag), hostNames);
+                string self = u.Manifest.Id;
+                FunctionEffects.Check(u.Functions, u.Scope, schema, new CallContext(self, u.Bag), hostNames,
+                    owner => visibility.CanSee(self, owner));
                 CommandSignatures.Resolve(u.Functions.Commands, schema, visibility, u.Scope,
                     new CallContext(u.Manifest.Id, u.Bag));
                 CommandSignatures.Resolve(u.Functions.UiActions, schema, visibility, u.Scope,

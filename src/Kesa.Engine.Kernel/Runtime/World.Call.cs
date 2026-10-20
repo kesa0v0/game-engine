@@ -191,6 +191,9 @@ namespace Kesa.Engine.Runtime
             if (fn.IsEntry) return "it is a " + fn.EntryKind + ", which runs only when submitted or triggered";
             if (fn.Writes) return "it changes the world (at " + fn.WriteWitness!.Value + ")";
             if (fn.Random) return "it uses random numbers (at " + fn.RandomWitness!.Value + ")";
+            if (fn.WritesUi) return "it changes UI state (at " + fn.UiWriteWitness!.Value + "); run it from a @ui_action";
+            // 화면 함수가 ui를 읽는 길은 아직 없다 (G279의 영수증과 함께 붙인다)
+            if (fn.TouchesUi) return "it reads UI state (at " + fn.UiTouchWitness!.Value + ")";
             return null;
         }
 

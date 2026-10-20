@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Schema;
@@ -17,13 +18,13 @@ namespace Kesa.Engine.Script
     public static class FunctionEffects
     {
         public static void Check(ModFunctions functions, ModScope scope, SchemaSet schema, CallContext context,
-            HostNames? hosts = null)
+            HostNames? hosts = null, Func<string, bool>? sees = null)
         {
             var bodies = new List<Body>();
             foreach (var function in functions.Functions)
             {
                 var body = new Body(function);
-                var walker = new Walker(scope, body, hosts ?? HostNames.None);
+                var walker = new Walker(scope, body, hosts ?? HostNames.None, new UiNames(schema, sees ?? (_ => true), context));
                 if (function.Definition != null)
                     walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
                 else
@@ -67,6 +68,40 @@ namespace Kesa.Engine.Script
                         if (call.Callee.Random && (witness == null || Before(call.Span, witness.Value))) witness = call.Span;
                     if (witness == null) continue;
                     body.Function.RandomWitness = witness;
+                    changed = true;
+                }
+            }
+
+            // UI 로컬 기록을 건드리는 함수: 직접 읽거나 쓰거나, 그런 함수를 부르는(문장이든 식이든) 함수 (G282)
+            changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (var body in bodies)
+                {
+                    if (body.Function.TouchesUi) continue;
+                    SourceSpan? witness = body.FirstUiTouch;
+                    foreach (var calls in new[] { body.StatementCalls, body.ExpressionCalls })
+                    foreach (var call in calls)
+                        if (call.Callee.TouchesUi && (witness == null || Before(call.Span, witness.Value))) witness = call.Span;
+                    if (witness == null) continue;
+                    body.Function.UiTouchWitness = witness;
+                    changed = true;
+                }
+            }
+            // UI를 쓰는 함수: ui.X.y에 대입하거나 submit을 하거나, 그런 함수를 문장으로 부르는 함수 (G282, 쓰기 함수 G117과 같은 모양)
+            changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (var body in bodies)
+                {
+                    if (body.Function.WritesUi) continue;
+                    SourceSpan? witness = body.FirstUiWrite;
+                    foreach (var call in body.StatementCalls)
+                        if (call.Callee.WritesUi && (witness == null || Before(call.Span, witness.Value))) witness = call.Span;
+                    if (witness == null) continue;
+                    body.Function.UiWriteWitness = witness;
                     changed = true;
                 }
             }
@@ -116,6 +151,8 @@ namespace Kesa.Engine.Script
                     call.Value, statementHint);
             }
 
+            CheckUiEffects(functions, bodies, context);
+
             // 정책 함수는 순수하다: 입구의 거부(C10, G122)도 거른 읽기(G197)도 상태를 건드리지 않는다
             foreach (var policy in functions.Policies)
             {
@@ -153,6 +190,59 @@ namespace Kesa.Engine.Script
         private static bool Before(SourceSpan a, SourceSpan b) =>
             a.Line < b.Line || (a.Line == b.Line && a.Col < b.Col);
 
+        /// <summary>
+        /// UI 로컬 효과의 자리 (G278·G282). UI 기록은 연결마다 다르고 저장되지 않으므로 게임 쪽 코드가 건드리면 컴퓨터마다 판이 갈라진다.
+        /// 거꾸로 <c>@ui_action</c>은 게임을 바꾸지 않는다: 바꾸려면 커맨드를 <c>submit</c>한다.
+        /// </summary>
+        private static void CheckUiEffects(ModFunctions functions, List<Body> bodies, CallContext context)
+        {
+            const string gameHint = "UI state is different on every screen and is not saved; pass what the game needs as a command " +
+                                    "argument with submit(...) (spec-gaps G278, G282)";
+
+            void Game(FunctionValue? fn, string what, SourceSpan span)
+            {
+                if (fn == null || !fn.TouchesUi) return;
+                context.Error(Codes.CmdUiEffect, what + " uses UI state (ui.… or submit), so it cannot run as game code", span, gameHint,
+                    new[] { fn.UiTouchWitness!.Value });
+            }
+
+            const string statementHint = "call it on its own line in a @ui_action or in another function that changes UI state (spec-gaps G282)";
+            foreach (var body in bodies)
+            {
+                foreach (var call in body.ExpressionCalls)
+                {
+                    if (!call.Callee.WritesUi || call.Callee.IsEntry) continue;
+                    context.Error(Codes.CmdUiEffect,
+                        "'" + call.Callee.Name + "' changes UI state, so it can only be called as a statement", call.Span,
+                        statementHint, new[] { call.Callee.UiWriteWitness!.Value });
+                }
+                foreach (var span in body.SubmitExpressions)
+                    context.Error(Codes.CmdUiEffect, "submit() asks the host to submit a command, so it can only be called as a statement",
+                        span, statementHint);
+
+                var fn = body.Function;
+                if (fn.IsUiAction)
+                {
+                    if (fn.Writes)
+                        context.Error(Codes.CmdUiEffect,
+                            "the @ui_action '" + fn.Name + "' changes the game; it can only change ui.… and submit commands",
+                            fn.Definition!.Span, "to change the game, submit(\"Command\", ...) a command that does it (spec-gaps G278)",
+                            new[] { fn.WriteWitness!.Value });
+                    if (fn.Random)
+                        context.Error(Codes.CmdUiEffect,
+                            "the @ui_action '" + fn.Name + "' draws random numbers; that would use up the game's random numbers",
+                            fn.Definition!.Span, "draw them in the command it submits (spec-gaps G278)", new[] { fn.RandomWitness!.Value });
+                }
+                else if (fn.IsCommand || fn.IsHandler || fn.IsWhen)
+                    Game(fn, "the " + fn.EntryKind + " '" + fn.Name + "'", fn.Definition!.Span);
+            }
+            foreach (var command in functions.Commands) Game(command.ActsFor, "the acts_for of '" + command.Id + "'", command.Span);
+            foreach (var when in functions.Whens)
+                Game(when.Condition, "the condition of @when on '" + when.Function.Name + "'", when.Span);
+            foreach (var policy in functions.Policies)
+                Game(policy.Function, "the " + policy.Noun + " '" + policy.Function.Name + "'", policy.Function.Definition!.Span);
+        }
+
         /// <summary>스키마가 선언한 순수 자리에 이 모드의 쓰기 함수가 있으면 오류다.</summary>
         private static void CheckPureSlots(SchemaSet schema, CallContext context)
         {
@@ -171,6 +261,13 @@ namespace Kesa.Engine.Script
                     context.Error(Codes.CmdWriteEffect,
                         what + " uses '" + fn.Name + "', which draws random numbers; it must give the same answer every time", span,
                         "draw random numbers in a @command body instead (spec-gaps G178)", new[] { fn.RandomWitness!.Value });
+                    return;
+                }
+                if (fn.TouchesUi)
+                {
+                    context.Error(Codes.CmdUiEffect,
+                        what + " uses '" + fn.Name + "', which uses UI state (ui.… or submit); game values cannot depend on a screen",
+                        span, "UI state is different on every screen and is not saved (spec-gaps G282)", new[] { fn.UiTouchWitness!.Value });
                     return;
                 }
                 if (!fn.Writes) return;
@@ -236,6 +333,80 @@ namespace Kesa.Engine.Script
             /// <summary>식 안에서 부른 쓰는 내장 (이름, 위치; G135).</summary>
             public List<KeyValuePair<string, SourceSpan>> BuiltinExpressionCalls { get; } =
                 new List<KeyValuePair<string, SourceSpan>>();
+
+            /// <summary>본문의 첫 <c>ui.…</c> 읽기·쓰기나 <c>submit</c> (G282).</summary>
+            public SourceSpan? FirstUiTouch { get; set; }
+
+            /// <summary>본문의 첫 <c>ui.X.y</c> 대입이나 문장 <c>submit</c> (G282).</summary>
+            public SourceSpan? FirstUiWrite { get; set; }
+
+            /// <summary>식 안의 <c>submit(...)</c> (G282: 문장으로만 부른다).</summary>
+            public List<SourceSpan> SubmitExpressions { get; } = new List<SourceSpan>();
+
+            public void TouchUi(SourceSpan span)
+            {
+                if (FirstUiTouch == null) FirstUiTouch = span;
+            }
+
+            public void WriteUi(SourceSpan span)
+            {
+                TouchUi(span);
+                if (FirstUiWrite == null) FirstUiWrite = span;
+            }
+        }
+
+        /// <summary>
+        /// <c>ui.기록.칸</c> 경로의 이름 검사 (G279). 경로는 늘 이 모양으로 적는다: <c>s = ui.Selection</c>처럼 기록을 값으로 들면
+        /// 그 뒤의 <c>s.unit = …</c>가 UI 쓰기인지 엔티티 쓰기인지 알 수 없다.
+        /// </summary>
+        private sealed class UiNames
+        {
+            private readonly SchemaSet _schema;
+            private readonly Func<string, bool> _sees;
+            private readonly CallContext _context;
+
+            public UiNames(SchemaSet schema, Func<string, bool> sees, CallContext context)
+            {
+                _schema = schema;
+                _sees = sees;
+                _context = context;
+            }
+
+            public void Check(string state, string member, SourceSpan span)
+            {
+                if (!_schema.TryGetUiState(state, out var type))
+                {
+                    var names = new List<string>();
+                    foreach (var s in _schema.UiStates) names.Add(s.Name);
+                    _context.Error(Codes.EvlUnknownName, "there is no UI state '" + state + "'", span,
+                        Suggest.Hint(state, names) ?? "declare it in a schema file with ui_state(\"" + state + "\", ...) (spec-gaps G277)");
+                    return;
+                }
+                if (!_sees(type.Mod))
+                {
+                    _context.Error(Codes.SchNotVisible,
+                        "UI state '" + state + "' belongs to mod '" + type.Mod + "', which mod '" + _context.Mod + "' does not depend on",
+                        span, "add \"" + type.Mod + "\" to dependencies in mod.py");
+                    return;
+                }
+                if (type.TryGetMember(member, out _)) return;
+                var members = new List<string>();
+                foreach (var m in type.Members) members.Add(m.Name);
+                _context.Error(Codes.EvlUnknownName, "UI state '" + state + "' has no field '" + member + "'", span,
+                    Suggest.Hint(member, members));
+            }
+
+            public void Positional(SourceSpan span) =>
+                _context.Error(Codes.CmdSubmit, "submit() takes the command's arguments by name", span,
+                    "write submit(\"Attack\", target=enemy) (spec-gaps G278)");
+
+            public void SubmitValue(SourceSpan span) =>
+                _context.Error(Codes.CmdUiEffect, "submit can only be called, not used as a value", span,
+                    "call submit(\"Command\", ...) on its own line (spec-gaps G282)");
+
+            public void Bare(SourceSpan span) =>
+                _context.Error(Codes.CmdUiEffect, "write the UI state as ui.State.field; ui and ui.State cannot be used as values",
+                    span, "a held ui.State would hide which assignments change UI state (spec-gaps G282)");
         }
 
         private sealed class Walker
@@ -247,11 +418,37 @@ namespace Kesa.Engine.Script
             /// <summary><c>with preconditions:</c> 블록 안을 걷는 중인가 (G178: 거기서는 난수를 쓸 수 없다).</summary>
             private bool _inPreconditions;
 
-            public Walker(ModScope scope, Body body, HostNames hosts)
+            private readonly UiNames _ui;
+
+            public Walker(ModScope scope, Body body, HostNames hosts, UiNames ui)
             {
                 _scope = scope;
                 _body = body;
                 _hosts = hosts;
+                _ui = ui;
+            }
+
+            /// <summary>지역 변수도 모드 이름도 아닌 실행 이름인가 (덮어쓰지 않은 <c>ui</c>·<c>submit</c>).</summary>
+            private bool IsRuntime(Expr expr, string name, SortedSet<string> locals) =>
+                expr is NameExpr n && n.Name == name && !locals.Contains(name) && !_scope.TryLookup(name, out _);
+
+            /// <summary><c>ui.기록.칸</c>이면 이름을 검사하고 true (G279).</summary>
+            private bool UiField(Expr expr, SortedSet<string> locals)
+            {
+                if (!(expr is AttributeExpr member) || !(member.Target is AttributeExpr state) ||
+                    !IsRuntime(state.Target, PureBuiltins.UiName, locals))
+                    return false;
+                _ui.Check(state.Name, member.Name, member.Span);
+                return true;
+            }
+
+            /// <summary>문장 <c>submit("커맨드", 이름=값)</c>: 커맨드 인자는 이름으로만 넘긴다 (G278).</summary>
+            private void Submit(CallExpr call, SortedSet<string> locals)
+            {
+                for (int i = 1; i < call.Arguments.Count; i++)
+                    if (call.Arguments[i].Name == null)
+                        _ui.Positional(call.Arguments[i].Value.Span);
+                foreach (var arg in call.Arguments) Expr(arg.Value, locals);
             }
 
             /// <summary>지역 변수가 아니고 모드가 <c>def</c> 함수로 묶은 이름이면 그 함수 (G112의 덮어쓰기와 같은 규칙).</summary>
@@ -284,6 +481,12 @@ namespace Kesa.Engine.Script
             /// <summary>문장 자리의 호출: 한 줄 전체이거나 이름 대입의 오른쪽 전체 (G117·G135).</summary>
             private void StatementCall(CallExpr call, SortedSet<string> locals)
             {
+                if (IsRuntime(call.Callee, PureBuiltins.SubmitName, locals))
+                {
+                    _body.WriteUi(call.Span);
+                    Submit(call, locals);
+                    return;
+                }
                 var callee = Resolve(call.Callee, locals);
                 if (callee != null) _body.StatementCalls.Add(new Call(callee, call.Span));
                 else if (WritingBuiltin(call.Callee, locals) != null)
@@ -305,7 +508,9 @@ namespace Kesa.Engine.Script
                             else Expr(es.Expr, locals);
                             break;
                         case AssignStmt assign:
-                            if (assign.Target is AttributeExpr target)
+                            // ui.기록.칸 = …는 UI 로컬 쓰기다. ui.기록.칸.x = …는 칸이 가리키는 엔티티 쓰기다 (G282)
+                            if (UiField(assign.Target, locals)) _body.WriteUi(assign.Span);
+                            else if (assign.Target is AttributeExpr target)
                             {
                                 if (_body.FirstWrite == null) _body.FirstWrite = assign.Span;
                                 Expr(target.Target, locals);
@@ -352,6 +557,11 @@ namespace Kesa.Engine.Script
             {
                 switch (expr)
                 {
+                    case CallExpr call when IsRuntime(call.Callee, PureBuiltins.SubmitName, locals):
+                        _body.TouchUi(call.Span);
+                        _body.SubmitExpressions.Add(call.Span);
+                        Submit(call, locals);
+                        break;
                     case CallExpr call:
                         var callee = Resolve(call.Callee, locals);
                         var builtin = callee == null ? WritingBuiltin(call.Callee, locals) : null;
@@ -364,6 +574,14 @@ namespace Kesa.Engine.Script
                             _body.BuiltinExpressionCalls.Add(new KeyValuePair<string, SourceSpan>(builtin, call.Span));
                         else if (!(call.Callee is NameExpr)) Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
+                        break;
+                    case NameExpr name when IsRuntime(name, PureBuiltins.UiName, locals):
+                        _body.TouchUi(name.Span);
+                        _ui.Bare(name.Span);
+                        break;
+                    case NameExpr name when IsRuntime(name, PureBuiltins.SubmitName, locals):
+                        _body.TouchUi(name.Span);
+                        _ui.SubmitValue(name.Span);
                         break;
                     case NameExpr name:
                         Resolve(name, locals); // 값으로 쓴 커맨드 이름을 기록한다 (G118)
@@ -382,7 +600,13 @@ namespace Kesa.Engine.Script
                         Expr(unary.Operand, locals);
                         break;
                     case AttributeExpr attr:
-                        Expr(attr.Target, locals);
+                        if (UiField(attr, locals)) _body.TouchUi(attr.Span);
+                        else if (IsRuntime(attr.Target, PureBuiltins.UiName, locals))
+                        {
+                            _body.TouchUi(attr.Span);
+                            _ui.Bare(attr.Span);
+                        }
+                        else Expr(attr.Target, locals);
                         break;
                     case IndexExpr index:
                         Expr(index.Target, locals);

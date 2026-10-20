@@ -50,6 +50,9 @@ namespace Kesa.Engine.Script
         /// <summary>함수 본문의 <c>text("키", ...)</c> 리터럴 호출 (G257). 이름 검사가 모으고 <c>check</c>의 번역 검사가 본다.</summary>
         public List<TextUse> TextUses { get; } = new List<TextUse>();
 
+        /// <summary>함수 본문의 <c>submit("커맨드", ...)</c> 리터럴 호출 (G278). 이름 검사가 모으고 로더가 대상을 본다.</summary>
+        public List<SubmitUse> SubmitUses { get; } = new List<SubmitUse>();
+
         /// <summary>
         /// 함수 본문의 <c>query(...)</c> 호출마다 리터럴로 적은 출처 이름 (G192). 이름 검사가 모으고 ⑤ 링크가 본다.
         /// </summary>
@@ -78,7 +81,10 @@ namespace Kesa.Engine.Script
             {
                 var walker = new Walker(globals, isLoadTimeName, context, isSchemaRuntimeName ?? (_ => false),
                     notVisible ?? (_ => null), functions.SpawnedDefs, schemaRuntimeNames ?? Array.Empty<string>(),
-                    functions.QueriedNames, hosts ?? HostNames.None, functions.DefIdLiterals, functions.TextUses);
+                    functions.QueriedNames, hosts ?? HostNames.None, functions.DefIdLiterals, functions.TextUses)
+                {
+                    Submits = functions.SubmitUses,
+                };
                 if (function.Definition != null)
                     walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
                 else
@@ -97,6 +103,10 @@ namespace Kesa.Engine.Script
             private readonly List<KeyValuePair<string, SourceSpan>> _spawned;
             private readonly List<KeyValuePair<string, SourceSpan>> _defIds;
             private readonly List<TextUse> _texts;
+
+            /// <summary><c>submit("커맨드", ...)</c> 리터럴 호출을 모을 곳 (G278).</summary>
+            public List<SubmitUse> Submits { get; set; } = new List<SubmitUse>();
+
             private readonly List<List<KeyValuePair<string, SourceSpan>>> _queried;
             private readonly IEnumerable<string> _schemaRuntimeNames;
             private readonly HostNames _hosts;
@@ -298,6 +308,21 @@ namespace Kesa.Engine.Script
                             foreach (var arg in call.Arguments)
                                 if (arg.Name != null) names.Add(arg.Name);
                             _texts.Add(new TextUse(key.Value, names, key.Span));
+                        }
+                        // submit("커맨드", ...)의 리터럴 이름과 넘긴 이름은 로더가 커맨드와 대조한다 (G278)
+                        if (call.Callee is NameExpr submit && submit.Name == PureBuiltins.SubmitName &&
+                            !IsShadowed(submit.Name, locals) && call.Arguments.Count > 0 &&
+                            call.Arguments[0].Name == null && call.Arguments[0].Value is StringLiteral command)
+                        {
+                            var names = new List<string>();
+                            var spans = new List<SourceSpan>();
+                            foreach (var arg in call.Arguments)
+                            {
+                                if (arg.Name == null) continue;
+                                names.Add(arg.Name);
+                                spans.Add(arg.Span);
+                            }
+                            Submits.Add(new SubmitUse(command.Value, names, spans, command.Span));
                         }
                         // 덮어쓰지 않은 query에 리터럴로 적은 출처 이름은 ⑤ 링크가 본다 (G192)
                         if (call.Callee is NameExpr query && query.Name == PureBuiltins.QueryName && !IsShadowed(query.Name, locals))
