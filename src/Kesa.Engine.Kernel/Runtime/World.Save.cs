@@ -185,8 +185,31 @@ namespace Kesa.Engine.Runtime
                     var args = new JsonObject();
                     foreach (var name in names) args.Add(name, SaveValue(t.Args[name]));
                     return new JsonObject().Add("text", new JsonString(t.Key)).Add("args", args);
+                case OptionValue o:
+                    return SaveOption(o, SaveValue);
             }
             throw new InvalidOperationException("a " + value.KindName + " value cannot be saved yet");
+        }
+
+        /// <summary>선택지 (G271): <c>{"option": 값, "label": …, "desc": …, "style": …, "data": …}</c>, 적지 않은 칸은 null.</summary>
+        private static JsonObject SaveOption(OptionValue o, Func<Value, JsonNode> save) =>
+            new JsonObject()
+                .Add("option", save(o.Value))
+                .Add("label", o.Label == null ? JsonNull.Instance : save(o.Label))
+                .Add("desc", o.Desc == null ? JsonNull.Instance : save(o.Desc))
+                .Add("style", o.Style == null ? (JsonNode)JsonNull.Instance : new JsonString(o.Style))
+                .Add("data", o.Data == null ? JsonNull.Instance : save(o.Data));
+
+        private static bool IsOptionNode(JsonObject o) =>
+            o.Members.Count == 5 && o.Members[0].Key == "option" && o.Members[1].Key == "label" && o.Members[2].Key == "desc" &&
+            o.Members[3].Key == "style" && o.Members[4].Key == "data";
+
+        private static OptionValue LoadOption(JsonObject o, Func<JsonNode, Value> load)
+        {
+            Value? Optional(JsonNode n) => n is JsonNull ? null : load(n);
+            var style = o.Members[3].Value;
+            return new OptionValue(load(o.Members[0].Value), Optional(o.Members[1].Value), Optional(o.Members[2].Value),
+                style is JsonNull ? null : Text(style, "an option style"), Optional(o.Members[4].Value));
         }
 
         // ---- 불러오기 ----
@@ -774,6 +797,7 @@ namespace Kesa.Engine.Runtime
                         foreach (var arg in AsObject(o.Members[1].Value, "text arguments").Members) args[arg.Key] = LoadValue(arg.Value);
                         return new TextValue(Text(o.Members[0].Value, "a text key"), args);
                     }
+                    else if (IsOptionNode(o)) return LoadOption(o, LoadValue);
                     throw new JsonFormatException("unknown value tag {" + string.Join(", ", KeysOf(o)) + "}");
             }
             throw new JsonFormatException("unknown value");

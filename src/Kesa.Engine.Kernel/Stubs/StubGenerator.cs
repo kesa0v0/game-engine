@@ -69,6 +69,9 @@ namespace Kesa.Engine.Stubs
         private const string PureNames =
             "class Text: ...\n" +
             "def text(key: str, /, **args: Any) -> Text: ...\n" +
+            "class Option: ...\n" +
+            "def option(value: Any, /, *, label: str | Text | None = ..., desc: str | Text | None = ..., style: str | None = ..., " +
+            "data: dict[str, Any] | None = ...) -> Option: ...\n" +
             "def floor(x: int | float, /) -> int: ...\n" +
             "def ceil(x: int | float, /) -> int: ...\n" +
             "def clamp(x: Any, low: Any, high: Any, /) -> Any: ...\n" +

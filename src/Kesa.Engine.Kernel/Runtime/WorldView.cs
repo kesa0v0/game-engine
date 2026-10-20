@@ -200,8 +200,12 @@ namespace Kesa.Engine.Runtime
             var who = new List<EntityId>();
             foreach (var e in answerable)
                 if (Sees(e)) who.Add(e);
-            var choices = new List<Value>(q.Choices.Count);
-            foreach (var c in q.Choices) choices.Add(Mask(c));
+            var choices = new List<OptionValue>(q.Choices.Count);
+            foreach (var c in q.Choices)
+            {
+                choices.Add(new OptionValue(Mask(c.Value), c.Label == null ? null : Mask(c.Label), c.Desc == null ? null : Mask(c.Desc),
+                    c.Style, c.Data == null ? null : Mask(c.Data)));
+            }
             return new Request(q.Id, q.Flow, q.Command, who, Mask(q.Title), choices, q.Responses, q.ResponseNames, q.Hint, Mask(q.Data))
             {
                 BlocksTime = q.BlocksTime,

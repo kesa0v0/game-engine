@@ -88,7 +88,7 @@ namespace Kesa.Engine.Tests.Runtime
         private static void Answer(World w, string conn, string choice)
         {
             var q = w.ViewAs(conn).OpenRequests.Single();
-            var a = w.Answer(conn, q.Id, PartyOf(w, conn), q.Choices.ToList().FindIndex(c => ((StrValue)c).Value == choice));
+            var a = w.Answer(conn, q.Id, PartyOf(w, conn), q.Choices.ToList().FindIndex(c => ((StrValue)c.Value).Value == choice));
             Assert.That(a.Succeeded, Is.True, a.Message);
         }
 

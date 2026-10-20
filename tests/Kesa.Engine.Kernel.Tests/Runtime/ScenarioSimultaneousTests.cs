@@ -109,7 +109,7 @@ namespace Kesa.Engine.Tests.Runtime
             }
             foreach (var q in v.OpenRequests)
                 sb.Append("Q").Append(q.Id).Append(' ').Append(string.Join(",", q.Who)).Append(' ').Append(Show(q.Title))
-                    .Append(' ').Append(string.Join(",", q.Choices.Select(Show))).Append('\n');
+                    .Append(' ').Append(string.Join(",", q.Choices.Select(c => Show(c.Value)))).Append('\n');
             Assert.That(v.Diagnostics, Is.Empty);
             return sb.ToString();
         }

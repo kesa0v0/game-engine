@@ -40,6 +40,31 @@ def Charter(house: Ref[House]):
 
 `ask`·`wait`·`advance`는 멈추는 호출이라 **문장으로만** 쓰고, 쓰는 곳(커맨드·핸들러·흐름 본문)에서만 쓴다.
 
+### 선택지의 보이는 모양: `option`
+
+선택지마다 화면에 보일 이름·설명·모양을 함께 적으려면 `option(값, ...)`으로 감싼다. 꾸밈이 없으면 맨 값을 그대로 쓴다.
+
+```python
+r = ask(house, text("harbor-charter", gold=5), choices=[
+    option("accept", desc=text("harbor-charter-accept-desc"), style="gold-glow"),
+    "decline",
+])
+if r.choice == "accept":   # 답은 감싼 것이 아니라 안의 값
+    ...
+```
+
+| 칸 | 뜻 |
+|---|---|
+| 첫 인자 | 고를 값. 답의 `r.choice`, `on_timeout=`이 가리키는 것 |
+| `label=` | 보일 이름(키나 `text(...)`). 없으면 화면이 값에서 꺼낸다 |
+| `desc=` | 보일 설명(키나 `text(...)`) |
+| `style=` | 보이는 모양의 이름표(문자열). 엔진은 읽지 않고 게임의 화면 파일이 그리는 법을 정한다 |
+| `data=` | 화면이 읽을 자유 dict |
+
+- 엔진은 맨 값도 `option`으로 감싸 두므로 화면은 늘 같은 모양을 받는다.
+- 칸의 값은 질문과 함께 저장되므로 수·문자열·`text(...)`·엔티티와 그 리스트·dict만 된다. `option`은 `choices=` 안에서만 뜻이 있다(`data=`에 넣으면 실행 오류).
+- 상대가 못 보는 엔티티는 칸 안에서도 "알 수 없음"으로 가려진다(7장).
+
 ### 응답 커맨드로 답하기
 
 선택지가 아니라 "할 수 있는 행동 중 하나"로 답하게 하려면 `responses=`에 응답 커맨드(`free` 없는 `@command`)를 적는다.

@@ -117,6 +117,7 @@ namespace Kesa.Engine.Script
             Add(AnyName, a => Truth(AnyName, a, stopOn: true));
             Add(AllName, a => Truth(AllName, a, stopOn: false));
             table.Add(TextName, new PureBuiltin(TextName, Text));
+            table.Add(OptionName, new PureBuiltin(OptionName, Option));
             return table;
         }
 
@@ -170,6 +171,57 @@ namespace Kesa.Engine.Script
             var copy = new SortedDictionary<string, Value>(StringComparer.Ordinal);
             foreach (var pair in keywords) copy[pair.Key] = pair.Value;
             return new TextValue(key.Value, copy);
+        }
+
+        /// <summary>질문의 선택지에 보이는 모양을 싣는 내장 (spec-gaps G271).</summary>
+        public const string OptionName = "option";
+
+        private static readonly string[] OptionFields = { "label", "desc", "style", "data" };
+
+        /// <summary>
+        /// <c>option(값, label=, desc=, style=, data=)</c>: <c>label</c>·<c>desc</c>는 텍스트 키나 <c>text(...)</c>, <c>style</c>은 문자열,
+        /// <c>data</c>는 dict. 어느 것이든 None이면 적지 않은 것과 같다. 저장할 수 있는 값인지는 <c>ask</c>가 본다.
+        /// </summary>
+        private static Value Option(IReadOnlyList<Value> args, IReadOnlyDictionary<string, Value> keywords)
+        {
+            Arity(OptionName, args, 1);
+            if (args[0] is OptionValue)
+                throw PureOps.TypeError("option() takes the value to choose, not another option");
+            Value? label = null, desc = null, data = null;
+            string? style = null;
+            foreach (var pair in keywords)
+            {
+                var v = pair.Value is NoneValue ? null : pair.Value;
+                switch (pair.Key)
+                {
+                    case "label":
+                        label = Shown("label", v);
+                        break;
+                    case "desc":
+                        desc = Shown("desc", v);
+                        break;
+                    case "style":
+                        if (v != null && !(v is StrValue))
+                            throw PureOps.TypeError("style= of option() must be a str, not " + v.KindName);
+                        style = (v as StrValue)?.Value;
+                        break;
+                    case "data":
+                        if (v != null && !(v is DictValue))
+                            throw PureOps.TypeError("data= of option() must be a dict, not " + v.KindName);
+                        data = v;
+                        break;
+                    default:
+                        throw new ScriptRuntimeException(Diagnostics.Codes.RunScript, "option() has no argument '" + pair.Key + "'",
+                            Diagnostics.Suggest.Hint(pair.Key, OptionFields));
+                }
+            }
+            return new OptionValue(args[0], label, desc, style, data);
+        }
+
+        private static Value? Shown(string field, Value? v)
+        {
+            if (v == null || v is StrValue || v is TextValue) return v;
+            throw PureOps.TypeError(field + "= of option() must be a text key (str) or text(...), not " + v.KindName);
         }
 
         private static void Arity(string name, IReadOnlyList<Value> args, int count)

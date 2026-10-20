@@ -280,7 +280,7 @@ namespace Kesa.Engine.ConsoleHost
                             long choice = i;
                             options.Add(new Option(seat,
                                 "질문 " + request.Id.ToString(CultureInfo.InvariantCulture) + " " + _text.Entity(by) + ": " +
-                                _text.Of(request.Choices[i]),
+                                _text.Of(request.Choices[i].Value),
                                 () => Text(_world.Answer(seat, request.Id, by, choice))));
                         }
                     }

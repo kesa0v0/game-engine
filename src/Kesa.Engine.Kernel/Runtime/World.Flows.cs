@@ -264,7 +264,7 @@ namespace Kesa.Engine.Runtime
                 var outerWarnings = OpenWarnings();
                 try
                 {
-                    Atomically(() => Continue(flow, new AnswerValue(this, null, choice, open.Choices[(int)choice], by)));
+                    Atomically(() => Continue(flow, new AnswerValue(this, null, choice, open.Choices[(int)choice].Value, by)));
                 }
                 finally
                 {

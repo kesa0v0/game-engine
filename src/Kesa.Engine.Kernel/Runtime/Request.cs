@@ -13,7 +13,7 @@ namespace Kesa.Engine.Runtime
     public sealed class Request
     {
         internal Request(long id, long flow, string command, IReadOnlyList<EntityId> who, Value title,
-            IReadOnlyList<Value> choices, IReadOnlyList<string> responses, IReadOnlyList<string> responseNames,
+            IReadOnlyList<OptionValue> choices, IReadOnlyList<string> responses, IReadOnlyList<string> responseNames,
             string? hint, Value data)
         {
             Id = id;
@@ -49,8 +49,8 @@ namespace Kesa.Engine.Runtime
         /// <summary>제목: 텍스트 키(<see cref="StrValue"/>)나 <see cref="TextValue"/>.</summary>
         public Value Title { get; }
 
-        /// <summary>고를 값들 (G138). 어떻게 보일지는 UI가 정한다 (G137).</summary>
-        public IReadOnlyList<Value> Choices { get; }
+        /// <summary>선택지 (G138). 맨 값도 option으로 감싸 둔다 (G271). 어떻게 보일지는 UI가 정한다 (G137).</summary>
+        public IReadOnlyList<OptionValue> Choices { get; }
 
         /// <summary>선택 방법의 제안. 커널은 해석하지 않는다 (G137).</summary>
         public string? Hint { get; }

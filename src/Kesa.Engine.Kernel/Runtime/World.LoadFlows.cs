@@ -210,8 +210,9 @@ namespace Kesa.Engine.Runtime
             var who = new List<EntityId>();
             foreach (var w in AsArray(Field(r, "who"), "who").Items) who.Add(new EntityId(Long(w, "an entity id")));
             var title = LoadValue(Field(r, "title"));
-            var choices = new List<Value>();
-            foreach (var c in AsArray(Field(r, "choices"), "choices").Items) choices.Add(LoadValue(c));
+            var choices = new List<OptionValue>();
+            foreach (var c in AsArray(Field(r, "choices"), "choices").Items)
+                choices.Add(LoadValue(c) is OptionValue option ? option : new OptionValue(LoadValue(c)));
             var responses = new List<string>();
             foreach (var c in AsArray(Field(r, "responses"), "responses").Items)
             {
@@ -608,6 +609,8 @@ namespace Kesa.Engine.Runtime
                     foreach (var arg in AsObject(o.Members[1].Value, "text arguments").Members)
                         args[arg.Key] = LoadScriptValue(arg.Value, where, problems);
                     return new TextValue(Text(o.Members[0].Value, "a text key"), args);
+                case JsonObject o when IsOptionNode(o):
+                    return LoadOption(o, n => LoadScriptValue(n, where, problems));
             }
             return LoadValue(node);
         }

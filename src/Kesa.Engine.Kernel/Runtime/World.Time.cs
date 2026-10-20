@@ -206,7 +206,7 @@ namespace Kesa.Engine.Runtime
             if (request.TimeoutChoice != null)
             {
                 long i = request.TimeoutChoice.Value;
-                return new AnswerValue(this, null, i, request.Choices[(int)i], null);
+                return new AnswerValue(this, null, i, request.Choices[(int)i].Value, null);
             }
             return new AnswerValue(this, request.ResponseNames[(int)request.TimeoutResponse!.Value], null, null, null);
         }

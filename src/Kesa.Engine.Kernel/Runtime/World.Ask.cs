@@ -148,7 +148,7 @@ namespace Kesa.Engine.Runtime
                     "the title of ask() must be a text key (str) or text(...), not " + positional[1].KindName, "write " + usage),
             };
 
-            var choices = new List<Value>();
+            var choices = new List<OptionValue>();
             var responses = new List<string>();
             var responseNames = new List<string>();
             string? hint = null;
@@ -167,7 +167,7 @@ namespace Kesa.Engine.Runtime
                             throw new ScriptRuntimeException(Codes.RunType, "choices= of ask() must be a non-empty list",
                                 PureOps.ListHint(pair.Value) ?? "write " + usage);
                         for (int i = 0; i < items.Items.Count; i++)
-                            choices.Add(Savable("choice " + i.ToString(CultureInfo.InvariantCulture) + " of ask()", items.Items[i]));
+                            choices.Add(Choice("choice " + i.ToString(CultureInfo.InvariantCulture) + " of ask()", items.Items[i]));
                         hasChoices = true;
                         break;
                     case "responses":
@@ -249,7 +249,7 @@ namespace Kesa.Engine.Runtime
         /// <c>on_timeout=</c>이 가리키는 선택지 번호나 응답 번호 (G161). 선택지 값(같은 값이 여럿이면 앞의 것)이나 응답 이름이어야 하고,
         /// 둘 다에 맞으면 어느 쪽인지 모호하다. 마감이 없으면 닿지 않는다.
         /// </summary>
-        private void TimeoutAnswer(string mod, Value onTimeout, long? deadline, List<Value> choices, List<string> responses,
+        private void TimeoutAnswer(string mod, Value onTimeout, long? deadline, List<OptionValue> choices, List<string> responses,
             out long? choice, out long? response)
         {
             choice = null;
@@ -259,7 +259,7 @@ namespace Kesa.Engine.Runtime
                     "add deadline=n, the number of ticks before the default answer is given (spec-gaps G160, G161)");
             var value = Savable("on_timeout= of ask()", onTimeout);
             for (int i = 0; i < choices.Count && choice == null; i++)
-                if (PureOps.ValuesEqual(choices[i], value)) choice = i;
+                if (PureOps.ValuesEqual(choices[i].Value, value)) choice = i;
             if (value is StrValue name)
             {
                 string id = name.Value.IndexOf('.') >= 0 ? name.Value : mod + "." + name.Value;
@@ -273,7 +273,7 @@ namespace Kesa.Engine.Runtime
             if (choice == null && response == null)
             {
                 var names = new List<string>();
-                foreach (var c in choices) if (c is StrValue s) names.Add(s.Value);
+                foreach (var c in choices) if (c.Value is StrValue s) names.Add(s.Value);
                 foreach (var r in responses) names.Add(r.Substring(r.IndexOf('.') + 1));
                 throw new ScriptRuntimeException(Codes.RunScript,
                     "on_timeout= of ask() must be one of its choices or responses, not " + Show(value),
@@ -297,6 +297,17 @@ namespace Kesa.Engine.Runtime
                     "drop free=True from it, or submit it on its own (spec S6)");
             }
             return id;
+        }
+
+        /// <summary>선택지 하나를 저장할 수 있는 option으로 (G271): 맨 값은 감싸고, option은 칸마다 저장할 수 있는 값으로 바꾼다.</summary>
+        private OptionValue Choice(string display, Value item)
+        {
+            if (!(item is OptionValue o)) return new OptionValue(Savable(display, item));
+            return new OptionValue(Savable(display, o.Value),
+                o.Label == null ? null : Savable("label= of " + display, o.Label),
+                o.Desc == null ? null : Savable("desc= of " + display, o.Desc),
+                o.Style,
+                o.Data == null ? null : Savable("data= of " + display, o.Data));
         }
 
         /// <summary>질문에 담아 저장할 수 있는 값으로 (spec S2 표: Request 값은 저장되므로 정규형). 엔티티는 id로 바꾼다.</summary>
@@ -332,7 +343,7 @@ namespace Kesa.Engine.Runtime
         /// <summary><c>ask</c>가 실행기에 넘기는 질문의 내용. 실행기는 이것을 들고 멈추기만 한다.</summary>
         private sealed class AskPayload : Value
         {
-            public AskPayload(IReadOnlyList<EntityId> who, Value title, IReadOnlyList<Value> choices,
+            public AskPayload(IReadOnlyList<EntityId> who, Value title, IReadOnlyList<OptionValue> choices,
                 IReadOnlyList<string> responses, IReadOnlyList<string> responseNames, string? hint, Value data)
             {
                 Who = who;
@@ -346,7 +357,7 @@ namespace Kesa.Engine.Runtime
 
             public IReadOnlyList<EntityId> Who { get; }
             public Value Title { get; }
-            public IReadOnlyList<Value> Choices { get; }
+            public IReadOnlyList<OptionValue> Choices { get; }
             public IReadOnlyList<string> Responses { get; }
             public IReadOnlyList<string> ResponseNames { get; }
             public string? Hint { get; }

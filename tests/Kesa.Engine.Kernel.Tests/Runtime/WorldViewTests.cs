@@ -236,7 +236,7 @@ namespace Kesa.Engine.Tests.Runtime
             var q = _w.ViewAs("B").Show(mine).OpenedRequest!;
             Assert.That(q.Id, Is.EqualTo(mine.OpenedRequest!.Id));
             Assert.That(((TextValue)q.Title).Args["who"], Is.SameAs(HiddenValue.Instance));
-            Assert.That(q.Choices[0], Is.SameAs(HiddenValue.Instance));
+            Assert.That(q.Choices[0].Value, Is.SameAs(HiddenValue.Instance));
 
             var poke = SubmitAs("B", "Poke", ("party", _b), ("other", _a));
             Assert.That(poke.OpenedRequest, Is.Not.Null);
@@ -502,8 +502,8 @@ namespace Kesa.Engine.Tests.Runtime
 
             var q = _w.ViewAs("B").OpenRequests.Single();
             Assert.That(q.Id, Is.EqualTo(r.OpenedRequest!.Id));
-            Assert.That(q.Choices[0], Is.SameAs(HiddenValue.Instance), "the scout in the fog is a face-down choice");
-            Assert.That(((StrValue)q.Choices[1]).Value, Is.EqualTo("skip"));
+            Assert.That(q.Choices[0].Value, Is.SameAs(HiddenValue.Instance), "the scout in the fog is a face-down choice");
+            Assert.That(((StrValue)q.Choices[1].Value).Value, Is.EqualTo("skip"));
             Assert.That(((TextValue)q.Title).Args["who"], Is.SameAs(HiddenValue.Instance));
             Assert.That(((DictValue)q.Data).Items[0].Value, Is.SameAs(HiddenValue.Instance));
             Assert.That(_w.Answer("B", q.Id, _b, 0).Succeeded, Is.True, "answering by number works with a hidden choice");

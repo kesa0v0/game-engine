@@ -118,7 +118,7 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(q.Command, Is.EqualTo("banking.Branch"));
             Assert.That(q.Who, Is.EqualTo(new[] { _red }));
             Assert.That(((StrValue)q.Title).Value, Is.EqualTo("Q"));
-            Assert.That(q.Choices.Select(c => ((StrValue)c).Value), Is.EqualTo(new[] { "low", "high" }));
+            Assert.That(q.Choices.Select(c => ((StrValue)c.Value).Value), Is.EqualTo(new[] { "low", "high" }));
             Assert.That(q.Hint, Is.EqualTo("std.choice"));
             var data = (DictValue)q.Data;
             Assert.That(((EntityValue)data.Items[1].Value).Id, Is.EqualTo(_red)); // 엔티티는 저장 가능한 id로
@@ -162,7 +162,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var q = Submit("Target", ("p", _red), ("a", _blue), ("b", _green)).OpenedRequest!;
             Assert.That(q.Who, Is.EqualTo(new[] { _red, _blue }));
-            Assert.That(q.Choices.Select(c => ((EntityValue)c).Id), Is.EqualTo(new[] { _blue, _green }));
+            Assert.That(q.Choices.Select(c => ((EntityValue)c.Value).Id), Is.EqualTo(new[] { _blue, _green }));
             Assert.That(_world.Answer("host", q.Id, _blue, 1).Succeeded, Is.True);
             Assert.That(V(_green), Is.EqualTo(7));
             Assert.That(V(_blue), Is.EqualTo(1));

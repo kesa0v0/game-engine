@@ -177,7 +177,8 @@ namespace Kesa.Engine.Runtime
             var who = new JsonArray();
             foreach (var id in request.Who) who.Add(new JsonNumber(id.Value));
             var choices = new JsonArray();
-            foreach (var c in request.Choices) choices.Add(SaveValue(c));
+            // 꾸밈 없는 선택지는 값만 적는다 (G271): 맨 값을 감싼 것과 같다
+            foreach (var c in request.Choices) choices.Add(c.IsPlain ? SaveValue(c.Value) : SaveValue(c));
             var responses = new JsonArray();
             foreach (var r in request.Responses) responses.Add(new JsonString(r));
             var names = new JsonArray();
@@ -385,6 +386,8 @@ namespace Kesa.Engine.Runtime
                     var args = new JsonObject();
                     foreach (var name in names) args.Add(name, SaveScriptValue(t.Args[name], writer));
                     return new JsonObject().Add("text", new JsonString(t.Key)).Add("args", args);
+                case OptionValue o:
+                    return SaveOption(o, v => SaveScriptValue(v, writer));
                 case ComponentView c:
                     return Tag("component", new JsonObject()
                         .Add("entity", new JsonNumber(c.Id.Value))
