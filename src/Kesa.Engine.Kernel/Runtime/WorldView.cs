@@ -70,6 +70,43 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public ActResult Act(UiState ui, string action, IReadOnlyDictionary<string, Value> args) => _world.ActAs(this, ui, action, args);
 
+        /// <summary>
+        /// UI 동작을 누르지 않고 사전 조건만 본다 (회색 버튼과 그 이유, G280): 인자 검사 → <c>require</c>. <paramref name="ui"/>는 읽기만 하고
+        /// 바꾸지 않는다. 커맨드의 <see cref="World.CheckPreconditions"/>와 같은 보고서다.
+        /// </summary>
+        public PreconditionReport CheckPreconditions(UiState ui, string action, IReadOnlyDictionary<string, Value> args) =>
+            Show(_world.CheckActAs(this, ui, action, args))!;
+
+        /// <summary>UI 동작 매개변수 하나의 후보 (<see cref="Candidates(string, IReadOnlyDictionary{string, Value}, string)"/>와 같고 못 보는 엔티티는 빠진다).</summary>
+        public CandidateList Candidates(UiState ui, string action, IReadOnlyDictionary<string, Value> args, string parameter)
+        {
+            var all = _world.ActCandidatesAs(this, ui, action, args, parameter);
+            var values = new List<Value>(all.Values.Count);
+            foreach (var v in all.Values)
+                if (AllSeen(v)) values.Add(v);
+            return new CandidateList(all.Command, all.Parameter, values, all.Needs, Bare(all.Arguments));
+        }
+
+        /// <summary>
+        /// 누를 수 있는 UI 동작 인자 조합 (콘솔이 나열할 때, G280). 사전 조건을 통과하고 못 보는 엔티티가 들지 않은 것만 센다.
+        /// </summary>
+        public LegalMoveList LegalMoves(UiState ui, string action, IReadOnlyDictionary<string, Value> args, int max)
+        {
+            var moves = _world.ActMovesAs(this, ui, action, args, max, move =>
+            {
+                foreach (var v in move.Values)
+                    if (!AllSeen(v)) return false;
+                return true;
+            });
+            return new LegalMoveList(moves.Command, moves.Moves, moves.Truncated, Bare(moves.Arguments));
+        }
+
+        /// <summary><see cref="World.CheckCommand"/>과 같다: 이름 확인은 보는 쪽과 상관없다.</summary>
+        public string? CheckCommand(string command, IEnumerable<string>? parameters = null) => _world.CheckCommand(command, parameters);
+
+        /// <summary><see cref="World.CheckUiAction"/>과 같다.</summary>
+        public string? CheckUiAction(string action, IEnumerable<string>? parameters = null) => _world.CheckUiAction(action, parameters);
+
         /// <summary><see cref="World.CheckCall"/>과 같다: 부를 수 있는지는 보는 쪽과 상관없다.</summary>
         public string? CheckCall(string function, int argumentCount) => _world.CheckCall(function, argumentCount);
 

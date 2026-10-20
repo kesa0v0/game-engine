@@ -32,17 +32,20 @@ namespace Kesa.Engine.Runtime
         /// <summary>이 월드의 스키마로 연결 하나의 UI 저장소를 새로 만든다. 모든 칸이 기본값이다 (G279).</summary>
         public UiState NewUiState() => new UiState(_schema);
 
+        private CommandDecl FindUiAction(string action)
+        {
+            if (_uiActions.TryGetValue(action, out var decl)) return decl;
+            throw new WorldException(Codes.RunUnknownName, "there is no UI action '" + action + "'",
+                _commands.ContainsKey(action)
+                    ? "'" + action + "' is a command; submit it, or call a @ui_action that submits it"
+                    : Suggest.Hint(action, _uiActions.Keys));
+        }
+
         internal ActResult ActAs(WorldView viewer, UiState ui, string action, IReadOnlyDictionary<string, Value> args)
         {
             NoHostWrites("Act");
             if (!ui.Belongs(_schema)) throw new ArgumentException("this UiState was made by another world", nameof(ui));
-            if (!_uiActions.TryGetValue(action, out var decl))
-            {
-                throw new WorldException(Codes.RunUnknownName, "there is no UI action '" + action + "'",
-                    _commands.ContainsKey(action)
-                        ? "'" + action + "' is a command; submit it, or call a @ui_action that submits it"
-                        : Suggest.Hint(action, _uiActions.Keys));
-            }
+            var decl = FindUiAction(action);
             if (_act != null) throw new InvalidOperationException("World.Act cannot be called while another UI action runs");
 
             var run = new ActRun(ui.Draft());
@@ -102,6 +105,92 @@ namespace Kesa.Engine.Runtime
             {
                 if (outermost) _meter = null;
             }
+        }
+
+        // ---- 버튼 확인과 나열 (G280) ----
+
+        /// <summary>
+        /// UI 동작을 누르지 않고 본다: 보는 쪽으로, 버릴 사본의 <c>ui</c>로 돈다. 회색 버튼 조건은 대개 <c>ui.…</c>를 읽는다
+        /// (<c>require(ui.Selection.unit is not None, …)</c>). 아무것도 바꾸지 않는다.
+        /// </summary>
+        private T Peek<T>(WorldView viewer, UiState ui, string action, Func<CommandDecl, T> run)
+        {
+            if (!ui.Belongs(_schema)) throw new ArgumentException("this UiState was made by another world", nameof(ui));
+            var decl = FindUiAction(action);
+            if (_act != null) throw new InvalidOperationException("a UI action cannot be checked while another UI action runs");
+            var savedViewer = _viewer;
+            _viewer = viewer;
+            _act = new ActRun(ui.Draft());
+            try
+            {
+                return run(decl);
+            }
+            finally
+            {
+                _viewer = savedViewer;
+                _act = null;
+            }
+        }
+
+        internal PreconditionReport CheckActAs(WorldView viewer, UiState ui, string action, IReadOnlyDictionary<string, Value> args) =>
+            Peek(viewer, ui, action, decl =>
+            {
+                var rejections = new List<ArgumentRejection>();
+                var checkedArgs = CheckArguments(decl, args, rejections);
+                if (rejections.Count > 0) return new PreconditionReport(decl.Id, rejections, Array.Empty<RequireOutcome>());
+                return EvaluateRequires(decl, checkedArgs);
+            });
+
+        internal CandidateList ActCandidatesAs(WorldView viewer, UiState ui, string action, IReadOnlyDictionary<string, Value> args,
+            string parameter) =>
+            Peek(viewer, ui, action, decl => Candidates(decl, args, parameter));
+
+        internal LegalMoveList ActMovesAs(WorldView viewer, UiState ui, string action, IReadOnlyDictionary<string, Value> args, int max,
+            Func<IReadOnlyDictionary<string, Value>, bool> keep)
+        {
+            if (max < 1) throw new WorldException(Codes.RunRange, "max must be at least 1, not " + max);
+            return Peek(viewer, ui, action, decl => LegalMoves(decl, args, max, keep));
+        }
+
+        /// <summary>
+        /// UI 정의를 읽을 때 커맨드 버튼(<c>command=</c>)을 확인한다 (G280): 있는 커맨드이고 적은 매개변수 이름이 모두 있으면 null, 아니면
+        /// 이유 문장("혹시 …?" 포함). <see cref="CheckCall"/>과 짝이다.
+        /// </summary>
+        public string? CheckCommand(string command, IEnumerable<string>? parameters = null)
+        {
+            if (!_commands.TryGetValue(command, out var decl))
+            {
+                string? hint = _uiActions.ContainsKey(command) ? "'" + command + "' is a @ui_action, not a command" : Suggest.Hint(command, _commands.Keys);
+                return "there is no command '" + command + "'" + (hint == null ? "" : " (" + hint + ")");
+            }
+            return CheckParameters(decl, parameters);
+        }
+
+        /// <summary>UI 동작 버튼(<c>ui_action=</c>)을 확인한다 (G280). <see cref="CheckCommand"/>와 같은 모양이다.</summary>
+        public string? CheckUiAction(string action, IEnumerable<string>? parameters = null)
+        {
+            try
+            {
+                return CheckParameters(FindUiAction(action), parameters);
+            }
+            catch (WorldException e)
+            {
+                return e.Hint == null ? e.Message : e.Message + " (" + e.Hint + ")";
+            }
+        }
+
+        private static string? CheckParameters(CommandDecl decl, IEnumerable<string>? parameters)
+        {
+            if (parameters == null) return null;
+            var names = new List<string>();
+            foreach (var p in decl.Parameters) names.Add(p.Name);
+            foreach (var name in parameters)
+            {
+                if (names.Contains(name)) continue;
+                string? hint = Suggest.Hint(name, names);
+                return decl.Id + " has no parameter '" + name + "'" + (hint == null ? "" : " (" + hint + ")");
+            }
+            return null;
         }
 
         /// <summary>UI 동작 밖의 계산(<c>derived</c>, 보기 정책)을 돌린다: 그 안에서는 <c>ui</c>가 없다 (게임 값은 화면에 기대지 않는다, G282).</summary>

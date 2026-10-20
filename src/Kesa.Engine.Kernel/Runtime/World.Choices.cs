@@ -17,9 +17,13 @@ namespace Kesa.Engine.Runtime
         /// <see cref="CandidateList.Needs"/>를 준다. <c>require</c>·<c>cost</c>는 보지 않는다(고른 뒤 막히는 이유는 사전 검사 보고서).
         /// 없는 커맨드, <c>choose</c>가 없는 매개변수, 스크립트 오류는 <see cref="WorldException"/>이다.
         /// </summary>
-        public CandidateList Candidates(string command, IReadOnlyDictionary<string, Value> args, string parameter)
+        public CandidateList Candidates(string command, IReadOnlyDictionary<string, Value> args, string parameter) =>
+            Candidates(FindCommand(command), args, parameter);
+
+        /// <summary>찾은 커맨드나 UI 동작(G280)의 후보.</summary>
+        private CandidateList Candidates(CommandDecl decl, IReadOnlyDictionary<string, Value> args, string parameter)
         {
-            var decl = FindCommand(command);
+            string command = decl.Id;
             var chooses = ChoosesOf(decl);
             var choose = chooses.Find(c => c.Parameter == parameter);
             if (choose == null)
@@ -63,7 +67,14 @@ namespace Kesa.Engine.Runtime
             Func<IReadOnlyDictionary<string, Value>, bool>? keep)
         {
             if (max < 1) throw new WorldException(Codes.RunRange, "max must be at least 1, not " + max);
-            var decl = FindCommand(command);
+            return LegalMoves(FindCommand(command), args, max, keep);
+        }
+
+        /// <summary>찾은 커맨드나 UI 동작(G280)의 합법 수.</summary>
+        private LegalMoveList LegalMoves(CommandDecl decl, IReadOnlyDictionary<string, Value> args, int max,
+            Func<IReadOnlyDictionary<string, Value>, bool>? keep)
+        {
+            string command = decl.Id;
             var chooses = ChoosesOf(decl);
             var rejections = new List<ArgumentRejection>();
             var fitted = CheckArguments(decl, args, rejections, partial: true);

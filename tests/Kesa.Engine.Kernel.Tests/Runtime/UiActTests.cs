@@ -27,6 +27,11 @@ namespace Kesa.Engine.Tests.Runtime
             "@view_policy\ndef may_see(viewer, entity, component):\n    return not entity.Cloak.on\n" +
             "@ui_action\ndef grow(u: Ref[Unit]):\n    ui.Selection.group += [u]\n" +
             "@command(free=True, acts_for=None)\ndef Hide(target: Ref[Unit]):\n    target.Cloak.on = True\n" +
+            // 회색 버튼: 먼저 골라야 누를 수 있고, 고른 유닛은 대상 후보에서 빠진다
+            "@ui_action\ndef attack(target: Ref[Unit]):\n    with preconditions:\n" +
+            "        require(ui.Selection.unit is not None, text(\"pick-first\"))\n" +
+            "        choose(target, where=lambda t: t != ui.Selection.unit)\n" +
+            "    submit(\"Hit\", target=target)\n" +
             "@command(free=True, acts_for=None)\ndef Hit(target: Ref[Unit]):\n    target.Hp.v -= 1\n" +
             "@command(free=True, acts_for=None)\ndef Kill(target: Ref[Unit]):\n    destroy(target)\n" +
             // 응답 커맨드: Turn이 연 질문의 답으로만 들어간다
@@ -250,6 +255,43 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(e.Hint, Does.Contain("core.click"));
             var c = Assert.Throws<WorldException>(() => _view.Act(_ui, "core.Hit", Args()))!;
             Assert.That(c.Hint, Does.Contain("is a command"));
+        }
+
+        [Test]
+        public void AButtonIsGreyUntilAUnitIsPicked()
+        {
+            var before = _view.CheckPreconditions(_ui, "core.attack", Args(("target", new EntityValue(_b))));
+            Assert.That(before.Passed, Is.False);
+            Assert.That(before.Requires.Single(r => r.Kind == PreconditionKind.Require).MessageKey, Is.EqualTo("pick-first"));
+            _view.Act(_ui, "core.click", Args(("u", new EntityValue(_a))));
+            var after = _view.CheckPreconditions(_ui, "core.attack", Args(("target", new EntityValue(_b))));
+            Assert.That(after.Passed, Is.True);
+            Assert.That(((EntityValue)_ui.Stored("Selection", "unit")).Id, Is.EqualTo(_a)); // 확인은 바꾸지 않는다
+        }
+
+        [Test]
+        public void CandidatesAndMovesReadUiStateAndSkipHiddenUnits()
+        {
+            var ghost = _world.Create("core:Ghost");
+            _view.Act(_ui, "core.click", Args(("u", new EntityValue(_a))));
+            var candidates = _view.Candidates(_ui, "core.attack", Args(), "target");
+            Assert.That(candidates.Values.Select(v => ((EntityValue)v).Id), Is.EqualTo(new[] { _b }));
+            var moves = _view.LegalMoves(_ui, "core.attack", Args(), 10);
+            Assert.That(moves.Moves.Select(m => ((EntityValue)m["target"]).Id), Is.EqualTo(new[] { _b }));
+            Assert.That(ghost, Is.Not.EqualTo(_b));
+            // 아무것도 고르지 않았으면 누를 수 있는 수가 없다
+            Assert.That(_view.LegalMoves(_world.NewUiState(), "core.attack", Args(), 10).Moves, Is.Empty);
+        }
+
+        [Test]
+        public void ButtonNamesAreChecked()
+        {
+            Assert.That(_view.CheckUiAction("core.attack", new[] { "target" }), Is.Null);
+            Assert.That(_view.CheckUiAction("core.atack"), Does.Contain("core.attack"));
+            Assert.That(_view.CheckUiAction("core.attack", new[] { "targt" }), Does.Contain("has no parameter 'targt'"));
+            Assert.That(_view.CheckCommand("core.Hit", new[] { "target" }), Is.Null);
+            Assert.That(_view.CheckCommand("core.click"), Does.Contain("is a @ui_action"));
+            Assert.That(_view.CheckCommand("core.Hti"), Does.Contain("core.Hit"));
         }
 
         [Test]
