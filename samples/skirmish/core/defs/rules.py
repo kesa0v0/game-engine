@@ -57,7 +57,7 @@ def resolve(a, t):
 @command(free=True, acts_for=None)
 def Start():
     with preconditions:
-        require(game() is None, text("skirmish.already_started"))
+        require(game() is None, text("skirmish-already-started"))
     red = spawn("Red")
     blue = spawn("Blue")
     red.Order.next = blue

@@ -78,7 +78,7 @@ def Move(party: Ref[Party], unit: Ref[Unit], dir: str):
 @command(free=True, acts_for=None)
 def Open():
     with preconditions:
-        require(town() is None, text("harbor.already_open"))
+        require(town() is None, text("harbor-already-open"))
     spawn("Town")
     gull = spawn("Gull")
     gull.Purse.gold = 20

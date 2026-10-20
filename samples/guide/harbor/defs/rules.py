@@ -12,7 +12,7 @@ def rivals(house):
 @command(free=True, acts_for=None)
 def Open():
     with preconditions:
-        require(town() is None, text("harbor.already_open"))
+        require(town() is None, text("harbor-already-open"))
     spawn("Town")
     gull = spawn("Gull")
     gull.Purse.gold = 20
@@ -41,7 +41,7 @@ def Raid(house: Ref[House], target: Ref[Ship]):
 # 용선 제안: 3틱 안에 답하지 않으면 거절한 것으로 친다. 받아들이면 2틱 뒤 생선이 들어온다
 @command(free=True, acts_for=lambda house: house)
 def Charter(house: Ref[House]):
-    r = ask(house, text("harbor.charter", gold=5), choices=["accept", "decline"],
+    r = ask(house, text("harbor-charter", gold=5), choices=["accept", "decline"],
             deadline=3, on_timeout="decline")
     if r.choice == "accept":
         house.Purse.gold += 5
