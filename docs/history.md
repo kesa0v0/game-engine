@@ -816,3 +816,16 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
   - `submit(..., request=…)`.
   - `PatchOperationCheck`가 패치로 `ui`를 건드리게 된 함수를 알리는 것.
 - **확인:** 테스트 2245개 통과(커널 2134, 번역 49, CLI 37, 콘솔 호스트 25). `engine check samples/skirmish` 경고 없음.
+
+## 2026-10-21: 커맨드 이름 번역은 하지 않음(G287), 붙기 전의 컴포넌트 값 읽기(G288)
+
+- **G287(결정만):** 사용자가 "커맨드는 버튼 뒤에 감춰져 번역이 필요 없지 않나"라고 짚어, 엔진은 커맨드·`@ui_action` 이름의 번역 키를 두지 않기로 했다. 버튼 글은 호스트 UI 파일의 일이다. 안내서 9장 표에서 그 줄을 빼고 8장 콘솔 절에 까닭을 적었다.
+- **G288 재현:** 임시 테스트에서 `Moves(left=3).left`는 `'Moves(...)' has no attribute 'left'`(힌트 없음)였다. `Unit("Scout", Moves=Moves(max=8))`에 `Moves(left=3)`을 넣어 생성하면 left=3, max=8이었다. 안 준 칸을 스키마 기본값으로 읽게 하면 틀린 값이 나온다는 것을 이 결과로 보였다.
+- **구현:** `World.Structure.cs`의 `ComponentInitValue`가 `IRuntimeAttributes`·`IRuntimeAssignable`을 구현한다. 값을 엔티티 보기로 돌리려고 월드를 들고 있다.
+  - 준 칸은 그 값을 준다.
+  - 없는 이름은 "혹시 …?" 오류, `derived` 칸은 엔티티에서 계산된다는 오류다.
+  - 안 준 칸은 "was not given"과 G288 힌트를 붙인 오류다.
+  - 쓰기는 "cannot be changed"와 새 값 만들기 힌트를 붙인 오류다.
+  - 로드 때의 효과 검사는 `m.left = 4`를 여전히 게임 쓰기로 본다. 실행하면 오류가 나므로 그대로 두었다.
+- **테스트·안내서:** 테스트 `ComponentValueReadTests`. 안내서 4장에 컴포넌트 값 문단을 더했다.
+- **확인:** 테스트 2249개 통과(커널 2138, 번역 49, CLI 37, 콘솔 호스트 25).

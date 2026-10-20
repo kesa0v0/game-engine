@@ -273,17 +273,49 @@ namespace Kesa.Engine.Runtime
                 }
                 values.Add(new KeyValuePair<MemberDecl, Value>(member, ToPlain(member.Display, pair.Value)));
             }
-            return new ComponentInitValue(component, values);
+            return new ComponentInitValue(this, component, values);
         }
 
-        private sealed class ComponentInitValue : Value, IValueEquality, IValueContainer
+        /// <summary>
+        /// 붙기 전의 컴포넌트 값: 준 칸만 든다 (G288). 준 칸은 읽히고, 안 준 칸은 붙는 순간 Def 값이나 스키마 기본값으로 정해지므로
+        /// 읽으면 오류다. 정체성이 없는 값이라 칸을 고치지 않는다.
+        /// </summary>
+        private sealed class ComponentInitValue : Value, IValueEquality, IValueContainer, IRuntimeAttributes, IRuntimeAssignable
         {
+            private readonly World _world;
+
             public Value MapValues(Func<Value, Value> map)
             {
                 var mapped = new List<KeyValuePair<MemberDecl, Value>>(_values.Count);
                 foreach (var pair in _values) mapped.Add(new KeyValuePair<MemberDecl, Value>(pair.Key, map(pair.Value)));
-                return new ComponentInitValue(Component, mapped);
+                return new ComponentInitValue(_world, Component, mapped);
             }
+
+            public Value GetAttribute(string name)
+            {
+                if (!Component.TryGetMember(name, out var member))
+                {
+                    var names = new List<string>();
+                    foreach (var m in Component.Members) names.Add(m.Name);
+                    throw new ScriptRuntimeException(Codes.RunUnknownName,
+                        "component '" + Component.Name + "' has no value '" + name + "'", Suggest.Hint(name, names));
+                }
+                foreach (var pair in _values)
+                    if (pair.Key == member) return _world.ToScript(pair.Value);
+                if (member.Kind == MemberKind.Derived)
+                    throw new ScriptRuntimeException(Codes.RunScript,
+                        "'" + name + "' is a derived value of " + Component.Name + "; it is computed on the entity",
+                        "read it after the component is on an entity, like unit." + Component.Name + "." + name);
+                throw new ScriptRuntimeException(Codes.RunScript,
+                    Component.Name + "(...) was not given '" + name + "', so its value is not known yet",
+                    "the first value comes from the Def, or the schema default, when the component is put on an entity; " +
+                    "give it here, or read it from the entity afterwards (spec-gaps G288)");
+            }
+
+            public void SetAttribute(string name, Value value) =>
+                throw new ScriptRuntimeException(Codes.RunScript,
+                    "a " + Component.Name + "(...) value cannot be changed",
+                    "make a new one, like " + Component.Name + "(" + name + "=...) (spec-gaps G288)");
 
             /// <summary>같은 컴포넌트에 같은 값들을 줬으면 같다(준 순서는 상관없다, G142).</summary>
             public bool ValueEquals(Value other)
@@ -301,8 +333,9 @@ namespace Kesa.Engine.Runtime
 
             private readonly IReadOnlyList<KeyValuePair<MemberDecl, Value>> _values;
 
-            public ComponentInitValue(ComponentType component, IReadOnlyList<KeyValuePair<MemberDecl, Value>> values)
+            public ComponentInitValue(World world, ComponentType component, IReadOnlyList<KeyValuePair<MemberDecl, Value>> values)
             {
+                _world = world;
                 Component = component;
                 _values = values;
             }

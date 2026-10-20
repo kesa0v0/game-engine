@@ -534,7 +534,7 @@ namespace Kesa.Engine.Runtime
                                 }
                                 values.Add(new KeyValuePair<MemberDecl, Value>(decl, value));
                             }
-                            return component == null ? (Value)NoneValue.Instance : new ComponentInitValue(component, values);
+                            return component == null ? (Value)NoneValue.Instance : new ComponentInitValue(this, component, values);
                         }
                         case "signal":
                         {
