@@ -110,6 +110,12 @@ namespace Kesa.Engine.Loading
                             diags.Error(Codes.ModBadId, "invalid mod id '" + id + "'", arg.Value.Span, hint: IdRule);
                             id = null;
                         }
+                        else if (id == ReservedId)
+                        {
+                            diags.Error(Codes.ModBadId, "mod id '" + ReservedId + "' is reserved for the engine", arg.Value.Span,
+                                hint: "the engine names its own commands and text keys with it; pick another id");
+                            id = null;
+                        }
                         break;
                     case "version":
                         version = ReadString(arg, diags);
@@ -239,6 +245,9 @@ namespace Kesa.Engine.Loading
         }
 
         private const string IdRule = "mod ids are lowercase letters, digits and '_', starting with a letter";
+
+        /// <summary>엔진이 쓰는 이름 (spec-gaps G273): 엔진 커맨드(<c>engine.pick</c>)와 번역 키(<c>engine-hidden</c>). 모드 id로 쓸 수 없다.</summary>
+        public const string ReservedId = "engine";
 
         /// <summary>모드 id 규칙 (spec-gaps G2): [a-z][a-z0-9_]*. 점은 네임스페이스 구분자라 쓸 수 없다.</summary>
         public static bool IsValidId(string id)

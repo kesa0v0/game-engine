@@ -77,6 +77,18 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(diags.Select(d => d.Code), Does.Contain(Codes.ModBadId));
         }
 
+        [Test]
+        public void TheEngineIdIsReserved()
+        {
+            var (m, diags) = Read("Mod(id=\"engine\")\n");
+            Assert.That(m, Is.Null);
+            Assert.That(diags.Select(d => d.Code + " " + d.Message + " | " + d.Hint), Is.EqualTo(new[]
+            {
+                "MOD005 mod id 'engine' is reserved for the engine | the engine names its own commands and text keys with it; pick another id",
+            }));
+            Assert.That(Read("Mod(id=\"engine_parts\")\n").Diagnostics, Is.Empty);
+        }
+
         [TestCase("x = 1\nMod(id=\"a\")\n")]
         [TestCase("Mod(id=\"a\")\nUnit(\"Scout\")\n")]
         [TestCase("Mod(id=\"a\")\nMod(id=\"b\")\n")]
