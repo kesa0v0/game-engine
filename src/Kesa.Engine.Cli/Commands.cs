@@ -12,7 +12,8 @@ using Kesa.Engine.Text;
 namespace Kesa.Engine.Cli
 {
     /// <summary>
-    /// CLI 명령 (spec S9). 종료 코드는 spec-gaps G78, <c>check</c> 출력 형식은 G79, <c>dump</c>는 G80, <c>stubs</c>는 G81, <c>--host</c>는 G221.
+    /// CLI 명령 (spec S9). 종료 코드는 spec-gaps G78, <c>check</c> 출력 형식은 G79, <c>dump</c>는 G80, <c>stubs</c>는 G81, <c>stages</c>는 G289,
+    /// <c>--host</c>는 G221.
     /// </summary>
     public static class Commands
     {
@@ -27,7 +28,8 @@ namespace Kesa.Engine.Cli
         public const string Usage =
             "usage: engine check <mods-dir> [--host <file>] [--json] [--warnings-as-errors]\n" +
             "       engine dump <mods-dir> [--host <file>]\n" +
-            "       engine stubs <mods-dir> [--host <file>]";
+            "       engine stubs <mods-dir> [--host <file>]\n" +
+            "       engine stages <mods-dir> [--host <file>]";
 
         /// <param name="args">명령 이름까지 포함한 전체 인자</param>
         public static int Run(string[] args, TextWriter stdout, TextWriter stderr)
@@ -35,6 +37,7 @@ namespace Kesa.Engine.Cli
             if (args.Length >= 1 && args[0] == "check") return Check(args[1..], stdout, stderr);
             if (args.Length >= 1 && args[0] == "dump") return Dump(args[1..], stdout, stderr);
             if (args.Length >= 1 && args[0] == "stubs") return Stubs(args[1..], stdout, stderr);
+            if (args.Length >= 1 && args[0] == "stages") return Stages(args[1..], stdout, stderr);
             stderr.WriteLine(Usage);
             return ExitUsage;
         }
@@ -60,6 +63,19 @@ namespace Kesa.Engine.Cli
             return LoadAndReport("dump", root, host, stderr, (diagnostics, result, _) =>
             {
                 stdout.Write(DefDump.ToJson(result));
+                stderr.Write(CheckReport.ToText(diagnostics, result, PathPrefix(root)));
+                return ExitOk;
+            });
+        }
+
+        /// <summary><c>engine stages &lt;mods-dir&gt;</c>: 단계 순서 덤프 텍스트는 stdout, 진단 텍스트는 stderr (G289).</summary>
+        private static int Stages(string[] args, TextWriter stdout, TextWriter stderr)
+        {
+            int parsed = Parse("stages", args, Array.Empty<string>(), stderr, out var root, out _, out var host);
+            if (parsed != ExitOk) return parsed;
+            return LoadAndReport("stages", root, host, stderr, (diagnostics, result, _) =>
+            {
+                stdout.Write(StageReport.ToText(result, PathPrefix(root)));
                 stderr.Write(CheckReport.ToText(diagnostics, result, PathPrefix(root)));
                 return ExitOk;
             });

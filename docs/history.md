@@ -865,3 +865,15 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
   - IDE0005는 붙어 있는 쓰지 않는 using 묶음을 첫 줄 하나로 알린다. 그래서 줄을 지우고 다시 검사하기를 0이 될 때까지 되풀이했다.
   - 모두 `src/Kesa.Engine.Kernel`에 있었다. using이 모두 빠진 두 파일은 앞의 빈 줄도 지웠다.
 - **확인:** 일반 빌드 경고·오류 0. 테스트 2258개 통과(커널 2146, 번역 49, CLI 38, 콘솔 호스트 25).
+
+## 2026-10-21: 단계 순서 덤프 `engine stages` (남은 일 3번, G289)
+
+- **명령:** `engine stages <mods-dir> [--host <file>]`. `check`와 같은 로드를 한다(`LoadAndReport`). 순서 텍스트는 stdout, 진단과 요약 줄은 stderr로 낸다. 종료 코드는 G78을 따른다.
+- **출력:** `Reporting/StageReport.ToText`가 만든다. 세 절이다.
+  - 단계 순서와 동률 규칙. 단계마다 그 단계를 뒤에 오게 한 간선을 위치와 함께 보인다. 제 `after`·`optional_after`(대상이 있을 때만)와 남의 `before`·`optional_before`(`(before= of X)`로 표시)다.
+  - 신호별 핸들러. 신호는 이름 순이고, 핸들러는 단계 순서로 묶는다. 순서를 얻지 못한 단계는 `(not ordered)`, 단계 없는 것은 `(no stage)`로 맨 뒤다. 묶음 안에서는 로드·정의 순서다.
+  - `@when` 반응. 같은 묶기를 쓴다.
+- `CheckReport.Location`을 internal로 열어 위치 표기를 같게 했다.
+- **안내서:** 1장의 `dump` 옆에 `stages` 한 줄을 넣었다. 6장 단계 절에 무엇을 보이는지와 순서 규칙을 적었다.
+- **테스트:** `CommandsTests.StagesPrintsTheOrderTheHandlersRunIn`. 두 모드, 단계 셋(`after`, 남의 `before`, 없는 단계를 가리킨 `optional_after`)과 핸들러 넷, `@when` 하나로 stdout 전체를 맞춘다. `samples/guide`에서도 손으로 돌려 보았다(`harbor.market`, `Sunk`→`harbor.insurance`, `Tick`→`(no stage)`).
+- **확인:** 테스트 2259개 통과(커널 2146, 번역 49, CLI 39, 콘솔 호스트 25).

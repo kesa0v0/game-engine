@@ -84,6 +84,52 @@ namespace Kesa.Engine.Cli.Tests
             Assert.That(text, Does.EndWith("errors: 2, warnings: 1, info: 0; mods loaded: 1, disabled: 0\n"));
         }
 
+        // 단계 순서 덤프 (G289): 단계 순서와 그 순서를 정한 간선, 신호별 핸들러, @when을 실행 순서로. 진단은 stderr
+        [Test]
+        public void StagesPrintsTheOrderTheHandlersRunIn()
+        {
+            Write("core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse_all(\"defs/\")\n");
+            Write("core/schema/types.py",
+                "stage(\"core.economy\", after=[\"core.admin\"])\n" +
+                "stage(\"core.admin\")\n" +
+                "stage(\"core.early\", before=[\"core.admin\"], optional_after=[\"nobody.stage\"])\n" +
+                "signal(\"Pulse\", n=int)\n" +
+                "component(\"Gold\", v=field(int, default=0))\n" +
+                "deftype(\"Town\", components=[\"Gold\"])\n");
+            Write("core/defs/defs.py",
+                "@on(Pulse)\ndef log(n):\n    pass\n" +
+                "@on(Pulse, stage=\"core.economy\")\ndef pay(n):\n    pass\n" +
+                "@on(Pulse, stage=\"core.admin\")\ndef count(n):\n    pass\n" +
+                "@when(lambda t: t.Gold.v > 5, stage=\"core.admin\")\ndef rich(t: Ref[Town]):\n    pass\n");
+            Write("trade/mod.py", "Mod(id=\"trade\", dependencies=[\"core\"])\nuse_all(\"defs/\")\n");
+            Write("trade/defs/defs.py", "@on(Pulse, stage=\"core.economy\")\ndef prices(n):\n    pass\n");
+
+            Assert.That(Commands.Run(new[] { "stages", _root }, _out, _err), Is.EqualTo(0), _err.ToString());
+            string p = _root + "/";
+            Assert.That(_out.ToString(), Is.EqualTo(
+                "stages (after/before order; when several can come next, the smaller id first):\n" +
+                "  1. core.early    " + p + "core/schema/types.py:3:7\n" +
+                "  2. core.admin    " + p + "core/schema/types.py:2:7\n" +
+                "       after core.early    " + p + "core/schema/types.py:3:29 (before= of core.early)\n" +
+                "  3. core.economy    " + p + "core/schema/types.py:1:7\n" +
+                "       after core.admin    " + p + "core/schema/types.py:1:30\n" +
+                "\n" +
+                "handlers, per signal (stage order, then load order, then definition order; no stage= last):\n" +
+                "  signal Pulse:\n" +
+                "    core.admin\n" +
+                "      core.count    " + p + "core/defs/defs.py:7:4\n" +
+                "    core.economy\n" +
+                "      core.pay    " + p + "core/defs/defs.py:4:4\n" +
+                "      trade.prices    " + p + "trade/defs/defs.py:1:4\n" +
+                "    (no stage)\n" +
+                "      core.log    " + p + "core/defs/defs.py:1:4\n" +
+                "\n" +
+                "@when reactions (the same order):\n" +
+                "    core.admin\n" +
+                "      core.rich    " + p + "core/defs/defs.py:10:6\n"));
+            Assert.That(_err.ToString(), Does.EndWith("errors: 0, warnings: 0, info: 0; mods loaded: 2, disabled: 0\n"));
+        }
+
         // 엔진 안의 예외는 3이고 stderr에 버그라고 알린다 (G78). 모드 내용으로는 닿으면 안 되는 길이라 보고 단계에서 던진다
         [Test]
         public void AnEngineExceptionExitsThreeAndSaysItIsABug()

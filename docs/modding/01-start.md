@@ -82,6 +82,8 @@ errors: 0, warnings: 0, info: 1; mods loaded: 2, disabled: 0
 - `--warnings-as-errors`는 경고도 오류로 친다(배포 전 확인용). `--json`은 도구용 출력이다.
 - `engine dump samples/guide`는 상속·패치가 끝난 **최종 Def**를 JSON으로 보인다. 값마다 어느 모드가 적었고 어느 패치가 바꿨는지가
   붙어 있어 "이 값이 왜 이렇지?"를 찾을 때 쓴다.
+- `engine stages samples/guide`는 단계 순서와 신호마다 핸들러가 도는 순서를 보인다. "왜 내 핸들러가 저것보다 먼저 돌지?"를 찾을 때
+  쓴다(6장).
 
 ## 편집기: `engine stubs`
 

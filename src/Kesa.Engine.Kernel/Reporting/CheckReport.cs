@@ -95,7 +95,7 @@ namespace Kesa.Engine.Reporting
         /// 파일이 없으면 빈 문자열, 줄이 없으면 파일만. <c>&lt;host core.path.find&gt;</c>처럼 꺾쇠로 싼 것은 모드 폴더의 파일이 아니라
         /// 호스트가 등록한 서명이라 폴더 경로를 붙이지 않는다 (spec-gaps G218).
         /// </summary>
-        private static string Location(SourceSpan span, string pathPrefix)
+        internal static string Location(SourceSpan span, string pathPrefix)
         {
             if (span.File.Length == 0) return "";
             if (span.File.StartsWith("<", StringComparison.Ordinal)) pathPrefix = "";
