@@ -61,6 +61,9 @@ namespace Kesa.Engine.Script
     public interface IScriptGlobals
     {
         Value? Lookup(string mod, string name);
+
+        /// <summary>그 모드에서 <see cref="Lookup"/>이 찾는 이름들: 실행 중 이름 오류의 "혹시 …?" 후보.</summary>
+        IEnumerable<string> Names(string mod);
     }
 
     /// <summary>

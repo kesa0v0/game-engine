@@ -31,9 +31,13 @@ namespace Kesa.Engine.Diagnostics
             return closest == null ? null : "did you mean '" + closest + "'?";
         }
 
-        /// <summary>Levenshtein 거리 (대소문자 구분, 서수 비교).</summary>
+        /// <summary>
+        /// 편집 거리 (대소문자 구분, 서수 비교): 넣기·빼기·바꾸기에 더해 이웃한 두 글자 맞바꾸기도 한 번이다(제한된 Damerau, OSA).
+        /// 그래서 <c>lfet</c> → <c>left</c>가 1이다.
+        /// </summary>
         public static int Distance(string a, string b)
         {
+            var before = new int[b.Length + 1]; // 두 줄 전 (맞바꾸기용)
             var prev = new int[b.Length + 1];
             var cur = new int[b.Length + 1];
             for (int j = 0; j <= b.Length; j++) prev[j] = j;
@@ -43,9 +47,12 @@ namespace Kesa.Engine.Diagnostics
                 for (int j = 1; j <= b.Length; j++)
                 {
                     int cost = a[i - 1] == b[j - 1] ? 0 : 1;
-                    cur[j] = Math.Min(Math.Min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+                    int d = Math.Min(Math.Min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+                    if (i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1]) d = Math.Min(d, before[j - 2] + 1);
+                    cur[j] = d;
                 }
-                var tmp = prev;
+                var tmp = before;
+                before = prev;
                 prev = cur;
                 cur = tmp;
             }

@@ -189,6 +189,14 @@ namespace Kesa.Engine.Runtime
                 if (!_schemaNames.TryGetValue(name, out var owned)) return null;
                 return _visibility == null || _visibility.CanSee(mod, owned.Key) ? owned.Value : null;
             }
+
+            public IEnumerable<string> Names(string mod)
+            {
+                if (_world._scopes.TryGetValue(mod, out var scope))
+                    foreach (var name in scope.Names) yield return name;
+                foreach (var pair in _schemaNames)
+                    if (_visibility == null || _visibility.CanSee(mod, pair.Value.Key)) yield return pair.Key;
+            }
         }
 
         /// <summary>

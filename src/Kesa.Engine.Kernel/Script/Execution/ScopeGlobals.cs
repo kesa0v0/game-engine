@@ -13,5 +13,8 @@ namespace Kesa.Engine.Script
 
         public Value? Lookup(string mod, string name) =>
             _scopes.TryGetValue(mod, out var scope) && scope.TryGet(name, out var value, out _) ? value : null;
+
+        public IEnumerable<string> Names(string mod) =>
+            _scopes.TryGetValue(mod, out var scope) ? scope.Names : (IEnumerable<string>)Array.Empty<string>();
     }
 }
