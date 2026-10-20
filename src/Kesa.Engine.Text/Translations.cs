@@ -24,13 +24,24 @@ namespace Kesa.Engine.Text
         private readonly IReadOnlyDictionary<string, FluentBundle> _bundles;
         private readonly IReadOnlyDictionary<string, string> _ownerLanguages;
 
-        private Translations(IReadOnlyDictionary<string, FluentBundle> bundles, IReadOnlyDictionary<string, string> ownerLanguages,
-            DefSet defs)
+        private Translations(Merge merge, DefSet defs)
         {
-            _bundles = bundles;
-            _ownerLanguages = ownerLanguages;
+            _bundles = merge.Build();
+            _ownerLanguages = merge.OwnerLanguages;
+            Entries = merge.ByLanguage;
+            OwnerMods = merge.OwnerMods;
+            ProvidedKeys = merge.ProvidedKeys;
             Defs = defs;
         }
+
+        /// <summary>언어 → 키 → 이긴 글 (<c>check</c>의 번역 검사가 본다).</summary>
+        internal IReadOnlyDictionary<string, Dictionary<string, Entry>> Entries { get; }
+
+        /// <summary>키 → 주인(처음 정의한 곳): 모드 id, 엔진은 <see cref="EngineTexts.Owner"/>, 호스트는 null.</summary>
+        internal IReadOnlyDictionary<string, string?> OwnerMods { get; }
+
+        /// <summary>엔진이나 호스트가 정의한 키. 모드가 덮어쓸 수 있는 <c>engine-</c> 키다 (G273).</summary>
+        internal HashSet<string> ProvidedKeys { get; }
 
         /// <summary>불린 Def: 문자열이 Def의 전체 이름과 같으면 그 Def의 이름을 보인다 (G267·G270).</summary>
         internal DefSet Defs { get; }
@@ -69,7 +80,7 @@ namespace Kesa.Engine.Text
                         mod.DefaultLanguage + "/ folder", new SourceSpan(mod.Directory + "/" + ModDiscovery.ManifestFileName, 1, 1),
                         mod.Id);
             }
-            return new Translations(merge.Build(), merge.OwnerLanguages, content.Frozen);
+            return new Translations(merge, content.Frozen);
         }
 
         /// <summary>플레이어의 언어 목록(앞이 먼저, 예: <c>["ko", "en"]</c>)에 맞춘 번역기 (G257). 언어를 바꾸면 새로 얻는다.</summary>
@@ -86,6 +97,9 @@ namespace Kesa.Engine.Text
             }
             return new Translator(chain, this, onError);
         }
+
+        /// <summary>그 키의 주인의 기본 언어.</summary>
+        internal bool OwnerLanguage(string key, out string language) => _ownerLanguages.TryGetValue(key, out language!);
 
         /// <summary>그 키의 주인(로드 순서상 처음 정의한 곳)의 기본 언어 번들, 없으면 null (G257 폴백 두 번째).</summary>
         internal FluentBundle? OwnerBundle(string key)
@@ -111,6 +125,12 @@ namespace Kesa.Engine.Text
             }
 
             public Dictionary<string, string> OwnerLanguages { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            public Dictionary<string, string?> OwnerMods { get; } = new Dictionary<string, string?>(StringComparer.Ordinal);
+
+            public HashSet<string> ProvidedKeys { get; } = new HashSet<string>(StringComparer.Ordinal);
+
+            public IReadOnlyDictionary<string, Dictionary<string, Entry>> ByLanguage => _byLanguage;
 
             /// <summary><c>&lt;태그&gt;/**/*.ftl</c>을 읽는다. 언어 폴더마다 상대 경로의 서수 순 (G18·G256). 읽은 언어 태그를 돌려준다.</summary>
             /// <param name="mod">모드 id, 호스트는 null</param>
@@ -180,6 +200,8 @@ namespace Kesa.Engine.Text
                     }
                     table[key] = entry;
                     if (!OwnerLanguages.ContainsKey(key) && defaultLanguage != null) OwnerLanguages[key] = defaultLanguage;
+                    if (!OwnerMods.ContainsKey(key)) OwnerMods[key] = mod;
+                    if (mod == null || mod == EngineTexts.Owner) ProvidedKeys.Add(key);
                 }
             }
 
@@ -236,7 +258,7 @@ namespace Kesa.Engine.Text
             }
         }
 
-        private sealed class Entry
+        internal sealed class Entry
         {
             public Entry(IEntry item, string? mod, SourceSpan span)
             {

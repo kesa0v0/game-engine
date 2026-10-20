@@ -7,6 +7,7 @@ using Kesa.Engine.Host;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Reporting;
 using Kesa.Engine.Stubs;
+using Kesa.Engine.Text;
 
 namespace Kesa.Engine.Cli
 {
@@ -48,7 +49,7 @@ namespace Kesa.Engine.Cli
             {
                 stdout.Write(json ? CheckReport.ToJson(diagnostics, result) : CheckReport.ToText(diagnostics, result, PathPrefix(root)));
                 return ExitOk;
-            }, warningsAsErrors: options.Contains(WarningsAsErrors));
+            }, warningsAsErrors: options.Contains(WarningsAsErrors), translations: true);
         }
 
         /// <summary><c>engine dump &lt;mods-dir&gt;</c>: 덤프 JSON은 stdout, 진단 텍스트는 stderr (G80).</summary>
@@ -215,7 +216,7 @@ namespace Kesa.Engine.Cli
         /// </summary>
         private static int LoadAndReport(string command, string root, HostFunctions? host, TextWriter stderr,
             Func<IReadOnlyList<Diagnostic>, ContentLoadResult, IReadOnlyList<ModManifest>, int> report,
-            bool warningsAsErrors = false)
+            bool warningsAsErrors = false, bool translations = false)
         {
             try
             {
@@ -223,6 +224,8 @@ namespace Kesa.Engine.Cli
                 var discovery = ModDiscovery.Discover(root, bag);
                 var order = ModSorter.Sort(discovery, bag);
                 var result = ContentLoader.Load(root, order, bag, host);
+                // 번역 파일 읽기와 검사 (G257). 번역 오류는 모드를 끄지 않는다
+                if (translations) TranslationCheck.Run(Translations.Load(result, bag), result, bag);
                 var diagnostics = bag.ToSortedList();
                 if (warningsAsErrors) diagnostics = PromoteWarnings(diagnostics);
                 int reported = report(diagnostics, result, discovery.Mods);

@@ -85,6 +85,10 @@ namespace Kesa.Engine.Loading
         /// <summary>모드들이 있는 폴더. <see cref="ModManifest.Directory"/>는 이 기준이다. 번역 파일(<c>locale/</c>)을 찾는 데 쓴다 (G256).</summary>
         public string ModsRoot { get; internal set; } = "";
 
+        /// <summary>살아남은 모드별 함수 본문의 <c>text("키", ...)</c> 리터럴 호출 (모드 id → 호출, G257). <c>check</c>의 번역 검사가 본다.</summary>
+        public IReadOnlyDictionary<string, IReadOnlyList<TextUse>> TextUses { get; internal set; } =
+            new SortedDictionary<string, IReadOnlyList<TextUse>>(StringComparer.Ordinal);
+
         /// <summary>살아남은 모드의 <c>@on</c> 핸들러, 모드 로드 순서 → 정의 순서 (spec S5 동률 규칙, spec-gaps G145).</summary>
         public IReadOnlyList<HandlerDecl> Handlers { get; internal set; } = Array.Empty<HandlerDecl>();
 

@@ -174,6 +174,19 @@ namespace Kesa.Engine.Diagnostics
         public const string LocBadLanguage = "LOC004";
         // locale/이 있는데 defaultLanguage가 없거나 그 언어 폴더가 없음 (G257)
         public const string LocNoDefaultLanguage = "LOC005";
+        // 아래는 check의 번역 검사 (G257)
+        // 번역문의 JOSA에 모르는 조사 (G268)
+        public const string LocUnknownParticle = "LOC006";
+        // 엔진 예약 접두사의 키: 불린 Def의 것이 아닌 def- 키, 엔진·호스트가 주지 않은 engine- 키 (G262·G273)
+        public const string LocReservedKey = "LOC007";
+        // 스크립트의 text("키")가 어느 언어에도 없음 (경고)
+        public const string LocMissingKey = "LOC008";
+        // 번역문이 쓰는 변수를 그 text() 호출이 넘기지 않음 (경고)
+        public const string LocMissingArgument = "LOC009";
+        // 다른 언어의 글이 주인의 기본 언어 글에 없는 변수를 씀 (경고)
+        public const string LocExtraVariable = "LOC010";
+        // 모드·언어마다 빠진 글의 수 (정보)
+        public const string LocUntranslated = "LOC011";
 
         // 커맨드 선언 (spec S6, spec-gaps G109)
         public const string CmdBadDecorator = "CMD001";

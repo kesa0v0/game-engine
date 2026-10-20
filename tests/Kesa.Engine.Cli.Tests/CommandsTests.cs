@@ -70,6 +70,20 @@ namespace Kesa.Engine.Cli.Tests
             Assert.That(_err.ToString(), Is.Empty);
         }
 
+        // check는 번역 파일도 읽고 검사한다. 번역 오류는 모드를 끄지 않지만 오류라 종료 코드는 1이다 (G257)
+        [Test]
+        public void CheckAlsoChecksTranslations()
+        {
+            Mod("Resource(\"Wood\")\ndef greet():\n    return text(\"core-hello\")\n");
+            Write("core/locale/en/core.ftl", "core-hi = { JOSA($x, \"에게\") }\n");
+            Assert.That(Run(_root), Is.EqualTo(1), _err.ToString());
+            string text = _out.ToString();
+            Assert.That(text, Does.Contain("core/mod.py:1:1: error LOC005: mod 'core' has locale/ but no defaultLanguage"));
+            Assert.That(text, Does.Contain("core/locale/en/core.ftl:1:1: error LOC006:"));
+            Assert.That(text, Does.Contain("core/defs/defs.py:3:17: warning LOC008: text(\"core-hello\") has no translation in any language"));
+            Assert.That(text, Does.EndWith("errors: 2, warnings: 1, info: 0; mods loaded: 1, disabled: 0\n"));
+        }
+
         [Test]
         public void ContentErrorsExitOneAndPrintPathsUnderTheGivenFolder()
         {

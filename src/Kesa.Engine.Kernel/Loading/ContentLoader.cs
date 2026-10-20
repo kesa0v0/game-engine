@@ -56,6 +56,7 @@ namespace Kesa.Engine.Loading
                 var commands = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var handlers = new List<HandlerDecl>();
                 var whens = new List<WhenDecl>();
+                var textUses = new SortedDictionary<string, IReadOnlyList<TextUse>>(StringComparer.Ordinal);
                 var contents = new SortedDictionary<string, ModContent>(StringComparer.Ordinal);
                 var hostFunctions = new SortedDictionary<string, HostSignature>(StringComparer.Ordinal);
                 foreach (var u in units)
@@ -77,6 +78,7 @@ namespace Kesa.Engine.Loading
                     foreach (var command in u.Functions.Commands) commands.Add(command.Id, command);
                     handlers.AddRange(u.Functions.Handlers);
                     whens.AddRange(u.Functions.Whens);
+                    textUses.Add(u.Manifest.Id, u.Functions.TextUses);
                 }
                 return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
                     run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound, scopes, commands)
@@ -84,6 +86,7 @@ namespace Kesa.Engine.Loading
                     ViewPolicy = run.ViewPolicy,
                     Order = order,
                     ModsRoot = modsRoot,
+                    TextUses = textUses,
                     Handlers = handlers,
                     Whens = whens,
                     Contents = contents,

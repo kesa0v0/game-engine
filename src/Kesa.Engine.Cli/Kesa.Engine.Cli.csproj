@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Kesa.Engine.Kernel\Kesa.Engine.Kernel.csproj" />
+    <ProjectReference Include="..\Kesa.Engine.Text\Kesa.Engine.Text.csproj" />
   </ItemGroup>
 
 </Project>
