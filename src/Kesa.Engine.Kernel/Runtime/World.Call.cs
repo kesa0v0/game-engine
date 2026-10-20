@@ -25,13 +25,15 @@ namespace Kesa.Engine.Runtime
             var fn = Callable(function, arguments.Length, withUi);
             var args = new List<Value>(arguments.Length);
             foreach (var a in arguments) args.Add(ToScript(a));
-            // 읽은 곳은 when 조건과 같은 장치로 모은다 (G246)
-            var savedReads = _whenReads;
+            // 목록 출처와 틱은 when 조건과 같은 장치로, 읽은 엔티티는 (엔티티, 칸 이름) 단위로 모은다 (G246·G290)
+            var savedWhenReads = _whenReads;
+            var savedReads = _callReads;
             var savedSources = _whenReadsSources;
             bool savedTick = _whenReadsTick;
-            var reads = new SortedSet<long>();
+            var reads = new SortedSet<CallRead>();
             var sources = new SortedSet<string>(StringComparer.Ordinal);
-            _whenReads = reads;
+            _whenReads = new SortedSet<long>();
+            _callReads = reads;
             _whenReadsSources = sources;
             _whenReadsTick = false;
             Value value;
@@ -43,7 +45,8 @@ namespace Kesa.Engine.Runtime
             finally
             {
                 tick = _whenReadsTick;
-                _whenReads = savedReads;
+                _whenReads = savedWhenReads;
+                _callReads = savedReads;
                 _whenReadsSources = savedSources;
                 _whenReadsTick = savedTick;
             }
@@ -126,17 +129,71 @@ namespace Kesa.Engine.Runtime
             return kept;
         }
 
-        private CallResult Receipt(string function, Value value, SortedSet<long> reads, SortedSet<string> sources, bool tick)
+        // ---- 영수증이 모으는 읽기 (G246·G290) ----
+
+        /// <summary>
+        /// 함수가 읽은 것 하나: 엔티티의 칸 하나(컴포넌트·역방향 컬렉션 이름), 살았는지만(<see cref="AliveRead"/>), 엔티티 전체(null).
+        /// </summary>
+        private readonly struct CallRead : IComparable<CallRead>
+        {
+            public CallRead(long id, string? name)
+            {
+                Id = id;
+                Name = name;
+            }
+
+            public long Id { get; }
+            public string? Name { get; }
+
+            public int CompareTo(CallRead other) => Id != other.Id ? Id.CompareTo(other.Id) : string.CompareOrdinal(Name, other.Name);
+        }
+
+        /// <summary>
+        /// 살았는지만 읽었다: Def와 그 <c>const</c>, Ref가 가리키는 대상, 엔티티 자신(<c>c.entity</c>). 죽을 때만 바뀐다. 칸 이름은 식별자라
+        /// 빈 문자열과 겹치지 않는다.
+        /// </summary>
+        private const string AliveRead = "";
+
+        /// <summary><c>controller(e)</c>를 읽었다: 배정이 바뀌면 도장이 찍히는 칸. 칸 이름은 식별자라 겹치지 않는다.</summary>
+        private const string SeatRead = "@seat";
+
+        /// <summary>호스트가 부르는 중이면 읽은 것을 모은다. 평소에는 null이라 읽기에 비용이 없다.</summary>
+        private SortedSet<CallRead>? _callReads;
+
+        /// <summary>엔티티 <paramref name="id"/>의 <paramref name="name"/>을 읽었다 (when 조건에는 엔티티를 읽은 것).</summary>
+        private void Read(long id, string? name)
+        {
+            _whenReads?.Add(id);
+            _callReads?.Add(new CallRead(id, name));
+        }
+
+        /// <summary>읽은 것의 지금 도장. 죽었거나 없는 엔티티는 0이고, 칸은 아직 찍히지 않았으면 만들어진 때다.</summary>
+        internal long ReadVersion(long id, string? name)
+        {
+            if (!_entities.ContainsKey(id) || !_stamps.TryGetValue(id, out var s)) return 0;
+            if (name == null) return s.Any;
+            if (name.Length == 0) return s.Created;
+            return s.ByName != null && s.ByName.TryGetValue(name, out var v) ? v : s.Created;
+        }
+
+        private CallResult Receipt(string function, Value value, SortedSet<CallRead> reads, SortedSet<string> sources, bool tick)
         {
             var ids = new long[reads.Count];
-            reads.CopyTo(ids);
-            var versions = new long[ids.Length];
-            for (int i = 0; i < ids.Length; i++) versions[i] = Version(new EntityId(ids[i]));
+            var readNames = new string?[reads.Count];
+            var versions = new long[reads.Count];
+            int at = 0;
+            foreach (var read in reads)
+            {
+                ids[at] = read.Id;
+                readNames[at] = read.Name;
+                versions[at] = ReadVersion(read.Id, read.Name);
+                at++;
+            }
             var names = new string[sources.Count];
             sources.CopyTo(names);
             var sourceVersions = new long[names.Length];
             for (int i = 0; i < names.Length; i++) sourceVersions[i] = SourceVersion(names[i]);
-            return new CallResult(function, value, this, ids, versions, names, sourceVersions, tick ? _tick : (long?)null,
+            return new CallResult(function, value, this, ids, readNames, versions, names, sourceVersions, tick ? _tick : (long?)null,
                 _viewer != null && _viewPolicy != null ? SeatsVersion : (long?)null);
         }
 

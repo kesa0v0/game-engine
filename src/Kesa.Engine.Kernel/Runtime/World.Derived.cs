@@ -499,7 +499,7 @@ namespace Kesa.Engine.Runtime
         private Value EntityAttribute(EntityId id, AttributeExpr site)
         {
             if (site.Cache is ComponentSite cached && ReferenceEquals(cached.Schema, _schema))
-                return SiblingOrNone(Record(id), cached.Component);
+                return SiblingOrNone(Record(id, cached.Component.Name), cached.Component);
             if (_schema.TryGetComponent(site.Name, out var component)) site.Cache = new ComponentSite(_schema, component);
             return EntityAttribute(id, site.Name);
         }
@@ -509,7 +509,7 @@ namespace Kesa.Engine.Runtime
         {
             var member = MemberAt(view.Component, site);
             if (member == null) return ComponentAttribute(view, site.Name);
-            return ToScript(ViewFiltered(ReadMemberTraced(Record(view.Id), view.Component, view.Row, member.Member)));
+            return ToScript(ViewFiltered(ReadMemberTraced(Record(view.Id, view.Component.Name), view.Component, view.Row, member.Member)));
         }
 
         private void WriteMember(ComponentView view, AttributeExpr site, Value value)
@@ -732,10 +732,15 @@ namespace Kesa.Engine.Runtime
 
         private Value EntityAttribute(EntityId id, string name)
         {
-            var entity = Record(id);
-            if (_schema.TryGetComponent(name, out var component)) return SiblingOrNone(entity, component);
+            var entity = Record(id, AliveRead);
+            if (_schema.TryGetComponent(name, out var component))
+            {
+                Read(id.Value, component.Name);
+                return SiblingOrNone(entity, component);
+            }
             if (_schema.TryGetType(name, out var defType)) return DefOrNone(entity, defType);
 
+            // 역방향 컬렉션은 Inverse가 그 이름으로 기록한다
             var candidates = new List<string> { entity.Def.Type.Name };
             foreach (var c in ComponentsOf(entity)) candidates.Add(c.Name);
             foreach (var inverse in entity.Def.Type.Inverses)
@@ -759,7 +764,7 @@ namespace Kesa.Engine.Runtime
 
         private Value DefConst(long id, DefType type, string name)
         {
-            var entity = Record(new EntityId(id));
+            var entity = Record(new EntityId(id), AliveRead);
             MemberDecl? found = null;
             foreach (var decl in type.Consts)
                 if (decl.Name == name) found = decl;
@@ -813,16 +818,23 @@ namespace Kesa.Engine.Runtime
 
         private Value ComponentAttribute(ComponentView view, string name)
         {
-            var entity = Record(view.Id);
+            var entity = Record(view.Id, AliveRead);
             var component = view.Component;
             if (component.TryGetMember(name, out var member))
+            {
+                Read(view.Id.Value, component.Name);
                 return ToScript(ViewFiltered(ReadMemberTraced(entity, component, view.Row, member)));
+            }
             if (name == "entity") return new EntityView(this, view.Id);
             if (name == "key" && view.Row != null)
                 return view.Row.Value.IsEntity ? new EntityView(this, new EntityId(view.Row.Value.EntityKey))
                     : view.Row.Value.IsInt ? new IntValue(view.Row.Value.Number)
                     : (Value)new StrValue(view.Row.Value.DefKey!);
-            if (_schema.TryGetComponent(name, out var sibling)) return SiblingOrNone(entity, sibling);
+            if (_schema.TryGetComponent(name, out var sibling))
+            {
+                Read(view.Id.Value, sibling.Name);
+                return SiblingOrNone(entity, sibling);
+            }
             if (_schema.TryGetType(name, out var defType)) return DefOrNone(entity, defType);
 
             var candidates = new List<string> { "entity", entity.Def.Type.Name };
@@ -837,7 +849,7 @@ namespace Kesa.Engine.Runtime
         /// <summary>키로 꼬집은 줄. 줄이 없으면 <c>None</c>이다 (<c>keys="listed"</c>, spec S4).</summary>
         private Value RowOrNone(EntityId id, ComponentType component, RowKey key)
         {
-            var entity = Record(id);
+            var entity = Record(id, component.Name);
             HiddenKey(key);
             if (!FindRow(entity, component, key, out _, out _)) return NoneValue.Instance;
             return new ComponentView(this, id, component, key);
@@ -845,7 +857,7 @@ namespace Kesa.Engine.Runtime
 
         private bool HasRowKey(EntityId id, ComponentType component, RowKey key)
         {
-            var entity = Record(id);
+            var entity = Record(id, component.Name);
             HiddenKey(key);
             return FindRow(entity, component, key, out _, out _);
         }

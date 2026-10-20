@@ -31,7 +31,7 @@ namespace Kesa.Engine.Runtime
             _seats[id.Value] = (issuer, kind);
             SeatsVersion++;
             Touch(id.Value); // controller(e)를 읽은 when 조건을 다시 본다
-            Stamp(id.Value, null);
+            Stamp(id.Value, SeatRead);
         }
 
         /// <summary><paramref name="id"/> 엔티티의 배정을 지운다(빈자리·AI가 맡음). 앉은 연결이 없으면 아무것도 하지 않는다.</summary>
@@ -41,7 +41,7 @@ namespace Kesa.Engine.Runtime
             if (!_seats.Remove(id.Value)) return;
             SeatsVersion++;
             Touch(id.Value);
-            Stamp(id.Value, null);
+            Stamp(id.Value, SeatRead);
         }
 
         /// <summary><paramref name="id"/> 엔티티에 앉은 연결. 없거나 죽은 엔티티면 null.</summary>
@@ -96,7 +96,7 @@ namespace Kesa.Engine.Runtime
                     "controller() takes one entity, got " + (positional.Count == 1 ? positional[0].KindName : positional.Count + " arguments"),
                     "write controller(party)");
             long id = entity.EntityId.Value;
-            _whenReads?.Add(id);
+            Read(id, SeatRead);
             if (!_seats.TryGetValue(id, out var seat) || HiddenFromViewer(id)) return NoneValue.Instance;
             return new StrValue(seat.Kind == SeatKind.Ai ? ControllerAi : ControllerHuman);
         }

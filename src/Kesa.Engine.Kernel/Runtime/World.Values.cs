@@ -177,8 +177,8 @@ namespace Kesa.Engine.Runtime
                 throw new WorldException(Codes.RunMissingValue, "'" + Shown(member, row) + "' has no value yet",
                     "a default computed at creation can only read members declared before it (spec-gaps G106)");
 
-            // Ref 칸은 대상이 살아 있는지에 따라 읽는 값이 달라진다(G91): when 조건이면 대상도 읽은 것이다
-            if (member.Kind == MemberKind.Ref && value is EntityValue target) _whenReads?.Add(target.Id.Value);
+            // Ref 칸은 대상이 살아 있는지에 따라 읽는 값이 달라진다(G91): when 조건이면 대상도 읽은 것이다(영수증은 살았는지만, G290)
+            if (member.Kind == MemberKind.Ref && value is EntityValue target) Read(target.Id.Value, AliveRead);
             if (member.Kind == MemberKind.Ref && value is EntityValue ev && !_entities.ContainsKey(ev.Id.Value))
             {
                 if (spec.Optional) return NoneValue.Instance;

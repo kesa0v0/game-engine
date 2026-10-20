@@ -30,7 +30,7 @@ namespace Kesa.Engine.Runtime
         /// <summary><c>key=int</c> 컴포넌트의 줄 키들 (키 순, 시작 시점의 목록, G129).</summary>
         public IReadOnlyList<long> RowInts(EntityId id, string componentName)
         {
-            var entity = Record(id);
+            var entity = Record(id, componentName);
             var component = Keyed(ComponentNamed(componentName), KeyKind.Int);
             Require(entity, component);
             var keys = new List<long>();
@@ -52,7 +52,7 @@ namespace Kesa.Engine.Runtime
         /// <summary>Def 키 컴포넌트의 줄 키들(키 id 순, 시작 시점의 목록). <c>keys="all"</c>이면 키 타입의 모든 구체 Def.</summary>
         public IReadOnlyList<string> RowKeys(EntityId id, string componentName)
         {
-            var entity = Record(id);
+            var entity = Record(id, componentName);
             var component = Keyed(ComponentNamed(componentName), KeyKind.Def);
             Require(entity, component);
             var keys = new SortedSet<string>(StringComparer.Ordinal);
@@ -73,7 +73,7 @@ namespace Kesa.Engine.Runtime
         /// <summary>엔티티 키 컴포넌트의 줄 키들 (id 순, 시작 시점의 목록).</summary>
         public IReadOnlyList<EntityId> RowEntities(EntityId id, string componentName)
         {
-            var entity = Record(id);
+            var entity = Record(id, componentName);
             var component = Keyed(ComponentNamed(componentName), KeyKind.Entity);
             Require(entity, component);
             var keys = new List<EntityId>();
@@ -86,7 +86,7 @@ namespace Kesa.Engine.Runtime
 
         private Value GetRow(EntityId id, MemberHandle member, RowKey key)
         {
-            var entity = Record(id);
+            var entity = Record(id, member.Component?.Name);
             var component = KeyedMember(member);
             var row = FindRow(entity, component, key, out var defRow, out var record);
             if (!row) throw NoRow(id, component, key);
@@ -115,7 +115,7 @@ namespace Kesa.Engine.Runtime
 
         private bool HasRow(EntityId id, string componentName, RowKey key)
         {
-            var entity = Record(id);
+            var entity = Record(id, componentName);
             var component = Keyed(ComponentNamed(componentName), key.Kind);
             return Has(entity, component) && FindRow(entity, component, key, out _, out _);
         }

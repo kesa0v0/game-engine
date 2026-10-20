@@ -877,3 +877,32 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **안내서:** 1장의 `dump` 옆에 `stages` 한 줄을 넣었다. 6장 단계 절에 무엇을 보이는지와 순서 규칙을 적었다.
 - **테스트:** `CommandsTests.StagesPrintsTheOrderTheHandlersRunIn`. 두 모드, 단계 셋(`after`, 남의 `before`, 없는 단계를 가리킨 `optional_after`)과 핸들러 넷, `@when` 하나로 stdout 전체를 맞춘다. `samples/guide`에서도 손으로 돌려 보았다(`harbor.market`, `Sunk`→`harbor.insurance`, `Tick`→`(no stage)`).
 - **확인:** 테스트 2259개 통과(커널 2146, 번역 49, CLI 39, 콘솔 호스트 25).
+
+## 2026-10-21: 영수증을 (엔티티, 컴포넌트) 단위로 (G290)
+
+- **재현:** 임시 테스트에서 `u.Life.hp`만 읽은 영수증이 같은 유닛의 `Owner`를 바꾸면 `Changed`가 참이었다(엔티티 단위, G246).
+- **바꾼 것:** 쓰기는 이미 (엔티티, 칸) 도장을 찍고 있어서 읽는 쪽만 고쳤다.
+  - `World.Call.cs`에 `CallRead`(id, 칸 이름)와 `_callReads`를 두었다. 호스트가 부르는 동안만 모으고, 평소에는 null이라 비용이 없다.
+  - `Record(id, 이름)`과 `Read(id, 이름)`은 when 쪽(`_whenReads`, 엔티티 단위)과 영수증 쪽에 함께 적는다.
+  - `CallResult`는 칸마다 `ReadVersion(id, 이름)`을 견준다. 이름이 null이면 엔티티 전체, `""`이면 살았는지만(만들어진 때 도장), 그 밖에는 그 칸의 도장이다.
+  - 이름을 붙인 길:
+    - 멤버 읽기·형제 컴포넌트(`ComponentAttribute`, `EntityAttribute`)
+    - 키 컴포넌트(`RowOrNone`·`HasRowKey`·`RowKeys`·`RowInts`·`RowEntities`·`GetRow`·`HasRow`)
+    - `Get`, `Has`, `contribs()`
+    - 역방향(`Inverse`가 그 inverse 이름으로)
+  - 살았는지만 보는 길: `DefOf`, `DefConst`, Ref 대상, UI 기록의 `Gone`.
+  - 배정은 `Seat`·`Unseat`가 `"@seat"` 칸에 도장을 찍고, `controller()`가 그것을 읽는다.
+- **테스트:** `CallReceiptNarrowingTests`.
+  - 읽지 않은 컴포넌트에는 거짓이다.
+  - Ref 대상은 죽을 때만 참이다.
+  - 아래 읽기는 여전히 참이 된다:
+    - 따라간 엔티티
+    - 붙이기·떼기
+    - 줄 추가·쓰기
+    - 역방향
+    - 다른 엔티티를 읽는 `derived`
+    - 기여 행
+    - 배정
+  - 쓸어 보기: 쓰기 열일곱 가지를 하나씩 한다. "안 바뀜"이라고 답한 영수증은 다시 불러도 값이 같아야 한다. 역방향 읽기를 일부러 "살았는지만"으로 바꾸면 이 테스트가 실패함을 확인하고 되돌렸다.
+- **남은 것:** `@when` 읽기 기록은 아직 엔티티 단위다(handoff).
+- **확인:** 테스트 2263개 통과(커널 2150, 번역 49, CLI 39, 콘솔 호스트 25).

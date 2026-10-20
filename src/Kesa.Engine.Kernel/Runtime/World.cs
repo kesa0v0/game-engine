@@ -272,13 +272,13 @@ namespace Kesa.Engine.Runtime
         public bool IsAlive(EntityId id) => _entities.ContainsKey(id.Value);
 
         /// <summary>엔티티가 가리키는 Def의 id.</summary>
-        public string DefOf(EntityId id) => Record(id).Def.Id;
+        public string DefOf(EntityId id) => Record(id, AliveRead).Def.Id;
 
         // ---- 읽기·쓰기 (키 없는 컴포넌트와 Def 타입의 const) ----
 
         public Value Get(EntityId id, MemberHandle member)
         {
-            var entity = Record(id);
+            var entity = Record(id, member.Component?.Name ?? AliveRead);
             if (member.Component == null)
             {
                 if (entity.Def.Type != member.DefType)
@@ -383,7 +383,7 @@ namespace Kesa.Engine.Runtime
             DropContributionsTo(id.Value, component);
         }
 
-        public bool Has(EntityId id, string componentName) => Has(Record(id), ComponentNamed(componentName));
+        public bool Has(EntityId id, string componentName) => Has(Record(id, componentName), ComponentNamed(componentName));
 
 
         // ---- 순회 ----
@@ -414,7 +414,7 @@ namespace Kesa.Engine.Runtime
             if (reference.Component.IsKeyed)
                 throw new WorldException(Codes.RunType,
                     "inverse collections of refs inside keyed rows are not supported yet ('" + reference.Display + "')");
-            var entity = Record(target);
+            var entity = Record(target, reference.Member.Spec.Inverse?.Name);
             string expected = ((EntityRefTypeRef)reference.Member.Spec.Type).Target.Name;
             if (entity.Def.Type.Name != expected)
                 throw new WorldException(Codes.RunType,
@@ -443,9 +443,16 @@ namespace Kesa.Engine.Runtime
 
         // ---- 작은 도우미 ----
 
-        private EntityRecord Record(EntityId id)
+        /// <summary>엔티티 전체를 읽는다: when 조건과 영수증이 엔티티의 어느 바뀜에든 다시 본다 (S5·G246).</summary>
+        private EntityRecord Record(EntityId id) => Record(id, null);
+
+        /// <summary>
+        /// 엔티티의 칸 <paramref name="name"/>(컴포넌트·역방향 컬렉션 이름, <see cref="AliveRead"/>, null이면 전체)을 읽는다. 영수증은
+        /// 그 칸이 바뀔 때만 다시 부르고(G290), when 조건은 엔티티 단위로 기록한다.
+        /// </summary>
+        private EntityRecord Record(EntityId id, string? name)
         {
-            _whenReads?.Add(id.Value); // when 조건을 평가하는 중이면 이 엔티티를 읽었다 (S5)
+            Read(id.Value, name);
             if (_entities.TryGetValue(id.Value, out var entity))
             {
                 // 보는 쪽으로 부르는 중이면 못 보는 엔티티는 죽은 id와 같다 (G198·G248)

@@ -345,7 +345,7 @@ namespace Kesa.Engine.Runtime
 
         private bool Gone(EntityValue e)
         {
-            _whenReads?.Add(e.Id.Value); // 살았는지에 따라 읽는 값이 달라진다: 영수증에 든다 (G91·G246과 같다)
+            Read(e.Id.Value, AliveRead); // 살았는지에 따라 읽는 값이 달라진다: 영수증에 든다 (G91·G246과 같다)
             return !IsAlive(e.Id) || HiddenFromViewer(e.Id.Value);
         }
 

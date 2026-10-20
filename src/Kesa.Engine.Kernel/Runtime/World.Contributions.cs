@@ -214,6 +214,7 @@ namespace Kesa.Engine.Runtime
             }
 
             var rows = new List<Value>();
+            Read(view.Id.Value, view.Component.Name); // 기여 행은 그 컴포넌트의 도장을 찍는다
             if (_contribByTarget.TryGetValue(view.Id.Value, out var ids))
             {
                 foreach (var id in ids)
