@@ -136,11 +136,11 @@ namespace Kesa.Engine.Text
                 case FixedValue f:
                     return new ExactNumber(f.Value.ToString());
                 case StrValue s:
-                    return new FluentString(IsDef(s.Value) ? Lookup(DefKey(s.Value), null) : s.Value);
+                    return IsDef(s.Value) ? Def(s.Value) : new FluentString(s.Value);
                 case TextValue t:
                     return new FluentString(Format(t));
                 case EntityValue _:
-                    return new FluentString(entityDef == null ? Hidden() : Lookup(DefKey(entityDef), null));
+                    return entityDef == null ? new FluentString(Hidden()) : Def(entityDef);
                 case HiddenValue _:
                     return new FluentString(Hidden());
                 default:
@@ -170,8 +170,21 @@ namespace Kesa.Engine.Text
 
         private string Hidden() => Lookup(EngineTexts.Hidden, null);
 
+        /// <summary>번역 인자 자리의 Def: 이름과 함께 Def id를 들고 가 <c>JOSA</c>·<c>DEFATTR</c>가 쓴다 (G267·G268).</summary>
+        private DefName Def(string defId) =>
+            new DefName(defId, Lookup(DefKey(defId), null), attribute => TryLookup(DefKey(defId) + "." + attribute, null));
+
         /// <summary><c>키</c>나 <c>키.속성</c>을 언어 목록 → 주인의 기본 언어 순으로 찾고, 없으면 키 그대로 (G257).</summary>
         private string Lookup(string key, IDictionary<string, IFluentType>? args)
+        {
+            var text = TryLookup(key, args);
+            if (text != null) return text;
+            Error("no translation for '" + key + "'");
+            return key;
+        }
+
+        /// <summary>없으면 알리지 않고 null (<c>DEFATTR</c>의 없는 속성은 빈 문자열, G268).</summary>
+        private string? TryLookup(string key, IDictionary<string, IFluentType>? args)
         {
             int dot = key.IndexOf('.');
             string id = dot < 0 ? key : key.Substring(0, dot);
@@ -179,8 +192,7 @@ namespace Kesa.Engine.Text
                 if (Has(bundle, key, dot)) return FormatIn(bundle, key, dot, args);
             var owner = _translations.OwnerBundle(id);
             if (owner != null && Has(owner, key, dot)) return FormatIn(owner, key, dot, args);
-            Error("no translation for '" + key + "'");
-            return key;
+            return null;
         }
 
         private static bool Has(FluentBundle bundle, string key, int dot) =>

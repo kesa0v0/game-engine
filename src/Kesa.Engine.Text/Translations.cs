@@ -193,6 +193,7 @@ namespace Kesa.Engine.Text
                     foreach (var entry in pair.Value.Values) entries.Add(entry.Item);
                     var bundle = NewBundle(pair.Key);
                     bundle.AddResourceOverriding(new Resource(entries, new List<Linguini.Syntax.Parser.Error.ParseError>()));
+                    TextFunctions.AddTo(bundle);
                     bundles[pair.Key] = bundle;
                 }
                 return bundles;
