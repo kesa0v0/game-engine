@@ -68,14 +68,14 @@ dotnet run --project src/Kesa.Engine.Cli -- check samples/guide
 (빌드한 실행 파일 이름은 `engine`이다: `engine check samples/guide`.)
 
 ```
-samples/guide/lighthouse/defs/patches.py:10:1: info PAT002: mod 'smuggler' is not loaded, so 1 patch call was not applied
+samples/guide/lighthouse/defs/patches.py:11:1: info PAT002: mod 'smuggler' is not loaded, so 1 patch call was not applied
 
 errors: 0, warnings: 0, info: 1; mods loaded: 2, disabled: 0
 ```
 
 - 한 줄이 진단 하나다: `파일:줄:열: 등급 코드: 내용`. 그 아래 `hint:`(대개 "did you mean 'X'?")와 `related:`(관련 위치)가 붙는다.
 - 이름 오타는 거의 다 로드 때 잡힌다: 없는 Def(`LNK001`), 없는 이름(`EVL001`), 컴포넌트·멤버 이름 오타(`EVL001`, 타입을 아는 곳에서),
-  같은 엔티티 안의 `derived` 순환(`SCH009`).
+  같은 엔티티 안의 `derived` 순환(`SCH009`). Def id 값을 `"Sloop"` 같은 맨 문자열과 비교하면 경고 `LNK005`(2장).
 - 종료 코드: 0 오류 없음(경고는 괜찮음), 1 내용 오류, 2 사용법 오류, 3 엔진 버그.
 - `--warnings-as-errors`는 경고도 오류로 친다(배포 전 확인용). `--json`은 도구용 출력이다.
 - `engine dump samples/guide`는 상속·패치가 끝난 **최종 Def**를 JSON으로 보인다. 값마다 어느 모드가 적었고 어느 패치가 바꿨는지가
@@ -98,10 +98,10 @@ dotnet run --project src/Kesa.Engine.Cli -- stubs samples/guide
 텍스트 콘솔 호스트로 한 판을 직접 돌릴 수 있다.
 
 ```
-dotnet run --project src/Kesa.Engine.ConsoleHost -- samples/skirmish --seat red=Red --seat blue=Blue
+dotnet run --project src/Kesa.Engine.ConsoleHost -- samples/skirmish --seat red=skirmish:Red --seat blue=skirmish:Blue
 ```
 
-- `--seat 연결=Def`는 그 Def의 엔티티가 생기면 그 연결을 앉힌다(7장). `--seat red`처럼 Def를 빼면 앉을 자리를 화면에서 묻는다.
+- `--seat 연결=Def`는 그 Def의 엔티티가 생기면 그 연결을 앉힌다(7장). 호스트는 Def의 전체 이름(`모드id:이름`, 2장)을 받는다. `--seat red`처럼 Def를 빼면 앉을 자리를 화면에서 묻는다.
 - `--seed N`으로 난수 씨앗을 바꾼다. 같은 씨앗이면 같은 판이 나온다.
 - 화면에는 모드의 `ui/console.txt`가 정한 값(8장), 열린 질문, 낼 수 있는 수가 번호와 함께 나온다. 번호를 넣어 고르고 `:q`로 끝낸다.
 - 모드에 오류가 있으면 `engine check`와 같은 형식으로 보이고 1로 끝난다.

@@ -700,3 +700,14 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **G248 본문:** 없는 내장 `has(u, "Life")` → `u.Life is None`. 결정이 바뀐 것이 아니라 표기 오류라 `바뀜`이 아닌 `**고침(2026-10-20):**` 줄을 붙임. 못 보는 컴포넌트가 `None`으로 읽히는 것은 `WorldViewCallTests`의 `p.Hand is None`으로 확인.
 - **주석:** `World.cs`의 `DefaultStepBudget`·`DefaultActionStepBudget`(사전 조건은 행동 예산, `World.Commands.cs`의 `StepMeter(_actionStepBudget)`로 확인), `World.Save.cs` 머리(멈춘 Flow도 저장).
 - **확인:** 테스트 2084개 통과.
+
+## 2026-10-20: Def id 이름 공간 구현 (G258~G266)
+
+결정(G258~G265)을 마친 뒤 사용자가 구현을 고름. 네 단계로 나눠 커밋(`dce42fb`·`5d82c14`·`c0d5d27`과 이 커밋). 이름 공간을 쓰는 결정 G266(`defid`라는 이름)은 2단계 앞에서 사용자와 정함(처음 추천은 `def_id`였으나 사용자가 `defid`를 물어 다시 따짐: 파이썬 내장도 붙여 쓰고 지역 변수 `def_id`와 부딪히지 않음).
+
+- **1단계 로더·실행 중 풀이:** 새 `Loading/DefIds.cs`(전체 이름 풀이, 글자 검사 `DEF005`, 같은 경로를 먼저 권하는 힌트, 타입 자리 값 정규화). 새 Def는 자기 모드 것, `override=True`는 전체 이름만. 다른 모드와 id가 겹치는 경우가 없어져 등록(`ContentLoader.Build.Register`)의 "서로 의존하지 않는 두 모드의 같은 id" 분기를 지움. ②b 생성자·③ 패치(대상, 경로 안 Def 키, 값)·④ 상속·스키마/커맨드/호스트 기본값에서 `DefId` 값을 그 코드의 모드 기준 전체 이름으로. 실행 중은 `PureEvaluator.ScriptMod`(지금 도는 세션의 맨 위 함수의 모드)로 `spawn`·칸 쓰기·줄 키를 풀고, 호스트가 부르면 그대로라 전체 이름이어야 함(G264). 속성 검사의 `spawn` 리터럴도 모드 기준. 스텁 `Literal`은 내 모드 짧은 이름 먼저, 보이는 전체 이름 뒤(G265), 줄 속성(`u.Skill.Cooking`)은 내 모드의 식별자 이름만. 예시 lighthouse는 harbor의 Def를 전체 이름으로. 콘솔 호스트는 전체 이름을 보이고 받음(`#1 banking:Vault`, `--seat red=skirmish:Red`, 짧게 받는 것은 호스트가 고를 일). harbor의 `Buy(kind: str)`는 `DefId`가 아니라 짧은 이름 그대로 받음.
+- **2단계 `defid`·`choose`·저장:** `defid("Sloop")`(로직은 `CallerBody`로 부른 모드 기준, 없는 Def는 실행 오류와 힌트, Def 파일 최상위에서도 씀). 리터럴은 `ModFunctions.DefIdLiterals`로 모아 ⑤ 링크(보이는 구체 Def, 타입 무관). 임시 테스트로 `DefId` 매개변수의 `choose(k, from_=["Sloop"])`가 풀리지 않아 맞는 값이 거부되는 것을 재현하고 고침(`PureEvaluator.ParameterType` 고리로 제출 검사, `World.Choices`의 후보 나열 모두). 저장 파일의 짧은 id는 풀지 않음을 테스트로 고정.
+- **3단계 경고:** `LNK005`. 속성 검사의 정적 타입에 `DefIdStatic`·`DefIdMapType`(DefId 키 맵)·`GroupType(DefIdStatic)`(DefId 리스트)을 더함(필드·const·커맨드 매개변수·함수 어노테이션). `==`·`!=`·`in`·`not in`·맵의 `["X"]`·돈 원소의 비교에서 `:` 없는 리터럴이면 경고. `DefId` 매개변수의 `choose(from_=[...])` 리터럴 오타는 `LNK001`.
+- **4단계 문서:** 안내서 2장에 "Def id의 이름 공간" 절, override·패치 예시·경로의 다른 모드 키(`Stock['harbor:Fish']`), 1장(LNK005, 콘솔 예시와 `patches.py` 줄 번호), 8장 콘솔 출력. spine-spec S1에 이름 공간 항목, 스텁 설명, 예시 `cost['core:Wood']`·`spawn("Warrior")`.
+- **테스트:** 기존 테스트의 id 기대값을 전체 이름으로(약 90개 파일), 등록 테스트는 새 전제로(같은 이름 다른 모드는 다른 Def, override 없이 남의 전체 이름은 `DEF005`). 새 `DefIdBuiltinTests` 9개, `BareDefIdWarningTests` 4개, `StubGeneratorTests`(G265 모양), `WorldSaveTests` 1개.
+- **확인:** 테스트 2099개 통과(커널 2041, CLI 36, 콘솔 호스트 22). `engine check samples/guide`·`samples/skirmish` 경고 없음. `spec-gaps` 표 확인 `265 6`.
