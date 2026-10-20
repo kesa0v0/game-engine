@@ -24,6 +24,9 @@ namespace Kesa.Engine.Runtime
 
             public SortedDictionary<string, SortedDictionary<string, Value>> Draft { get; }
             public List<UiSubmission> Submissions { get; } = new List<UiSubmission>();
+
+            /// <summary>본문이 <c>ui.…</c>를 읽었나 (화면 함수의 영수증, G279).</summary>
+            public bool ReadUi { get; set; }
         }
 
         /// <summary>UI 동작 id들 (<c>모드id.함수이름</c>, 이름순).</summary>
@@ -124,6 +127,28 @@ namespace Kesa.Engine.Runtime
             try
             {
                 return run(decl);
+            }
+            finally
+            {
+                _viewer = savedViewer;
+                _act = null;
+            }
+        }
+
+        /// <summary>화면 함수를 연결의 UI 기록과 함께 부른다 (G279·G280). 기록은 읽기만 한다(쓰는 함수는 거절된다).</summary>
+        internal CallResult CallAs(WorldView viewer, UiState ui, string function, Value[] arguments)
+        {
+            if (!ui.Belongs(_schema)) throw new ArgumentException("this UiState was made by another world", nameof(ui));
+            if (_act != null) throw new InvalidOperationException("a view function cannot be called while a UI action runs");
+            var run = new ActRun(ui.Draft());
+            long version = ui.Version;
+            var savedViewer = _viewer;
+            _viewer = viewer;
+            _act = run;
+            try
+            {
+                var result = Call(function, arguments, withUi: true);
+                return run.ReadUi ? result.WithUi(ui, version) : result;
             }
             finally
             {
@@ -318,7 +343,11 @@ namespace Kesa.Engine.Runtime
             return stored;
         }
 
-        private bool Gone(EntityValue e) => !IsAlive(e.Id) || HiddenFromViewer(e.Id.Value);
+        private bool Gone(EntityValue e)
+        {
+            _whenReads?.Add(e.Id.Value); // 살았는지에 따라 읽는 값이 달라진다: 영수증에 든다 (G91·G246과 같다)
+            return !IsAlive(e.Id) || HiddenFromViewer(e.Id.Value);
+        }
 
         /// <summary>스크립트의 <c>ui</c>: 기록 이름으로 <see cref="UiRecord"/>를 준다.</summary>
         private sealed class UiRoot : Value, IRuntimeAttributes
@@ -371,7 +400,9 @@ namespace Kesa.Engine.Runtime
             public Value GetAttribute(string name)
             {
                 Member(name);
-                return _world.UiRead(Fields()[name]);
+                var fields = Fields();
+                _world._act!.ReadUi = true;
+                return _world.UiRead(fields[name]);
             }
 
             public void SetAttribute(string name, Value value)

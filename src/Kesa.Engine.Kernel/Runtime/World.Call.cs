@@ -16,10 +16,13 @@ namespace Kesa.Engine.Runtime
         /// <c>모드.함수</c>를 위치 순서의 인자로 부른다. 쓰기 함수·난수 함수·커맨드·핸들러·반응은 부르지 않는다(G245). 없는 이름, 인자 수,
         /// 스크립트 오류, 걸음 예산(G224) 초과는 <see cref="WorldException"/>이다(G247). 아무것도 바꾸지 않는다.
         /// </summary>
-        public CallResult Call(string function, params Value[] arguments)
+        public CallResult Call(string function, params Value[] arguments) => Call(function, arguments, withUi: false);
+
+        /// <param name="withUi">UI 기록과 함께 부르나 (<see cref="WorldView.Call(UiState, string, Value[])"/>, G279): 그러면 <c>ui.…</c>를 읽는 함수도 부른다.</param>
+        private CallResult Call(string function, Value[] arguments, bool withUi)
         {
             NoHostWrites("Call");
-            var fn = Callable(function, arguments.Length);
+            var fn = Callable(function, arguments.Length, withUi);
             var args = new List<Value>(arguments.Length);
             foreach (var a in arguments) args.Add(ToScript(a));
             // 읽은 곳은 when 조건과 같은 장치로 모은다 (G246)
@@ -140,11 +143,12 @@ namespace Kesa.Engine.Runtime
         /// <summary>
         /// 부르기 전에 확인한다: 부를 수 있으면 null, 아니면 이유 문장(없는 이름이면 "혹시 …?"). UI 정의를 읽을 때 칸마다 쓴다 (G245·G247).
         /// </summary>
-        public string? CheckCall(string function, int argumentCount)
+        /// <param name="withUi">UI 기록과 함께 부를 칸이면 참: <c>ui.…</c>를 읽는 함수도 된다 (G279).</param>
+        public string? CheckCall(string function, int argumentCount, bool withUi = false)
         {
             try
             {
-                Callable(function, argumentCount);
+                Callable(function, argumentCount, withUi);
                 return null;
             }
             catch (WorldException e)
@@ -153,7 +157,7 @@ namespace Kesa.Engine.Runtime
             }
         }
 
-        private FunctionValue Callable(string function, int argumentCount)
+        private FunctionValue Callable(string function, int argumentCount, bool withUi)
         {
             int dot = function.LastIndexOf('.');
             if (dot <= 0 || dot == function.Length - 1)
@@ -168,11 +172,11 @@ namespace Kesa.Engine.Runtime
             {
                 var names = new List<string>();
                 foreach (var n in scope.Names)
-                    if (scope.TryGet(n, out var v, out _) && v is FunctionValue f && Refusal(f) == null) names.Add(n);
+                    if (scope.TryGet(n, out var v, out _) && v is FunctionValue f && Refusal(f, withUi) == null) names.Add(n);
                 throw Unknown("mod '" + mod + "' has no function '" + name + "'" +
                               (found ? " ('" + name + "' is a " + bound.KindName + ")" : ""), name, names);
             }
-            string? refusal = Refusal(fn);
+            string? refusal = Refusal(fn, withUi);
             if (refusal != null)
                 throw new WorldException(Codes.RunNotCallable, "'" + function + "' cannot be called by the host: " + refusal,
                     "the host calls pure functions only; move the reading part into its own function (spec-gaps G245)");
@@ -185,15 +189,16 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>호스트가 부르지 않는 함수면 그 이유, 아니면 null (G245).</summary>
-        private static string? Refusal(FunctionValue fn)
+        private static string? Refusal(FunctionValue fn, bool withUi)
         {
             if (fn.IsUiAction) return "it is a @ui_action, which the host runs as an action, not as a value to show";
             if (fn.IsEntry) return "it is a " + fn.EntryKind + ", which runs only when submitted or triggered";
             if (fn.Writes) return "it changes the world (at " + fn.WriteWitness!.Value + ")";
             if (fn.Random) return "it uses random numbers (at " + fn.RandomWitness!.Value + ")";
             if (fn.WritesUi) return "it changes UI state (at " + fn.UiWriteWitness!.Value + "); run it from a @ui_action";
-            // 화면 함수가 ui를 읽는 길은 아직 없다 (G279의 영수증과 함께 붙인다)
-            if (fn.TouchesUi) return "it reads UI state (at " + fn.UiTouchWitness!.Value + ")";
+            // ui를 읽는 화면 함수는 연결의 UI 기록과 함께 부른다 (G279)
+            if (fn.TouchesUi && !withUi)
+                return "it reads UI state (at " + fn.UiTouchWitness!.Value + "); call it with ViewAs(issuer).Call(ui, ...)";
             return null;
         }
 

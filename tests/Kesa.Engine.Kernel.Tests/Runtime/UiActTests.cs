@@ -54,6 +54,9 @@ namespace Kesa.Engine.Tests.Runtime
             "@ui_action\ndef nested(u: Ref[Unit]):\n    f = remember\n    x = [f(u)]\n" +
             // 이름으로 풀리지 않는 호출은 로드 검사를 지나지만 실행 중 안전망이 막는다
             "def chosen():\n    return ui.Selection.unit\n" +
+            // 화면 함수: 고른 유닛의 체력
+            "def selected_hp():\n    u = ui.Selection.unit\n    return None if u is None else u.Hp.v\n" +
+            "def plain_hp(u):\n    return u.Hp.v\n" +
             "@command(free=True, acts_for=None)\ndef Peek():\n    f = chosen\n    x = f()\n";
 
         private World _world = null!;
@@ -292,6 +295,45 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(_view.CheckCommand("core.Hit", new[] { "target" }), Is.Null);
             Assert.That(_view.CheckCommand("core.click"), Does.Contain("is a @ui_action"));
             Assert.That(_view.CheckCommand("core.Hti"), Does.Contain("core.Hit"));
+        }
+
+        [Test]
+        public void AViewFunctionReadsTheSelectionAndItsReceiptWatchesIt()
+        {
+            var none = _view.Call(_ui, "core.selected_hp");
+            Assert.That(none.Value, Is.SameAs(NoneValue.Instance));
+            Assert.That(none.Changed(_world), Is.False);
+
+            _view.Act(_ui, "core.click", Args(("u", new EntityValue(_a))));
+            Assert.That(none.Changed(_world), Is.True); // 기록이 바뀌었다
+
+            var hp = _view.Call(_ui, "core.selected_hp");
+            Assert.That(((IntValue)hp.Value).Value, Is.EqualTo(3));
+            Assert.That(hp.Changed(_world), Is.False);
+            _world.Submit("host", "core.Hit", Args(("target", new EntityValue(_a))));
+            Assert.That(hp.Changed(_world), Is.True); // 고른 유닛이 바뀌었다
+
+            var again = _view.Call(_ui, "core.selected_hp");
+            _world.Submit("host", "core.Kill", Args(("target", new EntityValue(_a))));
+            Assert.That(again.Changed(_world), Is.True); // 고른 유닛이 죽었다
+            Assert.That(_view.Call(_ui, "core.selected_hp").Value, Is.SameAs(NoneValue.Instance));
+        }
+
+        [Test]
+        public void AReceiptThatDidNotReadUiStateIgnoresIt()
+        {
+            var hp = _view.Call(_ui, "core.plain_hp", new EntityValue(_b));
+            _view.Act(_ui, "core.click", Args(("u", new EntityValue(_a))));
+            Assert.That(hp.Changed(_world), Is.False);
+        }
+
+        [Test]
+        public void ViewFunctionsCannotChangeUiState()
+        {
+            var e = Assert.Throws<WorldException>(() => _view.Call(_ui, "core.remember", new EntityValue(_a)))!;
+            Assert.That(e.Message, Does.Contain("it changes UI state"));
+            Assert.That(_view.CheckCall("core.selected_hp", 0), Does.Contain("Call(ui, ...)"));
+            Assert.That(_view.CheckCall("core.selected_hp", 0, withUi: true), Is.Null);
         }
 
         [Test]
