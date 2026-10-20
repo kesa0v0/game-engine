@@ -9,8 +9,8 @@ namespace Kesa.Engine.Script
     /// 제한된 파이썬 부분집합의 파서 (spec S2).
     /// 원칙: 유효한 파이썬이 아닌 것은 받아들이지 않는다. 유효하지만 아직 지원하지 않는 구문은
     /// <see cref="Codes.ParUnsupported"/>로 거부하고 구문 오류와 구분한다.
-    /// 지금 읽는 문장: 식, 대입, <c>def</c>(본문 포함), <c>if</c>/<c>elif</c>/<c>else</c>, <c>for</c>, <c>return</c>,
-    /// <c>pass</c>, <c>break</c>, <c>continue</c>, 조건식 (spec-gaps G102). 함수 밖의 <c>return</c>과 반복 밖의
+    /// 지금 읽는 문장: 식, 대입, <c>def</c>(본문 포함), <c>if</c>/<c>elif</c>/<c>else</c>, <c>for</c>, <c>while</c>,
+    /// <c>with</c>, <c>match</c>(<c>if</c>로 바꿔 넣음, G253), <c>return</c>, <c>pass</c>, <c>break</c>, <c>continue</c>, 조건식 (spec-gaps G102). 함수 밖의 <c>return</c>과 반복 밖의
     /// <c>break</c>/<c>continue</c>는 파이썬에서도 오류라 구문 오류다.
     /// </summary>
     public sealed partial class Parser
@@ -40,6 +40,7 @@ namespace Kesa.Engine.Script
         private int _pos;
         private int _functionDepth;
         private int _loopDepth;
+        private int _matchCount; // 함수 안에서 바꿔 넣은 match의 수: 숨은 대상 변수의 번호 (G253)
 
         private Parser(IReadOnlyList<Token> tokens, string file, DiagnosticBag diagnostics)
         {
@@ -225,8 +226,13 @@ namespace Kesa.Engine.Script
                 return;
             }
 
-            if (Cur.Kind == TokenKind.Name &&
-                (CompoundKeywords.Contains(Cur.Text) || (Cur.Text == "match" && IsSoftKeywordBlock())))
+            if (Cur.IsName("match") && IsSoftKeywordBlock())
+            {
+                body.AddRange(ParseMatch());
+                return;
+            }
+
+            if (Cur.Kind == TokenKind.Name && CompoundKeywords.Contains(Cur.Text))
             {
                 body.Add(SkipUnsupportedCompound());
                 return;

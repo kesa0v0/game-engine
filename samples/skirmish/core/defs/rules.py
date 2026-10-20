@@ -73,14 +73,14 @@ def Start():
     while g.Match.winner is None:
         # Attack의 본문이 맞은 쪽에 물으면 그 답까지 끝난 뒤에 여기로 돌아온다 (G243)
         r = ask(p, "turn", responses=["Move", "Attack", "EndTurn"], data={"turn": g.Match.turn})
-        if r.response == "Attack":
-            if alive(p.Order.next) == 0:
+        match r.response:
+            case "Attack" if alive(p.Order.next) == 0:
                 g.Match.winner = p
-        elif r.response == "EndTurn":
-            for u in query("Unit"):
-                u.Ready.acted = False
-            p = p.Order.next
-            g.Match.turn += 1
+            case "EndTurn":
+                for u in query("Unit"):
+                    u.Ready.acted = False
+                p = p.Order.next
+                g.Match.turn += 1
 
 @command(acts_for=lambda party: party)
 def Move(party: Ref[Party], unit: Ref[Unit], dir: str):

@@ -387,6 +387,7 @@ namespace Kesa.Engine.Script
                 }
 
                 var candidates = new List<string>(locals);
+                candidates.RemoveAll(l => l.StartsWith("$", StringComparison.Ordinal)); // match의 숨은 변수 (G253)
                 candidates.AddRange(_globals);
                 candidates.AddRange(PureBuiltins.RuntimeNames);
                 candidates.AddRange(_schemaRuntimeNames);

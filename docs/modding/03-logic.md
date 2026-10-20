@@ -5,12 +5,18 @@
 
 ## 되는 것과 안 되는 것
 
-**된다:** `def`, `if`/`elif`/`else`, `for x in ...`, `while`, `return`, `break`, `continue`, `pass`, `=`와 `+= -= *= /= //= %=`,
+**된다:** `def`, `if`/`elif`/`else`, `match`/`case`(아래), `for x in ...`, `while`, `return`, `break`, `continue`, `pass`, `=`와 `+= -= *= /= //= %=`,
 `a if c else b`, `lambda`, 리스트·사전 리터럴과 컴프리헨션, `any(...)`/`all(...)` 안의 제너레이터 식, `and or not`, `in`,
 `is None`/`is not None`, 모듈 상수(`SIZE = 5`).
 
-**안 된다(로드 오류):** `import`, `class`, `try`, `match`, 함수 안의 `def`, 재귀, 튜플(여러 값 돌려주기 포함), 슬라이스, `*args`,
+**안 된다(로드 오류):** `import`, `class`, `try`, 함수 안의 `def`, 재귀, 튜플(여러 값 돌려주기 포함), 슬라이스, `*args`,
 f-문자열, `**`·비트 연산, 연쇄 비교(`0 < x < 5`는 `0 < x and x < 5`로), `for`·`while`의 `else`, 같은 이름에 다시 대입(모듈 수준).
+
+**`match`:** 함수 안에서만 쓰고, `case`에는 리터럴(`"Attack"`, `3`, `-1`, `True`, `None`), `|`로 이은 리터럴, `_`(나머지 전부),
+가드(`case "Attack" if hp > 0:`)만 쓴다. 맞는 `case`가 없으면 아무것도 하지 않는다. 비교는 `==`와 같고 타입이 다르면 맞지 않는다
+(`True`와 `1`은 다르다). **`case x:`처럼 이름만 쓰면 로드 오류다.** 파이썬에서 그것은 `x`와 비교하는 것이 아니라 아무 값이나 받아
+`x`에 담는 것이라 함정이기 때문이다. 변수와 비교하려면 `case _ if pick == x:`로 쓴다. 점 이름(`case Kind.Fast:`)과 리스트·사전·클래스
+패턴도 아직 안 된다. 예시는 5장의 차례 루프.
 
 **값은 바꿀 수 없다.** 리스트·사전에 메서드가 없고 `a[i] = x`도 안 된다. 새로 만든다: `rows = rows + [x]`.
 

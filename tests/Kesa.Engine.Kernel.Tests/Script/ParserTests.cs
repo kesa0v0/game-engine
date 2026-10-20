@@ -126,7 +126,15 @@ namespace Kesa.Engine.Tests.Script
         [TestCase("with a, b:\n    pass\n")]
         [TestCase("@command\nclass C:\n    pass\n")]
         [TestCase("def f():\n    @command\n    def g():\n        pass\n")]
-        [TestCase("match x:\n    case 1:\n        pass\n")]
+        [TestCase("def f():\n    match x:\n        case y:\n            pass\n")]
+        [TestCase("def f():\n    match x:\n        case a.b:\n            pass\n")]
+        [TestCase("def f():\n    match x:\n        case P(1):\n            pass\n")]
+        [TestCase("def f():\n    match x:\n        case [1, 2]:\n            pass\n")]
+        [TestCase("def f():\n    match x:\n        case (1 | 2):\n            pass\n")]
+        [TestCase("def f():\n    match x:\n        case {\"a\": 1}:\n            pass\n")]
+        [TestCase("def f():\n    match x:\n        case 1, 2:\n            pass\n")]
+        [TestCase("def f():\n    match x:\n        case 1 as y:\n            pass\n")]
+        [TestCase("def f():\n    match x, y:\n        case 1:\n            pass\n")]
         public void UnsupportedPythonIsReportedSeparately(string text)
         {
             var (_, diags) = Parse(text);
@@ -196,6 +204,77 @@ namespace Kesa.Engine.Tests.Script
         public void ParsingContinuesAfterUnsupportedBlock()
         {
             var (module, _) = Parse("match x:\n    case 1:\n        y = 1\nx = 2\n");
+            Assert.That(module.Body.Last(), Is.InstanceOf<AssignStmt>());
+        }
+
+        // ---- match (spec-gaps G253) ----
+
+        [Test]
+        public void MatchBecomesAHiddenAssignmentAndAnIf()
+        {
+            var (module, diags) = Parse("def f(x):\n    match x:\n        case \"a\" | \"b\":\n            return 1\n" +
+                                        "        case -2 if g:\n            return 2\n        case _:\n            return 3\n");
+            Assert.That(diags, Is.Empty);
+            var body = ((FunctionDef)module.Body.Single()).Body;
+            Assert.That(body, Has.Count.EqualTo(2));
+            var assign = (AssignStmt)body[0];
+            Assert.That(((NameExpr)assign.Target).Name, Is.EqualTo("$m0"));
+            Assert.That(((NameExpr)assign.Value).Name, Is.EqualTo("x"));
+            var ifs = (IfStmt)body[1];
+            Assert.That(ifs.Branches, Has.Count.EqualTo(2));
+            Assert.That(((BinaryExpr)ifs.Branches[0].Condition).Op, Is.EqualTo("or"));
+            Assert.That(((BinaryExpr)ifs.Branches[1].Condition).Op, Is.EqualTo("and"));
+            Assert.That(ifs.Branches[1].Span.Line, Is.EqualTo(5), "a branch points at its 'case' line");
+            Assert.That(ifs.OrElse, Is.Not.Null);
+        }
+
+        [Test]
+        public void HiddenNamesCountFromZeroInEachFunction()
+        {
+            // 다른 함수의 match가 이 함수의 본문(해시)을 바꾸지 않게
+            var (module, diags) = Parse("def f(x):\n    match x:\n        case 1:\n            pass\n    match x:\n        case 2:\n            pass\n" +
+                                        "def g(x):\n    match x:\n        case 1:\n            pass\n");
+            Assert.That(diags, Is.Empty);
+            var names = module.Body.Cast<FunctionDef>()
+                .SelectMany(d => d.Body.OfType<AssignStmt>().Select(a => d.Name + ((NameExpr)a.Target).Name));
+            Assert.That(names, Is.EqualTo(new[] { "f$m0", "f$m1", "g$m0" }));
+        }
+
+        [TestCase("def f():\n    match x:\n        case _:\n            pass\n        case 1:\n            pass\n")]
+        [TestCase("def f():\n    match x:\n        case _ | 1:\n            pass\n")]
+        [TestCase("def f():\n    match x:\n        pass\n")]
+        [TestCase("def f():\n    match x:\n        case:\n            pass\n")]
+        public void BadMatchSyntaxIsASyntaxError(string text)
+        {
+            var (_, diags) = Parse(text);
+            Assert.That(diags.Select(d => d.Code), Has.All.EqualTo(Codes.ParSyntax));
+            Assert.That(diags, Is.Not.Empty);
+        }
+
+        [Test]
+        public void ACapturePatternPointsAtAGuard()
+        {
+            var (_, diags) = Parse("def f(x, y):\n    match x:\n        case y:\n            pass\n");
+            var d = diags.Single();
+            Assert.That(d.Message, Does.StartWith("'case y:' would match anything"));
+            Assert.That(d.Hint, Does.Contain("case _ if value == y:"));
+        }
+
+        [Test]
+        public void ParsingContinuesAfterABadMatch()
+        {
+            var (module, diags) = Parse("def f(x):\n    match x:\n        case y:\n            pass\n        case 1:\n            pass\n" +
+                                        "    return 2\nz = 1\n");
+            Assert.That(diags, Has.Count.EqualTo(1));
+            Assert.That(((FunctionDef)module.Body[0]).Body.Last(), Is.InstanceOf<ReturnStmt>());
+            Assert.That(module.Body.Last(), Is.InstanceOf<AssignStmt>());
+        }
+
+        [Test]
+        public void ATopLevelMatchIsALoadError()
+        {
+            var (module, diags) = Parse("match x:\n    case 1:\n        pass\nz = 1\n");
+            Assert.That(diags.Single().Code, Is.EqualTo(Codes.EvlUnsupported));
             Assert.That(module.Body.Last(), Is.InstanceOf<AssignStmt>());
         }
 

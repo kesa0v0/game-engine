@@ -50,15 +50,17 @@ def Charter(house: Ref[House]):
     while g.Match.winner is None:
         # Attack의 본문이 맞은 쪽에 물으면 그 답까지 끝난 뒤에 여기로 돌아온다 (G243)
         r = ask(p, "turn", responses=["Move", "Attack", "EndTurn"], data={"turn": g.Match.turn})
-        if r.response == "Attack":
-            if alive(p.Order.next) == 0:
+        match r.response:
+            case "Attack" if alive(p.Order.next) == 0:
                 g.Match.winner = p
-        elif r.response == "EndTurn":
-            for u in query("Unit"):
-                u.Ready.acted = False
-            p = p.Order.next
-            g.Match.turn += 1
+            case "EndTurn":
+                for u in query("Unit"):
+                    u.Ready.acted = False
+                p = p.Order.next
+                g.Match.turn += 1
 ```
+
+답을 가르는 `match`는 3장의 "`match`"를 본다. `"Move"`처럼 맞는 `case`가 없으면 아무것도 하지 않고 다음 바퀴로 간다.
 
 - "차례"라는 특별한 개념은 엔진에 없다. 모드가 이렇게 `ask` 루프로 만든다.
 - 응답 커맨드의 `acts_for`는 엔티티를 줘야 한다(`None` 불가). 엔진은 그 엔티티가 질문의 "누구"에 있는지와, 낸 연결이 거기 앉았는지를 본다.

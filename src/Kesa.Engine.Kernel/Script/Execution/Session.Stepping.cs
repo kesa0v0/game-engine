@@ -314,6 +314,7 @@ namespace Kesa.Engine.Script
             if (_owner.Builtins.TryGetValue(name, out var builtin)) return builtin;
 
             var candidates = new List<string>(frame.Locals.Keys);
+            candidates.RemoveAll(l => l.StartsWith("$", StringComparison.Ordinal)); // match의 숨은 변수 (G253)
             foreach (var key in _owner.Builtins.Keys) candidates.Add(key);
             throw Fail(Codes.RunScript, "name '" + name + "' is not defined", Suggest.Hint(name, candidates));
         }

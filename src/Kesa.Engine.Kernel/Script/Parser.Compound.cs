@@ -179,6 +179,168 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary>
+        /// <c>match 대상:</c>과 그 아래 <c>case</c>들 (spec-gaps G253). 숨은 지역 변수 <c>$m번호 = 대상</c>과
+        /// <c>if</c>/<c>elif</c>/<c>else</c>로 바꿔 넣으므로 검사기·실행기·저장은 <c>if</c>의 것을 그대로 쓴다.
+        /// 패턴은 리터럴, 세로줄로 이은 리터럴, <c>_</c>, 가드만 받는다. 함수 밖에서는 로드 오류다.
+        /// </summary>
+        private IReadOnlyList<Stmt> ParseMatch()
+        {
+            var keyword = Advance();
+            if (_functionDepth == 0)
+            {
+                _diagnostics.Error(Codes.EvlUnsupported, "'match' statements are only allowed inside functions", keyword.Span);
+                SkipToNewline();
+                if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                return new Stmt[] { new UnsupportedStmt("match", keyword.Span) };
+            }
+
+            bool inBlock = false;
+            try
+            {
+                var subject = ParseExpression();
+                if (Cur.IsOp(","))
+                    throw Unsupported("matching several values at once is not supported (there are no tuples)", Cur.Span);
+                Expect(":");
+                Advance(); // 줄바꿈과 들여쓰기는 IsSoftKeywordBlock이 확인했다
+                Advance();
+                inBlock = true;
+
+                string hidden = "$m" + _matchCount++;
+                var branches = new List<IfBranch>();
+                List<Stmt>? orElse = null;
+                while (Cur.Kind != TokenKind.Dedent && Cur.Kind != TokenKind.EndOfFile)
+                {
+                    if (Cur.Kind == TokenKind.Newline)
+                    {
+                        Advance();
+                        continue;
+                    }
+                    if (!Cur.IsName("case")) throw Fail("expected 'case'" + Describe(Cur), Cur.Span);
+                    var caseToken = Advance();
+                    if (orElse != null)
+                        throw Fail("a 'case _:' without a guard makes the cases after it unreachable", caseToken.Span);
+                    var pattern = ParsePattern(hidden);
+                    Expr? guard = null;
+                    if (Cur.IsName("if"))
+                    {
+                        Advance();
+                        guard = ParseExpression();
+                    }
+                    if (Cur.IsName("as"))
+                        throw Unsupported("'as' in a 'case' pattern is not supported yet", Cur.Span);
+                    Expect(":");
+                    var suite = ParseSuite();
+
+                    if (pattern == null && guard == null) orElse = suite;
+                    else
+                    {
+                        var condition = pattern == null ? guard! :
+                            guard == null ? pattern : new BinaryExpr("and", pattern, guard, guard.Span);
+                        branches.Add(new IfBranch(condition, suite, caseToken.Span));
+                    }
+                }
+                if (Cur.Kind == TokenKind.Dedent) Advance();
+
+                if (branches.Count == 0 && orElse == null) throw Fail("a 'match' statement needs at least one 'case'", keyword.Span);
+                // 가드 없는 'case _:' 하나뿐이면 언제나 실행하는 가지 하나다
+                var ifs = branches.Count == 0
+                    ? new IfStmt(new[] { new IfBranch(new BoolLiteral(true, keyword.Span), orElse!, keyword.Span) }, null, keyword.Span)
+                    : new IfStmt(branches, orElse, keyword.Span);
+                return new Stmt[] { new AssignStmt(new NameExpr(hidden, subject.Span), "=", subject, keyword.Span), ifs };
+            }
+            catch (ParseError)
+            {
+                if (!inBlock)
+                {
+                    SkipToNewline();
+                    if (Cur.Kind == TokenKind.Indent) SkipBlock();
+                }
+                else
+                {
+                    // match 블록의 짝이 맞는 Dedent까지 건너뛴다
+                    int depth = 1;
+                    while (Cur.Kind != TokenKind.EndOfFile)
+                    {
+                        var t = Advance();
+                        if (t.Kind == TokenKind.Indent) depth++;
+                        else if (t.Kind == TokenKind.Dedent && --depth == 0) break;
+                    }
+                }
+                return new Stmt[] { new UnsupportedStmt("match", keyword.Span) };
+            }
+        }
+
+        /// <summary>
+        /// <c>case</c> 뒤의 패턴을 <c>숨은 변수 == 리터럴</c>을 <c>or</c>로 이은 조건으로 읽는다. 가드 없는 <c>_</c>처럼
+        /// 무엇이든 맞는 패턴이면 null.
+        /// </summary>
+        private Expr? ParsePattern(string hidden)
+        {
+            Expr? condition = null;
+            bool anything = false;
+            while (true)
+            {
+                var start = Cur;
+                if (anything) throw Fail("'_' makes the remaining patterns unreachable", start.Span);
+                if (start.IsName("_"))
+                {
+                    Advance();
+                    anything = true;
+                }
+                else
+                {
+                    var compare = new BinaryExpr("==", new NameExpr(hidden, start.Span), ParseLiteralPattern(), start.Span);
+                    condition = condition == null ? compare : new BinaryExpr("or", condition, compare, start.Span);
+                }
+                if (Cur.IsOp(","))
+                    throw Unsupported("sequence patterns are not supported yet", Cur.Span);
+                if (!Accept("|")) break;
+            }
+            return anything ? null : condition;
+        }
+
+        private Expr ParseLiteralPattern()
+        {
+            var t = Cur;
+            switch (t.Kind)
+            {
+                case TokenKind.Int:
+                case TokenKind.Fixed:
+                case TokenKind.String:
+                    return ParseAtom();
+
+                case TokenKind.Op when t.Text == "-" &&
+                                       (PeekToken(1).Kind == TokenKind.Int || PeekToken(1).Kind == TokenKind.Fixed):
+                    Advance();
+                    return new UnaryExpr("-", ParseAtom(), t.Span);
+
+                case TokenKind.Op when t.Text == "(" || t.Text == "[" || t.Text == "{":
+                    throw Unsupported("parenthesized, sequence and mapping patterns are not supported yet", t.Span);
+
+                case TokenKind.Name when t.Text == "True" || t.Text == "False" || t.Text == "None":
+                    return ParseAtom();
+
+                case TokenKind.Name when !Keywords.Contains(t.Text):
+                    var next = PeekToken(1);
+                    if (next.IsOp(".")) throw Unsupported("dotted names in 'case' patterns are not supported yet", t.Span);
+                    if (next.IsOp("(")) throw Unsupported("class patterns are not supported (there are no classes)", t.Span);
+                    throw Unsupported(
+                        "'case " + t.Text + ":' would match anything and bind it to '" + t.Text +
+                        "' (a capture pattern); capture patterns are not supported", t.Span,
+                        "to compare with a variable write 'case _ if value == " + t.Text + ":'; to match anything write 'case _:'");
+
+                default:
+                    throw Fail("expected a pattern" + Describe(t), t.Span);
+            }
+        }
+
+        private ParseError Unsupported(string message, SourceSpan span, string? hint = null)
+        {
+            _diagnostics.Error(Codes.ParUnsupported, message, span, hint: hint);
+            return new ParseError();
+        }
+
+        /// <summary>
         /// <c>with 식:</c> 블록 (spec-gaps G111). <c>as</c>와 여러 항목(<c>with a, b:</c>)은 미지원으로 보고한다.
         /// 어디에 올 수 있는지는 로드 시점 검사가 본다.
         /// </summary>
@@ -242,6 +404,7 @@ namespace Kesa.Engine.Script
                 int savedLoopDepth = _loopDepth;
                 _functionDepth++;
                 _loopDepth = 0;
+                _matchCount = 0; // 함수마다 0부터: 다른 함수를 고쳐도 이 함수의 본문 해시가 그대로다 (G253)
                 try
                 {
                     body = ParseSuite();
