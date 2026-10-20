@@ -690,3 +690,13 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **예시 게임:** 스커미시 차례 루프의 `if r.response == …/elif`를 `match`로(`case "Attack" if …:`), 안내서 5장도 같이. 3장에 `match` 절, 9장 표 고침, spine-spec 72줄에 받는 패턴을 적음.
 - **테스트:** `ParserTests`(바꿔 넣은 모양, 함수마다 번호, 미지원 패턴 9가지는 `PAR002`, 구문 오류 4가지, 캡처 패턴 안내, 오류 뒤 이어 읽기, 최상위), 새 `MatchTests` 7개(리터럴·세로줄·음수·`fixed`·`True`·`None`·`_`, 타입이 다르면 안 맞음, 맞는 것 없음, 가드, `break`, 중첩), 새 `WorldMatchTests`(답으로 가지 고르기 4가지, `case` 안의 `ask`에서 저장·불러오기 C1·C4, 대상은 한 번만 평가, 최상위 로드 오류, 가드 안 이름 오타와 숨은 이름 안 보임).
 - **확인:** 테스트 2084개 통과(커널 2026, CLI 36, 콘솔 호스트 22). `spec-gaps` 표 확인 `252 6`.
+
+## 2026-10-20: 안내서에서 드러난 어긋남 고치기 (나머지)
+
+이미 정한 결정에 문서와 주석을 맞춘 것이라 새 G 없이 진행(커밋 `aee9d62`·`3f795b9`·`a0d19b6`과 이 커밋).
+
+- **spine-spec S2 73줄:** `ask(party, "Title_Key", ["a", "b"])` → `choices=["a", "b"]`(G138, 구현과 스텁은 `/, *`로 이름 인자만). 멈추는 호출 목록의 `await`(엔진에 없음)를 `ask`·`wait`·`advance`로.
+- **spine-spec S5·X2:** `on("Name")`·`emit("Name", ...)`·`@on("tick", ...)`·`emit("turn_start")`·`emit("tick")` → `@on(Name)`·`emit(Name(...))`·`@on(Tick, ...)`·엔진 신호 `Tick`(G145·G152·G154·G156).
+- **G248 본문:** 없는 내장 `has(u, "Life")` → `u.Life is None`. 결정이 바뀐 것이 아니라 표기 오류라 `바뀜`이 아닌 `**고침(2026-10-20):**` 줄을 붙임. 못 보는 컴포넌트가 `None`으로 읽히는 것은 `WorldViewCallTests`의 `p.Hand is None`으로 확인.
+- **주석:** `World.cs`의 `DefaultStepBudget`·`DefaultActionStepBudget`(사전 조건은 행동 예산, `World.Commands.cs`의 `StepMeter(_actionStepBudget)`로 확인), `World.Save.cs` 머리(멈춘 Flow도 저장).
+- **확인:** 테스트 2084개 통과.

@@ -38,12 +38,13 @@ namespace Kesa.Engine.Runtime
         private static readonly Dictionary<MemberDecl, Value> NoValues = new Dictionary<MemberDecl, Value>();
 
         /// <summary>
-        /// 읽기 실행 하나(<c>derived</c>, 사전 조건, 입구·정책 함수, <c>choose</c> 후보)의 기본 단계 예산 (G101). 값 하나를 읽는 일이라 작다.
+        /// 읽기 실행 하나(<c>derived</c>, 입구·정책 함수, <c>choose</c> 후보)의 기본 단계 예산 (G101·G224). 값 하나를 읽는 일이라 작다.
         /// </summary>
         public const int DefaultStepBudget = 100000;
 
         /// <summary>
-        /// 행동 실행 하나(커맨드 본문, <c>@on</c>·<c>@when</c> 핸들러, 멈춘 Flow를 이어서 실행하는 구간)의 기본 단계 예산 (G224).
+        /// 행동 실행 하나(커맨드의 사전 조건과 본문, <c>@on</c>·<c>@when</c> 핸들러, 멈춘 Flow를 이어서 실행하는 구간)의 기본 단계 예산 (G224).
+        /// 사전 조건만 검사할 때도 제출과 같은 예산이다.
         /// 행동은 세계 전체를 돌 수 있어 크게 둔다: 한 단계 약 45ns(규모 벤치)로 약 0.5초, 유닛 하나에 7단계면 약 140만 개.
         /// </summary>
         public const int DefaultActionStepBudget = 10_000_000;

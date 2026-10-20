@@ -11,7 +11,7 @@ namespace Kesa.Engine.Runtime
 {
     /// <summary>
     /// 저장과 불러오기 (spec S8, spec-gaps G140). 엔진이 정한 정규형 JSON이고 같은 상태는 같은 바이트다 (C4).
-    /// 지금은 월드 상태(엔티티·값·줄·기여 행·카운터)만 저장한다. 멈춘 Flow가 있으면 아직 저장하지 못한다.
+    /// 월드 상태(엔티티·값·줄·기여 행·카운터)와 멈춘 Flow(열린 질문·잠든 흐름, <c>World.SaveFlows.cs</c>)를 저장한다.
     /// </summary>
     public sealed partial class World
     {
