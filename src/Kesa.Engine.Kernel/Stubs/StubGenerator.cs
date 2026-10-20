@@ -187,7 +187,8 @@ namespace Kesa.Engine.Stubs
             "\n" +
             // derived 함수가 쓰는 순수 내장 (G207). 스키마 파일은 모드와 무관하므로 query는 느슨하게
             PureNames +
-            "def query(*names: str) -> list[Any]: ...\n";
+            "def query(*names: str) -> list[Any]: ...\n" +
+            "def defid(name: str, /) -> str: ...\n";
 
         private sealed class Writer
         {
@@ -656,6 +657,12 @@ namespace Kesa.Engine.Stubs
                 }
                 if (spawnable.Count > 0) Line("@overload");
                 Line("def spawn(def_id: str, /, **components: Any) -> Any: ...");
+
+                // defid(): 어떤 타입이든 보이는 구체 Def (G266)
+                var concrete = new List<string>();
+                foreach (var d in _defs.Defs)
+                    if (!d.IsAbstract && VisibleDef(d)) concrete.Add(d.Id);
+                Line("def defid(name: " + (concrete.Count == 0 ? "Never" : Literal(Spellings(concrete))) + ", /) -> str: ...");
                 Line();
             }
 

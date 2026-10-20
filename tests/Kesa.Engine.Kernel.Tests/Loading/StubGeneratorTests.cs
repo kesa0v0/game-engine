@@ -127,6 +127,7 @@ namespace Kesa.Engine.Tests.Loading
                 "def spawn(def_id: Literal[\"Scout\", \"core:Scout\"], /, **components: Any) -> Unit: ...\n" +
                 "@overload\n" +
                 "def spawn(def_id: str, /, **components: Any) -> Any: ...\n" +
+                "def defid(name: Literal[\"Wood\", \"Iron\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Scout\"], /) -> str: ...\n" +
                 "\n" +
                 "def Mod(*, id: str, version: str = ..., defaultLanguage: str = ..., dependencies: list[str] = ..., " +
                 "loadAfter: list[str] = ..., optional: list[str] = ...) -> None: ...\n" +

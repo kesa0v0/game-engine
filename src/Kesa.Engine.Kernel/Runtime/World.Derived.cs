@@ -141,7 +141,22 @@ namespace Kesa.Engine.Runtime
         private StepMeter _derivedMeter => _derivedMeterStore ??= new StepMeter(_stepBudget);
 
         private PureEvaluator Evaluator =>
-            _evaluator ??= new PureEvaluator(new WorldGlobals(this), RuntimeBuiltins(), _stepBudget);
+            _evaluator ??= new PureEvaluator(new WorldGlobals(this), RuntimeBuiltins(), _stepBudget) { ParameterType = CommandParameterType };
+
+        private Dictionary<FunctionValue, CommandDecl>? _commandsByFunction;
+
+        private TypeRef? CommandParameterType(FunctionValue function, string parameter)
+        {
+            if (_commandsByFunction == null)
+            {
+                _commandsByFunction = new Dictionary<FunctionValue, CommandDecl>();
+                foreach (var decl in _commands.Values) _commandsByFunction[decl.Function] = decl;
+            }
+            if (!_commandsByFunction.TryGetValue(function, out var command)) return null;
+            foreach (var p in command.Parameters)
+                if (p.Name == parameter) return p.Type;
+            return null;
+        }
 
         /// <summary>
         /// 함수 본문의 전역 이름: 모드가 묶은 이름, 그다음 그 모드에 보이는 컴포넌트·신호 생성자 (G230). 내장은 그 뒤다
@@ -205,6 +220,11 @@ namespace Kesa.Engine.Runtime
             table.Add(PureBuiltins.NowName, new PureBuiltin(PureBuiltins.NowName, NowBuiltin));
             table.Add(PureBuiltins.QueryName, new PureBuiltin(PureBuiltins.QueryName, QueryBuiltin));
             table.Add(PureBuiltins.ControllerName, new PureBuiltin(PureBuiltins.ControllerName, ControllerBuiltin));
+            table.Add(PureBuiltins.DefIdName,
+                new PureBuiltin(PureBuiltins.DefIdName, (p, k) => DefIdBuiltin(_evaluator?.ScriptMod ?? "", p, k))
+                {
+                    CallerBody = DefIdBuiltin,
+                });
             AddStructureBuiltins(table);
             AddSignalBuiltins(table);
             AddFlowBuiltins(table);

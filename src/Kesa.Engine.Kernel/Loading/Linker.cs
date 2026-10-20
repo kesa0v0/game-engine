@@ -44,7 +44,12 @@ namespace Kesa.Engine.Loading
             {
                 foreach (var pair in functions)
                 foreach (var spawned in pair.Value.SpawnedDefs)
-                    linker.CheckId(new ValueBlame(pair.Key, spawned.Value, Array.Empty<string>()), DefIds.Resolve(spawned.Key, pair.Key), null);
+                    linker.CheckId(new ValueBlame(pair.Key, spawned.Value, Array.Empty<string>()), DefIds.Resolve(spawned.Key, pair.Key), null,
+                        spawning: true);
+                // defid("Def id"): 어떤 타입이든 보이는 구체 Def여야 한다 (G266)
+                foreach (var pair in functions)
+                foreach (var literal in pair.Value.DefIdLiterals)
+                    linker.CheckId(new ValueBlame(pair.Key, literal.Value, Array.Empty<string>()), DefIds.Resolve(literal.Key, pair.Key), null);
                 foreach (var pair in functions)
                 foreach (var names in pair.Value.QueriedNames)
                     linker.CheckQuery(pair.Key, names);
@@ -147,7 +152,8 @@ namespace Kesa.Engine.Loading
             CheckId(ValueBlame.Of(origin, literal, fallback), id, typeName);
 
         /// <param name="typeName">기대하는 Def 타입. null이면 엔티티가 되는 Def 아무것이다 (<c>spawn</c>의 Def id, G134)</param>
-        private void CheckId(ValueBlame blame, string id, string? typeName)
+        /// <param name="typeName">기대하는 Def 타입. null이면 어떤 타입이든 되고, <paramref name="spawning"/>이면 엔티티가 되는 타입이어야 한다</param>
+        private void CheckId(ValueBlame blame, string id, string? typeName, bool spawning = false)
         {
             string mod = blame.Mod;
             var guards = blame.Guards;
@@ -163,14 +169,14 @@ namespace Kesa.Engine.Loading
             {
                 var ids = new List<string>();
                 foreach (var d in _defs.Defs)
-                    if (typeName == null ? !d.Type.IsDataOnly && !d.IsAbstract : d.Type.Name == typeName) ids.Add(d.Id);
+                    if (typeName == null ? (!spawning || !d.Type.IsDataOnly) && !d.IsAbstract : d.Type.Name == typeName) ids.Add(d.Id);
                 Fail(Codes.LnkNotFound, "there is no " + (typeName ?? "Def") + " '" + id + "'", DefIds.Hint(id, ids));
                 return;
             }
 
             if (typeName == null)
             {
-                if (record.Type.IsDataOnly)
+                if (spawning && record.Type.IsDataOnly)
                 {
                     Fail(Codes.LnkWrongType,
                         "'" + id + "' is a " + record.Type.Name + ", a data-only Def type with no components, so it cannot be spawned",

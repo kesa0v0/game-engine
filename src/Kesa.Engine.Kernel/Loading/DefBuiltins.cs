@@ -20,6 +20,7 @@ namespace Kesa.Engine.Loading
         private readonly ModManifest _manifest;
         private readonly Func<string, bool> _isActive;
         private readonly BuiltinFunction _modLoaded;
+        private readonly BuiltinFunction _defId;
         private readonly PatchNamespace _patch;
         private readonly List<PatchCall> _patchSink;
 
@@ -38,6 +39,7 @@ namespace Kesa.Engine.Loading
             _sink = sink;
             _patchSink = patchSink;
             _modLoaded = new BuiltinFunction(Interpreter.ModLoadedName, ModLoaded);
+            _defId = new BuiltinFunction(PureBuiltins.DefIdName, DefIdCall);
             _patch = new PatchNamespace(this);
         }
 
@@ -172,9 +174,25 @@ namespace Kesa.Engine.Loading
             return _isActive(id) ? BoolValue.True : BoolValue.False;
         }
 
+        /// <summary>
+        /// Def 파일 최상위의 <c>defid("Sloop")</c> (spec-gaps G266): 이 모드 기준 전체 이름. Def가 아직 다 모이지 않았으므로 있는지는
+        /// ⑤ 링크가 본다.
+        /// </summary>
+        private Value DefIdCall(CallContext ctx, SourceSpan span, IReadOnlyList<ArgValue> args)
+        {
+            var r = new ArgReader(ctx, PureBuiltins.DefIdName, span, args);
+            r.ExpectPositional(1, "defid(\"Sloop\")");
+            r.RejectRest(Array.Empty<string>());
+            var arg = r.Positional[0];
+            string id = DefIds.Resolve(DefConstructor.DefId(ctx, r.String(arg, "the Def id"), ArgReader.SpanOf(arg), "defid()"), _mod);
+            ctx.Functions.DefIdLiterals.Add(new KeyValuePair<string, SourceSpan>(id, ArgReader.SpanOf(arg)));
+            return new StrValue(id, ArgReader.SpanOf(arg));
+        }
+
         public Value? Lookup(string name)
         {
             if (name == Interpreter.ModLoadedName) return _modLoaded;
+            if (name == PureBuiltins.DefIdName) return _defId;
             if (name == Interpreter.PatchName) return _patch;
             if (_schema.TryGetType(name, out var t) && _visibility.CanSee(_mod, t.Mod)) return new DefConstructor(this, t);
             if (_schema.TryGetComponent(name, out var c) && _visibility.CanSee(_mod, c.Mod))
@@ -215,6 +233,7 @@ namespace Kesa.Engine.Loading
             get
             {
                 yield return Interpreter.ModLoadedName;
+                yield return PureBuiltins.DefIdName;
                 yield return Interpreter.PatchName;
                 foreach (var t in _schema.Types)
                     if (_visibility.CanSee(_mod, t.Mod)) yield return t.Name;

@@ -209,6 +209,9 @@ namespace Kesa.Engine.Script
                 }
                 else
                 {
+                    // DefId 매개변수의 목록은 타입을 아는 자리다: 짧은 이름은 커맨드의 모드 기준 (G261)
+                    var type = _owner.ParameterType?.Invoke(frame.Function, parameter);
+                    if (type != null) given = Loading.DefIds.Normalize(given, new Schema.ListTypeRef(type), TopMod);
                     candidate = given is ListValue || given is IRuntimeCollection
                         ? PureOps.Contains(given, value)
                         : throw Fail(Codes.RunType, "from_= of choose() must be a list, not " + given.KindName,

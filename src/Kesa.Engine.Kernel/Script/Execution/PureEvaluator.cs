@@ -40,6 +40,12 @@ namespace Kesa.Engine.Script
         /// </summary>
         public string ScriptMod => _active.Count == 0 ? "" : _active[_active.Count - 1].TopMod;
 
+        /// <summary>
+        /// 커맨드 매개변수의 타입 (커맨드 함수, 매개변수 이름). <c>choose(p, from_=[...])</c>의 짧은 Def id를 그 타입으로 푼다 (spec-gaps G261).
+        /// 런타임이 준다.
+        /// </summary>
+        public Func<FunctionValue, string, Schema.TypeRef?>? ParameterType { get; set; }
+
         private void Enter(Session session) => _active.Add(session);
         private void Leave() => _active.RemoveAt(_active.Count - 1);
 

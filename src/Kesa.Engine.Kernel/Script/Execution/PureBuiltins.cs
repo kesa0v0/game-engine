@@ -26,6 +26,12 @@ namespace Kesa.Engine.Script
         /// <summary>엔티티에 앉은 연결의 종류를 읽는 내장 (spec S6, spec-gaps G241): <c>"human"</c>·<c>"ai"</c>·<c>None</c>. 런타임이 더한다.</summary>
         public const string ControllerName = "controller";
 
+        /// <summary>
+        /// 짧은 Def id를 쓴 코드의 모드 기준 전체 이름으로 바꾸는 내장 (spec-gaps G261·G266). 없는 Def는 오류다. 부른 모드를 알아야 하므로
+        /// 런타임이 더한다.
+        /// </summary>
+        public const string DefIdName = "defid";
+
         /// <summary>월드의 구조를 바꾸는 내장 (spec-gaps G134, int 키 줄 헬퍼는 G129). 몸체는 월드가 준다.</summary>
         public const string SpawnName = "spawn";
         public const string DestroyName = "destroy";
@@ -86,7 +92,7 @@ namespace Kesa.Engine.Script
 
         private static SortedSet<string> NameSet()
         {
-            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName };
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName };
             set.UnionWith(WritingNameArray);
             return set;
         }

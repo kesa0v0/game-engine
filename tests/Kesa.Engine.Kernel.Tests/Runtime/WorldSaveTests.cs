@@ -270,6 +270,20 @@ namespace Kesa.Engine.Tests.Runtime
             }));
         }
 
+        /// <summary>저장 파일의 Def id는 전체 이름만 받는다: 짧은 이름은 어느 모드 것인지 모른다 (G264).</summary>
+        [Test]
+        public void ASavedShortDefIdIsNotResolved()
+        {
+            BuildNastyWorld();
+            string text = Encoding.UTF8.GetString(_world.Save());
+            Assert.That(text, Does.Contain("\"def\": \"banking:Scout\""));
+            var save = Encoding.UTF8.GetBytes(text.Replace("\"def\": \"banking:Scout\"", "\"def\": \"Scout\""));
+            Mod("banking", schema: Schema, defs: Defs, extra: ", version=\"1.0\"");
+            var result = World.Load(LoadClean(), save);
+            Assert.That(result.Succeeded, Is.False);
+            Assert.That(result.Diagnostics.Select(d => d.Message), Has.Some.Contains("the Def 'Scout' no longer exists"));
+        }
+
         /// <summary>호스트가 허락하면 지워진 컴포넌트·멤버·Def 키 줄의 값을 버리고, 버린 곳마다 경고를 남기고 불러온다 (G210).</summary>
         [Test]
         public void TheHostCanDropWhatTheContentRemovedAndLoadWithWarnings()

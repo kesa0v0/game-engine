@@ -549,5 +549,26 @@ namespace Kesa.Engine.Runtime
             string mod = _evaluator?.ScriptMod ?? "";
             return mod.Length == 0 || id.Length == 0 ? id : DefIds.Resolve(id, mod);
         }
+
+        /// <summary>
+        /// <c>defid("Sloop")</c> (spec-gaps G266): 부른 함수의 모드 기준 전체 이름. 그런 (구체) Def가 없으면 오류다. 리터럴 인자는 ⑤ 링크가
+        /// 먼저 본다.
+        /// </summary>
+        private Value DefIdBuiltin(string mod, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
+            if (positional.Count != 1 || keywords.Count > 0 || !(positional[0] is StrValue name))
+                throw new ScriptRuntimeException(Codes.RunType,
+                    "defid() takes one Def id string, got " +
+                    (positional.Count == 1 && keywords.Count == 0 ? positional[0].KindName : positional.Count + keywords.Count + " arguments"),
+                    "write defid(\"Sloop\")");
+            string id = mod.Length == 0 ? name.Value : DefIds.Resolve(name.Value, mod);
+            if (!_defs.TryGet(id, out _))
+            {
+                var ids = new List<string>();
+                foreach (var d in _defs.Defs) ids.Add(d.Id);
+                throw new ScriptRuntimeException(Codes.RunUnknownName, "there is no Def '" + id + "'", DefIds.Hint(id, ids));
+            }
+            return new StrValue(id);
+        }
     }
 }

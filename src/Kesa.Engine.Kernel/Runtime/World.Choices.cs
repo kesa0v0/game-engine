@@ -259,9 +259,12 @@ namespace Kesa.Engine.Runtime
                     : option is IRuntimeCollection collection ? collection.Iterate()
                     : throw new ScriptRuntimeException(Codes.RunType, "from_= of choose() must be a list, not " + option.KindName,
                         "write choose(" + choose.Parameter + ", from_=[...]) (spec-gaps G183)");
+                var parameterType = CommandParameterType(decl.Function, choose.Parameter);
                 foreach (var item in items)
                 {
-                    var plain = ToPlain("a candidate of '" + choose.Parameter + "'", item);
+                    // DefId 매개변수의 짧은 이름은 커맨드의 모드 기준 (G261)
+                    var full = parameterType == null ? item : Loading.DefIds.Normalize(item, parameterType, decl.Mod);
+                    var plain = ToPlain("a candidate of '" + choose.Parameter + "'", full);
                     if (!result.Exists(x => PureOps.ValuesEqual(ToScript(x), ToScript(plain)))) result.Add(plain);
                 }
                 return result;
