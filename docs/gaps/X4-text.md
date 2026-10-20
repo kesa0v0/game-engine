@@ -19,3 +19,17 @@
 **이유:** 후보는 Fluent+Linguini, gettext `.po`+Karambolo.PO(번역 도구가 가장 넓지만 자리 표시자 채우기와 `select`를 직접 써야 함), MessageFormat(.NET, 파일 형식은 따로), 우리 콘텐츠 언어(로더는 공짜지만 번역 도구가 없음), ICU4N(alpha, MessageFormat·PluralRules 미포팅으로 탈락)이었다. Fluent는 형식과 문법을 한 번에 주고, 모드를 받는 게임 엔진 OpenRA와 RobustToolbox(Space Station 14)가 Linguini를 쓴다(두 저장소의 프로젝트 파일로 확인). Linguini는 별이 42개이고 기여가 거의 한 사람(Ygg01)이라는 위험이 있지만 NuGet 내려받기 약 535만, 2026-10 기준 활발한 커밋이고, 형식은 Mozilla 표준(문법 1.0)이라 라이브러리와 따로 살아남는다. 사례: RimWorld는 XML Keyed·DefInjected와 언어별 C# LanguageWorker, 패러독스는 YAML 비슷한 `l_english:`과 글 안의 월드 읽기 `[ROOT.GetName]`(X4가 막은 방식, U14), Godot은 `.po`를 협업용으로 권함(일반 지식과 Godot 문서).
 
 **상태:** 확인
+
+## G255
+
+**위치:** G254 번역 키의 표기 (Fluent 식별자에는 점이 없음)
+
+**무엇이 비어 있었나:** 스크립트는 `text("harbor.charter")`처럼 점으로 이은 키를 썼지만, Fluent의 글 이름은 `[a-zA-Z][a-zA-Z0-9_-]*`이고 점은 속성(`harbor-charter.tooltip`)을 뜻한다. 스크립트의 키와 번역 파일의 이름을 어떻게 잇는지 없었다.
+
+**어떻게 정했나:** **스크립트에 적는 키는 Fluent 이름 그대로다.** 이어 붙이기는 하이픈(`text("harbor-charter", gold=5)`), 점은 Fluent처럼 속성만(`text("harbor-charter.tooltip")`, 글 이름 뒤에 하나). 엔진은 키 문자열을 바꾸거나 모드 접두사를 붙이지 않는다. 모드 id 접두사(`harbor-`)는 관례이고, 서로 순서 없는 모드끼리 같은 키를 정의하면 어떻게 하는지는 덮어쓰기 규칙에서 정한다. 이것은 키 문자열의 규칙일 뿐이고 스크립트의 데이터 경로(`house.Purse.gold`)와 무관하며, 번역 파일의 `{ $gold }`는 넘겨받은 인자만 읽는다(X4, U14). 예시 모드의 키도 바꿈(`harbor-charter`, `harbor-already-open`, `skirmish-already-started`).
+
+**이유:** 스크립트의 문자열로 번역 파일을 그대로 찾을 수 있고 번역자와 모더가 같은 이름을 본다. 엔진이 점을 하이픈으로 바꾸면 한 키에 표기가 둘이 되고 속성을 가리킬 길이 없어진다. 접두사를 엔진이 붙이면 남의 모드를 번역하는 모드가 대상 모드를 따로 적어야 하고 파일에 보이는 이름과 실제 이름이 달라진다. Space Station 14는 Fluent 키를 하이픈으로 길게 잇는 관례(`comp-gas-pump-ui-pump-status`), RimWorld Keyed·패러독스 키는 전역 이름에 모더가 접두사를 붙이는 관례다(일반 지식). 점을 속성으로 남기면 spec X4의 "규칙으로 도출한 키(`Scout.label`)"를 Fluent의 글과 속성(`Scout = 정찰병` / `.desc = …`)으로 옮길 길이 열린다(따로 정함).
+
+**알아 둘 것:** 커맨드(`banking.Ask`)·단계(`harbor.market`)·호스트 함수·`Call`의 함수 이름은 지금처럼 점으로 모드를 가른다. 번역 키만 하이픈이다(Fluent 문법 때문).
+
+**상태:** 확인
