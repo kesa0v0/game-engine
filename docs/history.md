@@ -711,3 +711,11 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **4단계 문서:** 안내서 2장에 "Def id의 이름 공간" 절, override·패치 예시·경로의 다른 모드 키(`Stock['harbor:Fish']`), 1장(LNK005, 콘솔 예시와 `patches.py` 줄 번호), 8장 콘솔 출력. spine-spec S1에 이름 공간 항목, 스텁 설명, 예시 `cost['core:Wood']`·`spawn("Warrior")`.
 - **테스트:** 기존 테스트의 id 기대값을 전체 이름으로(약 90개 파일), 등록 테스트는 새 전제로(같은 이름 다른 모드는 다른 Def, override 없이 남의 전체 이름은 `DEF005`). 새 `DefIdBuiltinTests` 9개, `BareDefIdWarningTests` 4개, `StubGeneratorTests`(G265 모양), `WorldSaveTests` 1개.
 - **확인:** 테스트 2099개 통과(커널 2041, CLI 36, 콘솔 호스트 22). `engine check samples/guide`·`samples/skirmish` 경고 없음. `spec-gaps` 표 확인 `265 6`.
+
+## 2026-10-20: X4 번역 설계 마무리와 질문의 선택지 (G267~G273)
+
+- **번역 인자 값 표(G267):** Linguini 0.11.0 임시 실험(저장소에 남기지 않음)으로 직접 만든 `IFluentType`이 자리 표시자에 `AsString()`으로 나오고 사용자 함수에 타입 그대로 가는 것, 그 값으로는 `select`가 안 되는 것(`Matches`가 불리지 않음), `NUMBER()`가 기본으로 없고 수가 불변 문화권 표기인 것을 확인. 실행 중 Def id가 문자열이라 "불린 Def의 전체 이름과 같은 문자열은 Def 이름"(사용자가 고름), 엔티티는 `text()` 때 Def를 적어 둠(`kesa-gone` 없음).
+- **조사(G268):** 번역문의 `JOSA($x, "을")`, Def 속성으로 고르기 `DEFATTR`. 뒤처리 표시 `(을)를`은 안 씀.
+- **호스트 API(G269):** `Translations.Load`(불변) → `For(언어 목록)`의 `Translator`, 다시 읽기는 `Load`를 다시 불러 갈아 끼움(사용자 질문 "핫 리로드가 되나?"에서).
+- **선택지 이야기(G270~G273):** Def의 `.desc`를 어떻게 띄우나에서 사용자가 "호스트가 k.title·k.desc를 배치"를 내어 제목·선택지 자리의 `Label`·`Attr`로(G270, 잠정), 선택지의 보이는 모양("보라색으로 불탐")은 모드가 `option(…, style=)`으로(G271), "응답 커맨드(내용: 예)"는 호스트가 보는 목록과 내는 함수만 `kesa.pick(choice=번호)`로 합침(G272, 커널의 `Answer`는 그대로, 번호인 것은 숨김 값 때문). 모드 id `kesa` 예약은 확인 중 드러남(G273, 잠정). advisor 검토로 사용자가 답하지 않은 G270을 잠정으로 고침.
+- **커밋:** `f8fba32`, `7c9eec1`, `297dc21`, `cea3c56`과 이 정리. 문서만 바뀜, 테스트 2099개 통과.
