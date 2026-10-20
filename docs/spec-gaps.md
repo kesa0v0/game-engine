@@ -18,7 +18,7 @@
 | [G9](gaps/S1-loading.md#g9) | S1 ① 정렬 | 설치 안 된 `loadAfter`·`optional` 대상은 조용히 무시, 이름이 아주 비슷한 설치 모드가 있으면 경고 + "혹시 …?". | 잠정 |
 | [G10](gaps/S1-loading.md#g10) | S1 ① 정렬 | 두 폴더가 같은 모드 id를 선언하면 둘 다 비활성화, `related`에 서로의 위치. | 잠정 |
 | [G11](gaps/S1-loading.md#g11) | S1 ① 정렬 | 사이클 모드에 `loadAfter`·`optional`로만 걸린 모드는 로드(순서만 잃음), 필수 의존이면 비활성화. | 확인 |
-| [G12](gaps/S1-loading.md#g12) | S1 매니페스트 | `Mod(...)`에 `version`·`defaultLanguage` 추가, 필드 이름은 camelCase, 모르는 필드는 오류 + "혹시 …?". | 잠정 |
+| [G12](gaps/S1-loading.md#g12) | S1 매니페스트 | `Mod(...)`에 `version`·`defaultLanguage` 추가, 필드 이름은 camelCase, 모르는 필드는 오류 + "혹시 …?". | 일부 바뀜(G256) |
 | [G15](gaps/S1-loading.md#g15) | S1 ① 정렬 | 매니페스트가 깨진 모드: `id`만 읽히면 의존 모드에 `MOD009`(의존성 로드 실패), `id`도 못 읽으면 `MOD007`(설치 안 됨). | 잠정 |
 | [G16](gaps/S1-loading.md#g16) | S1 ②a 스키마 파일 | 스키마 파일 구분: `use` 목록을 파일로 편 뒤 `schema/`로 시작하는 경로는 ②a, 나머지는 ②b, 묶음 안은 목록 순서. | 확인 |
 | [G18](gaps/S1-loading.md#g18) | S1 `use_all` | `use_all("dir/")`은 하위 폴더까지 `.py` 전부를 상대 경로 서수 순으로(`mod.py` 제외), 이미 나온 파일은 처음 자리에서 한 번만. | 잠정 |
