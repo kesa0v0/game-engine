@@ -7,19 +7,6 @@ using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Loading
 {
-    /// <summary>④가 한 모드의 식을 평가할 때 쓰는 이름 공간: 그 모드 파일이 묶은 이름과 내장 이름.</summary>
-    internal sealed class ModEnvironment
-    {
-        public ModEnvironment(ModScope scope, IBuiltins builtins)
-        {
-            Scope = scope;
-            Builtins = builtins;
-        }
-
-        public ModScope Scope { get; }
-        public IBuiltins Builtins { get; }
-    }
-
     /// <summary>
     /// <c>inherit</c>가 든 식을 ④에서 평가한다 (spec-gaps G30·G55·G56). 쓸 수 있는 것은 리터럴, 리스트·맵, 수의 <c>+ - *</c>과
     /// 단항 <c>-</c>, 리스트·문자열의 <c>+</c>, 같은 모드의 이름, 컴포넌트 값 생성자 호출, <c>inherit.이름</c>과

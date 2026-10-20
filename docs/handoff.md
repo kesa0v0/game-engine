@@ -82,7 +82,7 @@
 1. ~~실행 중 이름 오류의 "혹시 …?" 후보가 모드 전역을 빼먹는다.~~ **고침(2026-10-21):** `IScriptGlobals.Names`로 모드 전역도 후보에 넣음. 함께 `Suggest.Distance`가 이웃 두 글자 맞바꾸기를 한 번으로 셈(`lfet` → `left`, 전에는 힌트 없음).
 2. ~~종료 코드 3(엔진 내부 예외) 경로의 테스트가 없다.~~ **고침(2026-10-21):** `CommandsTests.AnEngineExceptionExitsThreeAndSaysItIsABug`(`LoadAndReport`를 internal로 열어 보고 단계에서 던짐).
 3. **단계 순서 덤프(S9 "왜?" 도구, G80).** 파생값 추적(`Explain`)·전제 조건 보고서(`CheckPreconditions`)·반응 추적(`Reactions`)은 API로 있다. CLI는 월드를 돌리지 않으므로 CLI 명령으로 남은 것은 단계 순서(`schema.StageOrder`·`HandlerStages`)를 보여 주는 덤프뿐이다. `dump`에서 특정 Def만 고르는 옵션도 미뤘다(G80).
-4. **파일 정리의 작은 나머지.** 새로 나눈 파일의 쓰지 않는 using, 같은 기준이 맞는 나머지 결과 타입(`LoadOrder`·`DiscoveryResult`·`ChooseInfo`·`ModFunctions` 등)을 제 파일로(원하면).
+4. ~~파일 정리의 작은 나머지.~~ **끝(2026-10-21):** 동작 클래스 파일에 얹혀 있던 타입 아홉을 제 파일로, `src/`의 쓰지 않는 using을 모두 지움(방법은 history의 "파일 정리의 작은 나머지").
 
 **필요해지면 할 것** (실제 모드 사례가 생기면 정한다):
 

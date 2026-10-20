@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 using Kesa.Engine.Schema;
 using Kesa.Engine.Script;
 

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using Kesa.Engine.Diagnostics;
-
 namespace Kesa.Engine.Script
 {
     /// <summary>

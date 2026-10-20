@@ -5,7 +5,6 @@ using System.Reflection;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Host;
 using Kesa.Engine.Numerics;
-using Kesa.Engine.Schema;
 using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Runtime

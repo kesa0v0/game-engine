@@ -1,11 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using Kesa.Engine.Diagnostics;
-using Kesa.Engine.Numerics;
-using Kesa.Engine.Schema;
-using Kesa.Engine.Script;
-
 namespace Kesa.Engine.Runtime
 {
     /// <summary>제출된 인자가 매개변수 타입에 맞지 않는 이유 (spec-gaps G115).</summary>

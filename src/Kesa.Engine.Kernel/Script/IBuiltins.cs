@@ -1,7 +1,4 @@
-using System;
 using System.Collections.Generic;
-using Kesa.Engine.Diagnostics;
-using Kesa.Engine.Numerics;
 
 namespace Kesa.Engine.Script
 {

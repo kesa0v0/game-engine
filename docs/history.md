@@ -848,3 +848,20 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - 모드 내용으로는 엔진 예외에 닿으면 안 되므로(닿으면 그것이 버그), `Commands.LoadAndReport`를 internal로 열고 보고 콜백에서 예외를 던져 시험한다.
 - 확인하는 것: 종료 코드 3, stderr 첫 줄 `engine check: internal error (this is an engine bug, please report it)`, 예외 내용, stdout은 비어 있음.
 - **확인:** 테스트 2258개 통과(커널 2146, 번역 49, CLI 38, 콘솔 호스트 25).
+
+## 2026-10-21: 파일 정리의 작은 나머지 (남은 일 4번)
+
+동작은 바뀌지 않는다. 파일 배치 규칙(CLAUDE.md, 2026-10-18)을 마저 맞췄다.
+
+- **제 파일로 옮긴 타입 아홉** (문서 주석과 함께 잘라 옮기는 스크립트로 했다):
+  - `LoadOrder`(←`ModSorter.cs`), `DiscoveryResult`(←`ModDiscovery.cs`)
+  - `ChooseInfo`(←`ChooseDependencies.cs`), `ModFunctions`(←`FunctionNameChecker.cs`)
+  - `ModEnvironment`(←`DeferredEvaluator.cs`), `HostReader`(←`HostAccess.cs`), `HostSignature`(←`HostSignatures.cs`)
+  - `GenericType`(←`SchemaBuiltins.cs`), `FrozenDef`(←`DefSet.cs`)
+  - `Frame.cs`의 `ResultTo`는 `Frame`의 칸이 쓰는 작은 열거형이라 그대로 둔다. `Ast.cs`·`SchemaModel.cs`·`Values.cs` 같은 모델 묶음도 규칙대로 그대로 둔다.
+- **쓰지 않는 using:**
+  - `dotnet format style --diagnostics IDE0005`는 이 저장소에서 아무것도 찾지 못했다. 일부러 넣은 using으로 확인했다.
+  - 이렇게 하면 찾는다: 저장소 루트에 임시 `.editorconfig`(`[*.cs]` `dotnet_diagnostic.IDE0005.severity = warning`)를 두고 `dotnet build Kesa.Engine.slnx --no-incremental -p:EnforceCodeStyleInBuild=true -p:GenerateDocumentationFile=true "-p:NoWarn=CS1591%3BCS1573%3BCS1572%3BCS1574%3BCS1587%3BRS2008"`로 빌드한다. 문서 주석 경고와 분석기 릴리스 추적(RS2008)은 이 검사에만 끈다. 끝나면 `.editorconfig`를 지운다.
+  - IDE0005는 붙어 있는 쓰지 않는 using 묶음을 첫 줄 하나로 알린다. 그래서 줄을 지우고 다시 검사하기를 0이 될 때까지 되풀이했다.
+  - 모두 `src/Kesa.Engine.Kernel`에 있었다. using이 모두 빠진 두 파일은 앞의 빈 줄도 지웠다.
+- **확인:** 일반 빌드 경고·오류 0. 테스트 2258개 통과(커널 2146, 번역 49, CLI 38, 콘솔 호스트 25).

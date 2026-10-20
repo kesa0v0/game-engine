@@ -6,21 +6,6 @@ using Kesa.Engine.Diagnostics;
 
 namespace Kesa.Engine.Loading
 {
-    public sealed class DiscoveryResult
-    {
-        internal DiscoveryResult(IReadOnlyList<ModManifest> mods, IReadOnlyList<string> failedIds)
-        {
-            Mods = mods;
-            FailedIds = failedIds;
-        }
-
-        /// <summary>매니페스트를 문제없이 읽은 모드 (폴더 이름 서수 순).</summary>
-        public IReadOnlyList<ModManifest> Mods { get; }
-
-        /// <summary>id는 읽혔지만 매니페스트에 오류가 있는 모드 (서수 순).</summary>
-        public IReadOnlyList<string> FailedIds { get; }
-    }
-
     /// <summary>
     /// 모드 루트의 바로 아래 폴더마다 <c>mod.py</c>를 찾아 읽는다 (spec S1 ① 발견).
     /// 폴더와 파일은 서수 순으로 다뤄 결과가 파일 시스템 순서와 무관하다.
