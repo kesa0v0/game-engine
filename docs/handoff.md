@@ -24,7 +24,7 @@
 | S10 UI가 보여 줄 값 읽기(`Call`·`ViewAs(…).Call`·영수증, G244~G248) | 끝남. UI 정의 파일은 호스트마다 제 형식(G249), 콘솔은 `ui/console.txt`(G250), 도장은 저장된 값의 것(G235·G251) |
 | X4 번역 파일·포매터, S10 UI의 행동(버튼 → 커맨드) | 없음 |
 
-결정은 `docs/spec-gaps.md`의 G1~G265. 기능을 더하거나 바꾸면 `docs/modding/`의 해당 장과 9장 "아직 없는 것"도 고친다(예시는 `samples/`에서 가져오고 `GuideSampleTests`·`SkirmishTests`가 돌린다).
+결정은 `docs/spec-gaps.md`의 G1~G266. 기능을 더하거나 바꾸면 `docs/modding/`의 해당 장과 9장 "아직 없는 것"도 고친다(예시는 `samples/`에서 가져오고 `GuideSampleTests`·`SkirmishTests`가 돌린다).
 
 ## 핵심 규칙 (자세한 것은 spec-gaps)
 
