@@ -50,7 +50,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             var screen = new StringWriter();
             var errors = new StringWriter();
-            int code = ConsoleHost.Play.Run(new[] { _root, "--seat", "red=banking:Vault" }, new StringReader(input), screen, errors);
+            int code = ConsoleHost.Play.Run(new[] { "--lang", "ko", _root, "--seat", "red=banking:Vault" }, new StringReader(input), screen, errors);
             return (code, screen.ToString().Replace("\r\n", "\n"), errors.ToString());
         }
 

@@ -156,10 +156,10 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             var screen = new StringWriter();
             var errors = new StringWriter();
-            int code = Play.Run(new[] { Root(), "--seat", "gull=harbor:Gull", "--seat", "crane=harbor:Crane" },
+            int code = Play.Run(new[] { "--lang", "ko", Root(), "--seat", "gull=harbor:Gull", "--seat", "crane=harbor:Crane" },
                 new StringReader("1\n:q\n"), screen, errors);
             Assert.That(code, Is.EqualTo(0), errors.ToString());
-            Assert.That(screen.ToString(), Does.Contain("[gull] #2 harbor:Gull").And.Contain("{gold: 20, fleet: 0, day: 0}"));
+            Assert.That(screen.ToString(), Does.Contain("[gull] #2 갈매기 상회").And.Contain("{gold: 20, fleet: 0, day: 0}"));
         }
     }
 }

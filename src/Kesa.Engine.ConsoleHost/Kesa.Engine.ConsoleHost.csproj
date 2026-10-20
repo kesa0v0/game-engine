@@ -13,6 +13,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Kesa.Engine.Kernel\Kesa.Engine.Kernel.csproj" />
+    <ProjectReference Include="..\Kesa.Engine.Text\Kesa.Engine.Text.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 콘솔 자신의 글: 실행 파일 옆 locale/<언어>/*.ftl (G274) -->
+    <None Include="locale\**\*.ftl" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

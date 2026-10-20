@@ -41,9 +41,9 @@ def Raid(house: Ref[House], target: Ref[Ship]):
 # 용선 제안: 3틱 안에 답하지 않으면 거절한 것으로 친다. 받아들이면 2틱 뒤 생선이 들어온다
 @command(free=True, acts_for=lambda house: house)
 def Charter(house: Ref[House]):
-    r = ask(house, text("harbor-charter", gold=5), choices=["accept", "decline"],
-            deadline=3, on_timeout="decline")
-    if r.choice == "accept":
+    r = ask(house, text("harbor-charter", gold=5), choices=["harbor-charter-accept", "harbor-charter-decline"],
+            deadline=3, on_timeout="harbor-charter-decline")
+    if r.choice == "harbor-charter-accept":
         house.Purse.gold += 5
         wait(ticks=2)
         house.Stock.Fish.amount += 3

@@ -44,7 +44,7 @@ def resolve(a, t):
     bx = t.Pos.x + sign(t.Pos.x - a.Pos.x)
     by = t.Pos.y + sign(t.Pos.y - a.Pos.y)
     if free(bx, by):
-        r = ask(t.Owner.party, "hit", choices=["hold", "retreat"], data={"unit": t, "roll": roll, "damage": damage})
+        r = ask(t.Owner.party, "skirmish-hit", choices=["skirmish-hit-hold", "skirmish-hit-retreat"], data={"unit": t, "roll": roll, "damage": damage})
         if r.index == 1:
             damage = damage // 2
             t.Pos.x = bx
@@ -72,7 +72,7 @@ def Start():
     p = red
     while g.Match.winner is None:
         # Attack의 본문이 맞은 쪽에 물으면 그 답까지 끝난 뒤에 여기로 돌아온다 (G243)
-        r = ask(p, "turn", responses=["Move", "Attack", "EndTurn"], data={"turn": g.Match.turn})
+        r = ask(p, "skirmish-turn", responses=["Move", "Attack", "EndTurn"], data={"turn": g.Match.turn})
         match r.response:
             case "Attack" if alive(p.Order.next) == 0:
                 g.Match.winner = p

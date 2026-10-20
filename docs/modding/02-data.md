@@ -73,8 +73,8 @@ Def 타입·컴포넌트·신호는 이름 하나를 함께 쓴다. 두 모드�
 `samples/guide/harbor/defs/things.py`:
 
 ```python
-Good("Fish", price=2, label="harbor.good.fish")
-Good("Salt", price=5, label="harbor.good.salt")
+Good("Fish", price=2, label="harbor-good-fish")
+Good("Salt", price=5, label="harbor-good-salt")
 
 House("Gull")
 House("Crane")
@@ -110,7 +110,8 @@ PRICES = {defid("Sloop"): 8}           # 사전 키도
 ```
 
 - 호스트(C# API, 명령 인자, 저장 파일)는 전체 이름만 받는다.
-- `TextKey` 값은 그냥 문자열이다(`label="harbor.good.fish"`). 번역은 아직 없다(9장).
+- `TextKey` 값은 번역 키 문자열이다(`label="harbor-good-fish"`). 글은 `locale/`의 번역 파일에 둔다(8장).
+  Def 자신의 화면 이름은 따로 적지 않고 번역 파일의 `def-harbor-Sloop` 키에 둔다(`/`도 `-`로: `def-harbor-rigs-Brig`).
 - Def에는 엔티티 Ref를 적을 수 없다. 엔티티는 게임 중에 생긴다.
 
 ### 상속

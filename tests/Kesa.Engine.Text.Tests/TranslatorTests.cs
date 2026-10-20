@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Kesa.Engine.Numerics;
 using Kesa.Engine.Runtime;
 using Kesa.Engine.Script;
@@ -15,7 +16,7 @@ namespace Kesa.Engine.Text.Tests
             "component(\"Hull\", hp=field(int, default=1))\n" +
             "deftype(\"Ship\", components=[\"Hull\"])\n";
 
-        private const string Defs = "Ship(\"Sloop\")\nShip(\"Brig\")\n";
+        private const string Defs = "Ship(\"Sloop\")\nShip(\"Brig\")\nShip(\"Raft\")\n";
 
         private const string Texts =
             "def-harbor-Sloop = sloop\n" +
@@ -134,6 +135,20 @@ namespace Kesa.Engine.Text.Tests
             Assert.That(s, Does.Contain("ships"));
             Assert.That(_errors, Has.Count.EqualTo(3));
             Assert.That(_errors[0], Is.EqualTo("no translation for 'harbor-nope'"));
+        }
+
+        // Def 이름의 번역이 없으면 키(def-…)가 아니라 Def id (G275)
+        [Test]
+        public void AnUntranslatedDefShowsItsId()
+        {
+            var raft = _world.Create("harbor:Raft");
+            Assert.That(_tr.Label(new StrValue("harbor:Raft")), Is.EqualTo("harbor:Raft"));
+            Assert.That(_tr.Label(new EntityValue(raft), _world), Is.EqualTo("harbor:Raft"));
+            string said = _tr.Format(T("harbor-said", new Dictionary<string, Value>
+                { ["who"] = new StrValue("harbor:Raft"), ["what"] = new StrValue("hi") }));
+            Assert.That(said, Is.EqualTo("harbor:Raft said: hi"));
+            Assert.That(_errors.Distinct(), Is.EqualTo(new[] { "no translation for 'def-harbor-Raft'" }), "still reported");
+            Assert.That(_tr.Attr(new StrValue("harbor:Raft"), "desc"), Is.EqualTo("def-harbor-Raft.desc"), "attributes keep the key");
         }
 
         [Test]

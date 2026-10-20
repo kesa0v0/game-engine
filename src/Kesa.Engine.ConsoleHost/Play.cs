@@ -6,6 +6,7 @@ using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Reporting;
 using Kesa.Engine.Runtime;
+using Kesa.Engine.Text;
 
 namespace Kesa.Engine.ConsoleHost
 {
@@ -17,13 +18,14 @@ namespace Kesa.Engine.ConsoleHost
     /// </summary>
     public static class Play
     {
-        public const string Usage = "usage: kesa-play <mods-dir> --seat <connection>[=<Def>] [--seat <connection>[=<Def>]...] [--seed <n>]";
+        public const string Usage = "usage: kesa-play <mods-dir> --seat <connection>[=<Def>] [--seat <connection>[=<Def>]...] [--seed <n>] [--lang <tag>[,<tag>...]]";
 
         public static int Run(string[] args, TextReader stdin, TextWriter stdout, TextWriter stderr)
         {
             string? root = null;
             var seats = new List<(string Connection, string? Def)>();
             int seed = 1;
+            string[]? languages = null;
             for (int i = 0; i < args.Length; i++)
             {
                 string? value = args[i] == "--seat" && i + 1 < args.Length ? args[i + 1] : null;
@@ -40,6 +42,9 @@ namespace Kesa.Engine.ConsoleHost
                 }
                 else if (args[i] == "--seed" && i + 1 < args.Length &&
                          int.TryParse(args[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out seed)) i++;
+                else if (args[i] == "--lang" && i + 1 < args.Length && languages == null &&
+                         Array.TrueForAll(args[i + 1].Split(','), LanguageTag.IsValid))
+                    languages = args[++i].Split(',');
                 else if (root == null && !args[i].StartsWith("--", StringComparison.Ordinal)) root = args[i];
                 else
                 {
@@ -71,8 +76,34 @@ namespace Kesa.Engine.ConsoleHost
                 foreach (var line in wrong) stderr.WriteLine(line);
                 return 1;
             }
-            new ConsoleGame(content, world, seats, panels, stdin, stdout).Run();
+            new ConsoleGame(content, world, seats, panels, Translator(content, languages ?? DefaultLanguages(), stderr), stdin, stdout).Run();
             return 0;
+        }
+
+        /// <summary>콘솔 자신의 번역 폴더: 실행 파일 옆 <c>locale/</c> (G274).</summary>
+        public static string HostLocale => Path.Combine(AppContext.BaseDirectory, Translations.LocaleFolder);
+
+        /// <summary><c>--lang</c>이 없으면 OS 표시 언어 뒤에 <c>en</c> (G274).</summary>
+        public static string[] DefaultLanguages()
+        {
+            string os = CultureInfo.CurrentUICulture.Name;
+            return os.Length == 0 || os == "en" ? new[] { "en" } : new[] { os, "en" };
+        }
+
+        /// <summary>
+        /// 번역을 읽는다. 번역 오류는 판을 막지 않는다(G257): 읽기 진단은 정보를 빼고 stderr에, 화면을 그리다 난 번역 오류는 같은 것을 한 번만.
+        /// </summary>
+        private static Translator Translator(ContentLoadResult content, string[] languages, TextWriter stderr)
+        {
+            var bag = new DiagnosticBag();
+            var texts = Translations.Load(content, bag, HostLocale);
+            foreach (var d in bag.ToSortedList())
+                if (d.Severity != Severity.Info) stderr.WriteLine(d);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            return texts.For(languages, message =>
+            {
+                if (seen.Add(message)) stderr.WriteLine("translation: " + message);
+            });
         }
     }
 }

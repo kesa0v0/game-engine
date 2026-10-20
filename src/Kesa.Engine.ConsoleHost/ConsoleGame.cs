@@ -7,6 +7,7 @@ using Kesa.Engine.Loading;
 using Kesa.Engine.Runtime;
 using Kesa.Engine.Schema;
 using Kesa.Engine.Script;
+using Kesa.Engine.Text;
 
 namespace Kesa.Engine.ConsoleHost
 {
@@ -39,7 +40,7 @@ namespace Kesa.Engine.ConsoleHost
         private readonly IReadOnlyList<ConsoleUi.Panel> _panels;
 
         public ConsoleGame(ContentLoadResult content, World world, IReadOnlyList<(string Connection, string? Def)> seats,
-            IReadOnlyList<ConsoleUi.Panel> panels, TextReader input, TextWriter output)
+            IReadOnlyList<ConsoleUi.Panel> panels, Translator translator, TextReader input, TextWriter output)
         {
             _content = content;
             _world = world;
@@ -48,7 +49,7 @@ namespace Kesa.Engine.ConsoleHost
             _seats = seats.Select(s => s.Connection).Distinct().ToList();
             _in = input;
             _out = output;
-            _text = new ValueText(world);
+            _text = new ValueText(world, translator);
         }
 
         private sealed class Option
@@ -80,7 +81,7 @@ namespace Kesa.Engine.ConsoleHost
                 var options = Options();
                 if (options.Count == 0)
                 {
-                    _out.WriteLine("낼 수 있는 것이 없다. 끝.");
+                    _out.WriteLine(_text.Say("no-moves"));
                     return;
                 }
                 for (int i = 0; i < options.Count; i++)
@@ -96,7 +97,7 @@ namespace Kesa.Engine.ConsoleHost
                         n >= 1 && n <= options.Count)
                         picked = options[n - 1];
                     else
-                        _out.WriteLine("1부터 " + options.Count.ToString(CultureInfo.InvariantCulture) + " 사이의 번호, 끝내려면 :q");
+                        _out.WriteLine(_text.Say("pick-number", ("n", new IntValue(options.Count))));
                 }
                 _out.WriteLine("[" + picked.Seat + "] " + picked.Run());
             }
@@ -119,7 +120,7 @@ namespace Kesa.Engine.ConsoleHost
                     {
                         if (_world.DefOf(id) != def || _world.SeatOf(id) != null) continue;
                         _world.Seat(id, connection);
-                        _out.WriteLine("[" + connection + "] " + _text.Entity(id) + "에 앉음");
+                        _out.WriteLine("[" + connection + "] " + Seated(id));
                         goto next;
                     }
                 }
@@ -139,25 +140,27 @@ namespace Kesa.Engine.ConsoleHost
                 var free = _world.SeatChoices().Where(id => _world.SeatOf(id) == null).ToList();
                 if (free.Count == 0) continue; // 후보가 아직 없다: 생기면 묻는다
                 _asked.Add(connection);
-                _out.WriteLine("앉을 자리: " + string.Join("  ",
+                _out.WriteLine(_text.Say("seat-choices") + " " + string.Join("  ",
                     free.Select((id, i) => (i + 1).ToString(CultureInfo.InvariantCulture) + ") " + _text.Entity(id))));
                 while (true)
                 {
-                    _out.Write(connection + "는 어디에? > ");
+                    _out.Write(_text.Say("where", ("connection", new StrValue(connection))) + " ");
                     string? line = _in.ReadLine();
                     if (line == null || line.Trim() == ":q") return false;
                     if (int.TryParse(line.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int n) &&
                         n >= 1 && n <= free.Count)
                     {
                         _world.Seat(free[n - 1], connection);
-                        _out.WriteLine("[" + connection + "] " + _text.Entity(free[n - 1]) + "에 앉음");
+                        _out.WriteLine("[" + connection + "] " + Seated(free[n - 1]));
                         break;
                     }
-                    _out.WriteLine("1부터 " + free.Count.ToString(CultureInfo.InvariantCulture) + " 사이의 번호, 끝내려면 :q");
+                    _out.WriteLine(_text.Say("pick-number", ("n", new IntValue(free.Count))));
                 }
             }
             return true;
         }
+
+        private string Seated(EntityId id) => _text.Say("seated", ("entity", new StrValue(_text.Entity(id))));
 
         // ---- 상태 ----
 
@@ -171,13 +174,13 @@ namespace Kesa.Engine.ConsoleHost
         private void WriteState()
         {
             _out.WriteLine();
-            _out.WriteLine("== 틱 " + _world.Tick.ToString(CultureInfo.InvariantCulture) + " ==");
+            _out.WriteLine(_text.Say("tick", ("tick", new IntValue(_world.Tick))));
             if (_panels.Count > 0) WritePanels();
             else WriteEntities();
             foreach (var request in _world.OpenRequests)
             {
-                _out.WriteLine("질문 " + request.Id.ToString(CultureInfo.InvariantCulture) + ": " + _text.Of(request.Title) +
-                               " → " + string.Join(", ", request.Who.Select(_text.Entity)) +
+                _out.WriteLine(_text.Say("question", ("id", new IntValue(request.Id)), ("title", new StrValue(_text.Label(request.Title))),
+                                   ("who", new StrValue(string.Join(", ", request.Who.Select(_text.Entity))))) +
                                (request.Data is NoneValue ? "" : "  " + _text.Of(request.Data)));
             }
         }
@@ -278,14 +281,15 @@ namespace Kesa.Engine.ConsoleHost
                     foreach (var move in responses.Moves)
                     {
                         string label = move.Command == World.PickCommand
-                            ? "질문 " + request.Id.ToString(CultureInfo.InvariantCulture) + " " + _text.Entity(move.By) + ": " +
-                              _text.Of(request.Choices[(int)((IntValue)move.Arguments[World.PickChoice]).Value].Value)
+                            ? _text.Say("pick", ("id", new IntValue(request.Id)), ("by", new StrValue(_text.Entity(move.By))),
+                                ("choice", new StrValue(_text.Label(request.Choices[(int)((IntValue)move.Arguments[World.PickChoice]).Value]))))
                             : Label(move.Command, move.Arguments);
                         options.Add(new Option(seat, label,
                             () => Text(_world.Respond(seat, request.Id, move.Command, move.Arguments))));
                     }
                     foreach (var needs in responses.Needs)
-                        _out.WriteLine("(" + needs.Command + "의 수를 나열할 수 없다: " + string.Join(", ", needs.Parameters) + "를 정해야 한다)");
+                        _out.WriteLine(_text.Say("needs", ("command", new StrValue(needs.Command)),
+                            ("parameters", new StrValue(string.Join(", ", needs.Parameters)))));
                 }
                 foreach (var command in _content.Commands.Keys.OrderBy(k => k, StringComparer.Ordinal))
                 {
@@ -306,7 +310,7 @@ namespace Kesa.Engine.ConsoleHost
             }
             catch (WorldException e)
             {
-                _out.WriteLine("(" + command + "의 수를 나열할 수 없다: " + e.Message + ")");
+                _out.WriteLine(_text.Say("cannot-list", ("command", new StrValue(command)), ("why", new StrValue(e.Message))));
                 return Array.Empty<IReadOnlyDictionary<string, Value>>();
             }
         }
@@ -317,10 +321,10 @@ namespace Kesa.Engine.ConsoleHost
         // ---- 결과 ----
 
         private string Text(SubmitResult r) =>
-            r.Succeeded ? "ok" : r.Outcome + Why(r.Error, r.Preconditions, r.ArgumentRejections);
+            r.Succeeded ? _text.Say("ok") : r.Outcome + Why(r.Error, r.Preconditions, r.ArgumentRejections);
 
         private string Text(AnswerResult r) =>
-            r.Succeeded ? "ok" : r.Outcome + (r.Message == null ? "" : ": " + r.Message) +
+            r.Succeeded ? _text.Say("ok") : r.Outcome + (r.Message == null ? "" : ": " + r.Message) +
                                  Why(r.Error, r.Preconditions, r.ArgumentRejections);
 
         private string Why(WorldException? error, PreconditionReport? report, IReadOnlyList<ArgumentRejection> rejections)
@@ -331,7 +335,9 @@ namespace Kesa.Engine.ConsoleHost
             if (report != null)
             {
                 foreach (var failure in report.Failures)
-                    reasons.Add(failure.MessageKey ?? failure.Kind + " " + (failure.Parameter ?? failure.Slot ?? ""));
+                    reasons.Add(failure.MessageKey != null
+                        ? _text.Message(failure.MessageKey, failure.Args)
+                        : failure.Kind + " " + (failure.Parameter ?? failure.Slot ?? ""));
             }
             return reasons.Count == 0 ? "" : ": " + string.Join("; ", reasons);
         }

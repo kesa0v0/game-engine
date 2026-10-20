@@ -11,9 +11,9 @@
 # 용선 제안: 3틱 안에 답하지 않으면 거절한 것으로 친다. 받아들이면 2틱 뒤 생선이 들어온다
 @command(free=True, acts_for=lambda house: house)
 def Charter(house: Ref[House]):
-    r = ask(house, text("harbor-charter", gold=5), choices=["accept", "decline"],
-            deadline=3, on_timeout="decline")
-    if r.choice == "accept":
+    r = ask(house, text("harbor-charter", gold=5), choices=["harbor-charter-accept", "harbor-charter-decline"],
+            deadline=3, on_timeout="harbor-charter-decline")
+    if r.choice == "harbor-charter-accept":
         house.Purse.gold += 5
         wait(ticks=2)
         house.Stock.Fish.amount += 3
@@ -25,7 +25,7 @@ def Charter(house: Ref[House]):
 |---|---|
 | 누구 | 답할 엔티티, 또는 엔티티 목록. 그 엔티티에 앉은 연결이 답한다(7장) |
 | 제목 | 문자열 키나 `text(...)` |
-| `choices=[...]` | 고를 선택지. 답은 몇 번째를 골랐나 |
+| `choices=[...]` | 고를 선택지. 답은 몇 번째를 골랐나. 문자열 선택지는 화면이 번역 키로 보인다(8장) |
 | `responses=["Move", ...]` | 답으로 낼 수 있는 응답 커맨드 이름(다른 모드 것은 `"mod.Name"`) |
 | `data={...}` | 화면에 보일 덧붙임 값 |
 | `deadline=n`, `on_timeout=값` | n틱 안에 답이 없으면 `on_timeout`(선택지나 응답 이름)으로 답한 것으로 친다. 둘은 함께 쓴다 |
@@ -46,10 +46,10 @@ def Charter(house: Ref[House]):
 
 ```python
 r = ask(house, text("harbor-charter", gold=5), choices=[
-    option("accept", desc=text("harbor-charter-accept-desc"), style="gold-glow"),
-    "decline",
+    option("harbor-charter-accept", desc=text("harbor-charter-accept-desc"), style="gold-glow"),
+    "harbor-charter-decline",
 ])
-if r.choice == "accept":   # 답은 감싼 것이 아니라 안의 값
+if r.choice == "harbor-charter-accept":   # 답은 감싼 것이 아니라 안의 값
     ...
 ```
 

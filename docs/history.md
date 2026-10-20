@@ -760,3 +760,13 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **CLI:** `engine check`가 번역 파일을 읽고 검사한다(`dump`·`stubs`는 안 함). CLI가 `Kesa.Engine.Text`를 참조.
 - **샘플:** 새 검사로 `LOC008` 경고 세 개가 나와 `harbor`·`skirmish`에 `defaultLanguage="en"`과 en·ko 번역 파일(`text()` 키만)을 더함. 선택지·제목 키 바꾸기는 콘솔 연결 때.
 - **확인:** 테스트 2185개 통과(커널 2077, 번역 48, CLI 37, 콘솔 호스트 23). `engine check samples/guide`·`samples/skirmish` 경고 없음.
+
+## 2026-10-20: 콘솔 호스트 번역 연결 (G274·G275)
+
+- **결정(확인):** G274 콘솔은 `--lang ko,en`으로 언어를 받고 없으면 `CurrentUICulture.Name` 뒤에 `en`, 태그가 아니면 사용법 오류(2), 콘솔 자신의 글은 실행 파일 옆 `locale/`의 `engine-console-…`. G275 번역 없는 Def 이름은 키가 아니라 Def id(G257 일부 바뀜).
+- **콘솔:** `ConsoleGame`이 `Translator`를 받아 모든 글을 `engine-console-…` 키로 찍고(ko는 옛 하드코딩 글과 같음), 질문 제목·선택지는 `Label`, `require` 실패는 `Message`, 엔티티는 `#번호 번역된 이름`(없어진 엔티티는 `(gone)` 글). 리스트·사전은 콘솔이 늘어놓고 맨 값만 `Value`. 읽기 진단은 정보를 빼고 stderr, 그리는 중의 번역 오류는 같은 것을 한 번만 `translation: …`.
+- **예시 모드:** 키를 G255 관례로(`harbor-charter-accept`·`-decline`, `skirmish-hit`·`-hit-hold`·`-hit-retreat`·`skirmish-turn`, `harbor-good-fish`·`-salt`), en·ko 번역에 Def 이름(`def-harbor-Gull` 등, 배는 `.desc`)을 더함. `lighthouse`는 일부러 번역이 없다.
+- **테스트:** 콘솔 테스트는 `--lang ko`로 돌리고 번역된 글을 기대함, `TheLanguageComesFromLang`(fr,en → 영어, 태그 오류는 2), `AnUntranslatedDefShowsItsId`.
+- **안내서:** 8장 "번역" 절(파일 자리, 키, Def 이름, `engine-` 키, 고르는 순서, `JOSA`·`DEFATTR`, 검사), 1·2·3·5장의 "번역은 아직 없음"과 예시 키, 9장 표는 "커맨드 이름의 번역"으로 바꿈.
+- **남은 것:** 수 목록의 커맨드 이름은 번역하지 않는다.
+- **확인:** 테스트 2187개 통과(커널 2077, 번역 49, CLI 37, 콘솔 호스트 24).

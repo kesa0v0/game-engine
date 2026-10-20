@@ -74,7 +74,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             var screen = new StringWriter();
             var errors = new StringWriter();
-            int code = Play.Run(new[] { Samples(), "--seat", "red=skirmish:Red", "--seat", "blue=skirmish:Blue", "--seed", seed.ToString() },
+            int code = Play.Run(new[] { "--lang", "ko", Samples(), "--seat", "red=skirmish:Red", "--seat", "blue=skirmish:Blue", "--seed", seed.ToString() },
                 new Bot(screen, limit), screen, errors);
             Assert.That(code, Is.EqualTo(0), errors.ToString());
             return screen.ToString();
@@ -86,15 +86,15 @@ namespace Kesa.Engine.ConsoleHost.Tests
             // --seat red: 앉을 후보(Seatable, G239)가 생기면 묻는다. 잘못된 번호는 다시 묻고, 남이 앉은 자리는 빠진다
             var screen = new StringWriter();
             var errors = new StringWriter();
-            int code = Play.Run(new[] { Samples(), "--seat", "red", "--seat", "blue" },
+            int code = Play.Run(new[] { "--lang", "ko", Samples(), "--seat", "red", "--seat", "blue" },
                 new StringReader("1\n9\n2\n1\n:q\n"), screen, errors);
             Assert.That(code, Is.EqualTo(0), errors.ToString());
             string text = screen.ToString();
-            Assert.That(text, Does.Contain("앉을 자리: 1) #1 skirmish:Red  2) #2 skirmish:Blue"));
-            Assert.That(text, Does.Contain("[red] #2 skirmish:Blue에 앉음"));
-            Assert.That(text, Does.Contain("앉을 자리: 1) #1 skirmish:Red\n").Or.Contain("앉을 자리: 1) #1 skirmish:Red\r\n"));
-            Assert.That(text, Does.Contain("[blue] #1 skirmish:Red에 앉음"));
-            Assert.That(text, Does.Contain("[blue] skirmish.EndTurn(party=#1 skirmish:Red)"));
+            Assert.That(text, Does.Contain("앉을 자리: 1) #1 빨강  2) #2 파랑"));
+            Assert.That(text, Does.Contain("[red] #2 파랑에 앉음"));
+            Assert.That(text, Does.Contain("앉을 자리: 1) #1 빨강\n").Or.Contain("앉을 자리: 1) #1 빨강\r\n"));
+            Assert.That(text, Does.Contain("[blue] #1 빨강에 앉음"));
+            Assert.That(text, Does.Contain("[blue] skirmish.EndTurn(party=#1 빨강)"));
         }
 
         [Test]
@@ -110,7 +110,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             // 빨강이 공격해 명중하면 질문은 파랑 진영에게 가고, 파랑에 앉은 연결이 답한다(배정 표, G236)
             string screen = PlayOut(seed: 1);
-            var asked = Regex.Match(screen, @"질문 \d+: hit → #2 skirmish:Blue[^\n]*\n(?:  \d+\)[^\n]*\n)+> (\[\w+\])");
+            var asked = Regex.Match(screen, @"질문 \d+: 명중! → #2 파랑[^\n]*\n(?:  \d+\)[^\n]*\n)+> (\[\w+\])");
             Assert.That(asked.Success, Is.True);
             Assert.That(asked.Groups[1].Value, Is.EqualTo("[blue]"));
         }
@@ -120,14 +120,14 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             // 선택지 답도 LegalResponses의 engine.pick 수라 한 번씩만 나온다 (G272)
             string screen = PlayOut(seed: 1);
-            var asked = Regex.Match(screen, @"질문 (\d+): hit → #2 skirmish:Blue[^\n]*\r?\n((?:  \d+\)[^\n]*\n)+)");
+            var asked = Regex.Match(screen, @"질문 (\d+): 명중! → #2 파랑[^\n]*\r?\n((?:  \d+\)[^\n]*\n)+)");
             Assert.That(asked.Success, Is.True);
             var lines = Regex.Matches(asked.Groups[2].Value, @"\d+\) ([^\r\n]*)").Select(m => m.Groups[1].Value);
             string q = asked.Groups[1].Value;
             Assert.That(lines, Is.EqualTo(new[]
             {
-                "[blue] 질문 " + q + " #2 skirmish:Blue: hold",
-                "[blue] 질문 " + q + " #2 skirmish:Blue: retreat",
+                "[blue] 질문 " + q + " #2 파랑: 버틴다",
+                "[blue] 질문 " + q + " #2 파랑: 물러난다",
             }));
         }
 
@@ -158,7 +158,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         public void AWrongNumberAsksAgain()
         {
             var screen = new StringWriter();
-            Play.Run(new[] { Samples(), "--seat", "red=skirmish:Red" }, new StringReader("9\nx\n:q\n"), screen, new StringWriter());
+            Play.Run(new[] { "--lang", "ko", Samples(), "--seat", "red=skirmish:Red" }, new StringReader("9\nx\n:q\n"), screen, new StringWriter());
             Assert.That(Regex.Matches(screen.ToString(), "1부터 1 사이의 번호").Count, Is.EqualTo(2));
         }
 
@@ -166,12 +166,29 @@ namespace Kesa.Engine.ConsoleHost.Tests
         public void MissingSeatsOrFolderAreUsageErrors()
         {
             var errors = new StringWriter();
-            Assert.That(Play.Run(new[] { Samples() }, new StringReader(""), new StringWriter(), errors), Is.EqualTo(2));
-            Assert.That(Play.Run(new[] { Samples(), "--seat" }, new StringReader(""), new StringWriter(), errors), Is.EqualTo(2));
-            Assert.That(Play.Run(new[] { Samples(), "--seat", "=A" }, new StringReader(""), new StringWriter(), errors),
+            Assert.That(Play.Run(new[] { "--lang", "ko", Samples() }, new StringReader(""), new StringWriter(), errors), Is.EqualTo(2));
+            Assert.That(Play.Run(new[] { "--lang", "ko", Samples(), "--seat" }, new StringReader(""), new StringWriter(), errors), Is.EqualTo(2));
+            Assert.That(Play.Run(new[] { "--lang", "ko", Samples(), "--seat", "=A" }, new StringReader(""), new StringWriter(), errors),
                 Is.EqualTo(2));
-            Assert.That(Play.Run(new[] { "no/such/dir", "--seat", "a=A" }, new StringReader(""), new StringWriter(), errors),
+            Assert.That(Play.Run(new[] { "--lang", "ko", "no/such/dir", "--seat", "a=A" }, new StringReader(""), new StringWriter(), errors),
                 Is.EqualTo(2));
+        }
+
+        // 언어는 --lang으로, 태그가 아니면 사용법 오류 (G274)
+        [Test]
+        public void TheLanguageComesFromLang()
+        {
+            var screen = new StringWriter();
+            var errors = new StringWriter();
+            int code = Play.Run(new[] { Samples(), "--seat", "red", "--seat", "blue", "--lang", "fr,en" },
+                new StringReader("1\n:q\n"), screen, errors);
+            Assert.That(code, Is.EqualTo(0), errors.ToString());
+            Assert.That(screen.ToString(), Does.Contain("== tick 0 ==").And.Contain("Seats: 1) #1 Red  2) #2 Blue"));
+            Assert.That(errors.ToString(), Is.Empty, "the sample has every text it shows");
+
+            Assert.That(Play.Run(new[] { Samples(), "--seat", "red", "--lang", "ko_KR" }, new StringReader(""), new StringWriter(), errors),
+                Is.EqualTo(2));
+            Assert.That(Play.DefaultLanguages()[^1], Is.EqualTo("en"));
         }
     }
 }

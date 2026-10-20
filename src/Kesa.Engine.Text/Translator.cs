@@ -67,7 +67,7 @@ namespace Kesa.Engine.Text
             switch (value)
             {
                 case StrValue s:
-                    return IsDef(s.Value) ? Lookup(DefKey(s.Value), null) : Lookup(s.Value, null);
+                    return IsDef(s.Value) ? DefText(s.Value) : Lookup(s.Value, null);
                 case OptionValue o:
                     return o.Label != null ? Label(o.Label, defOf) : Label(o.Value, defOf);
                 default:
@@ -101,10 +101,10 @@ namespace Kesa.Engine.Text
             switch (value)
             {
                 case StrValue s:
-                    return IsDef(s.Value) ? Lookup(DefKey(s.Value), null) : s.Value;
+                    return IsDef(s.Value) ? DefText(s.Value) : s.Value;
                 case EntityValue e:
                     var def = defOf(e.Id);
-                    return def == null ? Hidden() : Lookup(DefKey(def), null);
+                    return def == null ? Hidden() : DefText(def);
                 case TextValue t:
                     return Format(t);
                 case OptionValue o:
@@ -172,7 +172,17 @@ namespace Kesa.Engine.Text
 
         /// <summary>번역 인자 자리의 Def: 이름과 함께 Def id를 들고 가 <c>JOSA</c>·<c>DEFATTR</c>가 쓴다 (G267·G268).</summary>
         private DefName Def(string defId) =>
-            new DefName(defId, Lookup(DefKey(defId), null), attribute => TryLookup(DefKey(defId) + "." + attribute, null));
+            new DefName(defId, DefText(defId), attribute => TryLookup(DefKey(defId) + "." + attribute, null));
+
+        /// <summary>Def의 화면 이름. 어느 언어에도 없으면 키(<c>def-…</c>)가 아니라 Def id를 보인다 (G275).</summary>
+        private string DefText(string defId)
+        {
+            string key = DefKey(defId);
+            var text = TryLookup(key, null);
+            if (text != null) return text;
+            Error("no translation for '" + key + "'");
+            return defId;
+        }
 
         /// <summary><c>키</c>나 <c>키.속성</c>을 언어 목록 → 주인의 기본 언어 순으로 찾고, 없으면 키 그대로 (G257).</summary>
         private string Lookup(string key, IDictionary<string, IFluentType>? args)

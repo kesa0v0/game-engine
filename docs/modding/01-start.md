@@ -41,7 +41,7 @@ use_all("defs/")
 | `dependencies` | 꼭 있어야 하는 모드. 없으면 이 모드가 꺼진다(`MOD007`). 그 모드의 이름이 보이게 된다 |
 | `loadAfter` | 있으면 그 뒤에 불린다. 없어도 된다. 이름은 보이지 않는다 |
 | `optional` | 있으면 그 뒤에 불리고 `mod_loaded("x")`로 물을 수 있다(2장 패치) |
-| `defaultLanguage` | 언어 태그(`"en"`, `"ko"`, `"pt-BR"`). 틀린 모양이면 `MOD002`. 번역 파일은 `locale/<언어 태그>/` 아래의 `.ftl`(Fluent)이고, `locale/`이 있으면 이 칸과 그 언어 폴더가 있어야 한다. 플레이어 언어에 글이 없으면 이 언어로 보인다. 콘솔은 아직 번역을 쓰지 않는다(9장) |
+| `defaultLanguage` | 언어 태그(`"en"`, `"ko"`, `"pt-BR"`). 틀린 모양이면 `MOD002`. 번역 파일은 `locale/<언어 태그>/` 아래의 `.ftl`(Fluent)이고, `locale/`이 있으면 이 칸과 그 언어 폴더가 있어야 한다. 플레이어 언어에 글이 없으면 이 언어로 보인다(8장) |
 
 - 필드 이름은 camelCase다. `load_after=`라고 쓰면 `MOD003`과 "혹시 'loadAfter'?"가 나온다.
 - `use("defs/a.py")`는 파일 하나, `use_all("defs/")`는 그 폴더의 `.py` 전부(하위 폴더 포함, 경로 이름 순)를 불러온다.
@@ -105,5 +105,6 @@ dotnet run --project src/Kesa.Engine.ConsoleHost -- samples/skirmish --seat red=
 
 - `--seat 연결=Def`는 그 Def의 엔티티가 생기면 그 연결을 앉힌다(7장). 호스트는 Def의 전체 이름(`모드id:이름`, 2장)을 받는다. `--seat red`처럼 Def를 빼면 앉을 자리를 화면에서 묻는다.
 - `--seed N`으로 난수 씨앗을 바꾼다. 같은 씨앗이면 같은 판이 나온다.
+- `--lang ko,en`으로 보일 언어를 앞에서부터 고른다. 없으면 OS 표시 언어 뒤에 `en`이다(8장의 번역).
 - 화면에는 모드의 `ui/console.txt`가 정한 값(8장), 열린 질문, 낼 수 있는 수가 번호와 함께 나온다. 번호를 넣어 고르고 `:q`로 끝낸다.
 - 모드에 오류가 있으면 `engine check`와 같은 형식으로 보이고 1로 끝난다.

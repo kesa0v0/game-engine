@@ -1,5 +1,5 @@
-Good("Fish", price=2, label="harbor.good.fish")
-Good("Salt", price=5, label="harbor.good.salt")
+Good("Fish", price=2, label="harbor-good-fish")
+Good("Salt", price=5, label="harbor-good-salt")
 
 House("Gull")
 House("Crane")
