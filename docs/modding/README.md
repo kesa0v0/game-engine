@@ -15,12 +15,12 @@
 5. [흐름과 시간](05-flow.md): `ask`, 응답 커맨드, `wait`, 마감, 틱
 6. [반응](06-reactions.md): 신호와 `@on`, `@when`, 단계
 7. [자리와 숨긴 정보](07-seats-and-hidden.md): 배정 표, `acts_for`, `controller`, 보기 정책
-8. [화면에 보일 값](08-screen.md): 순수 함수로 값 만들기, 콘솔의 `ui/console.txt`, 번역 파일(`locale/`)
+8. [화면에 보일 값](08-screen.md): 순수 함수로 값 만들기, 콘솔의 `ui/console.txt`, 번역 파일(`locale/`), 화면 동작(`ui_state`·`@ui_action`·`submit`)
 9. [모드를 고칠 때와 아직 없는 것](09-updates-and-limits.md): 저장 호환, 지금 없는 기능
 
 ## 예시
 
-- `samples/skirmish`: 작은 전투(5×5 판, 두 진영). 차례 루프, 응답 커맨드, 명중 때 묻는 질문, 콘솔 화면.
+- `samples/skirmish`: 작은 전투(5×5 판, 두 진영). 차례 루프, 응답 커맨드, 명중 때 묻는 질문, 콘솔 화면, 유닛 고르기 → 공격(화면 동작).
 - `samples/guide`: 이 안내서용 작은 항구(`harbor`)와 그것을 고치는 모드(`lighthouse`). 스커미시에 없는 기능(키 줄, `derived`와
   기여 행, 상속, 패치, 신호와 반응, 마감 있는 질문, 보기 정책)을 담았다.
 

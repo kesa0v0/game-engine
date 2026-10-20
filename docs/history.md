@@ -770,3 +770,49 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **안내서:** 8장 "번역" 절(파일 자리, 키, Def 이름, `engine-` 키, 고르는 순서, `JOSA`·`DEFATTR`, 검사), 1·2·3·5장의 "번역은 아직 없음"과 예시 키, 9장 표는 "커맨드 이름의 번역"으로 바꿈.
 - **남은 것:** 수 목록의 커맨드 이름은 번역하지 않는다.
 - **확인:** 테스트 2187개 통과(커널 2077, 번역 49, CLI 37, 콘솔 호스트 24).
+
+## 2026-10-20~21: S10 UI의 행동 (G276~G286)
+
+- **결정(모두 확인):**
+  - G276: 화면만 바꾸는 동작은 모드 스크립트의 `@ui_action`이 쓴다.
+  - G277: 저장소는 스키마의 `ui_state` 선언이고 연결마다 기록 하나.
+  - G278: 본문은 보는 세계로 읽기만, 쓰기는 기록만, `submit`은 적어 두기만.
+  - G279: 표기는 컴포넌트와 같고 모든 칸에 기본값, Ref는 optional, 호스트가 `UiState`를 든다.
+  - G280: 사전 조건이 있고, 호스트 API는 커맨드의 것을 따른다(`Act`, `CheckCommand`).
+  - G281: 이름 공간은 타입·컴포넌트·신호와 하나.
+  - G282: UI를 쓰는 도우미는 문장으로만 부르고, "UI를 건드림"은 호출을 따라 퍼진다.
+  - G283: 응답 커맨드의 `submit`은 엔진이 짝지을 질문을 찾는다.
+  - G284: 기록의 리스트·사전은 읽을 때 죽은·숨긴 엔티티를 뺀다.
+  - G285: 콘솔은 표기를 늘리지 않고 `[화면]` 메뉴에 섞어 보인다.
+  - G286: 콘솔의 약속으로, `me` 매개변수에 앉은 엔티티를 넣는다.
+- **1단계 로드:**
+  - `UiStateDecl`·`SchemaSet.UiStates`. 리스트·사전 칸은 `ui_state`만 쓴다.
+  - `CommandDecl.IsUiAction`과 `ContentLoadResult.UiActions`. 사전 조건은 쓰고 `cost`는 오류.
+  - `FunctionEffects`가 `UiTouchWitness`·`UiWriteWitness`를 고정점으로 채운다(`CMD007`). `ui.기록.칸` 이름은 `UiNames`가 본다.
+  - 리터럴 `submit`은 `Linker.CheckSubmit`(`CMD008`)이 본다.
+  - 스텁에 `submit`과 늘 있는 `ui`를 둔다.
+- **2단계 실행:**
+  - `World.NewUiState()`, `WorldView.Act(ui, 이름, 인자)` → `ActResult`. 사본에 쓰고 성공해야 반영한다.
+  - `World.Deliver(issuer, UiSubmission)` → `DeliveryResult`.
+  - 프레임의 `UiWritable`은 G117의 `Writable`처럼 문장 호출을 따라간다.
+  - UI 동작 밖의 `ui`·`submit`은 실행 오류다(`derived`·보기 정책은 `OutsideAct`).
+  - 인자 검사도 보는 쪽으로 해서 숨긴 엔티티는 죽은 것처럼 거절한다. 이것은 advisor가 짚은 누출로, 임시 테스트로 재현한 뒤 고쳤다.
+  - UI 칸의 리스트 `+=`는 조용히 무시되던 것을 재현해 오류로 바꿨다.
+  - `Show(ActResult)`·`Show(DeliveryResult)`.
+- **2b 나열:**
+  - `WorldView.CheckPreconditions(ui, …)`·`Candidates(ui, …)`·`LegalMoves(ui, …)`: 버릴 사본으로 도는 `Peek`. 커맨드 쪽 `Candidates`·`LegalMoves`를 선언 단위로 나눠 함께 쓴다.
+  - `CheckCommand`·`CheckUiAction`.
+- **3단계 화면 함수:**
+  - `WorldView.Call(ui, 이름, 인자…)`. 보통 `Call`은 `ui`를 읽는 함수를 이 꼴을 알려 주며 거절하고, 쓰는 함수는 늘 거절한다.
+  - `CheckCall(…, withUi: true)`.
+  - `ui`를 읽은 영수증은 `UiState.Version`을 보고, 기록이 가리키는 엔티티도 읽은 곳으로 든다.
+- **4단계 콘솔·샘플:**
+  - 콘솔은 자리마다 `UiState`를 든다. UI 동작의 수는 모든 자리의 커맨드 뒤에 둔다. 처음에 자리마다 붙였더니 봇 테스트의 번호가 밀려서 옮겼다.
+  - 고르면 `Act` 뒤 `Deliver`한다.
+  - 스커미시에 `Selection` 기록, `defs/ui.py`의 `select`·`strike`, 화면 함수 `selection`을 더했다.
+- **안내서:** 8장 "버튼" 절을 "화면 동작"으로 다시 썼다(`ui_state`, `@ui_action`, `submit`, 도우미 규칙, 화면 함수, 콘솔). 9장 표도 고쳤다.
+- **미룸:**
+  - `@ui_action` 덮어쓰기·패치.
+  - `submit(..., request=…)`.
+  - `PatchOperationCheck`가 패치로 `ui`를 건드리게 된 함수를 알리는 것.
+- **확인:** 테스트 2245개 통과(커널 2134, 번역 49, CLI 37, 콘솔 호스트 25). `engine check samples/skirmish` 경고 없음.
