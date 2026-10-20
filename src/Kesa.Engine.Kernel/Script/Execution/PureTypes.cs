@@ -82,6 +82,13 @@ namespace Kesa.Engine.Script
     }
 
     /// <summary>
+    /// UI 로컬 기록 하나 (<c>ui.Selection</c>, spec-gaps G279). 칸 쓰기는 게임 쓰기가 아니라 UI 쓰기 모드 프레임(<see cref="Frame.UiWritable"/>)의 것이다.
+    /// </summary>
+    internal interface IUiRecord : IRuntimeAssignable
+    {
+    }
+
+    /// <summary>
     /// 속성 자리(<see cref="AttributeExpr"/>)를 받아 그 자리의 캐시(<see cref="AttributeExpr.Cache"/>)를 쓰는 런타임 값.
     /// 결과는 <see cref="IRuntimeAttributes.GetAttribute"/>와 같아야 한다: 이름을 문자열로 다시 찾지 않을 뿐이다.
     /// </summary>
@@ -236,6 +243,11 @@ namespace Kesa.Engine.Script
         /// 그 본문이 부른 함수에서만이다. <c>derived</c>·조건·사전 조건에서 굴리면 읽기만 해도 값이 바뀐다.
         /// </summary>
         public bool Random { get; set; }
+
+        /// <summary>
+        /// UI 로컬 효과를 내는 내장인가 (<c>submit</c>, spec-gaps G278·G282). UI 쓰기 모드 프레임의 문장으로만 부를 수 있다.
+        /// </summary>
+        public bool WritesUi { get; set; }
 
         /// <summary>
         /// 실행을 멈추고 답을 기다리는 내장인가 (<c>ask</c>, spec S2·X1). 자리 규칙은 쓰는 내장과 같아서 <see cref="Writes"/>도 참이다

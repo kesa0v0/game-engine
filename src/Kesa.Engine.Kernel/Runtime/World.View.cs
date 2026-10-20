@@ -46,11 +46,11 @@ namespace Kesa.Engine.Runtime
                            (viewer is EntityValue v ? " seen by " + v.Id : " seen by a spectator");
             try
             {
-                var value = RunGateFunction(function, new[]
+                var value = OutsideAct(() => RunGateFunction(function, new[]
                 {
                     ToScript(viewer), ToScript(new EntityValue(id)),
                     component == null ? (Value)NoneValue.Instance : new StrValue(component),
-                }, label);
+                }, label));
                 if (value is BoolValue b) return b.Value;
                 diagnostics.Add(new Diagnostic(Codes.RunViewPolicy, Severity.Error,
                     "computing " + label + ": it must return True or False, not " + value.KindName + "; treated as not seen",

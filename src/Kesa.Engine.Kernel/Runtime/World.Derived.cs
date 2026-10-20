@@ -151,6 +151,7 @@ namespace Kesa.Engine.Runtime
             {
                 _commandsByFunction = new Dictionary<FunctionValue, CommandDecl>();
                 foreach (var decl in _commands.Values) _commandsByFunction[decl.Function] = decl;
+                foreach (var decl in _uiActions.Values) _commandsByFunction[decl.Function] = decl;
             }
             if (!_commandsByFunction.TryGetValue(function, out var command)) return null;
             foreach (var p in command.Parameters)
@@ -237,6 +238,7 @@ namespace Kesa.Engine.Runtime
             AddSignalBuiltins(table);
             AddFlowBuiltins(table);
             AddRandomBuiltins(table);
+            AddUiBuiltins(table);
             AddHostBuiltins(table);
             return table;
         }
@@ -298,7 +300,7 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var self = new ComponentView(this, new EntityId(entity.Id), component, row);
-                var result = RunFunction(function, self);
+                var result = OutsideAct(() => RunFunction(function, self));
                 return CheckDerivedResult(member.Display, member, result);
             }
             catch (ScriptRuntimeException e) when (_computing.Count > 1)

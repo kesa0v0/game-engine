@@ -63,6 +63,13 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public CallResult Call(string function, params Value[] arguments) => _world.CallAs(this, function, arguments);
 
+        /// <summary>
+        /// 이 연결의 <c>@ui_action</c>을 부른다 (spec-gaps G278·G280): 인자 검사 → 사전 조건 → 본문. 본문의 읽기는 모두 이 연결로서의 거른
+        /// 읽기이고, <c>ui.…</c> 쓰기는 성공했을 때만 <paramref name="ui"/>에 들어간다. 게임은 바뀌지 않는다. 적어 둔 <c>submit</c>은
+        /// 결과의 <see cref="ActResult.Submissions"/>이고 호스트가 <see cref="World.Deliver"/>로 낸다. 없는 이름만 호출자 오류다.
+        /// </summary>
+        public ActResult Act(UiState ui, string action, IReadOnlyDictionary<string, Value> args) => _world.ActAs(this, ui, action, args);
+
         /// <summary><see cref="World.CheckCall"/>과 같다: 부를 수 있는지는 보는 쪽과 상관없다.</summary>
         public string? CheckCall(string function, int argumentCount) => _world.CheckCall(function, argumentCount);
 

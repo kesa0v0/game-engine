@@ -167,12 +167,12 @@ namespace Kesa.Engine.Script
             var (callee, positional, keywords) = CallParts(call, frame);
             if (callee is FunctionValue fn && fn.Definition != null)
             {
-                var called = Push(fn, null, positional, keywords, call.Span, frame.Writable);
+                var called = Push(fn, null, positional, keywords, call.Span, frame.Writable, frame.UiWritable);
                 called.Result = target == null ? ResultTo.Discard : ResultTo.Local;
                 called.ResultName = target;
                 return;
             }
-            var value = Invoke(callee, positional, keywords, call.Span, frame.Writable);
+            var value = Invoke(callee, positional, keywords, call.Span, frame.Writable, frame.UiWritable);
             if (callee is PureBuiltin b && b.Suspends)
             {
                 // 질문을 들고 멈춘다: 실행 고리가 돌아가고, 답은 이어서 실행할 때 target에 들어간다 (G136·G138)
@@ -187,7 +187,7 @@ namespace Kesa.Engine.Script
         {
             if (assign.Target is AttributeExpr attr)
             {
-                if (frame.Writable)
+                if (frame.Writable || frame.UiWritable)
                 {
                     ExecWrite(assign, attr, frame);
                     return;
@@ -200,6 +200,12 @@ namespace Kesa.Engine.Script
                         "that only reads, or called inside an expression",
                         "only a @command body, and functions that change the world called on their own line from it, " +
                         "can write (spec-gaps G117)");
+                }
+                // UI 동작 안이다: 무엇에 쓰려 했는지(UI 기록인가 게임인가)에 따라 ExecWrite가 알맞은 오류를 낸다
+                if (_stack.Exists(f => f.UiWritable))
+                {
+                    ExecWrite(assign, attr, frame);
+                    return;
                 }
             }
             if (!(assign.Target is NameExpr target))
@@ -244,6 +250,14 @@ namespace Kesa.Engine.Script
                         ? "the component or row is missing; check it with 'is not None' first"
                         : "only members of a component or of a row can be written (spec-gaps G117)");
             }
+            // UI 기록은 UI 쓰기 모드에서만, 게임 상태는 쓰기 모드에서만 (G278·G282)
+            if (owner is IUiRecord ? !frame.UiWritable : !frame.Writable)
+            {
+                if (owner is IUiRecord) throw NotUiWritable(frame);
+                throw Fail(Codes.RunNotWritable,
+                    "'" + frame.Function.Name + "' cannot change the game: a @ui_action only changes ui.… and submits commands",
+                    "to change the game, submit(\"Command\", ...) a command that does it (spec-gaps G278)");
+            }
 
             Value value;
             if (assign.Op == "=")
@@ -262,6 +276,13 @@ namespace Kesa.Engine.Script
             if (target is ISiteAssignable siteTarget) siteTarget.SetAttribute(attr, value);
             else target.SetAttribute(attr.Name, value);
         }
+        private ScriptRuntimeException NotUiWritable(Frame frame) =>
+            Fail(Codes.RunNotWritable,
+                "'" + frame.Function.Name + "' cannot change UI state here: it was reached through a function that only reads, " +
+                "or called inside an expression",
+                "only a @ui_action body, and functions that change UI state called on their own line from it, can change ui.… " +
+                "(spec-gaps G282)");
+
         // ---- 식 ----
 
         /// <summary>식 하나를 이 프레임의 칸 배치로 만든 실행 노드로 평가한다 (G226 ⑦).</summary>

@@ -74,6 +74,7 @@ namespace Kesa.Engine.Runtime
             : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, actionStepBudget)
         {
             _viewPolicy = loaded.ViewPolicy;
+            _uiActions = loaded.UiActions;
             _mods = loaded.Mods;
             _contents = loaded.Contents;
             _hostFunctions = loaded.HostFunctions;

@@ -21,6 +21,7 @@ namespace Kesa.Engine.Script
             {
                 CallSite = CallSite,
                 Writable = Writable,
+                UiWritable = UiWritable,
                 Result = Result,
                 ResultName = ResultName,
             };
@@ -45,6 +46,7 @@ namespace Kesa.Engine.Script
             Locals = null!;
             CallSite = default;
             Writable = false;
+            UiWritable = false;
             Result = ResultTo.Host;
             ResultName = null;
             Returned = NoneValue.Instance;
@@ -63,6 +65,12 @@ namespace Kesa.Engine.Script
         /// 순수 함수에서 시작한 호출, 식 안의 호출, <c>derived</c>·사전 조건·<c>Cond</c>는 커맨드 실행 중이라도 순수다.
         /// </summary>
         public bool Writable { get; set; }
+
+        /// <summary>
+        /// UI 쓰기 모드 (G282 런타임 안전망). <c>@ui_action</c> 본문, 그리고 UI 쓰기 모드 프레임이 문장으로 부른 UI를 쓰는 함수만 참이다.
+        /// 이 모드에서는 <c>ui.기록.칸</c>에 쓰고 <c>submit</c>할 수 있지만 게임은 바꾸지 못한다(<see cref="Writable"/>과 따로).
+        /// </summary>
+        public bool UiWritable { get; set; }
 
         /// <summary>
         /// 실행 중인 블록들, 바깥에서 안쪽 순 (S2 평가 모델: 문장 실행은 C# 호출 스택이 아니라 이 데이터에 있다).

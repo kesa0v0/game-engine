@@ -173,6 +173,30 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary>
+        /// <c>@ui_action</c>을 실행한다 (spec-gaps G278·G280): 사전 조건을 평가하고 실패한 <c>require</c>가 없으면 본문을 UI 쓰기 모드로
+        /// 실행한다. 게임 쓰기·난수·<c>ask</c>는 막힌다. 결과는 <c>require</c>마다의 결과다.
+        /// </summary>
+        public List<RequireOutcome> RunUiAction(FunctionValue action, IReadOnlyDictionary<string, Value> args,
+            SourceSpan callSite = default, StepMeter? meter = null)
+        {
+            var session = new Session(this, meter ?? new StepMeter(_budget));
+            Enter(session);
+            try
+            {
+                return session.Command(action, args, callSite, runBody: true, uiAction: true);
+            }
+            catch (ScriptRuntimeException e) when (e.Span.Line <= 0)
+            {
+                e.Span = callSite;
+                throw;
+            }
+            finally
+            {
+                Leave();
+            }
+        }
+
+        /// <summary>
         /// 멈춘 실행을 답 <paramref name="answer"/>로 이어서 다음 막힘이나 끝까지 실행한다. 다시 멈추면 그 실행을 돌려주고, 끝나면 null이다.
         /// <paramref name="from"/>은 바꾸지 않는다(사본에서 실행한다): 실행이 오류로 끝나면 부른 쪽은 그대로 다시 기다릴 수 있다 (C8·C9).
         /// </summary>

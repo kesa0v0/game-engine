@@ -12,16 +12,24 @@ namespace Kesa.Engine.Script
         /// <param name="writable">
         /// 부른 쪽이 쓰기 모드 프레임이고 이 호출이 문장일 때 참. 그래도 부르는 함수가 쓰기 함수여야 쓰기 모드가 된다 (G117).
         /// </param>
+        /// <param name="uiWritable">부른 쪽이 UI 쓰기 모드 프레임이고 이 호출이 문장일 때 참 (G282, <paramref name="writable"/>과 같은 규칙).</param>
         public Value Invoke(Value function, IReadOnlyList<Value> positional,
-            IReadOnlyDictionary<string, Value> keywords, SourceSpan site, bool writable = false)
+            IReadOnlyDictionary<string, Value> keywords, SourceSpan site, bool writable = false, bool uiWritable = false)
         {
             switch (function)
             {
                 case FunctionValue f:
-                    return CallFunction(f, null, positional, keywords, site, writable);
+                    return CallFunction(f, null, positional, keywords, site, writable, uiWritable);
                 case ClosureValue c:
-                    return CallFunction(c.Function, c.Captured, positional, keywords, site, writable);
+                    return CallFunction(c.Function, c.Captured, positional, keywords, site, writable, uiWritable);
                 case PureBuiltin b:
+                    if (b.WritesUi && !uiWritable)
+                    {
+                        throw Fail(Codes.RunNotWritable,
+                            b.Name + "() asks the host to submit a command, so it cannot be called here",
+                            "call it on its own line in a @ui_action or in a function that changes UI state called on its own " +
+                            "line from it (spec-gaps G282)");
+                    }
                     if (b.Writes && !writable)
                     {
                         throw Fail(Codes.RunNotWritable,
@@ -59,10 +67,10 @@ namespace Kesa.Engine.Script
         /// <summary>C# 쪽에서 끝까지 실행하는 호출 (호스트 실행, 식 안의 호출). 돌려준 값을 받는다.</summary>
         private Value CallFunction(FunctionValue fn, LocalTable? captured,
             IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
-            bool writable)
+            bool writable, bool uiWritable)
         {
             int depth = _stack.Count;
-            var newFrame = Push(fn, captured, positional, keywords, site, writable);
+            var newFrame = Push(fn, captured, positional, keywords, site, writable, uiWritable);
             newFrame.Result = ResultTo.Host;
             try
             {
@@ -92,7 +100,7 @@ namespace Kesa.Engine.Script
         /// <summary>재귀를 검사하고 인자를 묶은 프레임을 스택에 넣는다. <c>def</c>면 몸체 블록에서 시작한다.</summary>
         private Frame Push(FunctionValue fn, LocalTable? captured,
             IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
-            bool writable)
+            bool writable, bool uiWritable = false)
         {
             // 커맨드는 제출로만 실행된다 (G118). 이름으로 잡히지 않은 길(함수 값)의 마지막 방어선
             if (fn.IsEntry)
@@ -103,6 +111,7 @@ namespace Kesa.Engine.Script
             var newFrame = Enter(fn, captured, positional, keywords);
             newFrame.CallSite = site;
             newFrame.Writable = writable && fn.Writes;
+            newFrame.UiWritable = uiWritable && fn.WritesUi;
             if (fn.Definition != null) newFrame.Blocks.Add(BodyBlock(fn.Definition, newFrame.Layout));
             _stack.Add(newFrame);
             return newFrame;

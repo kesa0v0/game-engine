@@ -20,8 +20,11 @@ namespace Kesa.Engine.Script
         /// 사전 조건을 평가하고, <paramref name="runBody"/>이고 실패한 <c>require</c>가 없으면 같은 지역 변수로 본문을 이어서
         /// 실행한다 (G132). 본문 실행 중에만 상태 쓰기가 열린다. 본문 안에서 읽는 <c>derived</c>는 따로 도는 순수 실행이다.
         /// </summary>
+        /// <param name="uiAction">
+        /// <c>@ui_action</c>이면 참 (G278): 본문은 쓰기 모드가 아니라 UI 쓰기 모드로 돈다(게임은 못 바꾸고 <c>ui.…</c>와 <c>submit</c>만).
+        /// </param>
         public List<RequireOutcome> Command(FunctionValue command, IReadOnlyDictionary<string, Value> args,
-            SourceSpan site, bool runBody, Action? bodyStarts = null)
+            SourceSpan site, bool runBody, Action? bodyStarts = null, bool uiAction = false)
         {
             int depth = _stack.Count;
             var frame = Enter(command, null, Array.Empty<Value>(), args);
@@ -34,7 +37,13 @@ namespace Kesa.Engine.Script
                 var body = command.Definition!.Body;
                 bool hasBlock = body.Count > 0 && body[0] is WithStmt;
                 bool failed = hasBlock && EvaluateBlock((WithStmt)body[0], frame, results);
-                if (runBody && !failed)
+                if (runBody && !failed && uiAction)
+                {
+                    frame.UiWritable = true;
+                    frame.Blocks.Add(BodyBlock(command.Definition!, frame.Layout, hasBlock ? 1 : 0));
+                    RunUntil(depth);
+                }
+                else if (runBody && !failed)
                 {
                     bodyStarts?.Invoke(); // 사전 조건을 통과해 본문이 시작된다: 새 Flow (난수열을 연다, G182)
                     frame.Writable = true;
