@@ -160,6 +160,9 @@ namespace Kesa.Engine.Schema
         /// <summary>선언 호출의 위치.</summary>
         public SourceSpan Span { get; }
 
+        /// <summary>타입 인자의 위치 (타입이 그 자리에 맞지 않을 때 가리킨다).</summary>
+        public SourceSpan TypeSpan { get; internal set; }
+
         public Value? Default { get; internal set; }
         public NameRef? DefaultFrom { get; internal set; }
         public Value? Min { get; internal set; }
@@ -360,6 +363,29 @@ namespace Kesa.Engine.Schema
         public IReadOnlyList<NameRef> Components { get; }
     }
 
+    /// <summary>
+    /// <c>ui_state("Selection", unit=ref("Unit", optional=True))</c> (spec S10 3항, spec-gaps G277·G279): UI 로컬 저장소의 기록 하나.
+    /// 칸은 <c>field(...)</c>(리스트·사전도 됨)와 <c>ref(..., optional=True)</c>이고 모두 기본값이 있다. 이름은 Def 타입·컴포넌트·신호와
+    /// 한 이름 공간이다(G281).
+    /// </summary>
+    public sealed class UiStateDecl
+    {
+        internal UiStateDecl(string name, SourceSpan span, string mod, IReadOnlyList<MemberDecl> members)
+        {
+            Name = name;
+            Span = span;
+            Mod = mod;
+            Members = members;
+        }
+
+        public string Name { get; }
+        public SourceSpan Span { get; }
+        public string Mod { get; }
+
+        /// <summary>선언 순서.</summary>
+        public IReadOnlyList<MemberDecl> Members { get; }
+    }
+
     /// <summary>모드 하나의 스키마 파일들이 선언한 것 (실행 순서).</summary>
     public sealed class ModSchema
     {
@@ -371,6 +397,30 @@ namespace Kesa.Engine.Schema
         public List<ExtensionDecl> Extensions { get; } = new List<ExtensionDecl>();
         public List<SignalDecl> Signals { get; } = new List<SignalDecl>();
         public List<StageDecl> Stages { get; } = new List<StageDecl>();
+        public List<UiStateDecl> UiStates { get; } = new List<UiStateDecl>();
+    }
+
+    /// <summary>완성된 UI 로컬 기록 (G277·G279).</summary>
+    public sealed class UiStateType
+    {
+        private readonly Dictionary<string, MemberDecl> _members = new Dictionary<string, MemberDecl>(StringComparer.Ordinal);
+
+        internal UiStateType(UiStateDecl decl)
+        {
+            Decl = decl;
+            foreach (var m in decl.Members)
+            {
+                _members[m.Name] = m;
+                m.Display = decl.Name + "." + m.Name;
+            }
+        }
+
+        public UiStateDecl Decl { get; }
+        public string Name => Decl.Name;
+        public string Mod => Decl.Mod;
+        public IReadOnlyList<MemberDecl> Members => Decl.Members;
+
+        public bool TryGetMember(string name, out MemberDecl member) => _members.TryGetValue(name, out member!);
     }
 
     /// <summary>
@@ -539,6 +589,20 @@ namespace Kesa.Engine.Schema
         {
             _signals.Add(signal.Name, signal);
             _signalList.Add(signal);
+        }
+
+        private readonly Dictionary<string, UiStateType> _uiStates = new Dictionary<string, UiStateType>(StringComparer.Ordinal);
+        private readonly List<UiStateType> _uiStateList = new List<UiStateType>();
+
+        /// <summary>UI 로컬 기록 (G277). 로드 순서, 같은 모드 안에서는 선언 순서.</summary>
+        public IReadOnlyList<UiStateType> UiStates => _uiStateList;
+
+        public bool TryGetUiState(string name, out UiStateType state) => _uiStates.TryGetValue(name, out state!);
+
+        internal void Add(UiStateType state)
+        {
+            _uiStates.Add(state.Name, state);
+            _uiStateList.Add(state);
         }
 
         private readonly Dictionary<string, StageDecl> _stages = new Dictionary<string, StageDecl>(StringComparer.Ordinal);

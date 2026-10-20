@@ -17,6 +17,7 @@ namespace Kesa.Engine.Schema
         public const string Extend = "extend";
         public const string Signal = "signal";
         public const string Stage = "stage";
+        public const string UiState = "ui_state";
 
         /// <summary>Def 생성자 키워드 중 필드 이름으로 쓸 수 없는 것 (spec S1 상속·중복 ID).</summary>
         public static readonly IReadOnlyList<string> ReservedDefKeywords = new[] { "abstract", "override", "parent" };
@@ -45,6 +46,7 @@ namespace Kesa.Engine.Schema
             Add(new BuiltinFunction(Extend, DeclareExtension));
             Add(new BuiltinFunction(Signal, DeclareSignal));
             Add(new BuiltinFunction(Stage, DeclareStage));
+            Add(new BuiltinFunction(UiState, DeclareUiState));
             Add(new BuiltinFunction("const", MakeConst));
             Add(new BuiltinFunction("field", MakeField));
             Add(new BuiltinFunction("derived", MakeDerived));
@@ -62,6 +64,7 @@ namespace Kesa.Engine.Schema
                 yield return Extend;
                 yield return Signal;
                 yield return Stage;
+                yield return UiState;
                 yield return "const";
                 yield return "field";
                 yield return "derived";
@@ -192,10 +195,82 @@ namespace Kesa.Engine.Schema
             {
                 if (!(arg.Value is MemberSpec spec))
                     throw NotADeclaration(ctx, arg);
+                if (spec.Kind == MemberKind.Field && (spec.Type is ListTypeRef || spec.Type is DictTypeRef))
+                {
+                    throw ctx.Fail(Codes.SchBadDeclaration, "runtime fields cannot hold lists or maps", spec.TypeSpan,
+                        hint: "use element entities with ref(..., inverse=...) or a keyed component (spec S4)");
+                }
+                RejectEntityKeys(ctx, spec.Type, spec.TypeSpan);
                 members.Add(new MemberDecl(arg.Name!, arg.Span, ctx.Mod, spec));
             }
             _target.Components.Add(new ComponentDecl(name.Name, name.Span, ctx.Mod, key, keyKind, keys, members));
             return NoneValue.Instance;
+        }
+
+        /// <summary>
+        /// <c>ui_state("Selection", unit=ref("Unit", optional=True), panel=field(bool, default=False))</c> (spec-gaps G277·G279).
+        /// 칸은 <c>field</c>(리스트·사전, 엔티티 키도 됨)와 <c>optional=True</c>인 <c>ref</c>뿐이고 모두 기본값이 있어야 한다:
+        /// 엔티티의 <c>spawn</c>처럼 처음 값을 줄 때가 없다.
+        /// </summary>
+        private Value DeclareUiState(CallContext ctx, SourceSpan span, IReadOnlyList<ArgValue> args)
+        {
+            const string hint = "a UI state is never created like an entity, so every value starts from its default (spec-gaps G279)";
+            var r = new ArgReader(ctx, UiState, span, args);
+            r.ExpectPositional(1, "ui_state(\"Name\", value=field(int, default=0), unit=ref(\"Unit\", optional=True))");
+            var name = ReadTypeName(ctx, r, "UI state name");
+            var members = new List<MemberDecl>();
+            foreach (var arg in r.Rest())
+            {
+                if (!(arg.Value is MemberSpec spec))
+                    throw ctx.Fail(Codes.SchBadDeclaration,
+                        "'" + arg.Name + "' must be declared with field(...) or ref(...), not a " + arg.Value.KindName, arg.Span);
+                switch (spec.Kind)
+                {
+                    case MemberKind.Field:
+                        if (spec.DefaultFrom != null)
+                            throw ctx.Fail(Codes.SchBadDeclaration, "'" + arg.Name + "' cannot use default_from in a UI state", arg.Span,
+                                hint: "there is no Def to read it from; write default=... (spec-gaps G279)");
+                        if (spec.Default is FunctionValue)
+                            throw ctx.Fail(Codes.SchBadDeclaration, "'" + arg.Name + "' cannot have a function default in a UI state",
+                                arg.Span, hint: "write a value: default=0, default=[] (spec-gaps G279)");
+                        if (spec.Default == null)
+                            throw ctx.Fail(Codes.SchBadDeclaration, "'" + arg.Name + "' needs a default", arg.Span, hint: hint);
+                        break;
+                    case MemberKind.Ref:
+                        if (spec.Inverse != null)
+                            throw ctx.Fail(Codes.SchBadDeclaration, "a UI state's ref cannot have inverse=: the entity does not see " +
+                                                                    "who points at it from a screen", arg.Span);
+                        if (!spec.Optional)
+                            throw ctx.Fail(Codes.SchBadDeclaration, "'" + arg.Name + "' must be ref(..., optional=True)", arg.Span,
+                                hint: "it starts as None, and it reads as None again when its entity is gone (spec-gaps G279)");
+                        break;
+                    default:
+                        throw ctx.Fail(Codes.SchBadDeclaration,
+                            "'" + arg.Name + "': a UI state holds field(...) and ref(...) only, not " +
+                            spec.Kind.ToString().ToLowerInvariant() + " values", arg.Span,
+                            hint: "read Def values and derived values from the game where you need them (spec-gaps G277)");
+                }
+                members.Add(new MemberDecl(arg.Name!, arg.Span, ctx.Mod, spec));
+            }
+            _target.UiStates.Add(new UiStateDecl(name.Name, name.Span, ctx.Mod, members));
+            return NoneValue.Instance;
+        }
+
+        /// <summary>엔티티를 키로 쓰는 사전은 ui_state의 칸에서만 된다 (G277): 저장되는 값과 신호의 키는 str·int·DefId다.</summary>
+        private static void RejectEntityKeys(CallContext ctx, TypeRef type, SourceSpan span)
+        {
+            switch (type)
+            {
+                case DictTypeRef d:
+                    if (d.Key is EntityRefTypeRef)
+                        throw ctx.Fail(Codes.SchBadDeclaration, "map keys must be str, int or DefId[...], not " + d.Key.Display, span,
+                            hint: "entity keys are only for ui_state fields (spec-gaps G277)");
+                    RejectEntityKeys(ctx, d.Value, span);
+                    break;
+                case ListTypeRef l:
+                    RejectEntityKeys(ctx, l.Element, span);
+                    break;
+            }
         }
 
         /// <summary>
@@ -216,6 +291,7 @@ namespace Kesa.Engine.Schema
                         hint: "signal values have no defaults: every emit gives all of them (spec-gaps G145)");
                 if (ContainsFunctionType(type))
                     throw ctx.Fail(Codes.SchBadDeclaration, "a signal cannot carry function values", arg.Span);
+                RejectEntityKeys(ctx, type, arg.Span);
                 fields.Add(new SignalField(arg.Name!, type, arg.Span));
             }
             _target.Signals.Add(new SignalDecl(name.Name, name.Span, ctx.Mod, fields));
@@ -389,11 +465,7 @@ namespace Kesa.Engine.Schema
             r.ExpectPositional(1, "field(int, default=0)");
             var typeArg = r.Positional[0];
             var type = ReadType(ctx, typeArg);
-            if (type is ListTypeRef || type is DictTypeRef)
-            {
-                throw ctx.Fail(Codes.SchBadDeclaration, "runtime fields cannot hold lists or maps", typeArg.Span,
-                    hint: "use element entities with ref(..., inverse=...) or a keyed component (spec S4)");
-            }
+            // 리스트·사전은 ui_state의 칸에서만 된다 (G277). 컴포넌트의 칸이면 component()가 막는다
             if (type is EntityRefTypeRef entity)
             {
                 // 엔티티 Ref 칼럼을 선언하는 방법은 하나로 둔다 (inverse 등 옵션은 ref()만 받는다)
@@ -401,7 +473,7 @@ namespace Kesa.Engine.Schema
                     hint: "write ref(\"" + entity.Target.Name + "\")");
             }
             RejectFunctionType(ctx, type, typeArg);
-            var spec = new MemberSpec(MemberKind.Field, type, span);
+            var spec = new MemberSpec(MemberKind.Field, type, span) { TypeSpan = typeArg.Span };
             ReadDefaultMinMax(ctx, r, spec);
 
             var from = r.Take("default_from");
@@ -422,6 +494,7 @@ namespace Kesa.Engine.Schema
             var typeArg = r.Positional[0];
             var type = ReadType(ctx, typeArg);
             RejectFunctionType(ctx, type, typeArg);
+            RejectEntityKeys(ctx, type, typeArg.Span);
             var fnArg = r.Positional[1];
             if (!(fnArg.Value is FunctionValue fn))
                 throw ctx.Fail(Codes.EvlType, "derived() needs a function (def or lambda), not " + fnArg.Value.KindName,
@@ -569,8 +642,9 @@ namespace Kesa.Engine.Schema
                     Expect(ctx, span, indices, 2, "dict[str, int]");
                     var key = AsType(ctx, span, indices[0]);
                     // Def 리터럴의 맵 키는 str·int뿐이다 (spec-gaps G22). DefId는 리터럴에서 id 문자열로 적는다.
+                    // 엔티티 키는 ui_state의 칸에서만 된다(G277): 다른 자리는 선언 함수가 막는다
                     if (!ReferenceEquals(key, PrimitiveTypeRef.Str) && !ReferenceEquals(key, PrimitiveTypeRef.Int) &&
-                        !(key is DefIdTypeRef))
+                        !(key is DefIdTypeRef) && !(key is EntityRefTypeRef))
                     {
                         throw ctx.Fail(Codes.SchBadDeclaration, "map keys must be str, int or DefId[...], not " + key.Display,
                             span);

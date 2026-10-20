@@ -179,6 +179,7 @@ namespace Kesa.Engine.Stubs
             "def component(name: str, /, *, key: Any = ..., keys: Literal[\"all\", \"listed\"] = ..., **members: MemberDecl) -> None: ...\n" +
             "def extend(type_name: str, /, *, components: list[str] = ..., **consts: MemberDecl) -> None: ...\n" +
             "def signal(name: str, /, **values: Any) -> None: ...\n" +
+            "def ui_state(name: str, /, **members: MemberDecl) -> None: ...\n" +
             "def stage(id: str, /, *, after: list[str] = ..., before: list[str] = ..., optional_after: list[str] = ..., " +
             "optional_before: list[str] = ...) -> None: ...\n" +
             "def const(type: Any, /, *, default: Any = ..., min: int | float = ..., max: int | float = ..., " +
@@ -326,6 +327,7 @@ namespace Kesa.Engine.Stubs
                     WriteSignal(s);
                     schemaNames.Add(s.Name);
                 }
+                WriteUiStates(schemaNames);
                 int builtins = _out.Length;
 
                 WritePatch();
@@ -467,6 +469,32 @@ namespace Kesa.Engine.Stubs
                     parameters.Add(field.Name + ": " + TypeText(field.Type));
                 }
                 WriteInit(parameters);
+                Line();
+            }
+
+            /// <summary>
+            /// UI 로컬 기록 (G277): 보이는 기록마다 클래스 하나, 그리고 <c>ui.Selection.unit</c>으로 읽는 <c>ui</c>. 칸은 모두 쓸 수 있다
+            /// (쓰는 곳은 <c>@ui_action</c>뿐인 것은 로드가 본다).
+            /// </summary>
+            private void WriteUiStates(HashSet<string> schemaNames)
+            {
+                var visible = new List<UiStateType>();
+                foreach (var u in _schema.UiStates)
+                    if (Sees(u.Mod)) visible.Add(u);
+                if (visible.Count == 0) return;
+                foreach (var state in visible)
+                {
+                    Line("class " + state.Name + ":");
+                    foreach (var member in state.Members)
+                        Line("    " + member.Name + ": " + TypeText(member.Spec.Type) + (member.Kind == MemberKind.Ref ? " | None" : ""));
+                    if (state.Members.Count == 0) Line("    ...");
+                    Line();
+                    schemaNames.Add(state.Name);
+                }
+                Line("class _ui:");
+                foreach (var state in visible) Line("    " + state.Name + ": " + state.Name);
+                Line();
+                Line("ui: _ui");
                 Line();
             }
 

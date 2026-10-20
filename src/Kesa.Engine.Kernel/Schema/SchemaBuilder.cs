@@ -214,6 +214,8 @@ namespace Kesa.Engine.Schema
                     foreach (var t in m.Types) if (!Reserved(t.Name, t.Mod, t.Span)) Note(t.Name, t.Mod, t.Span);
                     foreach (var c in m.Components) if (!Reserved(c.Name, c.Mod, c.Span)) Note(c.Name, c.Mod, c.Span);
                     foreach (var s in m.Signals) if (!Reserved(s.Name, s.Mod, s.Span)) Note(s.Name, s.Mod, s.Span);
+                    // UI 로컬 기록도 같은 이름 공간이다: 스텁에서 같은 class가 된다 (G281)
+                    foreach (var u in m.UiStates) if (!Reserved(u.Name, u.Mod, u.Span)) Note(u.Name, u.Mod, u.Span);
                 }
 
                 bool Unique(string name, string mod, SourceSpan span)
@@ -228,7 +230,7 @@ namespace Kesa.Engine.Schema
                         owners.Add(otherMod);
                         if (!otherSpan.Equals(span)) related.Add(otherSpan);
                     }
-                    const string hint = "Def types, components and signals share one namespace";
+                    const string hint = "Def types, components, signals and UI states share one namespace";
                     if (owners.Count == 1)
                         Error(mod, Codes.SchDuplicateName, "'" + name + "' is declared more than once", span, hint, related);
                     else
@@ -247,6 +249,8 @@ namespace Kesa.Engine.Schema
                         if (!Engine(c.Name) && Unique(c.Name, c.Mod, c.Span)) _set.Add(new ComponentType(c));
                     foreach (var s in m.Signals)
                         if (!Engine(s.Name) && Unique(s.Name, s.Mod, s.Span)) _set.Add(new SignalType(s));
+                    foreach (var u in m.UiStates)
+                        if (!Engine(u.Name) && Unique(u.Name, u.Mod, u.Span)) _set.Add(new UiStateType(u));
                 }
             }
 
@@ -449,6 +453,10 @@ namespace Kesa.Engine.Schema
                 {
                     foreach (var f in s.Fields) CheckTypeNames(f.Type, s.Mod);
                 }
+                foreach (var u in _set.UiStates)
+                {
+                    foreach (var member in u.Members) CheckTypeNames(member.Spec.Type, member.Mod);
+                }
             }
 
             private void CheckTypeNames(TypeRef type, string mod)
@@ -621,6 +629,11 @@ namespace Kesa.Engine.Schema
                     Error(from, Codes.SchUnknownName, "'" + r.Name + "' is a signal, not a Def type", r.Span);
                     return null;
                 }
+                if (_set.TryGetUiState(r.Name, out _))
+                {
+                    Error(from, Codes.SchUnknownName, "'" + r.Name + "' is a UI state, not a Def type", r.Span);
+                    return null;
+                }
                 if (_ambiguous.Contains(r.Name)) return null;
 
                 var visible = new List<string>();
@@ -647,6 +660,12 @@ namespace Kesa.Engine.Schema
                 if (_set.TryGetSignal(r.Name, out _))
                 {
                     Error(from, Codes.SchUnknownName, "'" + r.Name + "' is a signal, not a component", r.Span);
+                    return null;
+                }
+                if (_set.TryGetUiState(r.Name, out _))
+                {
+                    Error(from, Codes.SchUnknownName, "'" + r.Name + "' is a UI state, not a component", r.Span,
+                        hint: "a UI state belongs to a screen, not to entities; read it as ui." + r.Name + " (spec-gaps G277)");
                     return null;
                 }
                 if (_ambiguous.Contains(r.Name)) return null;
