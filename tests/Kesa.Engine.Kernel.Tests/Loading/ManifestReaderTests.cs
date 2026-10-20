@@ -89,6 +89,26 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(Read("Mod(id=\"engine_parts\")\n").Diagnostics, Is.Empty);
         }
 
+        // defaultLanguage는 번역 폴더 이름과 같은 BCP 47 태그 (G256)
+        [TestCase("en", true)]
+        [TestCase("pt-BR", true)]
+        [TestCase("zh-Hant-TW", true)]
+        [TestCase("ko_KR", false)]
+        [TestCase("k", false)]
+        [TestCase("Korean language", false)]
+        [TestCase("en-", false)]
+        public void TheDefaultLanguageIsALanguageTag(string tag, bool valid)
+        {
+            var (m, diags) = Read("Mod(id=\"a\", defaultLanguage=\"" + tag + "\")\n");
+            if (valid)
+            {
+                Assert.That(diags, Is.Empty);
+                Assert.That(m!.DefaultLanguage, Is.EqualTo(tag));
+                return;
+            }
+            Assert.That(diags.Select(d => d.Code + " " + d.Message), Is.EqualTo(new[] { "MOD002 defaultLanguage '" + tag + "' is not a language tag" }));
+        }
+
         [TestCase("x = 1\nMod(id=\"a\")\n")]
         [TestCase("Mod(id=\"a\")\nUnit(\"Scout\")\n")]
         [TestCase("Mod(id=\"a\")\nMod(id=\"b\")\n")]

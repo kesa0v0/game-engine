@@ -77,6 +77,14 @@ namespace Kesa.Engine.Loading
         /// </summary>
         public PolicyDecl? ViewPolicy { get; internal set; }
 
+        /// <summary>
+        /// ①의 정렬 결과. 두 모드 사이에 선언된 순서가 있는지(<see cref="LoadOrder.IsOrdered"/>)를 번역의 같은 키 경고가 쓴다 (spec-gaps G256).
+        /// </summary>
+        public LoadOrder? Order { get; internal set; }
+
+        /// <summary>모드들이 있는 폴더. <see cref="ModManifest.Directory"/>는 이 기준이다. 번역 파일(<c>locale/</c>)을 찾는 데 쓴다 (G256).</summary>
+        public string ModsRoot { get; internal set; } = "";
+
         /// <summary>살아남은 모드의 <c>@on</c> 핸들러, 모드 로드 순서 → 정의 순서 (spec S5 동률 규칙, spec-gaps G145).</summary>
         public IReadOnlyList<HandlerDecl> Handlers { get; internal set; } = Array.Empty<HandlerDecl>();
 

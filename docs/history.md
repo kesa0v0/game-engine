@@ -729,3 +729,14 @@ handoff "남은 일" 1번. 재현(임시 테스트): `for u in query("Unit"): u.
 - **`engine.pick`(G272):** `LegalResponses`가 물은 엔티티마다 선택지 순서로 `engine.pick(by=, choice=번호)`를 먼저 내고 `max`에 셈. `Respond`가 `Answer`로 보냄. 번호인 까닭은 숨긴 엔티티가 커맨드 인자가 될 수 없어서. 콘솔 호스트는 이 한 길만 써 같은 선택지가 두 번 보이던 것을 임시 테스트로 재현하고 고침. 테스트 `PickMoveTests`, `SkirmishTests.EachChoiceIsListedOnceAsAPickMove`.
 - **`text()` 인자(G267):** `PureBuiltins.MakeText`가 수·str·bool·None·text만 바로 받고 나머지는 월드의 `TextArgument`에 물어 엔티티면 부른 때의 Def를 `TextValue.EntityDefs`에 적음(같음에는 들지 않음). 그 밖(list·dict·함수)은 `RUN015`와 힌트. 저장은 적은 것이 있을 때만 셋째 칸 `"defs"`, 불러올 때 없는 인자를 가리키면 거부. 거른 읽기는 숨긴 엔티티의 Def를 뺌(Def가 정체를 알려 주므로). 람다를 `text()`에 넣던 기존 테스트 두 곳은 엔티티 인자와 `option(data=)` 안의 람다로 바꿈. 테스트 `TextArgumentTests`.
 - **확인:** 테스트 2129개 통과(커널 2070, CLI 36, 콘솔 호스트 23).
+
+## 2026-10-20: 번역 어셈블리 1단계 (G254~G257·G267·G269·G270 구현)
+
+이미 정한 결정의 구현이라 새 G 없음. 두 단계로 나눈 앞쪽.
+
+- **프로젝트:** `src/Kesa.Engine.Text`(netstandard2.1, C# 9, Unity 호스트도 쓰게 커널과 같게), `Linguini.Bundle` `[0.11.0]` 고정, `Determinism.props` 안 켬. 테스트 `tests/Kesa.Engine.Text.Tests`. 둘 다 `Kesa.Engine.slnx`에 넣음.
+- **커널 쪽 배관:** `ContentLoadResult.Order`(G256의 "순서 없는 두 모드" 판정에 `LoadOrder.IsOrdered`가 필요한데 결과에 없었음), `ContentLoadResult.ModsRoot`(`ModManifest.Directory`가 모드 폴더 기준 상대 경로라서, 임시 테스트로 파일을 못 찾는 것을 보고 더함). `Loading/LanguageTag`(모양만 보는 BCP 47 검사, 5~8자 첫 조각도 규칙상 맞음), `defaultLanguage`가 태그가 아니면 `MOD002`(G256에 정했으나 구현이 없었음). 진단 `LOC001`(구문)·`LOC002`(한 곳 안의 같은 키)·`LOC003`(순서 없는 모드의 같은 키, 경고)·`LOC004`(폴더 이름)·`LOC005`(`defaultLanguage`·그 폴더 없음).
+- **모으기:** 파일마다 `LinguiniParser`로 직접 읽어 Junk만 빼고, 언어 → 키 → 이긴 글 표를 우리가 만든 뒤 언어마다 한 `Resource`로 번들에 넣음(Linguini의 글 하나 덮어쓰기는 공개가 아님). 구문 오류의 줄은 `Row`(파서가 멈춘 다음 글의 줄)가 아니라 빠진 글 `Slice`의 시작 줄(임시 테스트로 확인). 키의 주인 = 처음 정의한 곳, 그 기본 언어가 폴백 두 번째. 엔진 글 `engine-hidden`(en·ko)이 맨 앞, 호스트 폴더가 다음. 번들은 `SetUseIsolating(false)`(자리 표시자에 U+2068·U+2069를 안 붙임).
+- **번역기:** `Format`·`Text`·`Label`·`Attr`·`Value`(`WorldView`나 `World`를 받음), 늘 문자열, 오류는 `For(…, onError)`로. 빠진 인자 같은 오류에도 Fluent가 채운 글을 씀. 인자 표 G267: 불린 Def의 전체 이름 문자열·엔티티(적어 둔 Def)는 Def 이름, 숨김은 `engine-hidden`, 안쪽 `text()`는 먼저 번역, bool·None은 `true`·`false`·`none`. 수는 `FluentNumber`가 double을 거쳐 `0.000001`을 `1E-06.000000`, 큰 int를 지수 표기로 내는 것을 임시 테스트로 재현해 `ExactNumber`(FluentNumber를 상속한 record, `IFluentType`을 다시 구현해 커널의 십진 표기를 냄, 복수형 select는 그대로 됨)로 고침.
+- **남은 것(2단계):** Def 이름 값을 문자열이 아닌 직접 만든 Fluent 값으로 넘겨 `JOSA`·`DEFATTR`가 Def를 알게 하기.
+- **확인:** 테스트 2153개 통과(커널 2077, 번역 17, CLI 36, 콘솔 호스트 23).

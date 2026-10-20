@@ -122,6 +122,13 @@ namespace Kesa.Engine.Loading
                         break;
                     case "defaultLanguage":
                         defaultLanguage = ReadString(arg, diags);
+                        // 번역 폴더 이름과 같은 BCP 47 태그 (G256)
+                        if (defaultLanguage != null && !LanguageTag.IsValid(defaultLanguage))
+                        {
+                            diags.Error(Codes.ModBadManifest, "defaultLanguage '" + defaultLanguage + "' is not a language tag",
+                                arg.Value.Span, hint: LanguageTag.Rule);
+                            defaultLanguage = null;
+                        }
                         break;
                     case "dependencies":
                         ReadIdList(arg, dependencies, diags);

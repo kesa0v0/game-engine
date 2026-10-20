@@ -7,8 +7,10 @@
     <Project Path="src/Kesa.Engine.Cli/Kesa.Engine.Cli.csproj" />
     <Project Path="src/Kesa.Engine.ConsoleHost/Kesa.Engine.ConsoleHost.csproj" />
     <Project Path="src/Kesa.Engine.Kernel/Kesa.Engine.Kernel.csproj" />
+    <Project Path="src/Kesa.Engine.Text/Kesa.Engine.Text.csproj" />
     <Project Path="tests/Kesa.Engine.Cli.Tests/Kesa.Engine.Cli.Tests.csproj" />
     <Project Path="tests/Kesa.Engine.ConsoleHost.Tests/Kesa.Engine.ConsoleHost.Tests.csproj" />
     <Project Path="tests/Kesa.Engine.Kernel.Tests/Kesa.Engine.Kernel.Tests.csproj" />
+    <Project Path="tests/Kesa.Engine.Text.Tests/Kesa.Engine.Text.Tests.csproj" />
   </Folder>
 </Solution>

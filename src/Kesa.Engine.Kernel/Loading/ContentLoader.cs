@@ -82,6 +82,8 @@ namespace Kesa.Engine.Loading
                     run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound, scopes, commands)
                 {
                     ViewPolicy = run.ViewPolicy,
+                    Order = order,
+                    ModsRoot = modsRoot,
                     Handlers = handlers,
                     Whens = whens,
                     Contents = contents,

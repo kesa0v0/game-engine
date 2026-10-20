@@ -4,7 +4,7 @@ namespace Kesa.Engine.Diagnostics
     /// 진단 코드. 잠정 체계: 영역 접두사 + 세 자리 번호 (spec-gaps G6).
     /// LEX = 렉서, PAR = 파서, MOD = 모드 매니페스트·정렬, LOD = 콘텐츠 파일 목록, EVL = 로드 시점 평가,
     /// SCH = 스키마 단계(②a), DEF = Def 등록(②b), PAT = 패치(③), INH = 상속 펼치기(④), LNK = 링크(⑤), VAL = 검증(⑥),
-    /// RUN = 런타임 월드, CMD = 커맨드 선언과 함수 효과(쓰기), SAV = 저장과 불러오기, HST = 호스트 함수.
+    /// RUN = 런타임 월드, CMD = 커맨드 선언과 함수 효과(쓰기), SAV = 저장과 불러오기, HST = 호스트 함수, LOC = 번역 파일(커널 밖 Kesa.Engine.Text).
     /// </summary>
     public static class Codes
     {
@@ -162,6 +162,18 @@ namespace Kesa.Engine.Diagnostics
 
         // 호스트 함수 이름의 잘못된 사용: 이름 공간을 값으로 씀, 함수에 속성을 붙임, 모드 최상위 이름이 이름 공간을 가림 (spec S7, spec-gaps G218)
         public const string HostName = "HST002";
+
+        // 번역 파일 (spec X4). 번역 오류는 모드를 끄지 않고 그 글만 뺀다 (spec-gaps G257)
+        // .ftl 구문 오류 (G257)
+        public const string LocSyntax = "LOC001";
+        // 한 모드 안의 같은 언어에서 같은 키 (G256)
+        public const string LocDuplicate = "LOC002";
+        // 순서 없는 두 모드가 같은 언어에서 같은 키를 정의함, 나중 모드가 이김 (경고, G256)
+        public const string LocOverridden = "LOC003";
+        // locale/ 아래 폴더 이름이 언어 태그가 아님 (G256)
+        public const string LocBadLanguage = "LOC004";
+        // locale/이 있는데 defaultLanguage가 없거나 그 언어 폴더가 없음 (G257)
+        public const string LocNoDefaultLanguage = "LOC005";
 
         // 커맨드 선언 (spec S6, spec-gaps G109)
         public const string CmdBadDecorator = "CMD001";

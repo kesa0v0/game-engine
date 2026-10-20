@@ -1,0 +1,146 @@
+using System.Collections.Generic;
+using Kesa.Engine.Numerics;
+using Kesa.Engine.Runtime;
+using Kesa.Engine.Script;
+using NUnit.Framework;
+
+namespace Kesa.Engine.Text.Tests
+{
+    /// <summary>
+    /// 번역기 (spec-gaps G267·G269·G270): 번역 인자 값 표, 제목·선택지 자리(<c>Label</c>), 속성(<c>Attr</c>), 화면 값(<c>Value</c>).
+    /// </summary>
+    public class TranslatorTests : TextTestBase
+    {
+        private const string Schema =
+            "component(\"Hull\", hp=field(int, default=1))\n" +
+            "deftype(\"Ship\", components=[\"Hull\"])\n";
+
+        private const string Defs = "Ship(\"Sloop\")\nShip(\"Brig\")\n";
+
+        private const string Texts =
+            "def-harbor-Sloop = sloop\n" +
+            "    .desc = a small boat\n" +
+            "def-harbor-Brig = brig\n" +
+            "harbor-bought = bought { $ship } for { $n } gold ({ $f })\n" +
+            "harbor-said = { $who } said: { $what }\n" +
+            "harbor-flag = { $b ->\n    [true] yes\n   *[other] no\n} { $z }\n" +
+            "harbor-count = { $n ->\n    [one] one ship\n   *[other] { $n } ships\n}\n" +
+            "harbor-accept = Accept\n" +
+            "    .desc = take the deal\n" +
+            "harbor-offer = Offer from { $who }\n" +
+            "    .desc = { $who } offers a deal\n";
+
+        private List<string> _errors = null!;
+        private Translator _tr = null!;
+        private World _world = null!;
+
+        [SetUp]
+        public void NewTranslator()
+        {
+            Mod("harbor", schema: Schema, defs: Defs);
+            Ftl("harbor", "en", Texts);
+            var content = LoadContent();
+            _world = new World(content);
+            _errors = new List<string>();
+            _tr = LoadTextsClean(content).For(new[] { "en" }, _errors.Add);
+        }
+
+        private static TextValue T(string key, Dictionary<string, Value> args, Dictionary<string, string>? defs = null) =>
+            new TextValue(key, args, defs);
+
+        [Test]
+        public void NumbersStringsAndDefIdsFillTheirPlaces()
+        {
+            string s = _tr.Format(T("harbor-bought", new Dictionary<string, Value>
+            {
+                ["ship"] = new StrValue("harbor:Sloop"), ["n"] = new IntValue(5), ["f"] = new FixedValue(Fixed.FromRaw(1_500_000)),
+            }));
+            Assert.That(s, Is.EqualTo("bought sloop for 5 gold (1.5)"));
+            string literal = _tr.Format(T("harbor-said", new Dictionary<string, Value>
+            {
+                ["who"] = new StrValue("Sloop"), ["what"] = new StrValue("harbor:Nothing"),
+            }));
+            Assert.That(literal, Is.EqualTo("Sloop said: harbor:Nothing"), "only a loaded Def's full id becomes its name");
+            Assert.That(_errors, Is.Empty);
+        }
+
+        [Test]
+        public void NumbersKeepTheirDecimalText()
+        {
+            string Of(Value n) => _tr.Format(T("harbor-bought", new Dictionary<string, Value>
+                { ["ship"] = new StrValue("x"), ["n"] = n, ["f"] = new FixedValue(Fixed.FromRaw(1)) }));
+            Assert.That(Of(new IntValue(1234567)), Is.EqualTo("bought x for 1234567 gold (0.000001)"));
+            Assert.That(Of(new IntValue(1234567890123456789)), Does.Contain(" 1234567890123456789 "), "past 2^53 a double would round");
+        }
+
+        [Test]
+        public void IntsPickPluralBranchesAndBoolsAndNonePickStrings()
+        {
+            string Count(long n) => _tr.Format(T("harbor-count", new Dictionary<string, Value> { ["n"] = new IntValue(n) }));
+            Assert.That((Count(1), Count(3)), Is.EqualTo(("one ship", "3 ships")));
+            string flag = _tr.Format(T("harbor-flag", new Dictionary<string, Value> { ["b"] = BoolValue.True, ["z"] = NoneValue.Instance }));
+            Assert.That(flag, Is.EqualTo("yes none"));
+        }
+
+        [Test]
+        public void EntitiesUseTheRecordedDefHiddenValuesAndNestedTexts()
+        {
+            var said = T("harbor-said", new Dictionary<string, Value>
+            {
+                ["who"] = new EntityValue(new EntityId(99)), // 없어진 엔티티: 적어 둔 Def로
+                ["what"] = T("harbor-bought", new Dictionary<string, Value>
+                    { ["ship"] = HiddenValue.Instance, ["n"] = new IntValue(2), ["f"] = new IntValue(0) }),
+            }, new Dictionary<string, string> { ["who"] = "harbor:Brig" });
+            Assert.That(_tr.Format(said), Is.EqualTo("brig said: bought unknown for 2 gold (0)"));
+        }
+
+        [Test]
+        public void LabelTreatsStringsAsKeysOrDefsAndValueShowsThemAsWritten()
+        {
+            var sloop = _world.Create("harbor:Sloop");
+            Assert.That(_tr.Label(new StrValue("harbor-accept")), Is.EqualTo("Accept"));
+            Assert.That(_tr.Label(new StrValue("harbor:Brig")), Is.EqualTo("brig"));
+            Assert.That(_tr.Label(new EntityValue(sloop), _world), Is.EqualTo("sloop"));
+            Assert.That(_tr.Label(HiddenValue.Instance), Is.EqualTo("unknown"));
+            Assert.That(_tr.Value(new StrValue("harbor-accept")), Is.EqualTo("harbor-accept"), "a screen value is shown as written");
+            Assert.That(_tr.Value(new StrValue("harbor:Brig")), Is.EqualTo("brig"));
+            Assert.That(_tr.Value(new IntValue(-3)), Is.EqualTo("-3"));
+            Assert.That(_tr.Value(new EntityValue(sloop)), Is.EqualTo("unknown"), "without a world the entity cannot be named");
+            Assert.That(_errors, Is.Empty);
+        }
+
+        [Test]
+        public void AttrReadsTheFluentAttributeOfKeysDefsEntitiesTextsAndOptions()
+        {
+            var sloop = _world.Create("harbor:Sloop");
+            Assert.That(_tr.Attr(new StrValue("harbor-accept"), "desc"), Is.EqualTo("take the deal"));
+            Assert.That(_tr.Attr(new StrValue("harbor:Sloop"), "desc"), Is.EqualTo("a small boat"));
+            Assert.That(_tr.Attr(new EntityValue(sloop), "desc", _world), Is.EqualTo("a small boat"));
+            var offer = T("harbor-offer", new Dictionary<string, Value> { ["who"] = new StrValue("harbor:Brig") });
+            Assert.That(_tr.Attr(offer, "desc"), Is.EqualTo("brig offers a deal"));
+
+            var plain = new OptionValue(new StrValue("harbor-accept"), null, null, null, null);
+            var dressed = new OptionValue(new StrValue("x"), new StrValue("harbor:Brig"), offer, null, null);
+            Assert.That((_tr.Label(plain), _tr.Attr(plain, "desc")), Is.EqualTo(("Accept", "take the deal")));
+            Assert.That((_tr.Label(dressed), _tr.Attr(dressed, "desc")), Is.EqualTo(("brig", "Offer from brig")));
+        }
+
+        [Test]
+        public void MissingKeysAndArgumentsFallBackAndReportButNeverThrow()
+        {
+            Assert.That(_tr.Label(new StrValue("harbor-nope")), Is.EqualTo("harbor-nope"));
+            Assert.That(_tr.Attr(new StrValue("harbor:Brig"), "desc"), Is.EqualTo("def-harbor-Brig.desc"));
+            string s = _tr.Format(T("harbor-count", new Dictionary<string, Value>()));
+            Assert.That(s, Does.Contain("ships"));
+            Assert.That(_errors, Has.Count.EqualTo(3));
+            Assert.That(_errors[0], Is.EqualTo("no translation for 'harbor-nope'"));
+        }
+
+        [Test]
+        public void TheHostCanFormatItsOwnKeys()
+        {
+            Assert.That(_tr.Text("harbor-count", ("n", new IntValue(1))), Is.EqualTo("one ship"));
+            Assert.That(Translator.DefKey("harbor:rigs/Brig"), Is.EqualTo("def-harbor-rigs-Brig"));
+        }
+    }
+}

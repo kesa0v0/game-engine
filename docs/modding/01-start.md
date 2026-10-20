@@ -41,7 +41,7 @@ use_all("defs/")
 | `dependencies` | 꼭 있어야 하는 모드. 없으면 이 모드가 꺼진다(`MOD007`). 그 모드의 이름이 보이게 된다 |
 | `loadAfter` | 있으면 그 뒤에 불린다. 없어도 된다. 이름은 보이지 않는다 |
 | `optional` | 있으면 그 뒤에 불리고 `mod_loaded("x")`로 물을 수 있다(2장 패치) |
-| `defaultLanguage` | 문자열. 번역(아직 없음, 9장)을 위해 받아 둔다 |
+| `defaultLanguage` | 언어 태그(`"en"`, `"ko"`, `"pt-BR"`). 틀린 모양이면 `MOD002`. 번역 파일은 `locale/<언어 태그>/` 아래의 `.ftl`(Fluent)이고, `locale/`이 있으면 이 칸과 그 언어 폴더가 있어야 한다. 플레이어 언어에 글이 없으면 이 언어로 보인다. 콘솔은 아직 번역을 쓰지 않는다(9장) |
 
 - 필드 이름은 camelCase다. `load_after=`라고 쓰면 `MOD003`과 "혹시 'loadAfter'?"가 나온다.
 - `use("defs/a.py")`는 파일 하나, `use_all("defs/")`는 그 폴더의 `.py` 전부(하위 폴더 포함, 경로 이름 순)를 불러온다.

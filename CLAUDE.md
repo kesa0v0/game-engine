@@ -13,7 +13,7 @@
 
 ## 빌드와 테스트
 
-저장소 루트에서 `dotnet build`, `dotnet test`. 커널은 `netstandard2.1`, C# 9, 부동소수점·시계·비시드 난수 등은 `src/Kesa.Engine.Analyzers/BannedSymbols.txt`와 `DeterminismAnalyzer`로 금지(결정론, spec P2). 둘 다 `Determinism.props`로 켠다(호스트 함수 프로젝트도 같은 파일, G220).
+저장소 루트에서 `dotnet build`, `dotnet test`. 커널은 `netstandard2.1`, C# 9, 부동소수점·시계·비시드 난수 등은 `src/Kesa.Engine.Analyzers/BannedSymbols.txt`와 `DeterminismAnalyzer`로 금지(결정론, spec P2). 둘 다 `Determinism.props`로 켠다(호스트 함수 프로젝트도 같은 파일, G220). 번역 어셈블리 `src/Kesa.Engine.Text`(Linguini 0.11.0 고정)는 시뮬레이션 밖이라 이 분석기를 켜지 않는다(G254). 새 프로젝트는 `Kesa.Engine.slnx`에 넣어야 루트 `dotnet test`가 돈다.
 
 파일 배치(2026-10-18): 동작 클래스(`World`·`Interpreter`·`ContentLoader` 등)의 파일에는 그 클래스만 둔다. 공개 결과 타입은 제 파일(주된 타입 이름)에 그 열거형과 함께 둔다(`SubmitResult.cs`에 `SubmitOutcome`과 `SubmitResult`). 같은 종류의 작은 타입을 묶은 모델 파일(`Ast.cs`·`Values.cs`·`SchemaModel.cs` 등)은 그대로 묶는다. 한 파일이 900줄을 넘으면 `// ----` 절을 따라 partial 파일로 나눈다.
 

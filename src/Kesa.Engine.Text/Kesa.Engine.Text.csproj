@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 커널처럼 Unity 호스트도 쓸 수 있게 netstandard2.1 -->
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <RootNamespace>Kesa.Engine.Text</RootNamespace>
+  </PropertyGroup>
+
+  <!-- 번역은 시뮬레이션 밖이라(spec X4 P2) 결정론 분석기(Determinism.props)를 켜지 않는다 (spec-gaps G254) -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kesa.Engine.Text.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 버전 고정, 호스트·모드 코드는 Linguini 타입을 보지 않는다 (G254) -->
+    <PackageReference Include="Linguini.Bundle" Version="[0.11.0]" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kesa.Engine.Kernel\Kesa.Engine.Kernel.csproj" />
+  </ItemGroup>
+
+</Project>
