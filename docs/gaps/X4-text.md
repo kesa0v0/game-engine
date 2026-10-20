@@ -121,6 +121,8 @@ def-harbor-rigs-Brig = 브리그
 
 **상태:** 확인
 
+**바뀜:** 숨김 값의 메시지 키는 `engine-hidden`이다(엔진 예약 이름은 `engine`) → G273.
+
 ## G268
 
 **위치:** X4 조사 함수와 Def 속성으로 고르기 (spec X4 "조사 등은 언어 팩의 확장 포매터", G267에서 이어짐)
@@ -170,6 +172,8 @@ tr.DefName("harbor:Sloop");
 
 **바뀜:** 제목·선택지 자리의 문자열은 키라 `Value`가 아니라 `Label`로 바꾸고, `DefName`·`DefAttr`는 `Label`·`Attr`에 합친다 → G270.
 
+**바뀜:** 엔진·호스트의 번역 키는 `engine-hidden`·`engine-console-…`이다(엔진 예약 이름은 `engine`) → G273.
+
 ## G270
 
 **위치:** X4 제목·선택지 자리의 글과 Def의 다른 글 (G269의 API를 고침, G263 "스크립트에서 속성을 꺼내는 법"에서 이어짐)
@@ -184,7 +188,7 @@ tr.Attr(value, "desc", world);   // 그 값의 Fluent 속성
 tr.Value(value, world);          // 화면 값 안의 맨 값 (G269 그대로)
 ```
 
-- `Label`: 문자열은 Def의 전체 이름이면 그 Def의 이름, 아니면 키로 번역한다(키에는 `:`가 들어갈 수 없어 둘은 헷갈리지 않음). 쪽지는 번역하고, 엔티티는 그 Def의 이름, 숨김 값은 `kesa-hidden`, 그 밖은 `Value`와 같다. 선택지가 `option`이고 `label`이 있으면 그것을 쓴다(G271).
+- `Label`: 문자열은 Def의 전체 이름이면 그 Def의 이름, 아니면 키로 번역한다(키에는 `:`가 들어갈 수 없어 둘은 헷갈리지 않음). 쪽지는 번역하고, 엔티티는 그 Def의 이름, 숨김 값은 `engine-hidden`(G273), 그 밖은 `Value`와 같다. 선택지가 `option`이고 `label`이 있으면 그것을 쓴다(G271).
 - `Attr`: 키면 `키.속성`, Def id면 `def-….속성`, 엔티티면 그 Def의 속성, 쪽지면 그 키의 속성을 같은 인자로. `option`에 `desc`가 있고 속성이 `"desc"`면 그것을 쓴다. 없는 속성은 G257의 없는 키처럼 폴백한다.
 - G269의 `DefName`·`DefAttr`는 따로 두지 않는다(`Label`·`Attr`가 Def id를 받는다).
 - **스크립트 내장 `deftext`는 만들지 않는다.** 선택지·제목에 Def의 글을 보이는 일은 화면이 값에서 꺼낸다(G137, "어떻게 보일지는 UI가 정함"). 스크립트가 직접 문장을 만들 때는 번역문의 `{ DEFATTR($ship, "desc") }`(G268)로 된다. 자주 필요해지면 그때 더한다.

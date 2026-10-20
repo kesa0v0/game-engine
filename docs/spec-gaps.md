@@ -296,8 +296,8 @@
 | [G232](gaps/X-flow-time.md#g232) | X1·G184 응답 커맨드의 합법 수를 질문 하나에 대해 (콘솔 호스트에서 드러남) | 호스트 API `LegalResponses(질문, by, 최대)`: 응답 커맨드마다 펼치되 답하는 엔티티는 엔진이 정함(`acts_for`가 `choose` 없는 매개변수를 그대로 돌려주면 질문 대상으로 채우고, 아니면 펼친 뒤 `acts_for`가 대상인 수만), 수마다 커맨드·인자·답하는 엔티티, 펼칠 수 없는 커맨드는 `Needs`, `ViewAs`는 그 연결이 답할 수 있는 대상과 보이는 수만. | 일부 바뀜(G272) |
 | [G243](gaps/X-flow-time.md#g243) | X1·G139 응답 커맨드의 본문이 멈추면 (구멍 6) | 멈춘 본문은 새 Flow가 되고 바깥은 질문을 닫고 기다리다 그 Flow가 끝나면 같은 트랜잭션에서 `r.response`·`r.by`로 이어 감(여러 겹 가능), 안쪽이 실행 중에 버려지면 바깥은 `r.interrupted`가 참인 답으로 이어 가고, 불러오며 취소되면 바깥도 함께 취소. | 확인 |
 | [G271](gaps/X-flow-time.md#g271) | X1 선택지에 보이는 모양을 싣기 (G138·G137에서 이어짐, 사용자 제안) | 선택지는 맨 값이나 `option(값, label=, desc=, style=, data=)`, 엔진이 맨 값을 감싸 호스트는 늘 option 목록을 받음, `style`은 커널이 읽지 않는 이름표이고 그리는 법은 게임의 UI 파일(G249), `r.choice`는 안의 값, 고를 수 없음은 나중에. | 확인 |
-| [G272](gaps/X-flow-time.md#g272) | X1 호스트가 답을 내는 길을 하나로 (G232에서 이어짐, 사용자 제안) | `LegalResponses`가 선택지마다 엔진 예약 커맨드 `kesa.pick(choice=번호)`의 수를 응답 수와 같은 목록에 냄, 호스트는 무엇이든 `Respond`, 커널 안에서는 지금의 `Answer` 길(`r.response`는 `None`), 값이 아니라 번호인 것은 숨김 값 때문, `Answer`는 남음. | 확인 |
-| [G273](gaps/X-flow-time.md#g273) | 엔진 예약 이름 `kesa` (G272·G269에서 드러남) | 모드 id `kesa`는 엔진 예약이라 쓰면 `MOD005`, 그래서 `kesa.pick` 같은 엔진 커맨드와 `kesa-hidden` 같은 엔진·호스트 번역 키가 모드 것과 겹치지 않음. | 잠정 |
+| [G272](gaps/X-flow-time.md#g272) | X1 호스트가 답을 내는 길을 하나로 (G232에서 이어짐, 사용자 제안) | `LegalResponses`가 선택지마다 엔진 예약 커맨드 `kesa.pick(choice=번호)`의 수를 응답 수와 같은 목록에 냄, 호스트는 무엇이든 `Respond`, 커널 안에서는 지금의 `Answer` 길(`r.response`는 `None`), 값이 아니라 번호인 것은 숨김 값 때문, `Answer`는 남음. | 일부 바뀜(G273) |
+| [G273](gaps/X-flow-time.md#g273) | 엔진 예약 이름 `engine` (G272·G269에서 드러남) | 모드 id `engine`은 엔진 예약이라 쓰면 `MOD005`, 엔진 커맨드는 `engine.pick`, 엔진·호스트 번역 키는 `engine-hidden`·`engine-console-…`(앞서 적은 `kesa` 이름을 바꿈). | 확인 |
 
 ## X4 로컬라이제이션
 
@@ -309,9 +309,9 @@
 | [G257](gaps/X4-text.md#g257) | X4 P3 폴백과 `check`의 번역 검사 | 폴백은 호스트가 넘기는 플레이어 언어 목록(태그 줄이기 포함) → 키의 주인 모드(처음 정의한 모드)의 `defaultLanguage` → 키, `check`는 구문·중복 오류와 없는 키·안 넘긴 변수·기본 언어에 없는 변수 경고와 빠진 글 정보, 번역 오류는 그 글만 빼고 모드를 끄지 않음(S1 오류 정책의 예외). | 확인 |
 | [G262](gaps/X4-text.md#g262) | X4 Def 이름의 번역 키 (G255에서 멈췄다 이름 공간 G258~G261 뒤에 이어짐) | Def id의 `:`·`/`를 `-`로 바꾸고 앞에 `def-`(`harbor:rigs/Brig` → `def-harbor-rigs-Brig`), `def-` 접두사는 엔진이 예약해 모더의 일반 키로 쓰면 `check` 오류, 종류 이름은 키에 넣지 않음. 한 Def의 여러 글(설명 등)을 나누는 법은 이어서 정함. | 확인 |
 | [G263](gaps/X4-text.md#g263) | X4 한 Def에 붙는 여러 글 (G262에서 이어짐) | 메시지 값이 화면 이름, 나머지는 Fluent 속성(`.desc` 등), 속성 이름은 모더가 정하고 엔진은 값만 이름으로 앎, 키 뒤에 붙이는 `-desc`는 Def 키와 겹쳐 안 씀, 스크립트에서 속성을 꺼내는 법은 엔진 API와 함께, 없는 속성은 G257의 없는 키처럼. | 확인 |
-| [G267](gaps/X4-text.md#g267) | X4 번역 인자 값 표 (G254에서 이어짐, Linguini 실험) | int·fixed는 수, str은 그대로이되 불린 Def의 전체 이름과 같으면 그 Def의 번역된 이름 값, 엔티티는 `text()` 때 적어 둔 Def의 이름, 숨김은 `kesa-hidden`, 안쪽 `text()`는 먼저 번역, bool·None은 `true`·`false`·`none`, list·dict 등은 `text()`의 실행 오류. | 확인 |
+| [G267](gaps/X4-text.md#g267) | X4 번역 인자 값 표 (G254에서 이어짐, Linguini 실험) | int·fixed는 수, str은 그대로이되 불린 Def의 전체 이름과 같으면 그 Def의 번역된 이름 값, 엔티티는 `text()` 때 적어 둔 Def의 이름, 숨김은 `kesa-hidden`, 안쪽 `text()`는 먼저 번역, bool·None은 `true`·`false`·`none`, list·dict 등은 `text()`의 실행 오류. | 일부 바뀜(G273) |
 | [G268](gaps/X4-text.md#g268) | X4 조사 함수와 Def 속성으로 고르기 (G267에서 이어짐) | 번역문에서 `{ JOSA($ship, "을") }`(짝 중 아무 쪽이나, 이름에 붙여 돌려줌, 숫자는 읽는 소리, 받침을 모르면 `을(를)`), 엔진이 모든 언어에 넣고 `check`가 모르는 조사를 잡음, Def 속성으로 고르기는 `DEFATTR($ship, "gender")`. 글 뒤처리 표시(`(을)를`)는 안 씀. | 확인 |
-| [G269](gaps/X4-text.md#g269) | X4 호스트의 번역 API와 번역 다시 읽기 (G254에서 이어짐) | `Translations.Load`(불변) → `For(언어 목록)`의 `Translator`가 쪽지·맨 값·호스트 키·Def 이름을 늘 문자열로(오류는 따로 받음), 호스트는 제 `.ftl` 폴더를 넘기고 모드가 덮어씀, 모드 화면 파일에는 키 부르기를 더하지 않음, 다시 읽기는 `Load`를 다시 불러 갈아 끼움(파일 지켜보기는 호스트 몫). | 일부 바뀜(G270) |
+| [G269](gaps/X4-text.md#g269) | X4 호스트의 번역 API와 번역 다시 읽기 (G254에서 이어짐) | `Translations.Load`(불변) → `For(언어 목록)`의 `Translator`가 쪽지·맨 값·호스트 키·Def 이름을 늘 문자열로(오류는 따로 받음), 호스트는 제 `.ftl` 폴더를 넘기고 모드가 덮어씀, 모드 화면 파일에는 키 부르기를 더하지 않음, 다시 읽기는 `Load`를 다시 불러 갈아 끼움(파일 지켜보기는 호스트 몫). | 일부 바뀜(G270·G273) |
 | [G270](gaps/X4-text.md#g270) | X4 제목·선택지 자리의 글과 Def의 다른 글 (G269·G263에서 이어짐) | 제목·선택지 자리의 문자열은 키(G138)라 `tr.Label`(키, Def 이름, 쪽지, 엔티티의 Def 이름), 속성은 `tr.Attr(값, "desc")`(키·Def·엔티티 모두), 화면 값의 맨 값은 `tr.Value`(문자열은 그대로), `DefName`·`DefAttr`는 이 둘에 합침, 스크립트 내장 `deftext`는 만들지 않음. | 잠정 |
 
 ## 숨긴 정보 (9절 미결 2, G196~G206)
