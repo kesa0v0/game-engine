@@ -116,10 +116,19 @@ namespace Kesa.Engine.Runtime
         /// <see cref="LegalMoves"/>처럼 펼치되, 답하는 엔티티는 엔진이 정한다: <c>acts_for</c>가 매개변수를 그대로 돌려주고
         /// (<c>lambda party: party</c>) 그 매개변수에 <c>choose</c>가 없으면 질문 대상으로 채우고, 아니면 펼친 뒤 <c>acts_for</c>가
         /// 질문 대상인 수만 남긴다. <paramref name="by"/>가 있으면 그 대상의 수만 (대상이 아니면 빈 목록).
-        /// 입구 정책은 보지 않는다(어느 연결이 낼 수 있는지는 <see cref="ViewAs"/>). 선택지 답은 <see cref="Request.Choices"/>다.
-        /// 없는 질문 번호는 <see cref="WorldException"/>이다.
+        /// 입구 정책은 보지 않는다(어느 연결이 낼 수 있는지는 <see cref="ViewAs"/>). 선택지 답도 엔진 커맨드 <see cref="PickCommand"/>의
+        /// 수로 먼저 든다(G272): 호스트는 어느 수든 <see cref="Respond"/>로 낸다. 없는 질문 번호는 <see cref="WorldException"/>이다.
         /// </summary>
         public ResponseMoveList LegalResponses(long request, EntityId? by, int max) => LegalResponses(request, by, max, null, null);
+
+        /// <summary>
+        /// 선택지로 답하는 엔진 커맨드 (spec-gaps G272·G273): 인자는 <see cref="PickBy"/>(답하는 엔티티)와 <see cref="PickChoice"/>(선택지 번호).
+        /// 값이 아니라 번호인 것은 못 보는 엔티티가 든 선택지도 가려진 채 고를 수 있어야 해서다. <see cref="Respond"/>가 <see cref="Answer"/>로 보낸다.
+        /// </summary>
+        public const string PickCommand = Loading.ManifestReader.ReservedId + ".pick";
+
+        public const string PickBy = "by";
+        public const string PickChoice = "choice";
 
         /// <param name="answers">있으면 이 대상만 (보기 쪽: 그 연결이 답할 수 있는 대상, G200).</param>
         /// <param name="keep">있으면 이것이 참인 수만 센다 (거른 읽기, G202).</param>
@@ -137,6 +146,23 @@ namespace Kesa.Engine.Runtime
             var moves = new List<ResponseMove>();
             var needs = new List<ResponseNeeds>();
             bool truncated = false;
+            // 선택지 답도 같은 목록의 수다 (G272): 대상마다 선택지 순서로 engine.pick(by=, choice=)
+            foreach (var id in who)
+            {
+                for (int i = 0; i < open.Choices.Count && !truncated; i++)
+                {
+                    if (moves.Count == max)
+                    {
+                        truncated = true;
+                        break;
+                    }
+                    moves.Add(new ResponseMove(PickCommand, new SortedDictionary<string, Value>(StringComparer.Ordinal)
+                    {
+                        [PickBy] = new EntityValue(id), [PickChoice] = new IntValue(i),
+                    }, id));
+                }
+            }
+            if (truncated) return new ResponseMoveList(request, moves, truncated, needs);
             foreach (var command in open.Responses)
             {
                 var decl = FindCommand(command);

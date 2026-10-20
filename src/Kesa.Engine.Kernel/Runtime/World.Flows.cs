@@ -293,6 +293,7 @@ namespace Kesa.Engine.Runtime
         public AnswerResult Respond(string issuer, long request, string command, IReadOnlyDictionary<string, Value> args)
         {
             NoHostWrites("Respond");
+            if (command == PickCommand) return Pick(issuer, request, args);
             if (!_commands.TryGetValue(command, out var decl))
             {
                 throw new WorldException(Codes.RunUnknownName, "there is no command '" + command + "'",
@@ -371,6 +372,23 @@ namespace Kesa.Engine.Runtime
             {
                 return new AnswerResult(request, issuer, AnswerOutcome.ScriptError) { Arguments = checkedArgs, Error = e };
             }
+        }
+
+        /// <summary>
+        /// <see cref="PickCommand"/>의 수 (G272): 인자 <c>by</c>(엔티티)와 <c>choice</c>(번호)를 읽어 <see cref="Answer"/>와 같은 길로 간다.
+        /// 인자 모양이 틀린 것은 <see cref="LegalResponses"/>의 수를 그대로 넘기지 않은 호출자 오류다.
+        /// </summary>
+        private AnswerResult Pick(string issuer, long request, IReadOnlyDictionary<string, Value> args)
+        {
+            const string usage = "pass the move from LegalResponses as it is: {\"by\": entity, \"choice\": index}";
+            foreach (var key in args.Keys)
+                if (key != PickBy && key != PickChoice)
+                    throw new WorldException(Codes.RunType, PickCommand + " has no argument '" + key + "'", usage);
+            if (!args.TryGetValue(PickBy, out var by) || !(by is IEntityReference who))
+                throw new WorldException(Codes.RunType, PickCommand + " needs by= with the answering entity", usage);
+            if (!args.TryGetValue(PickChoice, out var choice) || !(choice is IntValue index))
+                throw new WorldException(Codes.RunType, PickCommand + " needs choice= with the index of the choice", usage);
+            return Answer(issuer, request, who.EntityId, index.Value);
         }
 
         private FlowRecord? FindFlow(long request)

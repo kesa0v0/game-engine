@@ -116,6 +116,22 @@ namespace Kesa.Engine.ConsoleHost.Tests
         }
 
         [Test]
+        public void EachChoiceIsListedOnceAsAPickMove()
+        {
+            // 선택지 답도 LegalResponses의 engine.pick 수라 한 번씩만 나온다 (G272)
+            string screen = PlayOut(seed: 1);
+            var asked = Regex.Match(screen, @"질문 (\d+): hit → #2 skirmish:Blue[^\n]*\r?\n((?:  \d+\)[^\n]*\n)+)");
+            Assert.That(asked.Success, Is.True);
+            var lines = Regex.Matches(asked.Groups[2].Value, @"\d+\) ([^\r\n]*)").Select(m => m.Groups[1].Value);
+            string q = asked.Groups[1].Value;
+            Assert.That(lines, Is.EqualTo(new[]
+            {
+                "[blue] 질문 " + q + " #2 skirmish:Blue: hold",
+                "[blue] 질문 " + q + " #2 skirmish:Blue: retreat",
+            }));
+        }
+
+        [Test]
         public void SkippingUnchangedPanelsByReceiptDrawsTheSameScreens()
         {
             // 스커미시는 ui/console.txt가 있어 패널의 영수증(CallResult.Changed, G246·G250)으로 건너뛴다

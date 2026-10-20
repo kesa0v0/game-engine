@@ -272,22 +272,16 @@ namespace Kesa.Engine.ConsoleHost
                 var view = _world.ViewAs(seat);
                 foreach (var request in view.OpenRequests)
                 {
+                    // 선택지 답(engine.pick)과 응답 커맨드가 한 목록이고 어느 것이든 Respond로 낸다 (G272).
                     // 거른 질문의 대상은 이 자리가 답할 수 있는 것만이다 (G234)
-                    foreach (var by in request.Who)
-                    {
-                        for (int i = 0; i < request.Choices.Count; i++)
-                        {
-                            long choice = i;
-                            options.Add(new Option(seat,
-                                "질문 " + request.Id.ToString(CultureInfo.InvariantCulture) + " " + _text.Entity(by) + ": " +
-                                _text.Of(request.Choices[i].Value),
-                                () => Text(_world.Answer(seat, request.Id, by, choice))));
-                        }
-                    }
                     var responses = view.LegalResponses(request.Id, null, MaxMoves);
                     foreach (var move in responses.Moves)
                     {
-                        options.Add(new Option(seat, Label(move.Command, move.Arguments),
+                        string label = move.Command == World.PickCommand
+                            ? "질문 " + request.Id.ToString(CultureInfo.InvariantCulture) + " " + _text.Entity(move.By) + ": " +
+                              _text.Of(request.Choices[(int)((IntValue)move.Arguments[World.PickChoice]).Value].Value)
+                            : Label(move.Command, move.Arguments);
+                        options.Add(new Option(seat, label,
                             () => Text(_world.Respond(seat, request.Id, move.Command, move.Arguments))));
                     }
                     foreach (var needs in responses.Needs)
