@@ -122,7 +122,9 @@ namespace Kesa.Engine.ConsoleHost.Tests
             string screen = PlayOut(seed: 1);
             var asked = Regex.Match(screen, @"질문 (\d+): 명중! → #2 파랑[^\n]*\r?\n((?:  \d+\)[^\n]*\n)+)");
             Assert.That(asked.Success, Is.True);
-            var lines = Regex.Matches(asked.Groups[2].Value, @"\d+\) ([^\r\n]*)").Select(m => m.Groups[1].Value);
+            // 화면 동작(G285)은 질문과 상관없이 뒤에 붙는다
+            var lines = Regex.Matches(asked.Groups[2].Value, @"\d+\) ([^\r\n]*)").Select(m => m.Groups[1].Value)
+                .Where(l => !l.Contains("[화면]"));
             string q = asked.Groups[1].Value;
             Assert.That(lines, Is.EqualTo(new[]
             {
@@ -145,6 +147,59 @@ namespace Kesa.Engine.ConsoleHost.Tests
             {
                 ConsoleGame.AlwaysRedraw = false;
             }
+        }
+
+        /// <summary>적힌 글을 차례로 찾아 그 메뉴 번호를 고르는 입력. 다 고르면 끝낸다.</summary>
+        private sealed class Script : TextReader
+        {
+            private readonly StringWriter _screen;
+            private readonly string[] _wants;
+            private int _next;
+
+            public Script(StringWriter screen, params string[] wants)
+            {
+                _screen = screen;
+                _wants = wants;
+            }
+
+            public override string? ReadLine()
+            {
+                if (_next == _wants.Length) return null;
+                string text = _screen.ToString();
+                string block = text.Substring(text.LastIndexOf("== 틱", StringComparison.Ordinal));
+                string want = _wants[_next++];
+                var hit = Regex.Matches(block, @"^  (\d+)\) (.*)$", RegexOptions.Multiline)
+                    .FirstOrDefault(m => m.Groups[2].Value.Contains(want));
+                Assert.That(hit, Is.Not.Null, "no move '" + want + "' in\n" + block);
+                return hit!.Groups[1].Value;
+            }
+        }
+
+        [Test]
+        public void SelectingAUnitThenStrikingAnswersTheTurnQuestion()
+        {
+            // 화면 동작은 커맨드 뒤에 [화면]으로 나오고, me에는 앉은 진영이 들어간다 (G285·G286)
+            var screen = new StringWriter();
+            var errors = new StringWriter();
+            int code = Play.Run(new[] { "--lang", "ko", Samples(), "--seat", "red=skirmish:Red", "--seat", "blue=skirmish:Blue", "--seed", "1" },
+                new Script(screen,
+                    "[red] skirmish.Start()",
+                    "Move(dir=north, party=#1 빨강, unit=#5",
+                    "[red] skirmish.EndTurn(",
+                    "Move(dir=south, party=#2 파랑, unit=#8",
+                    "[blue] skirmish.EndTurn(",
+                    "[red] [화면] skirmish.select(unit=#5 궁수)",
+                    "[red] [화면] skirmish.strike(target=#8 궁수)"),
+                screen, errors);
+            Assert.That(code, Is.EqualTo(0), errors.ToString());
+            string text = screen.ToString();
+            // 고르기 전에는 공격 동작이 없다(require가 막음), 고른 뒤에는 그 자리의 화면 함수가 고른 유닛을 보인다
+            int selected = text.IndexOf("{selected: #5 궁수}", StringComparison.Ordinal);
+            Assert.That(selected, Is.GreaterThan(0));
+            Assert.That(text.IndexOf("skirmish.strike(", StringComparison.Ordinal), Is.GreaterThan(selected));
+            // strike가 적은 Attack은 빨강이 답할 차례 질문의 답으로 들어간다 (G283)
+            Assert.That(text, Does.Contain("[red] skirmish.Attack(party=#1 빨강, target=#8 궁수, unit=#5 궁수): ok"));
+            Assert.That(text, Does.Contain("{unit: #5 궁수, x: 2, y: 3, hp: 6, acted: true"));
         }
 
         [Test]

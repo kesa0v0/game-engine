@@ -3,6 +3,7 @@ skirmish-hit = Hit!
 skirmish-hit-hold = Hold
 skirmish-hit-retreat = Retreat
 skirmish-turn = Your turn
+skirmish-select-first = Select a unit that can still act first.
 
 def-skirmish-Red = Red
 def-skirmish-Blue = Blue

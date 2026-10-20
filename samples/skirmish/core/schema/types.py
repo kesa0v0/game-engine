@@ -11,3 +11,5 @@ deftype("Party", components=["Order", "Seatable"])
 deftype("Unit", components=["Pos", "Life", "Owner", "Ready"],
     max_hp=const(int), attack=const(int), reach=const(int))
 deftype("Game", components=["Match"])
+# 화면에만 있는 기록: 연결마다 하나, 저장되지 않는다 (spec-gaps G277·G279). 고른 유닛
+ui_state("Selection", unit=ref("Unit", optional=True))

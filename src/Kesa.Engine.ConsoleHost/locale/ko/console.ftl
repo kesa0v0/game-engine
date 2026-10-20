@@ -11,3 +11,4 @@ engine-console-cannot-list = ({ $command }의 수를 나열할 수 없다: { $wh
 engine-console-needs = ({ $command }의 수를 나열할 수 없다: { $parameters }를 정해야 한다)
 engine-console-pick = 질문 { $id } { $by }: { $choice }
 engine-console-ok = ok
+engine-console-screen = [화면]

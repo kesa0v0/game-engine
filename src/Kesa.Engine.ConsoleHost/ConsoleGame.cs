@@ -39,6 +39,12 @@ namespace Kesa.Engine.ConsoleHost
         /// <summary>모드의 <c>ui/console.txt</c> (G250). 비면 엔티티를 늘어놓는다.</summary>
         private readonly IReadOnlyList<ConsoleUi.Panel> _panels;
 
+        /// <summary>자리마다 UI 기록 하나 (G279·G285). 콘솔이 든다.</summary>
+        private readonly Dictionary<string, UiState> _ui = new Dictionary<string, UiState>(StringComparer.Ordinal);
+
+        /// <summary>UI 동작에 앉은 엔티티를 넣는 매개변수 이름 (콘솔의 약속, G286).</summary>
+        public const string MeParameter = "me";
+
         public ConsoleGame(ContentLoadResult content, World world, IReadOnlyList<(string Connection, string? Def)> seats,
             IReadOnlyList<ConsoleUi.Panel> panels, Translator translator, TextReader input, TextWriter output)
         {
@@ -162,6 +168,12 @@ namespace Kesa.Engine.ConsoleHost
 
         private string Seated(EntityId id) => _text.Say("seated", ("entity", new StrValue(_text.Entity(id))));
 
+        private UiState Ui(string seat)
+        {
+            if (!_ui.TryGetValue(seat, out var ui)) _ui[seat] = ui = _world.NewUiState();
+            return ui;
+        }
+
         // ---- 상태 ----
 
         /// <summary>엔티티마다 마지막으로 그린 줄과 그때의 도장. 도장이 그대로면 값을 다시 읽지 않는다 (G235).</summary>
@@ -201,7 +213,7 @@ namespace Kesa.Engine.ConsoleHost
                     {
                         var key = (seat, me.Value, panel.Place);
                         if (AlwaysRedraw || !_drawn.TryGetValue(key, out var drawn) || drawn.Result == null || drawn.Result.Changed(_world))
-                            _drawn[key] = drawn = Draw(view, panel, me);
+                            _drawn[key] = drawn = Draw(view, Ui(seat), panel, me);
                         foreach (var line in drawn.Lines) _out.WriteLine(line);
                     }
                 }
@@ -212,12 +224,12 @@ namespace Kesa.Engine.ConsoleHost
         private readonly Dictionary<(string, long, string), (CallResult? Result, List<string> Lines)> _drawn =
             new Dictionary<(string, long, string), (CallResult?, List<string>)>();
 
-        private (CallResult? Result, List<string> Lines) Draw(WorldView view, ConsoleUi.Panel panel, EntityId me)
+        private (CallResult? Result, List<string> Lines) Draw(WorldView view, UiState ui, ConsoleUi.Panel panel, EntityId me)
         {
             CallResult result;
             try
             {
-                result = view.Call(panel.Function, new EntityValue(me));
+                result = view.Call(ui, panel.Function, new EntityValue(me));
             }
             catch (WorldException e)
             {
@@ -298,15 +310,61 @@ namespace Kesa.Engine.ConsoleHost
                         options.Add(new Option(seat, Label(command, move), () => Text(_world.Submit(seat, command, move))));
                 }
             }
+            // 화면 동작은 모든 자리의 커맨드 뒤에: 게임을 바꾸는 수의 번호가 화면 동작 때문에 밀리지 않는다
+            foreach (var seat in _seats) UiOptions(seat, _world.ViewAs(seat), options);
             return options;
         }
 
+        /// <summary>
+        /// 그 자리의 UI 동작 합법 수를 <c>[화면]</c>을 붙여 커맨드들 뒤에 둔다 (G285). <c>me</c> 매개변수가 있으면 앉은 엔티티마다 그것을 넣어
+        /// 나열하고(G286), 없으면 자리마다 한 번. 고르면 <c>Act</c> 뒤 적힌 <c>submit</c>을 차례로 <c>Deliver</c>한다(G283).
+        /// </summary>
+        private void UiOptions(string seat, WorldView view, List<Option> options)
+        {
+            var ui = Ui(seat);
+            foreach (var action in _world.UiActions)
+            {
+                bool takesMe = _content.UiActions[action].Parameters.Any(p => p.Name == MeParameter);
+                var givens = takesMe
+                    ? _world.SeatsOf(seat).Select(me => (IReadOnlyDictionary<string, Value>)new Dictionary<string, Value> { [MeParameter] = new EntityValue(me) })
+                    : new[] { (IReadOnlyDictionary<string, Value>)new Dictionary<string, Value>() };
+                foreach (var given in givens)
+                {
+                    foreach (var move in Moves(action, () => view.LegalMoves(ui, action, given, MaxMoves)))
+                    {
+                        var shown = move.Where(p => !(takesMe && p.Key == MeParameter)).ToDictionary(p => p.Key, p => p.Value);
+                        options.Add(new Option(seat, _text.Say("screen") + " " + Label(action, shown), () => Act(seat, view, ui, action, move)));
+                    }
+                }
+            }
+        }
+
+        private string Act(string seat, WorldView view, UiState ui, string action, IReadOnlyDictionary<string, Value> move)
+        {
+            var acted = view.Act(ui, action, move);
+            if (!acted.Succeeded) return acted.Outcome + Why(acted.Error, acted.Preconditions, acted.ArgumentRejections);
+            if (acted.Submissions.Count == 0) return _text.Say("ok");
+            var lines = new List<string>();
+            foreach (var submission in acted.Submissions)
+            {
+                var delivered = _world.Deliver(seat, submission);
+                string result = delivered.Submitted != null ? Text(delivered.Submitted)
+                    : delivered.Answered != null ? Text(delivered.Answered)
+                    : delivered.Refusal!;
+                lines.Add(Label(submission.Command, submission.Arguments) + ": " + result);
+            }
+            return string.Join("; ", lines);
+        }
+
         /// <summary>합법 수. 호스트가 줘야 할 인자가 빠져 나열할 수 없으면 비운다.</summary>
-        private IReadOnlyList<IReadOnlyDictionary<string, Value>> Moves(WorldView view, string command, IReadOnlyDictionary<string, Value> args)
+        private IReadOnlyList<IReadOnlyDictionary<string, Value>> Moves(WorldView view, string command, IReadOnlyDictionary<string, Value> args) =>
+            Moves(command, () => view.LegalMoves(command, args, MaxMoves));
+
+        private IReadOnlyList<IReadOnlyDictionary<string, Value>> Moves(string command, Func<LegalMoveList> list)
         {
             try
             {
-                return view.LegalMoves(command, args, MaxMoves).Moves;
+                return list().Moves;
             }
             catch (WorldException e)
             {

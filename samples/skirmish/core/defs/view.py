@@ -24,6 +24,10 @@ def status(me):
 def board(me):
     return [board_row(y, me) for y in range(SIZE)]
 
+# 이 자리가 골라 둔 유닛 (ui.py의 select)
+def selection(me):
+    return {"selected": ui.Selection.unit}
+
 def units(me):
     return [{"unit": u, "x": u.Pos.x, "y": u.Pos.y, "hp": u.Life.hp, "acted": u.Ready.acted, "party": u.Owner.party}
             for u in query("Unit")]

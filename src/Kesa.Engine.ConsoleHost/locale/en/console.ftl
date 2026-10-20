@@ -11,3 +11,4 @@ engine-console-cannot-list = (cannot list the moves of { $command }: { $why })
 engine-console-needs = (cannot list the moves of { $command }: choose { $parameters } first)
 engine-console-pick = question { $id } { $by }: { $choice }
 engine-console-ok = ok
+engine-console-screen = [screen]

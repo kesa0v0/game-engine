@@ -50,13 +50,16 @@ namespace Kesa.Engine.ConsoleHost
             return panels;
         }
 
-        /// <summary>시작할 때 줄마다 부를 수 있는지 본다 (G247 <c>CheckCall</c>). 틀린 줄마다 <c>곳: 이유</c> 한 줄.</summary>
+        /// <summary>
+        /// 시작할 때 줄마다 부를 수 있는지 본다 (G247 <c>CheckCall</c>). 콘솔은 늘 자리의 UI 기록과 함께 부르므로 <c>ui</c>를 읽는 함수도
+        /// 된다(G285). 틀린 줄마다 <c>곳: 이유</c> 한 줄.
+        /// </summary>
         public static List<string> Check(World world, IEnumerable<Panel> panels)
         {
             var errors = new List<string>();
             foreach (var panel in panels)
             {
-                string? why = world.CheckCall(panel.Function, 1);
+                string? why = world.CheckCall(panel.Function, 1, withUi: true);
                 if (why != null) errors.Add(panel.Place + ": " + why);
             }
             return errors;
