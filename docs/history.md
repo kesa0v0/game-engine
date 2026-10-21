@@ -1012,3 +1012,9 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **박멸 `@when`:** `@when(lambda d: d.Status.cured and d.Status.on_board == 0 and not d.Status.eradicated)`가 `eradicated`를 적는다. 조건이 모든 도시의 큐브를 건너 읽는데도 `Treat`로 큐브가 0이 되면 정확히 한 번 발동한다(`@when` 읽기 기록이 도시 건너 `derived`를 따라감). 박멸한 질병은 `add_cube`가 더 올리지 않는다.
 - **알게 된 것:** 에픽을 섞은 덱에서 기대한 대로 도는지는 시험에서 `slot`을 직접 정해 확인한다. 엔진 구멍은 새로 안 드러남.
 - **테스트:** `PandemicTests` 37개(새 9개 + 폭발 한도 시험을 "7번에서 8번째로"로 고침). 기존 시험은 에픽을 먼저 버려 두고 돌린다.
+
+## 기여 행 설계(G294~G301)와 스크립트 내장 (2026-10-21)
+
+- **설계:** 보너스를 손으로 넣는 것(값 기여 행)과 있으면 붙는 것(선언 보너스)으로 나눴다(G294). 선언은 `const(list[Contrib])` 칸을 커널이 모으고(G295), `contrib(...)`로 만든다(G296). 키 줄은 `key=`(G297), 모인 줄은 `source`·`component`·`key`(G298), 다른 엔티티는 `to=` 한 걸음(G300), 조건부는 `when=lambda src, dst`(G301). 이름 있는 효과(효과 Def 키 줄, 만료)는 `std.stats`의 몫. 사례 비교(RimWorld `statOffsets`·`equippedStatOffsets`, 패러독스 static·event·triggered modifier, GAS, 이전 엔진 `ModifierDef`·`Comp_ModifierProvider`)는 각 G의 이유에.
+- **구현 1단계(G299):** 쓰기 내장 `add_contrib(e.C, "이름", "op", 값, source=e)` → int id, `remove_contrib(id)`, `remove_contribs(출처)` → 뗀 수(`World.Contributions.cs`의 `AddContributionBuiltins`, 검사는 호스트 API와 같음). `contribs()`의 줄에 `id`. `contribs`와 멤버 검사를 `DerivedMemberArg`로 함께 씀. 스텁과 안내서 3장·9장.
+- **테스트:** `ScriptContributionTests` 6개(id로 넣고 빼기와 `c.id`, 출처로 모두 빼기와 수, 키 줄은 줄을 넘김, 실패한 커맨드는 되감음, 잘못된 인자의 안내, 순수 함수에서는 `CMD004`). 처음 쓴 오타 이름 `plian`은 가까운 `derived`가 없어 힌트가 없는 것이 맞아 `mxa`로 고침.

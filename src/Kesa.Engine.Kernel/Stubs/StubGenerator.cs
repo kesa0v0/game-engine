@@ -76,6 +76,7 @@ namespace Kesa.Engine.Stubs
             "def ceil(x: int | float, /) -> int: ...\n" +
             "def clamp(x: Any, low: Any, high: Any, /) -> Any: ...\n" +
             "class Contribution:\n" +
+            "    id: int | None\n" +
             "    op: str\n" +
             "    value: Any\n" +
             "    source: Any\n" +
@@ -132,6 +133,9 @@ namespace Kesa.Engine.Stubs
             "def remove_row(rows: Any, key: Any, /) -> None: ...\n" +
             "def replace_rows(rows: Any, new_rows: list[Any], /) -> None: ...\n" +
             "def append_row(rows: Any, row: Any, /) -> Any: ...\n" +
+            "def add_contrib(component: Any, member: str, op: str, value: int | float, /, *, source: Any = ...) -> int: ...\n" +
+            "def remove_contrib(id: int, /) -> None: ...\n" +
+            "def remove_contribs(source: Any, /) -> int: ...\n" +
             "\n" +
             "class random:\n" +
             "    @staticmethod\n" +

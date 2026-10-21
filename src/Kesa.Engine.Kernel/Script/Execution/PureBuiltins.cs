@@ -42,6 +42,11 @@ namespace Kesa.Engine.Script
         public const string ReplaceRowsName = "replace_rows";
         public const string AppendRowName = "append_row";
 
+        /// <summary>기여 행을 넣고 빼는 쓰는 내장 (spec-gaps G299). 몸체는 월드가 준다.</summary>
+        public const string AddContribName = "add_contrib";
+        public const string RemoveContribName = "remove_contrib";
+        public const string RemoveContribsName = "remove_contribs";
+
         /// <summary>멈춰서 답을 기다리는 내장 (spec X1, spec-gaps G138). 자리 규칙은 쓰는 내장과 같다 (G136).</summary>
         public const string AskName = "ask";
 
@@ -80,6 +85,7 @@ namespace Kesa.Engine.Script
         private static readonly string[] WritingNameArray =
         {
             SpawnName, DestroyName, AttachName, DetachName, AddRowName, RemoveRowName, ReplaceRowsName, AppendRowName,
+            AddContribName, RemoveContribName, RemoveContribsName,
             AskName, WaitName, AdvanceName, EmitName, PayName,
         };
 

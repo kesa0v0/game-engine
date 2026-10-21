@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Numerics;
@@ -191,7 +192,7 @@ namespace Kesa.Engine.Runtime
 
         // ---- 함수 본문의 contribs ----
 
-        /// <summary><c>contribs(h, "max")</c>: 그 자리를 겨냥한 행들 (넣은 순). 행은 <c>op</c>, <c>value</c>(fixed), <c>source</c>를 가진다.</summary>
+        /// <summary><c>contribs(h, "max")</c>: 그 자리를 겨냥한 행들 (넣은 순). 행은 <c>id</c>, <c>op</c>, <c>value</c>(fixed), <c>source</c>를 가진다.</summary>
         private Value ContribsBuiltin(IReadOnlyList<Value> args)
         {
             if (args.Count != 2)
@@ -200,18 +201,7 @@ namespace Kesa.Engine.Runtime
                 throw new ScriptRuntimeException(Codes.RunType,
                     "contribs() takes the component being computed (or one of its sibling components), not " + args[0].KindName,
                     args[0] is RowsView ? "pick one row first, e.g. h.Skill[key]" : null);
-            if (!(args[1] is StrValue name))
-                throw new ScriptRuntimeException(Codes.RunType, "the second argument of contribs() is a value name (str), not " + args[1].KindName);
-
-            if (!view.Component.TryGetMember(name.Value, out var member) || member.Kind != MemberKind.Derived)
-            {
-                var derived = new List<string>();
-                foreach (var m in view.Component.Members)
-                    if (m.Kind == MemberKind.Derived) derived.Add(m.Name);
-                throw new ScriptRuntimeException(Codes.RunScript,
-                    "'" + view.Component.Name + "' has no derived value '" + name.Value + "' to take contributions",
-                    Suggest.Hint(name.Value, derived));
-            }
+            var member = DerivedMemberArg(PureBuiltins.ContribsName, view, args[1]);
 
             var rows = new List<Value>();
             Read(view.Id.Value, view.Component.Name); // 기여 행은 그 컴포넌트의 도장을 찍는다
@@ -229,6 +219,96 @@ namespace Kesa.Engine.Runtime
                 }
             }
             return new ListValue(rows);
+        }
+
+        /// <summary>둘째 인자: 그 컴포넌트의 <c>derived</c> 이름. 없거나 <c>derived</c>가 아니면 "혹시 …?"를 붙인 오류다.</summary>
+        private static MemberDecl DerivedMemberArg(string function, ComponentView view, Value name)
+        {
+            if (!(name is StrValue s))
+                throw new ScriptRuntimeException(Codes.RunType,
+                    "the second argument of " + function + "() is a value name (str), not " + name.KindName);
+            if (view.Component.TryGetMember(s.Value, out var member) && member.Kind == MemberKind.Derived) return member;
+            var derived = new List<string>();
+            foreach (var m in view.Component.Members)
+                if (m.Kind == MemberKind.Derived) derived.Add(m.Name);
+            throw new ScriptRuntimeException(Codes.RunScript,
+                "'" + view.Component.Name + "' has no derived value '" + s.Value + "' to take contributions",
+                Suggest.Hint(s.Value, derived));
+        }
+
+        // ---- 함수 본문의 add_contrib·remove_contrib·remove_contribs (G299) ----
+
+        private void AddContributionBuiltins(SortedDictionary<string, Value> table)
+        {
+            void Writer(string name, Func<IReadOnlyList<Value>, IReadOnlyDictionary<string, Value>, Value> body) =>
+                table.Add(name, new PureBuiltin(name, (p, k) => Guard(() => body(p, k))) { Writes = true });
+
+            Writer(PureBuiltins.AddContribName, AddContribBuiltin);
+            Writer(PureBuiltins.RemoveContribName, (p, k) =>
+            {
+                Expect(PureBuiltins.RemoveContribName, p, k, 1, "remove_contrib(id)");
+                switch (p[0])
+                {
+                    case IntValue id:
+                        RemoveContribution(id.Value);
+                        return NoneValue.Instance;
+                    case NoneValue _:
+                        throw new ScriptRuntimeException(Codes.RunType,
+                            "remove_contrib() got None: that contribution has no id",
+                            "a contribution declared by a component or a key row (c.id is None) cannot be removed; " +
+                            "detach the component or remove the row that declares it (spec-gaps G299)");
+                }
+                throw new ScriptRuntimeException(Codes.RunType,
+                    "remove_contrib() takes the id that add_contrib() returned (int), not " + p[0].KindName);
+            });
+            Writer(PureBuiltins.RemoveContribsName, (p, k) =>
+            {
+                Expect(PureBuiltins.RemoveContribsName, p, k, 1, "remove_contribs(source)");
+                return new IntValue(RemoveBySource(EntityArg(PureBuiltins.RemoveContribsName, p[0])));
+            });
+        }
+
+        /// <summary>
+        /// <c>add_contrib(u.Health, "max", "add", 3, source=wall)</c>: 기여 행을 넣고 그 id(int)를 돌려준다. 키 줄은 줄 하나
+        /// (<c>u.Skill.Medicine</c>)를 넘긴다. 검사는 호스트 API와 같다.
+        /// </summary>
+        private Value AddContribBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
+            const string name = PureBuiltins.AddContribName;
+            const string usage = "add_contrib(entity.Component, \"derived name\", \"op\", value, source=entity)";
+            if (positional.Count != 4)
+                throw new ScriptRuntimeException(Codes.RunScript,
+                    name + "() takes 4 positional arguments, got " + positional.Count, "write " + usage);
+            EntityId? source = null;
+            foreach (var pair in keywords)
+            {
+                if (pair.Key != "source")
+                    throw new ScriptRuntimeException(Codes.RunScript, name + "() has no keyword '" + pair.Key + "'",
+                        Suggest.Hint(pair.Key, new[] { "source" }));
+                if (!(pair.Value is NoneValue)) source = EntityArg(name, pair.Value);
+            }
+
+            ComponentView view;
+            switch (positional[0])
+            {
+                case ComponentView v: view = v; break;
+                case RowsView _:
+                    throw new ScriptRuntimeException(Codes.RunType, name + "() got all the rows of a keyed component",
+                        "pick one row, like entity.Skill.Medicine or entity.Skill[key]");
+                case NoneValue _:
+                    throw new ScriptRuntimeException(Codes.RunNoComponent, name + "() got None: the component is not attached",
+                        "check it with 'is not None' first");
+                default:
+                    throw new ScriptRuntimeException(Codes.RunType,
+                        name + "() takes a component of an entity (entity.Component), not " + positional[0].KindName, "write " + usage);
+            }
+            var member = DerivedMemberArg(name, view, positional[1]);
+            if (!(positional[2] is StrValue op))
+                throw new ScriptRuntimeException(Codes.RunType,
+                    "the op given to " + name + "() is a name (str), not " + positional[2].KindName, "write " + usage);
+
+            long id = AddContribution(view.Id, new MemberHandle(view.Component, null, member), view.Row, op.Value, positional[3], source);
+            return new IntValue(id);
         }
 
         private static bool SameRow(RowKey? a, RowKey? b)
@@ -259,13 +339,14 @@ namespace Kesa.Engine.Runtime
             {
                 switch (name)
                 {
+                    case "id": return new IntValue(_row.Id);
                     case "op": return new StrValue(_row.Op);
                     case "value": return new FixedValue(_row.Value);
                     case "source":
                         return _row.Source != null ? (Value)new EntityView(_world, new EntityId(_row.Source.Value)) : NoneValue.Instance;
                 }
                 throw new ScriptRuntimeException(Codes.RunScript, "a contribution has no '" + name + "'",
-                    Suggest.Hint(name, new[] { "op", "value", "source" }));
+                    Suggest.Hint(name, new[] { "id", "op", "value", "source" }));
             }
         }
     }

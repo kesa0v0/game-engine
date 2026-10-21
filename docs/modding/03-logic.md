@@ -38,6 +38,7 @@ f-문자열, `**`·비트 연산, 연쇄 비교(`0 < x < 5`는 `0 < x and x < 5`
 |---|---|
 | 엔티티 | `spawn("DefId", 컴포넌트=컴포넌트(...))`, `destroy(e)`, `attach(e, 컴포넌트(...))`, `detach(e.컴포넌트)` |
 | 줄 | `add_row(e.C, 키[, [C(...)]])`, `remove_row(e.C, 키)`, `append_row`, `replace_rows` |
+| 기여 행 | `add_contrib(e.C, "이름", "op", 값, source=e)`, `remove_contrib(id)`, `remove_contribs(출처)` (아래) |
 | 그 밖 | `emit(신호(...))`(6장), `pay(필드, 수)`(4장), `ask`·`wait`·`advance`(5장) |
 
 "문장으로만"은 한 줄 전체이거나 `x = f(...)`의 오른쪽 전체여야 한다는 뜻이다. `if pay(...)`처럼 식 안에 넣으면 `CMD004`:
@@ -95,10 +96,18 @@ component("Fleet", strength=derived(int, lambda f: sum([s.Hull.hp for s in f.ent
 
 - `h.entity`는 그 컴포넌트를 가진 엔티티, `h.Owner`처럼 같은 엔티티의 다른 컴포넌트도 바로 읽는다.
 - 함수는 **순수**해야 한다: 쓰기·난수가 있으면 로드 오류(`CMD004`).
-- **기여 행**은 `derived` 값에 붙는 "수정치" 줄이다(버프·장비 보너스). 행마다 `op`(문자열, 뜻은 모드가 정함), `value`(`fixed`),
+- **기여 행**은 `derived` 값에 붙는 "수정치" 줄이다(버프·장비 보너스). 행마다 `id`, `op`(문자열, 뜻은 모드가 정함), `value`(`fixed`),
   `source`(낸 엔티티나 `None`)가 있고, `contribs(h, "max_hp")`가 넣은 순서대로 준다. 어떻게 합칠지는 `derived` 함수가 정한다.
-- 기여 행을 넣고 빼는 것은 지금 호스트 API(`AddContribution`·`RemoveContribution`)뿐이다. 출처나 대상 엔티티가 죽으면 행도 지워진다.
-  스크립트에서 넣는 내장과 만료(몇 틱 뒤 사라짐)는 아직 없다(9장).
+- 커맨드·핸들러·반응에서 기여 행을 넣고 뺀다. 출처나 대상 엔티티가 죽으면 행도 지워지고, 실패한 커맨드는 넣고 뺀 것을 되감는다.
+
+  ```python
+  row = add_contrib(ship.Hull, "max_hp", "add", 2, source=dock)   # 넣은 행의 id(int)
+  remove_contrib(row)                                              # 그 행 하나
+  n = remove_contribs(dock)                                        # dock이 낸 행 모두, 뗀 수
+  ```
+
+  첫 인자는 읽을 때와 같이 컴포넌트(`ship.Hull`)이고, 키 컴포넌트면 줄 하나(`pawn.Skill.Medicine`)다. 나중에 지울 행은 id를 엔티티 칸에
+  적어 둔다. 몇 틱 뒤 사라지는 만료는 아직 없다(9장).
 - 같은 엔티티 안에서 자기를 다시 읽는 순환은 로드 때 `SCH009`. 다른 엔티티를 거치는 순환은 실행 때 `RUN014`.
 
 ## 난수

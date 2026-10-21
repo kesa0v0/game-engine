@@ -244,6 +244,7 @@ namespace Kesa.Engine.Runtime
                     CallerBody = DefIdBuiltin,
                 });
             AddStructureBuiltins(table);
+            AddContributionBuiltins(table);
             AddSignalBuiltins(table);
             AddFlowBuiltins(table);
             AddRandomBuiltins(table);
