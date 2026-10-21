@@ -142,6 +142,7 @@ namespace Kesa.Engine.Tests.Loading
                 "    Resource: _Resource_consts | None\n" +
                 "    Unit: _Unit_consts | None\n" +
                 "def defdata(id: str, /) -> _DefData: ...\n" +
+                "def defs(type: Literal[\"Resource\", \"Unit\"], /) -> list[str]: ...\n" +
                 "\n" +
                 "def Mod(*, id: str, version: str = ..., defaultLanguage: str = ..., dependencies: list[str] = ..., " +
                 "loadAfter: list[str] = ..., optional: list[str] = ...) -> None: ...\n" +

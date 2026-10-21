@@ -57,5 +57,8 @@ namespace Kesa.Engine.Script
         /// 함수 본문의 <c>query(...)</c> 호출마다 리터럴로 적은 출처 이름 (G192). 이름 검사가 모으고 ⑤ 링크가 본다.
         /// </summary>
         public List<List<KeyValuePair<string, SourceSpan>>> QueriedNames { get; } = new List<List<KeyValuePair<string, SourceSpan>>>();
+
+        /// <summary>함수 본문의 <c>defs("City")</c>에 리터럴로 적은 Def 타입 이름 (G305). 이름 검사가 모으고 ⑤ 링크가 본다.</summary>
+        public List<KeyValuePair<string, SourceSpan>> DefTypeLiterals { get; } = new List<KeyValuePair<string, SourceSpan>>();
     }
 }

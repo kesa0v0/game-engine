@@ -73,6 +73,7 @@ def rivals(house):
 | `s.Hull.hp -= 3` | 쓰기(`field`와 `ref`만, 쓰는 곳에서만) |
 | `s.Ship.base_hp` | Def 타입 이름으로 그 엔티티 Def의 `const` 읽기 |
 | `defdata("Medic").Role.treat_all` | 엔티티가 없는 Def의 `const`를 Def id로 읽기 |
+| `defs("City")` | 그 Def 타입의 Def 전체 id 목록 |
 | `house.ships` | 역방향 컬렉션(그 상회를 가리키는 배들) |
 | `house.Stock.Fish.amount`, `house.Stock[k]` | 키 컴포넌트의 줄 |
 | `u.Life is None` | 그 컴포넌트가 붙어 있지 않다(또는 보이지 않는다, 7장) |
@@ -85,6 +86,9 @@ def rivals(house):
   짧은 이름이면 쓴 모드 기준이고, 키 줄을 돌 때의 키 같은 Def id 값도 받는다(`for k in p.Roles: defdata(k).Role.moves`).
   타입 이름 뒤가 그 타입의 `const`들이고, Def가 그 타입이 아니면 `None`이다. 없는 Def는 실행 오류("혹시 …?"),
   리터럴로 적은 id와 타입·`const` 이름의 오타는 로드 때 잡힌다.
+- `defs("City")`는 그 타입의 Def들의 전체 id 목록이다(`abstract` 빼고, 모드 로드 순서 뒤 등록 순서). 내가 의존하지 않는 모드의
+  Def도 나온다. 판을 깔 때 도시 이름을 박아 두지 않고 `for name in defs("City"): spawn(name)`으로 쓰면 다른 모드가 더한 도시도
+  깔린다. 값은 전체 이름이라 맨 문자열과 비교하지 말고 `defid("Atlanta")`와 비교한다.
 
 ## `derived`와 기여 행
 

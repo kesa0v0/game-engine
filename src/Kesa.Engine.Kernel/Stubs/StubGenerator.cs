@@ -202,6 +202,7 @@ namespace Kesa.Engine.Stubs
             "def query(*names: str) -> list[Any]: ...\n" +
             "def defid(name: str, /) -> str: ...\n" +
             "def defdata(id: str, /) -> Any: ...\n" +
+            "def defs(type: str, /) -> list[str]: ...\n" +
             ContribNames;
 
         /// <summary>선언 보너스 (G295~G297): 스키마 파일(기본값)과 Def 파일에서 쓴다. 로직에서는 <c>add_contrib</c>를 쓴다.</summary>
@@ -716,15 +717,17 @@ namespace Kesa.Engine.Stubs
 
                 // defdata(): Def 타입 이름으로 그 타입의 const들, 그 타입이 아니면 None (G303)
                 Line("class _DefData:");
-                bool anyType = false;
+                var typeNames = new List<string>();
                 foreach (var t in _schema.Types)
                 {
                     if (!Sees(t.Mod)) continue;
                     Line("    " + t.Name + ": " + ConstsName(t) + " | None");
-                    anyType = true;
+                    typeNames.Add(t.Name);
                 }
-                if (!anyType) Line("    ...");
+                if (typeNames.Count == 0) Line("    ...");
                 Line("def defdata(id: str, /) -> _DefData: ...");
+                // defs(): 그 타입의 Def 전체 id 목록 (G305)
+                Line("def defs(type: " + (typeNames.Count == 0 ? "Never" : Literal(typeNames)) + ", /) -> list[str]: ...");
                 Line();
             }
 

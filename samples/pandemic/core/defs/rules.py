@@ -1,7 +1,4 @@
-DISEASES = ["Blue", "Yellow"]
-CITIES = ["Atlanta", "Chicago", "Montreal", "NewYork", "Washington", "SanFrancisco",
-          "LosAngeles", "MexicoCity", "Miami", "Bogota", "Lima", "SaoPaulo"]
-
+# 질병과 도시는 이름을 박아 두지 않고 Def에서 모두 돈다(defs): 확장 모드가 도시나 질병 Def를 더하면 판에 그대로 깔린다
 def game():
     for g in query("Game"):
         return g
@@ -250,18 +247,19 @@ def seed_epidemics():
 def Start():
     with preconditions:
         require(game() is None, text("pandemic-already-started"))
-    for name in DISEASES:
+    for name in defs("Disease"):
         spawn(name)
-    for name in CITIES:
+    cities = defs("City")
+    for name in cities:
         spawn(name)
     # 카드는 섞은 순서로 만든다: 엔티티 번호 순서가 어느 도시인지를 드러내면 안 된다 (안내서 7장의 알려진 한계)
     slot = 0
-    for name in random.sample(CITIES, len(CITIES)):
-        spawn("Infection", Card=Card(slot=slot), Face=Face(city=city_of(defid(name))))
+    for name in random.sample(cities, len(cities)):
+        spawn("Infection", Card=Card(slot=slot), Face=Face(city=city_of(name)))
         slot += 1
     slot = 0
-    for name in random.sample(CITIES, len(CITIES)):
-        spawn("Back", Card=Card(slot=slot), Face=Face(city=city_of(defid(name))))
+    for name in random.sample(cities, len(cities)):
+        spawn("Back", Card=Card(slot=slot), Face=Face(city=city_of(name)))
         slot += 1
     alice = spawn("Alice")
     bob = spawn("Bob")
@@ -269,6 +267,8 @@ def Start():
     bob.Order.next = alice
     alice.At.city = city_of(defid("Atlanta"))
     bob.At.city = city_of(defid("Atlanta"))
+    for p in [alice, bob]:
+        p.Actions.left = p.Actions.per_turn
     g = spawn("Pandemic")
     # 처음 손패: 둘이서 하면 네 장씩
     for p in [alice, bob]:
@@ -286,7 +286,7 @@ def Start():
         if g.Match.over:
             break
         if r.response == "EndTurn" or p.Actions.left == 0:
-            p.Actions.left = 4
+            p.Actions.left = p.Actions.per_turn
             draw_phase(g, p)
             # 손이 넘치면 한도까지 버려야 한다
             while p.Hand.over and not g.Match.over:
@@ -332,7 +332,7 @@ def BuildStation(player: Ref[Player], card: Ref[PlayerCard] | None):
 def Treat(player: Ref[Player], disease: DefId[Disease]):
     with preconditions:
         require(player.Actions.left > 0, text("pandemic-no-actions"))
-        choose(disease, from_=[defid(d) for d in DISEASES if player.At.city.Cubes[defid(d)].count > 0])
+        choose(disease, from_=[d for d in defs("Disease") if player.At.city.Cubes[d].count > 0])
     row = player.At.city.Cubes[disease]
     if disease_of(disease).Status.cured or any(r.treat_all for r in roles(player)):
         row.count = 0
@@ -351,7 +351,7 @@ def DiscoverCure(player: Ref[Player], disease: DefId[Disease]):
     with preconditions:
         require(player.Actions.left > 0, text("pandemic-no-actions"))
         require(player.At.city.Research.station, text("pandemic-needs-station"))
-        choose(disease, from_=[defid(d) for d in DISEASES if len(cards_of(player, defid(d))) >= player.Cure.cards and not disease_of(defid(d)).Status.cured])
+        choose(disease, from_=[d for d in defs("Disease") if len(cards_of(player, d)) >= player.Cure.cards and not disease_of(d).Status.cured])
     for k in range(player.Cure.cards):
         best = None
         for c in cards_of(player, disease):

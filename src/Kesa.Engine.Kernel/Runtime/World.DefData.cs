@@ -96,6 +96,30 @@ namespace Kesa.Engine.Runtime
             public Value GetAttribute(string name) => _world.DefConst(_id, _type, name);
         }
 
+        // ---- defs (G305) ----
+
+        /// <summary>
+        /// <c>defs("City")</c>: 그 타입의 Def들의 전체 id. 순서는 등록 순서(모드 로드 순서 뒤 파일 순서), <c>abstract</c>는 동결본에 없어 빠진다(G70).
+        /// 부른 모드가 의존하지 않는 모드의 Def도 나온다.
+        /// </summary>
+        private Value DefsBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
+            if (positional.Count != 1 || keywords.Count > 0 || !(positional[0] is StrValue name))
+                throw new ScriptRuntimeException(Codes.RunType,
+                    "defs() takes one Def type name, got " +
+                    (positional.Count == 1 && keywords.Count == 0 ? positional[0].KindName : positional.Count + keywords.Count + " arguments"),
+                    "write defs(\"City\")");
+            if (!_schema.TryGetType(name.Value, out _))
+            {
+                var names = new List<string>();
+                foreach (var t in _schema.Types) names.Add(t.Name);
+                throw new ScriptRuntimeException(Codes.RunScript, "there is no Def type '" + name.Value + "'", Suggest.Hint(name.Value, names));
+            }
+            var ids = new List<Value>();
+            foreach (var def in _defs.OfType(name.Value)) ids.Add(new StrValue(def.Id));
+            return new ListValue(ids);
+        }
+
         // ---- defdata (G303·G304) ----
 
         /// <summary>

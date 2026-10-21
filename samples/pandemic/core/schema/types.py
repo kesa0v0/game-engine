@@ -4,6 +4,7 @@
 RATES = [2, 2, 2, 3, 3, 4, 4]
 OUTBREAK_LIMIT = 8
 HAND_LIMIT = 7
+ACTIONS = 4        # 턴마다 행동 수 (역할 보너스 전)
 CUBE_SUPPLY = 16   # 질병마다 큐브 수. 실제 판은 24개인데 도시가 12개라 줄였다
 CURE_CARDS = 5     # 치료제에 필요한 같은 색 도시 카드 수
 EPIDEMICS = 2      # 플레이어 덱에 섞는 에픽 카드 수
@@ -34,6 +35,10 @@ def is_over(m):
 def cure_cards(c):
     return CURE_CARDS + floor(sum([x.value for x in contribs(c, "cards") if x.op == "add"]))
 
+# 턴마다 받는 행동 수: 기본 ACTIONS에 기여("add")를 더한다. 확장의 역할이 보너스를 선언할 수 있게 derived로 둔다
+def turn_actions(a):
+    return ACTIONS + floor(sum([x.value for x in contribs(a, "per_turn") if x.op == "add"]))
+
 def hand_size(h):
     return len(h.entity.hand)
 
@@ -48,7 +53,7 @@ def is_danger(l):
     return any(l.entity.Cubes[d].count >= 3 for d in l.entity.Cubes)
 
 component("At", city=ref("City", optional=True, inverse="here"))
-component("Actions", left=field(int, default=4))
+component("Actions", left=field(int, default=4), per_turn=derived(int, turn_actions))
 component("Order", next=ref("Player", optional=True))
 component("Match", turn=field(int, default=1), outbreaks=field(int, default=0), epidemics=field(int, default=0), deck_out=field(bool, default=False),
     rate=derived(int, infection_rate), lost=derived(bool, is_lost), won=derived(bool, is_won), over=derived(bool, is_over))

@@ -250,6 +250,7 @@ namespace Kesa.Engine.Runtime
                 {
                     CallerBody = DefDataBuiltin,
                 });
+            table.Add(PureBuiltins.DefsName, new PureBuiltin(PureBuiltins.DefsName, DefsBuiltin));
             AddStructureBuiltins(table);
             AddContributionBuiltins(table);
             AddSignalBuiltins(table);

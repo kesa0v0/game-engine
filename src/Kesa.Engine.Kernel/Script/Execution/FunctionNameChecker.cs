@@ -29,6 +29,7 @@ namespace Kesa.Engine.Script
                     functions.QueriedNames, hosts ?? HostNames.None, functions.DefIdLiterals, functions.TextUses)
                 {
                     Submits = functions.SubmitUses,
+                    DefTypes = functions.DefTypeLiterals,
                 };
                 if (function.Definition != null)
                     walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
@@ -51,6 +52,9 @@ namespace Kesa.Engine.Script
 
             /// <summary><c>submit("커맨드", ...)</c> 리터럴 호출을 모을 곳 (G278).</summary>
             public List<SubmitUse> Submits { get; set; } = new List<SubmitUse>();
+
+            /// <summary><c>defs("City")</c>의 리터럴 타입 이름을 모을 곳 (G305).</summary>
+            public List<KeyValuePair<string, SourceSpan>> DefTypes { get; set; } = new List<KeyValuePair<string, SourceSpan>>();
 
             private readonly List<List<KeyValuePair<string, SourceSpan>>> _queried;
             private readonly IEnumerable<string> _schemaRuntimeNames;
@@ -244,6 +248,10 @@ namespace Kesa.Engine.Script
                             !IsShadowed(defid.Name, locals) && call.Arguments.Count == 1 &&
                             call.Arguments[0].Name == null && call.Arguments[0].Value is StringLiteral literal)
                             _defIds.Add(new KeyValuePair<string, SourceSpan>(literal.Value, literal.Span));
+                        // defs("City")의 타입 이름도 링크가 본다 (G305)
+                        if (call.Callee is NameExpr defs && defs.Name == PureBuiltins.DefsName && !IsShadowed(defs.Name, locals) &&
+                            call.Arguments.Count == 1 && call.Arguments[0].Name == null && call.Arguments[0].Value is StringLiteral typeName)
+                            DefTypes.Add(new KeyValuePair<string, SourceSpan>(typeName.Value, typeName.Span));
                         // text("키", ...)의 리터럴 키와 넘긴 이름은 check의 번역 검사가 본다 (G257)
                         if (call.Callee is NameExpr text && text.Name == PureBuiltins.TextName &&
                             !IsShadowed(text.Name, locals) && call.Arguments.Count > 0 &&

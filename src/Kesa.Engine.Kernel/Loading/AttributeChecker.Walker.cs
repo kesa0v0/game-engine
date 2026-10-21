@@ -286,6 +286,8 @@ namespace Kesa.Engine.Loading
 
                 if (builtin == PureBuiltins.QueryName) return new GroupType(new EntityType(QueriedType(call)));
                 if (builtin == PureBuiltins.DefDataName) return DefDataStatic.Instance;
+                // defs("City")의 원소는 전체 이름 Def id다: 맨 문자열과 비교하면 경고 (G261·G305)
+                if (builtin == PureBuiltins.DefsName) return new GroupType(DefIdStatic.Instance);
                 if (builtin == PureBuiltins.SpawnName)
                 {
                     DefType? type = null;

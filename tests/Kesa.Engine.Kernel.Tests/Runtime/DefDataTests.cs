@@ -99,6 +99,54 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(r.Error!.Hint, Is.EqualTo("did you mean 'Ship'?"));
         }
 
+        // ---- defs (G305) ----
+
+        [Test]
+        public void DefsListsEveryConcreteDefOfATypeInLoadOrder()
+        {
+            // 부른 모드(banking)는 addon에 의존하지 않지만 addon의 배도 나온다. 추상 Hull은 빠진다
+            Mod("banking", schema: Schema, defs: Ships + "Ship(\"Hull\", abstract=True)\n" + Command(
+                "    n = 0\n    for k in defs(\"Ship\"):\n        n = n * 10 + defdata(k).Ship.speed\n" +
+                "    s.Mark.n = n * 10 + len(defs(\"Cargo\"))\n"));
+            Mod("addon", defs: "Ship(\"Galleon\", speed=4)\n", extra: ", dependencies=[\"banking\"]");
+            _world = new World(LoadClean());
+            _sloop = _world.Create("banking:Sloop");
+            Assert.That(Check().Succeeded, Is.True);
+            Assert.That(N(), Is.EqualTo(3241));
+        }
+
+        [TestCase("Shp", "there is no Def type 'Shp'", "did you mean 'Ship'?")]
+        [TestCase("Mark", "'Mark' is a component, not a Def type", null)]
+        public void ALiteralTypeNameIsCheckedAtLoad(string name, string message, string? hint)
+        {
+            Mod("banking", schema: Schema, defs: Ships + Command("    s.Mark.n = len(defs(\"" + name + "\"))\n"));
+            Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.LnkNotFound));
+            Assert.That(d.Message, Is.EqualTo(message));
+            if (hint != null) Assert.That(d.Hint, Is.EqualTo(hint));
+        }
+
+        [Test]
+        public void AnUnknownTypeNameAtRunTimeIsAnError()
+        {
+            Start(Command("    s.Mark.n = len(defs(s.Mark.name))\n"));
+            _world.Set(_sloop, _world.Member("Mark", "name"), new StrValue("Shipp"));
+            var r = Check();
+            Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(r.Error!.Message, Does.Contain("there is no Def type 'Shipp'"));
+            Assert.That(r.Error!.Hint, Is.EqualTo("did you mean 'Ship'?"));
+        }
+
+        [Test]
+        public void ItsIdsAreFullNamesSoABareComparisonWarns()
+        {
+            Mod("banking", schema: Schema, defs: Ships + Command(
+                "    for k in defs(\"Ship\"):\n        if k == \"Sloop\":\n            s.Mark.n = 1\n"));
+            Load(out var diags);
+            Assert.That(diags.Select(d => d.Code), Is.EqualTo(new[] { Codes.LnkBareDefId }));
+        }
+
         [Test]
         public void APausedFlowHoldingDefdataSavesAndLoads()
         {

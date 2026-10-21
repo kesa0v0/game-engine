@@ -56,6 +56,10 @@ namespace Kesa.Engine.Loading
                 foreach (var pair in functions)
                 foreach (var names in pair.Value.QueriedNames)
                     linker.CheckQuery(pair.Key, names);
+                // defs("타입"): 보이는 Def 타입이어야 한다 (G305)
+                foreach (var pair in functions)
+                foreach (var literal in pair.Value.DefTypeLiterals)
+                    linker.CheckDefType(pair.Key, literal.Key, literal.Value);
                 // submit("커맨드", ...)에 리터럴로 적은 커맨드: 있고 보이고 넘긴 이름이 매개변수와 맞아야 한다 (G278)
                 var byId = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 foreach (var command in commands ?? Array.Empty<CommandDecl>()) byId[command.Id] = command;
@@ -501,6 +505,24 @@ namespace Kesa.Engine.Loading
                         "'" + name + "' belongs to mod '" + owner + "', which mod '" + mod + "' does not depend on", span,
                         "add \"" + owner + "\" to dependencies in mod.py");
             }
+        }
+
+        /// <summary><c>defs("City")</c>에 리터럴로 적은 타입 이름: 이 모드에 보이는 Def 타입이어야 한다 (G305). 데이터 전용 타입도 된다.</summary>
+        private void CheckDefType(string mod, string name, SourceSpan span)
+        {
+            if (!_schema.TryGetType(name, out var type))
+            {
+                var candidates = new List<string>();
+                foreach (var t in _schema.Types) candidates.Add(t.Name);
+                string what = _schema.TryGetComponent(name, out _) ? "'" + name + "' is a component, not a Def type"
+                    : "there is no Def type '" + name + "'";
+                _stage.Error(mod, Codes.LnkNotFound, what, span, Suggest.Hint(name, candidates));
+                return;
+            }
+            if (!_visibility.CanSee(mod, type.Mod))
+                _stage.Error(mod, Codes.LnkNotVisible,
+                    "'" + name + "' belongs to mod '" + type.Mod + "', which mod '" + mod + "' does not depend on", span,
+                    "add \"" + type.Mod + "\" to dependencies in mod.py");
         }
 
         private static bool Contains(IReadOnlyList<string> list, string item)

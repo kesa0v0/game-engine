@@ -1055,3 +1055,12 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **간단화:** 처음 감염(판 깔기)은 역할을 보지 않는다. 규칙은 일반 지식으로 씀(규칙서와 대조할 것).
 - **알게 된 것:** 엔진 구멍 새로 없음. `defdata`로 능력형 역할이 데이터로 된다.
 - **테스트:** `PandemicTests` 44개(새 5개: 의무병의 한 번에 치료, 들어가면 걷힘, 놓이지 않음(폭발 없음), 운영 전문가의 카드 없는 연구소, 격리 전문가의 이웃 보호와 연쇄 폭발).
+
+## 판데믹 확장 모드 `brink` A단계와 `defs(타입)` (G305, 2026-10-22)
+
+- **재현:** 확장 모드 `brink`(코어 의존)가 `City` Def 둘(부에노스아이레스·산티아고)을 더하고 `patch.append`로 기존 도시의 이웃을 이었는데, 판을 깔면 도시 엔티티는 12개 그대로였다(임시 시험). 코어 `Start`가 박아 둔 `CITIES` 목록만 돌았고, Def를 타입으로 도는 내장이 없었다 → G305.
+- **구현 `defs("City")`:** 순수 내장(`PureBuiltins.DefsName`, 본체 `World.DefData.cs`의 `DefsBuiltin`)이 `DefSet.OfType`의 전체 id 목록(등록 순서, abstract는 동결본에 없음). 모르는 타입은 실행 오류("혹시 …?"). 리터럴 타입 이름은 ⑤ 링크가 봄(`ModFunctions.DefTypeLiterals` → `Linker.CheckDefType`: 없는 타입·컴포넌트 이름은 `LNK001`, 안 보이는 타입은 `LNK` 가시성 오류, 데이터 전용 타입도 됨). 속성 검사기는 원소를 `DefIdStatic`으로 보아 맨 문자열 비교를 경고(G261). 스텁: 모드 스텁 `def defs(type: Literal[보이는 타입들], /) -> list[str]`, 스키마 스텁 `type: str`.
+- **코어 고침:** `DISEASES`·`CITIES` 목록을 없애고 `defs("Disease")`·`defs("City")`로(등록 순서가 목록과 같아 시드 3의 판은 그대로). 턴마다 행동 수를 `Actions.per_turn` derived(`ACTIONS` + 기여 `add`)로 두어 확장 역할이 선언 보너스를 걸 수 있게 함.
+- **`brink`:** 도시 둘과 이웃 패치(`defs/map.py`), 제너럴리스트 `Role("Generalist", grants=[contrib("Actions.per_turn", "add", 1)])`(`defs/roles.py`), en·ko 도시 이름.
+- **알게 된 것:** 확장이 보너스를 걸려면 코어가 그 값을 `derived`로 열어 둬야 한다(엔진 구멍이 아니라 코어 모드의 설계). 이름을 박은 목록은 확장을 조용히 무시한다.
+- **테스트:** `DefDataTests`에 `defs` 4개(5케이스: 로드 순서·의존하지 않는 모드·abstract, 리터럴 타입 오타와 컴포넌트 이름, 실행 중 모르는 타입, 맨 문자열 비교 경고). `PandemicTests`는 코어 모드만 읽게(`Load(out, 모드들)`), 새 `BrinkTests` 5개(둘 다 깨끗이 로드, 새 도시와 카드, 패치한 이웃이 양쪽, 새 도시로 이동, 제너럴리스트 5행동).

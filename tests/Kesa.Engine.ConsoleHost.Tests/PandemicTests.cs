@@ -26,11 +26,15 @@ namespace Kesa.Engine.ConsoleHost.Tests
         private World _w = null!;
         private EntityId _alice, _bob;
 
-        private static ContentLoadResult Load(out List<Diagnostic> diagnostics)
+        /// <summary>코어 모드만 읽는다. 확장(<c>brink</c>)을 얹은 판은 <see cref="BrinkTests"/>가 본다.</summary>
+        internal static ContentLoadResult Load(out List<Diagnostic> diagnostics, params string[] mods)
         {
+            if (mods.Length == 0) mods = new[] { "pandemic" };
             var bag = new DiagnosticBag();
             string root = Root();
-            var content = ContentLoader.Load(root, ModSorter.Sort(ModDiscovery.Discover(root, bag), bag), bag);
+            var discovery = ModDiscovery.Discover(root, bag);
+            var chosen = discovery.Mods.Where(m => mods.Contains(m.Id)).ToList();
+            var content = ContentLoader.Load(root, ModSorter.Sort(chosen, bag, discovery.FailedIds), bag);
             diagnostics = bag.ToSortedList().ToList();
             return content;
         }
