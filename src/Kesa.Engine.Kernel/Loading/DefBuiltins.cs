@@ -202,6 +202,7 @@ namespace Kesa.Engine.Loading
             if (name == Interpreter.ModLoadedName) return _modLoaded;
             if (name == PureBuiltins.DefIdName) return _defId;
             if (name == Interpreter.PatchName) return _patch;
+            if (name == ContribFunction.Name) return ContribFunction.Instance;
             if (_schema.TryGetType(name, out var t) && _visibility.CanSee(_mod, t.Mod)) return new DefConstructor(this, t);
             if (_schema.TryGetComponent(name, out var c) && _visibility.CanSee(_mod, c.Mod))
                 return new ComponentConstructor(c);
@@ -245,6 +246,7 @@ namespace Kesa.Engine.Loading
                 yield return Interpreter.ModLoadedName;
                 yield return PureBuiltins.DefIdName;
                 yield return Interpreter.PatchName;
+                yield return ContribFunction.Name;
                 foreach (var t in _schema.Types)
                     if (_visibility.CanSee(_mod, t.Mod)) yield return t.Name;
                 foreach (var c in _schema.Components)

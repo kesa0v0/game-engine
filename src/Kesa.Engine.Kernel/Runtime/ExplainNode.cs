@@ -66,7 +66,12 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>같은 근거에 값과 아래 근거만 바꾼 것 (거른 읽기).</summary>
         internal ExplainNode With(Value value, IReadOnlyList<ExplainNode> reads) =>
-            new ExplainNode(Kind, Entity, Component, Key, Member, value, reads, Op, Source) { Names = Names };
+            new ExplainNode(Kind, Entity, Component, Key, Member, value, reads, Op, Source)
+            {
+                Names = Names,
+                FromComponent = FromComponent,
+                FromKey = FromKey,
+            };
 
         /// <summary><see cref="ExplainKind.Query"/>의 출처 이름들 (Def 타입·컴포넌트).</summary>
         internal IReadOnlyList<string> Names { get; private set; } = new string[0];
@@ -88,6 +93,12 @@ namespace Kesa.Engine.Runtime
         public string? Op { get; }
 
         public EntityId? Source { get; }
+
+        /// <summary>선언에서 모인 기여면 선언이 있던 컴포넌트 (G298). 저장된 기여 행이면 null.</summary>
+        public string? FromComponent { get; internal set; }
+
+        /// <summary>선언이 키 줄의 키 Def에 있었으면 그 Def id (G298).</summary>
+        public string? FromKey { get; internal set; }
 
         /// <summary>사람이 읽는 들여쓴 글 (예: <c>Health.max of #1 = 14</c>).</summary>
         public string Render()
@@ -118,6 +129,12 @@ namespace Kesa.Engine.Runtime
             {
                 text.Append("contribution ").Append(Op).Append(' ').Append(World.Show(Value));
                 if (Source != null) text.Append(" from ").Append(Source.Value);
+                if (FromComponent != null)
+                {
+                    text.Append(" (").Append(FromComponent);
+                    if (FromKey != null) text.Append('[').Append(FromKey).Append(']');
+                    text.Append(')');
+                }
             }
             else
             {

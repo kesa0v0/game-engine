@@ -120,6 +120,21 @@ namespace Kesa.Engine.Schema
         public override string Display => Kind + "[\"" + Target.Name + "\"]";
     }
 
+    /// <summary>
+    /// <c>Contrib</c>: 선언 보너스 하나 (spec-gaps G295·G296). <c>contrib(...)</c>로 만들고 <c>const</c>에만 둔다.
+    /// 이 타입의 목록인 칸은 커널이 모아 <c>contribs()</c>에 준다.
+    /// </summary>
+    public sealed class ContribTypeRef : TypeRef
+    {
+        public static readonly ContribTypeRef Instance = new ContribTypeRef();
+
+        private ContribTypeRef()
+        {
+        }
+
+        public override string Display => "Contrib";
+    }
+
     // ---- 값 선언 (spec S4: const / derived / field, S3: ref) ----
 
     public enum MemberKind

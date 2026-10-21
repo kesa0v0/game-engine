@@ -51,6 +51,7 @@ namespace Kesa.Engine.Schema
             Add(new BuiltinFunction("field", MakeField));
             Add(new BuiltinFunction("derived", MakeDerived));
             Add(new BuiltinFunction("ref", MakeRef));
+            Add(ContribFunction.Instance); // const의 기본값에 쓴다 (G295). Def 파일에서도 보인다
             foreach (var pair in TypeNames()) Add(pair.Key, pair.Value);
         }
 
@@ -86,6 +87,7 @@ namespace Kesa.Engine.Schema
             yield return new KeyValuePair<string, Value>("DefId", GenericType.DefId);
             yield return new KeyValuePair<string, Value>("Cond", GenericType.Cond);
             yield return new KeyValuePair<string, Value>("Action", GenericType.Action);
+            yield return new KeyValuePair<string, Value>("Contrib", ContribTypeRef.Instance);
         }
 
         private void Add(BuiltinFunction f) => Add(f.Name, f);
@@ -201,6 +203,10 @@ namespace Kesa.Engine.Schema
                         hint: "use element entities with ref(..., inverse=...) or a keyed component (spec S4)");
                 }
                 RejectEntityKeys(ctx, spec.Type, spec.TypeSpan);
+                // 키 줄의 보너스는 키 Def가 든다 (G295): 줄마다의 칸에 두면 어느 줄이 낸 것인지 겹친다
+                if (keyArg != null && IsContribList(spec.Type))
+                    throw ctx.Fail(Codes.SchBadDeclaration, "a keyed component cannot declare contributions in its rows",
+                        spec.TypeSpan, hint: "a Def-keyed row takes the contributions declared on its key Def (spec-gaps G295)");
                 members.Add(new MemberDecl(arg.Name!, arg.Span, ctx.Mod, spec));
             }
             _target.Components.Add(new ComponentDecl(name.Name, name.Span, ctx.Mod, key, keyKind, keys, members));
@@ -436,6 +442,10 @@ namespace Kesa.Engine.Schema
                 throw ctx.Fail(Codes.SchBadDeclaration, "a const value cannot hold entities", typeArg.Span,
                     hint: "to refer to a Def, write DefId[\"X\"] (spec-gaps G32)");
             }
+            // 커널이 모으는 모양은 하나다 (G295): 다른 모양이면 조용히 안 모이는 대신 여기서 막는다
+            if (ContainsContrib(type) && !IsContribList(type))
+                throw ctx.Fail(Codes.SchBadDeclaration, "Contrib values are collected only from const(list[Contrib]), not " +
+                                                        type.Display, typeArg.Span, hint: "spec-gaps G295");
             var spec = new MemberSpec(MemberKind.Const, type, span);
             ReadDefaultMinMax(ctx, r, spec);
 
@@ -573,11 +583,28 @@ namespace Kesa.Engine.Schema
             return false;
         }
 
-        /// <summary>함수 값은 Def(const)에만 둔다 (spec S2).</summary>
+        /// <summary>함수 값과 선언 보너스(<c>Contrib</c>)는 Def(const)에만 둔다 (spec S2, spec-gaps G295).</summary>
         private static void RejectFunctionType(CallContext ctx, TypeRef type, ArgValue arg)
         {
             if (ContainsFunctionType(type))
                 throw ctx.Fail(Codes.SchBadDeclaration, "function values can only be const values of a Def", arg.Span);
+            if (ContainsContrib(type))
+                throw ctx.Fail(Codes.SchBadDeclaration, "Contrib values can only be const values", arg.Span,
+                    hint: "declare them as const(list[Contrib]); to add a contribution while the game runs, use add_contrib (spec-gaps G295, G299)");
+        }
+
+        /// <summary>커널이 모으는 선언 보너스 칸의 타입 <c>list[Contrib]</c>인가 (G295).</summary>
+        public static bool IsContribList(TypeRef type) => type is ListTypeRef l && l.Element is ContribTypeRef;
+
+        private static bool ContainsContrib(TypeRef type)
+        {
+            switch (type)
+            {
+                case ContribTypeRef _: return true;
+                case ListTypeRef l: return ContainsContrib(l.Element);
+                case DictTypeRef d: return ContainsContrib(d.Key) || ContainsContrib(d.Value);
+            }
+            return false;
         }
 
         private static bool ContainsEntityRef(TypeRef type)

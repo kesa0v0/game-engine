@@ -172,6 +172,10 @@ namespace Kesa.Engine.Reporting
                         return new JsonObject().Add("function", JsonNode.String(fn.Name));
                     case HostReference host:
                         return new JsonObject().Add("host", JsonNode.String(host.Name));
+                    case ContribValue contrib:
+                        return new JsonObject().Add("contrib", JsonNode.String(contrib.Target))
+                            .Add("op", JsonNode.String(contrib.Op)).Add("value", JsonNode.String(contrib.Amount.ToString()))
+                            .Add("key", contrib.Key == null ? JsonNode.Null : JsonNode.String(contrib.Key));
                     case ComponentValue cv:
                         var fields = new JsonObject();
                         foreach (var f in cv.Fields) fields.Add(f.Name, Value(f.Value));

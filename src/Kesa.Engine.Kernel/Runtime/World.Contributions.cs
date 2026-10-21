@@ -218,7 +218,101 @@ namespace Kesa.Engine.Runtime
                         c.Source == null ? (EntityId?)null : new EntityId(c.Source.Value)));
                 }
             }
+            if (DeclarationSites().Count > 0) CollectDeclared(view, member, rows);
             return new ListValue(rows);
+        }
+
+        // ---- 선언 보너스 (G295~G298) ----
+
+        /// <summary>
+        /// 선언 칸이 있는 자리: 키 없는 컴포넌트와 그 <c>const(list[Contrib])</c> 칸들, 또는 Def 키 컴포넌트와 그 키 Def 타입의 칸들.
+        /// 스키마에서 한 번 뽑아 두어 읽을 때마다 훑지 않는다 (G295).
+        /// </summary>
+        private sealed class DeclarationSite
+        {
+            public DeclarationSite(ComponentType component, List<MemberDecl> slots)
+            {
+                Component = component;
+                Slots = slots;
+            }
+
+            public ComponentType Component { get; }
+            public List<MemberDecl> Slots { get; }
+        }
+
+        private List<DeclarationSite>? _declarationSites;
+
+        private List<DeclarationSite> DeclarationSites()
+        {
+            if (_declarationSites != null) return _declarationSites;
+            var sites = new List<DeclarationSite>();
+            foreach (var component in _schema.Components)
+            {
+                IEnumerable<MemberDecl> members = component.Members;
+                if (component.IsKeyed)
+                {
+                    if (component.KeyKind != KeyKind.Def || component.Key == null) continue;
+                    members = component.Key.Consts;
+                }
+                var slots = new List<MemberDecl>();
+                foreach (var m in members)
+                    if (m.Kind == MemberKind.Const && SchemaBuiltins.IsContribList(m.Spec.Type)) slots.Add(m);
+                if (slots.Count > 0) sites.Add(new DeclarationSite(component, slots));
+            }
+            return _declarationSites = sites;
+        }
+
+        /// <summary>
+        /// 붙은 컴포넌트와 키 줄의 키 Def가 선언한 보너스 중 이 자리를 겨냥한 것을 저장된 줄 뒤에 붙인다 (컴포넌트 순, 키 id 순).
+        /// 선언이 있을 수 있는 컴포넌트는 모두 읽은 것으로 적어, 나중에 붙거나 떼어져도 <c>@when</c>이 깨어난다.
+        /// </summary>
+        private void CollectDeclared(ComponentView view, MemberDecl member, List<Value> rows)
+        {
+            string? wantKey = null;
+            if (view.Row != null)
+            {
+                if (view.Row.Value.Kind != KeyKind.Def) return; // 선언의 key=는 Def id뿐이다 (G297)
+                wantKey = view.Row.Value.DefKey;
+            }
+            var entity = Record(view.Id);
+            foreach (var site in DeclarationSites())
+            {
+                var component = site.Component;
+                Read(entity.Id, component.Name);
+                if (!Has(entity, component) || HiddenFromViewer(entity.Id, component.Name)) continue;
+                if (!component.IsKeyed)
+                {
+                    foreach (var slot in site.Slots)
+                        Collect(Read(null, component, slot, DefMembers(entity, component), entity.Values), null);
+                    continue;
+                }
+                foreach (var key in DefRowKeys(entity, component))
+                {
+                    if (!_defs.TryGet(key, out var keyDef)) continue;
+                    foreach (var slot in site.Slots)
+                    {
+                        Value list = keyDef.Consts.TryGet(slot.Name, out var raw) ? raw.Value
+                            : slot.Spec.Default ?? new ListValue(new List<Value>());
+                        Collect(list, key);
+                    }
+                }
+
+                void Collect(Value list, string? from)
+                {
+                    foreach (var item in ((ListValue)list).Items)
+                    {
+                        var c = (ContribValue)item;
+                        if (c.Component != view.Component.Name || c.Member != member.Name || c.Key != wantKey) continue;
+                        rows.Add(new DeclaredContributionView(this, entity.Id, component.Name, from, c));
+                        _trace?.Add(new ExplainNode(ExplainKind.Contribution, view.Id, view.Component.Name, wantKey, member.Name,
+                            new FixedValue(c.Amount), new List<ExplainNode>(), c.Op, new EntityId(entity.Id))
+                        {
+                            FromComponent = component.Name,
+                            FromKey = from,
+                        });
+                    }
+                }
+            }
         }
 
         /// <summary>둘째 인자: 그 컴포넌트의 <c>derived</c> 이름. 없거나 <c>derived</c>가 아니면 "혹시 …?"를 붙인 오류다.</summary>
@@ -344,9 +438,60 @@ namespace Kesa.Engine.Runtime
                     case "value": return new FixedValue(_row.Value);
                     case "source":
                         return _row.Source != null ? (Value)new EntityView(_world, new EntityId(_row.Source.Value)) : NoneValue.Instance;
+                    case "component":
+                    case "key":
+                        return NoneValue.Instance; // 저장된 줄은 선언에서 오지 않았다 (G298)
                 }
-                throw new ScriptRuntimeException(Codes.RunScript, "a contribution has no '" + name + "'",
-                    Suggest.Hint(name, new[] { "id", "op", "value", "source" }));
+                throw NoAttribute(name);
+            }
+        }
+
+        private static readonly string[] ContributionAttributes = { "id", "op", "value", "source", "component", "key" };
+
+        private static ScriptRuntimeException NoAttribute(string name) =>
+            new ScriptRuntimeException(Codes.RunScript, "a contribution has no '" + name + "'",
+                Suggest.Hint(name, ContributionAttributes));
+
+        /// <summary>
+        /// 선언에서 모인 줄 (G298): <c>id</c>는 None(뗄 수 없다, G299), <c>source</c>는 선언을 든 엔티티,
+        /// <c>component</c>는 선언이 있던 컴포넌트, <c>key</c>는 키 줄에서 왔으면 그 키 Def id.
+        /// </summary>
+        private sealed class DeclaredContributionView : Value, IRuntimeAttributes, IValueEquality
+        {
+            private readonly World _world;
+            private readonly long _source;
+            private readonly string _component;
+            private readonly string? _key;
+            private readonly ContribValue _contrib;
+
+            public DeclaredContributionView(World world, long source, string component, string? key, ContribValue contrib)
+            {
+                _world = world;
+                _source = source;
+                _component = component;
+                _key = key;
+                _contrib = contrib;
+            }
+
+            public override string KindName => "contribution";
+
+            /// <summary>같은 엔티티의 같은 자리에서 온 같은 선언이면 같다 (G142).</summary>
+            public bool ValueEquals(Value other) =>
+                other is DeclaredContributionView v && v._source == _source && v._component == _component && v._key == _key &&
+                ReferenceEquals(v._contrib, _contrib);
+
+            public Value GetAttribute(string name)
+            {
+                switch (name)
+                {
+                    case "id": return NoneValue.Instance;
+                    case "op": return new StrValue(_contrib.Op);
+                    case "value": return new FixedValue(_contrib.Amount);
+                    case "source": return new EntityView(_world, new EntityId(_source));
+                    case "component": return new StrValue(_component);
+                    case "key": return _key == null ? (Value)NoneValue.Instance : new StrValue(_key);
+                }
+                throw NoAttribute(name);
             }
         }
     }

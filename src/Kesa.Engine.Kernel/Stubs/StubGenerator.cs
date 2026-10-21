@@ -80,6 +80,8 @@ namespace Kesa.Engine.Stubs
             "    op: str\n" +
             "    value: Any\n" +
             "    source: Any\n" +
+            "    component: str | None\n" +
+            "    key: str | None\n" +
             "def contribs(component: Any, member: str, /) -> list[Contribution]: ...\n" +
             "def now() -> int: ...\n" +
             "def controller(entity: Any, /) -> Literal[\"human\", \"ai\"] | None: ...\n";
@@ -198,7 +200,13 @@ namespace Kesa.Engine.Stubs
             // derived 함수가 쓰는 순수 내장 (G207). 스키마 파일은 모드와 무관하므로 query는 느슨하게
             PureNames +
             "def query(*names: str) -> list[Any]: ...\n" +
-            "def defid(name: str, /) -> str: ...\n";
+            "def defid(name: str, /) -> str: ...\n" +
+            ContribNames;
+
+        /// <summary>선언 보너스 (G295~G297): 스키마 파일(기본값)과 Def 파일에서 쓴다. 로직에서는 <c>add_contrib</c>를 쓴다.</summary>
+        private const string ContribNames =
+            "class Contrib: ...\n" +
+            "def contrib(target: str, op: str, value: int | float, /, *, key: str = ...) -> Contrib: ...\n";
 
         private sealed class Writer
         {
@@ -340,6 +348,7 @@ namespace Kesa.Engine.Stubs
                 WriteModLoaded();
                 Line("inherit: Any");
                 Line();
+                _out.Append(ContribNames);
                 // Def 파일에 로직(@command 등)도 함께 쓴다 (G207)
                 _out.Append(PureNames).Append('\n').Append(LogicNames).Append('\n');
                 WriteEntityLookups();

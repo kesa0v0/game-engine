@@ -202,6 +202,9 @@ namespace Kesa.Engine.Loading
                 case DefIdTypeRef d:
                     if (value is StrValue s) CheckId(blame(s.Origin, fallback), s.Value, d.Target.Name);
                     return;
+                case ContribTypeRef _:
+                    if (value is ContribValue c) CheckContrib(blame(c.Span, fallback), c);
+                    return;
                 case OptionalTypeRef optional:
                     CheckValue(blame, value, optional.Inner, fallback);
                     return;
@@ -220,6 +223,74 @@ namespace Kesa.Engine.Loading
                     }
                     return;
             }
+        }
+
+        /// <summary>
+        /// 선언 보너스의 대상과 키 (G295·G297): 보이는 컴포넌트의 <c>derived</c>여야 하고(G98), 키 컴포넌트면 Def 키 컴포넌트이고 그 키 타입의
+        /// Def를 <c>key=</c>로 가리켜야 한다. 키 없는 컴포넌트는 <c>key=</c>를 받지 않는다.
+        /// </summary>
+        private void CheckContrib(ValueBlame blame, ContribValue c)
+        {
+            string mod = blame.Mod;
+            var span = blame.Span;
+
+            void Fail(string code, string message, string? hint = null)
+            {
+                if (!_reported.Add(mod + "\n" + span + "\n" + code + "\n" + c.Target)) return;
+                _stage.Error(mod, code, message, span, hint);
+            }
+
+            if (!_schema.TryGetComponent(c.Component, out var component))
+            {
+                var names = new List<string>();
+                foreach (var x in _schema.Components) names.Add(x.Name);
+                Fail(Codes.LnkNotFound, "contrib() targets '" + c.Target + "', but there is no component '" + c.Component + "'",
+                    Suggest.Hint(c.Component, names));
+                return;
+            }
+            if (!_visibility.CanSee(mod, component.Mod))
+            {
+                Fail(Codes.LnkNotVisible,
+                    "component '" + c.Component + "' belongs to mod '" + component.Mod + "', which mod '" + mod + "' does not depend on",
+                    "add \"" + component.Mod + "\" to dependencies in mod.py");
+                return;
+            }
+            if (!component.TryGetMember(c.Member, out var member) || member.Kind != MemberKind.Derived)
+            {
+                if (member != null)
+                {
+                    Fail(Codes.LnkWrongType,
+                        "contrib() targets '" + c.Target + "', which is not a derived value; contributions only target derived values",
+                        "spec-gaps G98");
+                    return;
+                }
+                var derived = new List<string>();
+                foreach (var m in component.Members)
+                    if (m.Kind == MemberKind.Derived) derived.Add(m.Name);
+                Fail(Codes.LnkNotFound, "component '" + c.Component + "' has no derived value '" + c.Member + "'",
+                    Suggest.Hint(c.Member, derived));
+                return;
+            }
+            if (!component.IsKeyed)
+            {
+                if (c.Key != null)
+                    Fail(Codes.LnkWrongType, "'" + c.Component + "' is not a keyed component, so contrib() takes no key=");
+                return;
+            }
+            if (component.KeyKind != KeyKind.Def)
+            {
+                Fail(Codes.LnkWrongType,
+                    "'" + c.Component + "' is keyed by " + component.KeyDisplay + "; a contrib() written in a Def can only target rows " +
+                    "keyed by a Def", "add one while the game runs with add_contrib (spec-gaps G297, G299)");
+                return;
+            }
+            if (c.Key == null)
+            {
+                Fail(Codes.LnkWrongType, "'" + c.Component + "' is a keyed component; say which row with key=\"...\"",
+                    "write contrib(\"" + c.Target + "\", \"" + c.Op + "\", ..., key=\"" + component.Key!.Name + " id\") (spec-gaps G297)");
+                return;
+            }
+            CheckId(blame, c.Key, component.Key!.Name);
         }
 
         private void CheckId(ResolvedValue origin, string id, string typeName, SourceSpan literal, SourceSpan fallback) =>

@@ -204,6 +204,9 @@ namespace Kesa.Engine.Loading
                 case DefIdTypeRef d:
                     return value is StrValue ? null : "expected a Def id string for " + d.Display + ", found " + value.KindName;
 
+                case ContribTypeRef c:
+                    return value is ContribValue ? null : "expected contrib(...) for " + c.Display + ", found " + value.KindName;
+
                 case ListTypeRef list:
                     if (!(value is ListValue lv)) return Expected(list, value);
                     foreach (var item in lv.Items)

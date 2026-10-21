@@ -55,6 +55,11 @@ namespace Kesa.Engine.Runtime
             var entity = Record(id, componentName);
             var component = Keyed(ComponentNamed(componentName), KeyKind.Def);
             Require(entity, component);
+            return new List<string>(DefRowKeys(entity, component));
+        }
+
+        private SortedSet<string> DefRowKeys(EntityRecord entity, ComponentType component)
+        {
             var keys = new SortedSet<string>(StringComparer.Ordinal);
             if (component.Keys == KeysMode.All)
             {
@@ -62,12 +67,12 @@ namespace Kesa.Engine.Runtime
             }
             else
             {
-                if (entity.Def.Components.TryGet(componentName, out var rc)) foreach (var k in rc.Rows.Keys) keys.Add(k);
-                if (entity.Rows.TryGetValue(componentName, out var rows))
+                if (entity.Def.Components.TryGet(component.Name, out var rc)) foreach (var k in rc.Rows.Keys) keys.Add(k);
+                if (entity.Rows.TryGetValue(component.Name, out var rows))
                     foreach (var pair in rows.ByDef)
                         if (pair.Value.Attached) keys.Add(pair.Key);
             }
-            return new List<string>(keys);
+            return keys;
         }
 
         /// <summary>엔티티 키 컴포넌트의 줄 키들 (id 순, 시작 시점의 목록).</summary>

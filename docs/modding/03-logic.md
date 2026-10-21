@@ -108,6 +108,24 @@ component("Fleet", strength=derived(int, lambda f: sum([s.Hull.hp for s in f.ent
 
   첫 인자는 읽을 때와 같이 컴포넌트(`ship.Hull`)이고, 키 컴포넌트면 줄 하나(`pawn.Skill.Medicine`)다. 나중에 지울 행은 id를 엔티티 칸에
   적어 둔다. 몇 틱 뒤 사라지는 만료는 아직 없다(9장).
+- **선언 보너스**: 붙어 있는 동안 늘 주는 보너스는 손으로 넣지 않고 Def에 적는다. `const(list[Contrib])` 칸이면 엔진이 모아
+  `contribs()`에 저장된 행 뒤로 넣는다. 모으는 곳은 엔티티에 붙은 (키 없는) 컴포넌트의 그 칸과, 키 컴포넌트 줄의 키 Def의 그 칸이다.
+
+  ```python
+  # schema
+  deftype("Trait", grants=const(list[Contrib], default=[]))
+  component("Traits", key="Trait", keys="listed", n=field(int, default=0))
+  component("Armor", bonus=const(list[Contrib], default=[contrib("Health.max", "add", 1)]))
+  # defs
+  Trait("Tough", grants=[contrib("Health.max", "add", 3), contrib("Skill.eff", "add", 2, key="Medicine")])
+  Unit("Knight", Armor=Armor(bonus=[contrib("Health.max", "add", 2)]), Traits={"Tough": Traits()})
+  ```
+
+  대상(`"Health.max"`)은 로드 때 검사한다: 컴포넌트가 있고 보이는지, `derived`인지. 키 컴포넌트를 겨냥하면 `key=`(Def id)가 꼭 있어야
+  하고 그 줄이 없는 엔티티에서는 건너뛴다. 값이 Def에 있으니 다른 모드가 `patch.append`로 더할 수 있고 옛 세이브에도 반영된다.
+  모인 행은 `id`가 `None`(뗄 수 없다. 컴포넌트를 떼거나 줄을 지운다), `source`는 그 엔티티, `component`는 선언이 있던 컴포넌트
+  (`"Traits"`), `key`는 키 줄에서 왔으면 그 Def id(`"mymod:Tough"`)다. 저장된 행은 `component`·`key`가 `None`이다.
+  다른 엔티티(든 칼)에서 오는 보너스(`to=`)와 조건부 보너스(`when=`)는 아직 없다(9장).
 - 같은 엔티티 안에서 자기를 다시 읽는 순환은 로드 때 `SCH009`. 다른 엔티티를 거치는 순환은 실행 때 `RUN014`.
 
 ## 난수

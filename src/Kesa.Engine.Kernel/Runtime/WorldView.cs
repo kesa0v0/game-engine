@@ -373,7 +373,9 @@ namespace Kesa.Engine.Runtime
                         continue;
                     }
                     case ExplainKind.Contribution:
-                        if (SeesRead(read) && (read.Source == null || !_world.IsAlive(read.Source.Value) || Sees(read.Source.Value)))
+                        // 선언에서 온 줄은 선언한 컴포넌트까지 보여야 한다 (G298)
+                        if (SeesRead(read) && (read.Source == null || !_world.IsAlive(read.Source.Value) ||
+                                               (read.FromComponent == null ? Sees(read.Source.Value) : Sees(read.Source.Value, read.FromComponent))))
                             kept.Add(read.With(Filter(read.Value), read.Reads));
                         else hidden = true;
                         continue;
