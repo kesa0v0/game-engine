@@ -354,6 +354,7 @@ namespace Kesa.Engine.Loading
                 string name = attr.Name;
                 if (_schema.TryGetComponent(name, out var component)) return View(component, entity.Type, entity.Self);
                 if (_schema.TryGetType(name, out var defType)) return new DefConstsType(defType);
+                if (name == "defid") return DefIdStatic.Instance;
                 foreach (var type in Owners(entity.Type))
                 foreach (var inverse in type.Inverses)
                     if (inverse.Name == name)
@@ -392,6 +393,7 @@ namespace Kesa.Engine.Loading
                     return component.KeyKind == KeyKind.Entity ? new EntityType(component.Key) : StaticType.Unknown;
                 if (_schema.TryGetComponent(name, out var sibling)) return View(sibling, view.Owner, view.Self);
                 if (_schema.TryGetType(name, out var defType)) return new DefConstsType(defType);
+                if (name == "defid") return DefIdStatic.Instance;
 
                 if (!Reporting) return StaticType.Unknown;
                 var candidates = new List<string> { "entity" };

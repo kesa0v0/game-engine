@@ -8,7 +8,7 @@ def game():
 
 def city_of(name):
     for c in query("City"):
-        if c.Site.city == name:
+        if c.defid == name:
             return c
     return None
 
@@ -21,7 +21,7 @@ def Start():
     with preconditions:
         require(game() is None, text("pandemic-already-started"))
     for name in CITIES:
-        spawn(name, Site=Site(city=defid(name)))
+        spawn(name)
     alice = spawn("Alice")
     bob = spawn("Bob")
     alice.Order.next = bob

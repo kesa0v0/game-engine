@@ -740,6 +740,7 @@ namespace Kesa.Engine.Runtime
                 return SiblingOrNone(entity, component);
             }
             if (_schema.TryGetType(name, out var defType)) return DefOrNone(entity, defType);
+            if (name == "defid") return new StrValue(entity.Def.Id); // 이 엔티티의 Def 전체 이름 (G293)
 
             // 역방향 컬렉션은 Inverse가 그 이름으로 기록한다
             var candidates = new List<string> { entity.Def.Type.Name };

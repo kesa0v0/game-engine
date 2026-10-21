@@ -109,6 +109,8 @@ if ship.Mark.kind == defid("Sloop"):   # 맞음
 PRICES = {defid("Sloop"): 8}           # 사전 키도
 ```
 
+- 엔티티가 자기 Def를 알려면 `ship.defid`(전체 이름, G293)를 읽는다: `if ship.defid == defid("Sloop")`. 도시처럼 Def가 정체성인 엔티티를 찾을 때 쓴다
+  (`samples/pandemic`의 `city_of`).
 - 호스트(C# API, 명령 인자, 저장 파일)는 전체 이름만 받는다.
 - `TextKey` 값은 번역 키 문자열이다(`label="harbor-good-fish"`). 글은 `locale/`의 번역 파일에 둔다(8장).
   Def 자신의 화면 이름은 따로 적지 않고 번역 파일의 `def-harbor-Sloop` 키에 둔다(`/`도 `-`로: `def-harbor-rigs-Brig`).

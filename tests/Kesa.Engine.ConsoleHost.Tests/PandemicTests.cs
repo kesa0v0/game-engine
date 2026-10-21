@@ -48,7 +48,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         private string CityOf(EntityId player)
         {
             var city = (EntityValue)_w.Get(player, _w.Member("At", "city"));
-            return ((StrValue)_w.Get(city.Id, _w.Member("Site", "city"))).Value;
+            return _w.DefOf(city.Id);
         }
 
         private long Left(EntityId player) => ((IntValue)_w.Get(player, _w.Member("Actions", "left"))).Value;
@@ -109,7 +109,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
             var links = new Dictionary<string, List<string>>();
             foreach (var city in _w.All("City"))
             {
-                string name = ((StrValue)_w.Get(city, _w.Member("Site", "city"))).Value;
+                string name = _w.DefOf(city);
                 links[name] = ((ListValue)_w.Get(city, _w.Member("City", "neighbors"))).Items.Select(i => ((StrValue)i).Value).ToList();
             }
             foreach (var pair in links)

@@ -260,6 +260,7 @@
 | [G222](gaps/S7-host.md#g222) | S7 호스트 함수의 스크립트 타입과 C# 타입 대응 | C# 타입 대응: `int`는 `long`만, `fixed`는 `Fixed`, `Ref[X]`는 `EntityId`, `DefId[X]`는 `string`, None 허용은 nullable, `list[T]`는 `IReadOnlyList<T>`, `dict`는 엔진 값 `Value`로만. | 확인 |
 | [G291](gaps/S7-host.md#g291) | G221에서 미룬 것: 호스트 함수를 Def 값이나 패치 값으로 | 읽기 등급 호스트 함수는 `Goal("B", check=core.goals.reached)`처럼 `Cond` 칸의 값이 된다. 로드가 등급(읽기)·서명(칸의 Def 하나를 받음)·반환(bool)을 보고, `Action` 칸은 스크립트 함수만 받는다. | 일부 바뀜(G292) |
 | [G292](gaps/S7-host.md#g292) | G291에서 이어서: `Action` 칸에 호스트 함수 | `Action` 칸도 호스트 함수를 받는다. 읽기든 쓰기 등급이든 되고 반환은 가리지 않으며, 그 칸이 부르는 꼴(Def 하나를 받음)로 부를 수 있는지만 로드가 본다. 목록 안의 호스트 함수도 된다. | 확인 |
+| [G293](gaps/S3-S4-data.md#g293) | 엔티티가 자기 Def id를 읽는 속성 | `e.defid`는 그 엔티티의 Def 전체 이름이다. `defid("Atlanta")`와 비교하고 맨 리터럴 비교는 `LNK005`. 스텁은 구체 Def id 리터럴. | 확인 |
 
 ## S8 저장
 
