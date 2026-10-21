@@ -341,3 +341,20 @@ Unit("Knight", Armor=Armor(grants=[Grant("Health.max", "add", 3)]))
 **이유:** 규칙 하나("그 타입의 목록 `const`는 모인다")로 세 쓰임을 다 덮고, 값이 Def에 살아 패치와 로드 검사가 된다. RimWorld의 `statOffsets`(Def에 적는 목록)와 이전 엔진 `ModifierDef.StatChanges`가 같은 모양이다. ECS로 옮기면(flecs 기준, 일반 지식) Def는 프리팹, 키 컴포넌트 줄은 쌍(spine-spec 153줄), 이 칸은 프리팹의 데이터 컴포넌트이고, 모으기는 "붙은 컴포넌트와 쌍의 대상 프리팹의 그 컴포넌트" 쿼리라 나중의 ECS 백본(G226)에도 그대로 옮겨진다. 같은 눈으로 보면 다른 엔티티(Ref로 들린 칼)에서 오는 보너스는 "어떤 관계가 보너스를 전하나"의 물음이 되고, flecs가 관계에 성질을 붙이듯 Ref 선언에 표시하는 길이 첫 후보다(그 항목에서 정함, 결정 아님).
 
 **상태:** 확인
+
+## G296
+
+**위치:** G295에서 이어서: 보너스 값 타입의 이름
+
+**무엇이 비어 있었나:** G295는 커널의 보너스 값 타입을 정했지만 이름은 미뤘다(논의 때 `Grant`). 후보는 `Contrib`(`contribs()`·"기여 행"과 한 단어), `Grant`("준다"는 뜻이 드러나지만 `contribs()`와 이름이 다름), `Modifier`(익숙하지만 패러독스에서는 묶음을 뜻하고 spine-spec 157줄 "모디파이어는 엔진 내장이 아니다"와 부딪힘)였다.
+
+**어떻게 정했나:** 만드는 함수는 `contrib(대상, op, 값)`, 칸에 적는 타입은 `Contrib`이다(`const(list[Contrib])`). 커널 값의 기존 관례(`option(...)` → `Option`, `text(...)` → `Text`: 만드는 함수는 소문자, 타입은 대문자)를 따른다. 대문자 생성자는 모드가 선언한 컴포넌트(`Moves(...)`)의 것이다.
+
+```python
+deftype("Trait", grants=const(list[Contrib], default=[]))
+Trait("Tough", grants=[contrib("Health.max", "add", 3)])
+```
+
+**이유:** 선언한 보너스는 `contribs()`를 읽을 때 저장된 기여 행과 같은 모양(`op`·`value`·`source`)으로 섞여 나오므로, 한 개념에 한 단어를 쓴다. 칸 이름(`grants`)은 모더가 짓고 엔진이 정하지 않는다.
+
+**상태:** 확인
