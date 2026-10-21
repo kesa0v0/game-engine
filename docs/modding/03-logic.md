@@ -137,8 +137,22 @@ component("Fleet", strength=derived(int, lambda f: sum([s.Hull.hp for s in f.ent
   ```
 
   Ref는 키 없는 컴포넌트의 것이어야 하고, 역방향 컬렉션은 선언을 든 타입의 것이어야 한다(로드 때 검사). 칼을 내려놓거나 Ref가
-  비거나 칼이 죽으면 보너스는 저절로 빠진다. 모인 행의 `source`는 칼·진영이다. 여러 걸음(진영 → 지방 → 유닛)과 조건부 보너스
-  (`when=`)는 아직 없다(9장).
+  비거나 칼이 죽으면 보너스는 저절로 빠진다. 모인 행의 `source`는 칼·진영이다. 여러 걸음(진영 → 지방 → 유닛)은 아직 없다(9장).
+
+  조건부 보너스는 `when=`에 `(src, dst)`를 받아 bool을 돌려주는 함수를 준다. `src`는 선언을 든 엔티티(칼), `dst`는 받는
+  엔티티(폰)다. 거짓이면 그 행은 `contribs()`에 나오지 않는다.
+
+  ```python
+  def happy(src, dst):
+      return dst.Mood.value >= 5
+  Sword("Longsword", Blade=Blade(grants=[
+      contrib("Melee.dmg", "add", 5, to="Held.holder", when=happy),
+      contrib("Melee.dmg", "add", 2, to="Held.holder", when=lambda src, dst: src.Blade.blessed),
+  ]))
+  ```
+
+  함수는 `Cond` 칸과 같다: 순수 함수나 읽기 호스트 함수, 쓰기·난수는 로드 오류. 조건이 읽은 값은 그 `derived`의 읽기라
+  `@when`·`Explain`에 잡힌다. bool이 아니거나 오류가 나면 그 `derived` 읽기 전체가 오류이고, 조건이 그 스탯 자신을 읽으면 순환 오류(`RUN014`)다.
 - 같은 엔티티 안에서 자기를 다시 읽는 순환은 로드 때 `SCH009`. 다른 엔티티를 거치는 순환은 실행 때 `RUN014`.
 
 ## 난수

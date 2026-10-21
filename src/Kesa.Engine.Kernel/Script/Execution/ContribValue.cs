@@ -43,6 +43,11 @@ namespace Kesa.Engine.Script
         /// <summary><c>to=</c>를 쓴 곳 (링크 오류 위치).</summary>
         public SourceSpan ToSpan { get; internal set; }
 
+        /// <summary>
+        /// 조건 (G301): <c>(src, dst)</c>로 부르는 순수 함수(<see cref="FunctionValue"/>)나 읽기 호스트 함수. 거짓이면 그 줄은 없다. null이면 늘 있다.
+        /// </summary>
+        public Value? When { get; internal set; }
+
         public string Target => Component + "." + Member;
 
         public override string KindName => "contrib";
@@ -50,7 +55,7 @@ namespace Kesa.Engine.Script
         /// <summary>대상·연산·값·키가 같으면 같다 (쓴 곳은 상관없다, G142).</summary>
         public bool ValueEquals(Value other) =>
             other is ContribValue c && c.Component == Component && c.Member == Member && c.Op == Op && c.Amount.Equals(Amount) &&
-            c.Key == Key && c.To == To;
+            c.Key == Key && c.To == To && ReferenceEquals(c.When, When);
 
         public Value GetAttribute(string name)
         {

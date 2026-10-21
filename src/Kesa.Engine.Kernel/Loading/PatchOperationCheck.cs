@@ -205,7 +205,8 @@ namespace Kesa.Engine.Loading
                     return value is StrValue ? null : "expected a Def id string for " + d.Display + ", found " + value.KindName;
 
                 case ContribTypeRef c:
-                    return value is ContribValue ? null : "expected contrib(...) for " + c.Display + ", found " + value.KindName;
+                    if (!(value is ContribValue contrib)) return "expected contrib(...) for " + c.Display + ", found " + value.KindName;
+                    return contrib.When == null ? null : WhenMismatch(contrib.When);
 
                 case ListTypeRef list:
                     if (!(value is ListValue lv)) return Expected(list, value);
@@ -230,24 +231,52 @@ namespace Kesa.Engine.Loading
                 case FunctionTypeRef f:
                     if (value is HostReference host) return HostSlotMismatch(f, host);
                     if (!(value is FunctionValue fn)) return "expected a function for " + f.Display + ", found " + value.KindName;
-                    // 커맨드는 제출로만 실행된다 (G118)
-                    if (fn.IsEntry)
-                        return "'" + fn.Name + "' is a " + fn.EntryKind + ", so it cannot be a value of " + f.Display +
-                               "; use a plain function";
-                    // 두 자리 모두 게임 쪽에서 돈다: 화면마다 다른 UI 기록에 기댈 수 없다 (G282)
-                    if (fn.TouchesUi)
-                        return "'" + fn.Name + "' uses UI state (ui.… or submit) (at " + fn.UiTouchWitness + "), but " + f.Display +
-                               " holds functions that run as game code, and a game value cannot depend on a screen";
-                    // 확인용 자리에는 쓰기 함수를 둘 수 없다 (G117). 판정은 ②b 끝에 끝나 있다
-                    if (f.Kind == FunctionSlotKind.Cond && fn.Writes)
-                        return "'" + fn.Name + "' changes the world (at " + fn.WriteWitness + "), but " + f.Display +
-                               " only holds functions that read";
-                    if (f.Kind == FunctionSlotKind.Cond && fn.Random)
-                        return "'" + fn.Name + "' draws random numbers (at " + fn.RandomWitness + "), but " + f.Display +
-                               " only holds functions that give the same answer every time";
-                    return null;
+                    return FunctionMismatch(fn, f.Display, f.Kind == FunctionSlotKind.Cond);
             }
             return "values of type " + type.Display + " cannot be written in a patch";
+        }
+
+        /// <summary>함수 자리의 스크립트 함수. <paramref name="reads"/>면 <c>Cond</c>처럼 읽기만 하고 같은 답을 내야 한다.</summary>
+        private static string? FunctionMismatch(FunctionValue fn, string slot, bool reads)
+        {
+            // 커맨드는 제출로만 실행된다 (G118)
+            if (fn.IsEntry)
+                return "'" + fn.Name + "' is a " + fn.EntryKind + ", so it cannot be a value of " + slot + "; use a plain function";
+            // 함수 자리는 모두 게임 쪽에서 돈다: 화면마다 다른 UI 기록에 기댈 수 없다 (G282)
+            if (fn.TouchesUi)
+                return "'" + fn.Name + "' uses UI state (ui.… or submit) (at " + fn.UiTouchWitness + "), but " + slot +
+                       " holds functions that run as game code, and a game value cannot depend on a screen";
+            // 확인용 자리에는 쓰기 함수를 둘 수 없다 (G117). 판정은 ②b 끝에 끝나 있다
+            if (reads && fn.Writes)
+                return "'" + fn.Name + "' changes the world (at " + fn.WriteWitness + "), but " + slot + " only holds functions that read";
+            if (reads && fn.Random)
+                return "'" + fn.Name + "' draws random numbers (at " + fn.RandomWitness + "), but " + slot +
+                       " only holds functions that give the same answer every time";
+            return null;
+        }
+
+        private const string WhenSlot = "contrib(when=...)";
+
+        /// <summary>
+        /// 선언 보너스의 조건 (G301): <c>Cond</c> 칸과 같은 함수와 검사. 다만 <c>(src, dst)</c> 둘로 부르므로 호스트 함수는 위치 인자 둘로
+        /// 부를 수 있어야 한다(받는 엔티티 타입은 정해지지 않는다).
+        /// </summary>
+        private static string? WhenMismatch(Value when)
+        {
+            if (when is FunctionValue fn) return FunctionMismatch(fn, WhenSlot, reads: true);
+            if (!(when is HostReference host)) return null;
+            string name = "'" + host.Name + "'";
+            if (host.Writes) return name + " is a host function that changes the world, but " + WhenSlot + " only holds functions that read";
+            var signature = host.Signature;
+            var parameters = signature.Parameters;
+            bool two = parameters.Count >= 2;
+            for (int i = 0; two && i < parameters.Count; i++)
+                if (i >= 2 && parameters[i].Default == null) two = false;
+            if (!two) return name + " " + signature.Canonical + " cannot be called with two entities (src, dst), as " + WhenSlot + " does";
+            if (!ReferenceEquals(signature.Returns, PrimitiveTypeRef.Bool))
+                return name + " returns " + (signature.Returns == null ? "None" : signature.Returns.Display) + ", but " + WhenSlot +
+                       " needs a bool";
+            return null;
         }
 
         /// <summary>

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Host;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Numerics;
 using Kesa.Engine.Script;
@@ -74,12 +75,48 @@ namespace Kesa.Engine.Schema
                         "to= is \"Component.ref\" or the name of an inverse collection, not \"" + to + "\"", ArgReader.SpanOf(toArg),
                         hint: "one step from the entity that declares it, e.g. to=\"Held.holder\" or to=\"units\" (spec-gaps G300)");
             }
-            r.RejectRest(new[] { "key", "to" });
+            // when=: 조건 (G301). Cond 칸과 같은 함수(순수 스크립트 함수나 읽기 호스트 함수)이고 (src, dst) 둘로 부른다.
+            // 쓰기·난수·UI는 효과 판정 뒤에 값 검사(PatchOperationCheck.Mismatch)가 본다
+            Value? when = null;
+            var whenArg = r.Take("when");
+            if (whenArg != null)
+            {
+                switch (whenArg.Value)
+                {
+                    case FunctionValue fn:
+                        if (!TakesTwo(fn))
+                            throw ctx.Fail(Codes.EvlArguments,
+                                "the when= function of contrib() is called with two arguments (src, dst), but '" + fn.Name + "' takes " +
+                                fn.Parameters.Count, whenArg.Span,
+                                hint: "write when=lambda src, dst: ... (src declares the contribution, dst receives it; spec-gaps G301)");
+                        break;
+                    case HostReference _:
+                        break;
+                    case NoneValue _:
+                        break;
+                    default:
+                        throw ctx.Fail(Codes.EvlType, "when= of contrib() takes a function, not " + whenArg.Value.KindName,
+                            whenArg.Span, hint: "write when=lambda src, dst: ... (spec-gaps G301)");
+                }
+                if (!(whenArg.Value is NoneValue)) when = whenArg.Value;
+            }
+            r.RejectRest(new[] { "key", "to", "when" });
             return new ContribValue(component, member, op, amount, key, ArgReader.SpanOf(targetArg))
             {
                 To = to,
                 ToSpan = toArg == null ? SourceSpan.None : ArgReader.SpanOf(toArg),
+                When = when,
             };
+        }
+
+        /// <summary>위치 인자 둘로 부를 수 있는가: 매개변수가 둘 이상이고 셋째부터는 기본값이 있다.</summary>
+        private static bool TakesTwo(FunctionValue fn)
+        {
+            var parameters = fn.Parameters;
+            if (parameters.Count < 2) return false;
+            for (int i = 2; i < parameters.Count; i++)
+                if (parameters[i].Default == null) return false;
+            return true;
         }
     }
 }

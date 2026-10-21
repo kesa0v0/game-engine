@@ -204,7 +204,9 @@ namespace Kesa.Engine.Runtime
         /// 함수를 실행한다. 가장 바깥 실행(<c>derived</c> 읽기나 생성 순간의 기본값 하나)이 예산 하나를 열고,
         /// 그 안에서 읽힌 다른 <c>derived</c>는 남은 단계를 이어서 쓴다 (G101: 최상위 계산 하나마다 예산 하나).
         /// </summary>
-        private Value RunFunction(FunctionValue function, Value self)
+        private Value RunFunction(FunctionValue function, Value self) => RunFunction(function, new[] { self });
+
+        private Value RunFunction(FunctionValue function, Value[] arguments)
         {
             var span = function.Definition?.Span ?? function.Lambda!.Span;
             bool outermost = _meter == null;
@@ -215,7 +217,7 @@ namespace Kesa.Engine.Runtime
             }
             try
             {
-                return Evaluator.Run(function, new[] { self }, span, _meter);
+                return Evaluator.Run(function, arguments, span, _meter);
             }
             finally
             {

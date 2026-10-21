@@ -298,6 +298,23 @@ namespace Kesa.Engine.Runtime
             return _contributionSteps = steps;
         }
 
+        /// <summary>
+        /// 선언의 조건 <c>when(src, dst)</c> (G301). 그 <c>derived</c> 계산 안에서 돌아 읽기가 <c>@when</c> 기록·영수증·<c>Explain</c>에
+        /// 그대로 잡히고, 오류는 그 읽기의 오류다(거짓으로 치지 않는다). 자기 스탯을 다시 읽으면 재진입 감지(G100)가 잡는다.
+        /// </summary>
+        private bool WhenHolds(ContribValue c, long source, EntityId target)
+        {
+            var arguments = new Value[] { new EntityView(this, new EntityId(source)), new EntityView(this, target) };
+            Value result;
+            if (c.When is FunctionValue fn) result = RunFunction(fn, arguments);
+            else if (BindHostReferences(c.When!) is HostCallable host) result = host.Call(arguments, new SortedDictionary<string, Value>(StringComparer.Ordinal));
+            else throw new ScriptRuntimeException(Codes.RunType, "the when= of contrib(\"" + c.Target + "\") is not a function");
+            if (result is BoolValue b) return b.Value;
+            throw new ScriptRuntimeException(Codes.RunType,
+                "the when= of contrib(\"" + c.Target + "\") returned " + result.KindName + ", not bool",
+                "return True or False (spec-gaps G301)");
+        }
+
         private static void AddSteps(Value value, SortedSet<string> names)
         {
             if (!(value is ListValue list)) return;
@@ -395,6 +412,7 @@ namespace Kesa.Engine.Runtime
                     {
                         var c = (ContribValue)item;
                         if (c.To != to || c.Component != view.Component.Name || c.Member != member.Name || c.Key != wantKey) continue;
+                        if (c.When != null && !WhenHolds(c, entity.Id, view.Id)) continue;
                         rows.Add(new DeclaredContributionView(this, entity.Id, component.Name, from, c));
                         _trace?.Add(new ExplainNode(ExplainKind.Contribution, view.Id, view.Component.Name, wantKey, member.Name,
                             new FixedValue(c.Amount), new List<ExplainNode>(), c.Op, new EntityId(entity.Id))

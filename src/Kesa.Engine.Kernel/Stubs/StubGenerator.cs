@@ -206,7 +206,8 @@ namespace Kesa.Engine.Stubs
         /// <summary>선언 보너스 (G295~G297): 스키마 파일(기본값)과 Def 파일에서 쓴다. 로직에서는 <c>add_contrib</c>를 쓴다.</summary>
         private const string ContribNames =
             "class Contrib: ...\n" +
-            "def contrib(target: str, op: str, value: int | float, /, *, key: str = ..., to: str = ...) -> Contrib: ...\n";
+            "def contrib(target: str, op: str, value: int | float, /, *, key: str = ..., to: str = ..., " +
+            "when: Callable[[Any, Any], bool] | None = ...) -> Contrib: ...\n";
 
         private sealed class Writer
         {
