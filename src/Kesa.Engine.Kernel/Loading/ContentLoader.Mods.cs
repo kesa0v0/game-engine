@@ -231,7 +231,7 @@ namespace Kesa.Engine.Loading
                 name => builtins.Lookup(name) == null && builtins.Explain(name) is { } e && e.Code == Codes.SchNotVisible
                     ? e.Message
                     : null,
-                builtins.RuntimeSchemaNames, hostNames);
+                builtins.RuntimeSchemaNames, hostNames, builtins.IsVisibleDefTypeName);
 
         /// <summary>
         /// 이 모드의 함수 본문에서 보이는 호스트 함수 (G218): 소유 모드가 자신이거나 필수 의존(전이)인 함수. 다른 활성 모드의 함수는

@@ -40,8 +40,8 @@ namespace Kesa.Engine.Tests.Runtime
             "@when(lambda c: c.Pop.size > 0, repeat=True, cooldown=2)\ndef grow(c: Ref[City]):\n    pass\n" +
             "@when(lambda: now() % 4 == 0)\ndef season():\n    pass\n" +
             // query의 목록: 생성·삭제(City), 붙이기·떼기(Tag)로 바뀐다 (G193)
-            "@when(lambda: len(query(\"City\")) >= 2)\ndef towns():\n    pass\n" +
-            "@when(lambda: any(u.Tag.x >= 1 for u in query(\"Unit\", \"Tag\")))\ndef marked():\n    pass\n" +
+            "@when(lambda: len(query(City)) >= 2)\ndef towns():\n    pass\n" +
+            "@when(lambda: any(u.Tag.x >= 1 for u in query(Unit, Tag)))\ndef marked():\n    pass\n" +
             "@when(lambda u: u.Out.n == 7, once=\"game\")\ndef lucky(u: Ref[Unit]):\n    pass\n" +
             // 본문이 다른 조건을 바꾸는 반응: 이사하면 그 유닛의 n을 올린다
             "@when(lambda u: u.Home.city is not None)\ndef settled(u: Ref[Unit]):\n    u.Out.n = u.Out.n + 1\n" +

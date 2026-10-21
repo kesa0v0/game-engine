@@ -57,7 +57,7 @@ namespace Kesa.Engine.Tests.Loading
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.CmdPreconditions));
             Assert.That(d.Message,
-                Is.EqualTo("'require' here is a component or signal this mod sees, so the built-in require() cannot be used"));
+                Is.EqualTo("'require' here is a Def type, component or signal this mod sees, so the built-in require() cannot be used"));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
         }
 

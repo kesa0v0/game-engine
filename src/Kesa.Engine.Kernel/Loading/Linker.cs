@@ -507,7 +507,7 @@ namespace Kesa.Engine.Loading
             }
         }
 
-        /// <summary><c>defs("City")</c>에 리터럴로 적은 타입 이름: 이 모드에 보이는 Def 타입이어야 한다 (G305). 데이터 전용 타입도 된다.</summary>
+        /// <summary><c>defs(City)</c>에 리터럴로 적은 타입 이름: 이 모드에 보이는 Def 타입이어야 한다 (G305). 데이터 전용 타입도 된다.</summary>
         private void CheckDefType(string mod, string name, SourceSpan span)
         {
             if (!_schema.TryGetType(name, out var type))

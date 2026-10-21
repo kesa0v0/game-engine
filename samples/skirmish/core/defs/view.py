@@ -30,4 +30,4 @@ def selection(me):
 
 def units(me):
     return [{"unit": u, "x": u.Pos.x, "y": u.Pos.y, "hp": u.Life.hp, "acted": u.Ready.acted, "party": u.Owner.party}
-            for u in query("Unit")]
+            for u in query(Unit)]

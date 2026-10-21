@@ -50,11 +50,11 @@ namespace Kesa.Engine.Bench
             "Unit(\"Soldier\")\n" +
             "@on(Tick)\n" +
             "def grow():\n" +
-            "    for u in query(\"Unit\"):\n" +
+            "    for u in query(Unit):\n" +
             "        u.Food.amount += 1\n" +
             "@command(free=True, acts_for=None)\n" +
             "def FeedAll(fail: bool):\n" +
-            "    for u in query(\"Unit\"):\n" +
+            "    for u in query(Unit):\n" +
             "        u.Food.amount += 1\n" +
             "    if fail:\n" +
             "        empty = []\n" +

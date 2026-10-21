@@ -27,7 +27,7 @@ namespace Kesa.Engine.Tests.Runtime
             "Party(\"Player\")\n" +
             "@on(Tick)\n" +
             "def income():\n" +
-            "    for p in query(\"Party\"):\n" +
+            "    for p in query(Party):\n" +
             "        p.Gold.n += 1\n" +
             // 기한 3틱의 선택. 시간은 흐르고, 답이나 기본 답이 오면 같은 스크립트가 이어진다
             "@command(free=True, acts_for=lambda party: party)\n" +

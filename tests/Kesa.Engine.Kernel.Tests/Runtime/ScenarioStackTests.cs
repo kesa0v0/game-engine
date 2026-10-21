@@ -44,11 +44,11 @@ namespace Kesa.Engine.Tests.Runtime
             "Spell(\"Charm\", effect=charm)\n" +
             "def top():\n" +
             "    t = None\n" +
-            "    for s in query(\"Spell\"):\n" +
+            "    for s in query(Spell):\n" +
             "        t = s\n" +
             "    return t\n" +
             "def seats():\n" +
-            "    return len(query(\"Party\"))\n" +
+            "    return len(query(Party))\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Cast(by: Ref[Party], spell: DefId[Spell], target: Ref[Party]):\n" +
             "    spawn(spell, Pending=Pending(by=by, target=target))\n" +

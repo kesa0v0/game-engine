@@ -6,4 +6,4 @@ def ships(me):
     return [{"ship": s, "hp": s.Hull.hp, "max": s.Hull.max_hp} for s in me.ships]
 
 def plans(me):
-    return [{"house": h, "plan": "?" if h.Secret is None else h.Secret.plan} for h in query("House")]
+    return [{"house": h, "plan": "?" if h.Secret is None else h.Secret.plan} for h in query(House)]

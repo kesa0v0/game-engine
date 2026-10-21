@@ -80,9 +80,9 @@ namespace Kesa.Engine.Tests.Runtime
         public void ALoopOverAQuerySkipsWhatDiesOnTheWay()
         {
             Make("@command(free=True, acts_for=None)\ndef Cull(c: Ref[City]):\n" +
-                 "    for u in query(\"Unit\"):\n" +
+                 "    for u in query(Unit):\n" +
                  "        c.Tally.n += 1\n" +
-                 "        for v in query(\"Unit\"):\n" +
+                 "        for v in query(Unit):\n" +
                  "            if v != u:\n                destroy(v)\n");
             Ok(RunOnCity("Cull"));
             Assert.That(Tally(), Is.EqualTo(1), "the first unit destroys the rest, so the outer loop runs once");
@@ -128,7 +128,7 @@ namespace Kesa.Engine.Tests.Runtime
                  "    before = len(us)\n" +
                  "    destroy(v)\n" +
                  "    c.Tally.n = before * 100 + len(us) * 10 + (1 if v in us else 0)\n" +
-                 "    c.Tally.s = \"empty\" if not query(\"Unit\", \"Skill\") else \"some\"\n");
+                 "    c.Tally.s = \"empty\" if not query(Unit, Skill) else \"some\"\n");
             Ok(RunOnCity("Count"));
             Assert.That(Tally(), Is.EqualTo(320));
             Assert.That(Log(), Is.EqualTo("some"));
@@ -151,7 +151,7 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [TestCase("c.units[0]", "an entity group (units) cannot be indexed")]
-        [TestCase("query(\"Unit\")[0]", "an entity group (query(...)) cannot be indexed")]
+        [TestCase("query(Unit)[0]", "an entity group (query(...)) cannot be indexed")]
         public void AGroupCannotBeIndexed(string expr, string message)
         {
             Make("@command(free=True, acts_for=None)\ndef Pick(c: Ref[City]):\n    v = " + expr + "\n");
@@ -177,7 +177,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Make("@command(free=True, acts_for=None)\ndef Same(c: Ref[City]):\n" +
                  "    a = c.units\n" +
-                 "    b = query(\"Unit\")\n" +
+                 "    b = query(Unit)\n" +
                  "    c.Tally.n = (10 if a == b else 0) + (1 if a == [u for u in a] else 0)\n");
             Ok(RunOnCity("Same"));
             Assert.That(Tally(), Is.EqualTo(10), "two groups with the same members are equal; a group is not a list");

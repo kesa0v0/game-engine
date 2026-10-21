@@ -32,7 +32,7 @@ f-문자열, `**`·비트 연산, 연쇄 비교(`0 < x < 5`는 `0 < x and x < 5`
 | 수 | `abs`, `min`, `max`, `clamp(x, lo, hi)`, `floor`, `ceil`, `round`, `sum`, `len`, `range` |
 | 참거짓 | `any`, `all` |
 | 글 | `text("키", 이름=값)`: 번역 키와 인자 (번역 파일은 8장). 키는 `harbor-charter`처럼 하이픈으로 잇고 점은 쓰지 않는다(번역 파일 Fluent의 이름 규칙, 점은 속성 `harbor-charter.tooltip`). 인자는 수·문자열·`True`/`False`·`None`·엔티티·안쪽 `text(...)`만 되고 list·dict·함수는 실행 오류다. 엔티티는 `text()`를 부른 때의 Def를 같이 적어 두어, 그 뒤에 엔티티가 없어져도 이름을 보일 수 있다 |
-| 월드 읽기 | `query("타입", "컴포넌트"...)`, `contribs(h, "이름")`, `now()`(지금 틱), `controller(e)`(7장) |
+| 월드 읽기 | `query(타입, 컴포넌트...)`, `defs(타입)`, `defdata("Def id")`, `contribs(h, "이름")`, `now()`(지금 틱), `controller(e)`(7장) |
 
 | 쓰는 곳(커맨드·핸들러·흐름의 본문)에서만, **문장으로만** | |
 |---|---|
@@ -50,8 +50,22 @@ f-문자열, `**`·비트 연산, 연쇄 비교(`0 < x < 5`는 `0 < x and x < 5`
 
 - 한 모드의 함수·상수는 그 모드 안 어디서나 부른다(스키마 파일의 함수도 Def 파일에서 보인다).
 - **다른 모드의 함수는 부를 수 없다.** 다른 모드의 컴포넌트·신호·커맨드 이름은 `dependencies`에 있으면 쓸 수 있다.
-- 없는 이름은 로드 때 `EVL001`과 "혹시 …?". 타입을 아는 곳(매개변수에 `Ref[X]`를 붙였거나, `query("X")`로 돌거나, `spawn` 결과 등)에서는
+- 없는 이름은 로드 때 `EVL001`과 "혹시 …?". 타입을 아는 곳(매개변수에 `Ref[X]`를 붙였거나, `query(X)`로 돌거나, `spawn` 결과 등)에서는
   `u.Lfie.hp` 같은 컴포넌트·멤버 오타도 로드 때 잡힌다.
+
+**이름 쓰는 법.** 선언에서 새로 짓는 이름은 문자열이고, 함수 안에서 이미 있는 스키마 이름(Def 타입·컴포넌트·신호)을 가리킬 때는
+따옴표 없는 맨 이름이다. Def id는 어디서나 문자열이다.
+
+| 자리 | 쓰는 법 |
+|---|---|
+| 선언(새 이름) | `component("Health", ...)`, `deftype("City", ...)`, `City("Atlanta", ...)` |
+| 함수 안의 Def 타입·컴포넌트·신호 | `query(City)`, `query(Unit, Wounded)`, `defs(City)`, `emit(Damaged(...))`, `component == Face` |
+| Def id | `spawn("Atlanta")`, `defdata("Medic")`, `defid("Sloop")` |
+
+- 함수 안의 `City`는 **타입을 가리키는 값**이다. 변수에 담아 넘길 수 있지만(`t = City`, `query(t)`) 부를 수는 없다:
+  `City("x")`는 로드 오류이고 엔티티는 `spawn("Def id")`로 만든다. Def의 `const`는 엔티티(`e.City.pop`)나 `defdata(id).City.pop`으로 읽는다.
+- `query("City")`처럼 이름 자리에 문자열을 쓰면 로드 오류다(실행 중 만든 문자열도 오류). 따옴표를 빼면 된다.
+- 맨 이름이라 오타는 `EVL001`과 "혹시 …?"로 잡히고, 의존하지 않는 모드의 이름은 `SCH003`이다.
 
 ## 엔티티 읽고 쓰기
 
@@ -59,12 +73,12 @@ f-문자열, `**`·비트 연산, 연쇄 비교(`0 < x < 5`는 `0 < x and x < 5`
 
 ```python
 def town():
-    for h in query("Harbor"):
+    for h in query(Harbor):
         return h
     return None
 
 def rivals(house):
-    return [s for s in query("Ship") if s.Owner.house != house]
+    return [s for s in query(Ship) if s.Owner.house != house]
 ```
 
 | 쓰는 법 | 뜻 |
@@ -73,21 +87,21 @@ def rivals(house):
 | `s.Hull.hp -= 3` | 쓰기(`field`와 `ref`만, 쓰는 곳에서만) |
 | `s.Ship.base_hp` | Def 타입 이름으로 그 엔티티 Def의 `const` 읽기 |
 | `defdata("Medic").Role.treat_all` | 엔티티가 없는 Def의 `const`를 Def id로 읽기 |
-| `defs("City")` | 그 Def 타입의 Def 전체 id 목록 |
+| `defs(City)` | 그 Def 타입의 Def 전체 id 목록 |
 | `house.ships` | 역방향 컬렉션(그 상회를 가리키는 배들) |
 | `house.Stock.Fish.amount`, `house.Stock[k]` | 키 컴포넌트의 줄 |
 | `u.Life is None` | 그 컴포넌트가 붙어 있지 않다(또는 보이지 않는다, 7장) |
 | `a == b` | 같은 엔티티인가(id 비교) |
 
-- `query("Ship")`은 살아 있는 Ship 엔티티들, `query("Unit", "Wounded")`는 그중 `Wounded`가 붙은 것. 결과는 인덱싱할 수 없다
+- `query(Ship)`은 살아 있는 Ship 엔티티들, `query(Unit, Wounded)`는 그중 `Wounded`가 붙은 것. 결과는 인덱싱할 수 없다
   (도중에 죽을 수 있어서). 필요하면 `[u for u in query(...)]`로 복사한다.
 - 순서는 엔티티 id 순(만든 순)이라 결정론적이다.
 - 엔티티를 만들지 않는 데이터 전용 Def(역할·특성처럼 키 줄의 키로만 쓰는 것)는 `defdata(id)`로 읽는다. id는 `defid`처럼
   짧은 이름이면 쓴 모드 기준이고, 키 줄을 돌 때의 키 같은 Def id 값도 받는다(`for k in p.Roles: defdata(k).Role.moves`).
   타입 이름 뒤가 그 타입의 `const`들이고, Def가 그 타입이 아니면 `None`이다. 없는 Def는 실행 오류("혹시 …?"),
   리터럴로 적은 id와 타입·`const` 이름의 오타는 로드 때 잡힌다.
-- `defs("City")`는 그 타입의 Def들의 전체 id 목록이다(`abstract` 빼고, 모드 로드 순서 뒤 등록 순서). 내가 의존하지 않는 모드의
-  Def도 나온다. 판을 깔 때 도시 이름을 박아 두지 않고 `for name in defs("City"): spawn(name)`으로 쓰면 다른 모드가 더한 도시도
+- `defs(City)`는 그 타입의 Def들의 전체 id 목록이다(`abstract` 빼고, 모드 로드 순서 뒤 등록 순서). 내가 의존하지 않는 모드의
+  Def도 나온다. 판을 깔 때 도시 이름을 박아 두지 않고 `for name in defs(City): spawn(name)`으로 쓰면 다른 모드가 더한 도시도
   깔린다. 값은 전체 이름이라 맨 문자열과 비교하지 말고 `defid("Atlanta")`와 비교한다.
 
 ## `derived`와 기여 행
@@ -133,7 +147,9 @@ component("Fleet", strength=derived(int, lambda f: sum([s.Hull.hp for s in f.ent
   대상(`"Health.max"`)은 로드 때 검사한다: 컴포넌트가 있고 보이는지, `derived`인지. 키 컴포넌트를 겨냥하면 `key=`(Def id)가 꼭 있어야
   하고 그 줄이 없는 엔티티에서는 건너뛴다. 값이 Def에 있으니 다른 모드가 `patch.append`로 더할 수 있고 옛 세이브에도 반영된다.
   모인 행은 `id`가 `None`(뗄 수 없다. 컴포넌트를 떼거나 줄을 지운다), `source`는 그 엔티티, `component`는 선언이 있던 컴포넌트
-  (`"Traits"`), `key`는 키 줄에서 왔으면 그 Def id(`"mymod:Tough"`)다. 저장된 행은 `component`·`key`가 `None`이다.
+  값(`c.component == Traits`로 비교한다. 문자열 `"Traits"`와 비교하면 늘 거짓이라 경고 `EVL009`), `key`는 키 줄에서 왔으면 그
+  Def id(`"mymod:Tough"`)다. 저장된 행은 `component`·`key`가 `None`이다. 행의 속성은 `value`·`op`·`id`·`source`·`component`·`key`
+  여섯이고 다른 이름은 로드 오류다.
   다른 엔티티에 주는 보너스는 `to=`로 한 걸음 간다. `"컴포넌트.ref칼럼"`이면 그 Ref가 가리키는 엔티티에, 역방향 컬렉션 이름이면
   그 컬렉션의 모든 엔티티에 간다. 없으면 자기 자신이다.
 

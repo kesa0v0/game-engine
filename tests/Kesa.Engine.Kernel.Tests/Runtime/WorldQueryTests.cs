@@ -19,7 +19,7 @@ namespace Kesa.Engine.Tests.Runtime
             "component(\"Mood\", value=field(int, default=50))\n" +
             "component(\"Out\", n=field(int, default=0), s=field(str, default=\"\"))\n" +
             "component(\"Wounded\", turns=field(int, default=1))\n" +
-            "component(\"Census\", towns=derived(int, lambda c: len(query(\"Settlement\"))))\n" +
+            "component(\"Census\", towns=derived(int, lambda c: len(query(Settlement))))\n" +
             "deftype(\"Need\")\n" +
             "deftype(\"Settlement\", components=[\"Mood\"])\n" +
             "deftype(\"Unit\", components=[\"Out\"])\n" +
@@ -28,7 +28,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private const string Commands =
             "Settlement(\"Town\")\nUnit(\"Scout\")\nBoard(\"Main\")\nNeed(\"Food\")\n" +
-            "def board():\n    return [b for b in query(\"Board\")][0]\n" +
+            "def board():\n    return [b for b in query(Board)][0]\n" +
             "@command(free=True, acts_for=None)\ndef Found(mood: int):\n    s = spawn(\"Town\")\n    s.Mood.value = mood\n" +
             "@command(free=True, acts_for=None)\ndef Raze(s: Ref[Settlement]):\n    destroy(s)\n" +
             "@command(free=True, acts_for=None)\ndef Hurt(e: Ref[Unit]):\n    attach(e, Wounded(turns=2))\n" +
@@ -72,10 +72,10 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var w = Make(
                 "@command(free=True, acts_for=None)\ndef Count():\n" +
-                "    unhappy = [s for s in query(\"Settlement\") if s.Mood.value < 20]\n" +
+                "    unhappy = [s for s in query(Settlement) if s.Mood.value < 20]\n" +
                 "    b = board()\n" +
-                "    b.Out.n = len(unhappy) * 100 + sum(1 for u in query(\"Unit\", \"Wounded\"))\n" +
-                "    b.Out.s = \"yes\" if any(s.Mood.value > 90 for s in query(\"Settlement\")) else \"no\"\n");
+                "    b.Out.n = len(unhappy) * 100 + sum(1 for u in query(Unit, Wounded))\n" +
+                "    b.Out.s = \"yes\" if any(s.Mood.value > 90 for s in query(Settlement)) else \"no\"\n");
             var main = w.Create("core:Main");
             foreach (int mood in new[] { 10, 50, 5, 95 }) w.Set(w.Create("core:Town"), w.Member("Mood", "value"), new IntValue(mood));
             var u = w.Create("core:Scout");
@@ -87,23 +87,28 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
-        public void ANameMadeAtRunTimeIsCheckedWhenItRuns()
+        public void ANameGivenAtRunTimeIsCheckedWhenItRuns()
         {
-            var w = Make("@command(free=True, acts_for=None)\ndef Look(name: str):\n    board().Out.n = len(query(name))\n");
-            w.Create("core:Main");
-            var r = Run(w, "Look", ("name", new StrValue("Setlement")));
+            // 문자열은 받지 않는다 (G307). 이름 값은 변수로 넘길 수 있고 데이터 전용 타입은 그때 오류다
+            var w = Make("@command(free=True, acts_for=None)\ndef Look(name: str):\n    board().Out.n = len(query(name))\n" +
+                         "@command(free=True, acts_for=None)\ndef Pick(data: bool):\n    t = Need if data else Settlement\n    board().Out.n = len(query(t))\n");
+            var main = w.Create("core:Main");
+            w.Create("core:Town");
+            var r = Run(w, "Look", ("name", new StrValue("Settlement")));
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
-            Assert.That(r.Error!.Code, Is.EqualTo(Codes.RunUnknownName));
-            Assert.That(r.Error.Message, Does.Contain("there is no Def type or component 'Setlement'"));
-            Assert.That(r.Error.Hint, Does.Contain("Settlement"));
-            Assert.That(Run(w, "Look", ("name", new StrValue("Need"))).Error!.Code, Is.EqualTo(Codes.RunNotEntity));
+            Assert.That(r.Error!.Code, Is.EqualTo(Codes.RunType));
+            Assert.That(r.Error.Message, Does.Contain("query() takes schema names, not strings"));
+            Assert.That(r.Error.Hint, Does.Contain("write query(Settlement) without quotes"));
+            Assert.That(Run(w, "Pick", ("data", BoolValue.False)).Succeeded, Is.True);
+            Assert.That(((IntValue)w.Get(main, w.Member("Out", "n"))).Value, Is.EqualTo(1));
+            Assert.That(Run(w, "Pick", ("data", BoolValue.True)).Error!.Code, Is.EqualTo(Codes.RunNotEntity));
         }
 
         // ---- when이 목록 변화를 안다 (G193) ----
 
         private const string Watch =
-            "@when(lambda: any(s.Mood.value < 20 for s in query(\"Settlement\")))\ndef unrest():\n    board().Out.s = board().Out.s + \"u\"\n" +
-            "@when(lambda: len(query(\"Unit\", \"Wounded\")) >= 2)\ndef triage():\n    board().Out.s = board().Out.s + \"t\"\n" +
+            "@when(lambda: any(s.Mood.value < 20 for s in query(Settlement)))\ndef unrest():\n    board().Out.s = board().Out.s + \"u\"\n" +
+            "@when(lambda: len(query(Unit, Wounded)) >= 2)\ndef triage():\n    board().Out.s = board().Out.s + \"t\"\n" +
             "@when(lambda: board().Census.towns >= 3)\ndef crowded():\n    board().Out.s = board().Out.s + \"c\"\n";
 
         private static string Log(World w, EntityId main) => ((StrValue)w.Get(main, w.Member("Out", "s"))).Value;
@@ -152,7 +157,7 @@ namespace Kesa.Engine.Tests.Runtime
             var b = w.Create("core:Town");
             var node = w.Explain(main, w.Member("Census", "towns"));
             Assert.That(node.Reads.Single().Kind, Is.EqualTo(ExplainKind.Query));
-            Assert.That(node.Render(), Is.EqualTo("Census.towns of " + main + " = 2\n  query(\"Settlement\") = [" + a + ", " + b + "]"));
+            Assert.That(node.Render(), Is.EqualTo("Census.towns of " + main + " = 2\n  query(Settlement) = [" + a + ", " + b + "]"));
         }
 
         // ---- 저장 ----
@@ -162,10 +167,10 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Mod("core", schema: Schema, defs: Commands +
                 "@command(free=True, acts_for=None)\ndef Poll(u: Ref[Unit]):\n" +
-                "    towns = query(\"Settlement\")\n" +
+                "    towns = query(Settlement)\n" +
                 "    r = ask(u, \"Go\", choices=[\"a\", \"b\"])\n" +
                 "    spawn(\"Town\")\n" +
-                "    u.Out.n = len(towns) * 10 + len(query(\"Settlement\"))\n");
+                "    u.Out.n = len(towns) * 10 + len(query(Settlement))\n");
             var content = LoadClean();
             foreach (bool reload in new[] { false, true })
             {
@@ -191,12 +196,14 @@ namespace Kesa.Engine.Tests.Runtime
 
         // ---- 로드 검사 (G192) ----
 
-        [TestCase("query(\"Setlement\")", Codes.LnkNotFound, "there is no Def type or component 'Setlement'")]
-        [TestCase("query(\"Need\")", Codes.LnkWrongType, "'Need' is a data-only Def type with no components")]
-        [TestCase("query(\"Unit\", \"Board\")", Codes.LnkWrongType, "query() was given two Def types ('Unit' and 'Board')")]
-        [TestCase("query(\"Raid\")", Codes.LnkNotFound, "'Raid' is a signal, not a Def type or component")]
+        // 맨 이름의 오타는 이름 검사가 잡는다 (G306), 문자열은 옛 표기다 (G307)
+        [TestCase("query(Setlement)", Codes.EvlUnknownName, "name 'Setlement' is not defined")]
+        [TestCase("query(\"Settlement\")", Codes.EvlArguments, "query() takes schema names, not strings")]
+        [TestCase("query(Need)", Codes.LnkWrongType, "'Need' is a data-only Def type with no components")]
+        [TestCase("query(Unit, Board)", Codes.LnkWrongType, "query() was given two Def types ('Unit' and 'Board')")]
+        [TestCase("query(Raid)", Codes.LnkNotFound, "'Raid' is a signal, not a Def type or component")]
         [TestCase("query()", Codes.EvlArguments, "query() needs at least one Def type or component name")]
-        [TestCase("query(of=\"Unit\")", Codes.EvlArguments, "query() takes no keyword arguments")]
+        [TestCase("query(of=Unit)", Codes.EvlArguments, "query() takes no keyword arguments")]
         public void LiteralNamesAreCheckedAtLoad(string call, string code, string message)
         {
             Mod("core", schema: Schema, defs: "def f():\n    return len(" + call + ")\n");
@@ -204,18 +211,19 @@ namespace Kesa.Engine.Tests.Runtime
             var d = diagnostics.Single();
             Assert.That(d.Code, Is.EqualTo(code));
             Assert.That(d.Message, Does.Contain(message));
-            if (code == Codes.LnkNotFound && call.Contains("Setlement")) Assert.That(d.Hint, Does.Contain("Settlement"));
+            if (call.Contains("Setlement")) Assert.That(d.Hint, Does.Contain("Settlement"));
         }
 
         [Test]
         public void AQueriedNameMustBeVisible()
         {
             Mod("core", schema: Schema);
-            Mod("other", defs: "def f():\n    return len(query(\"Settlement\"))\n");
+            Mod("other", defs: "def f():\n    return len(query(Settlement))\n");
             Load(out var diagnostics);
             var d = diagnostics.Single();
-            Assert.That(d.Code, Is.EqualTo(Codes.LnkNotVisible));
-            Assert.That(d.Message, Does.Contain("'Settlement' belongs to mod 'core', which mod 'other' does not depend on"));
+            // 맨 이름이라 이름 검사가 본다 (G230·G306)
+            Assert.That(d.Code, Is.EqualTo(Codes.SchNotVisible), d.ToString());
+            Assert.That(d.Message, Does.Contain("'Settlement'").And.Contain("'core'"));
         }
 
         [Test]

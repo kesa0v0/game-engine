@@ -2,12 +2,12 @@ SIZE = 5
 DIRS = {"north": [0, -1], "south": [0, 1], "west": [-1, 0], "east": [1, 0]}
 
 def game():
-    for g in query("Game"):
+    for g in query(Game):
         return g
     return None
 
 def unit_at(x, y):
-    for u in query("Unit"):
+    for u in query(Unit):
         if u.Pos.x == x and u.Pos.y == y:
             return u
     return None
@@ -33,7 +33,7 @@ def place(party, kind, x, y):
     u.Life.hp = u.Unit.max_hp
 
 def alive(party):
-    return len([u for u in query("Unit") if u.Owner.party == party])
+    return len([u for u in query(Unit) if u.Owner.party == party])
 
 # 명중하면 맞은 쪽 주인이 버틸지 물러날지 고른다. 물러나면 피해가 절반이고 공격자 반대쪽으로 한 칸 간다
 def resolve(a, t):
@@ -77,7 +77,7 @@ def Start():
             case "Attack" if alive(p.Order.next) == 0:
                 g.Match.winner = p
             case "EndTurn":
-                for u in query("Unit"):
+                for u in query(Unit):
                     u.Ready.acted = False
                 p = p.Order.next
                 g.Match.turn += 1

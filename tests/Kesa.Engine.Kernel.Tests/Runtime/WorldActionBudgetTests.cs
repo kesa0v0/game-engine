@@ -16,7 +16,7 @@ namespace Kesa.Engine.Tests.Runtime
         private const string Schema =
             "def everyone(c) -> int:\n" +
             "    n = 0\n" +
-            "    for u in query(\"Unit\"):\n" +
+            "    for u in query(Unit):\n" +
             "        n += u.Food.amount\n" +
             "    return n\n" +
             "component(\"Food\", amount=field(int, default=0))\n" +
@@ -28,11 +28,11 @@ namespace Kesa.Engine.Tests.Runtime
             "Unit(\"Soldier\")\nOffice(\"Bureau\")\n" +
             "@command(free=True, acts_for=None)\n" +
             "def FeedAll():\n" +
-            "    for u in query(\"Unit\"):\n" +
+            "    for u in query(Unit):\n" +
             "        u.Food.amount += 1\n" +
             "def count_units() -> int:\n" +
             "    n = 0\n" +
-            "    for u in query(\"Unit\"):\n" +
+            "    for u in query(Unit):\n" +
             "        n += 1\n" +
             "    return n\n" +
             "@command(free=True, acts_for=None)\n" +
@@ -44,19 +44,19 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\n" +
             "def AskThenFeed(u: Ref[Unit]):\n" +
             "    r = ask(u, \"go?\", choices=[\"go\"])\n" +
-            "    for x in query(\"Unit\"):\n" +
+            "    for x in query(Unit):\n" +
             "        x.Food.amount += 1\n";
 
         private const string Grow =
             "@on(Tick)\n" +
             "def grow():\n" +
-            "    for u in query(\"Unit\"):\n" +
+            "    for u in query(Unit):\n" +
             "        u.Food.amount += 1\n";
 
         private const string Runaway =
             "@on(Tick)\n" +
             "def runaway():\n" +
-            "    for u in query(\"Unit\"):\n" +
+            "    for u in query(Unit):\n" +
             "        u.Food.amount += 1\n" +
             "    while True:\n" +
             "        pass\n";

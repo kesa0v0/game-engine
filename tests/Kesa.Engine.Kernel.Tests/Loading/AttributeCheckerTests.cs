@@ -48,7 +48,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void ATypoAfterAQueryLoopIsALoadError()
         {
-            Assert.That(Errors("def feed():\n    for u in query(\"Unit\"):\n        u.Fod.amount += 1\n"), Is.EqualTo(new[]
+            Assert.That(Errors("def feed():\n    for u in query(Unit):\n        u.Fod.amount += 1\n"), Is.EqualTo(new[]
             {
                 "EVL001 6: a Unit entity has no component or collection 'Fod' | did you mean 'Food'?",
             }));
@@ -106,8 +106,8 @@ namespace Kesa.Engine.Tests.Loading
         {
             // t는 None 또는 Spell: Spell로 본다. c = u.Food처럼 다른 지역 변수에서 온 값도 따라간다
             Assert.That(Errors(
-                "def top():\n    t = None\n    for s in query(\"Spell\"):\n        t = s\n    if t is not None:\n        t.Spel.effect(t)\n" +
-                "def feed():\n    for u in query(\"Unit\"):\n        c = u.Food\n        c.amont = 1\n"), Is.EqualTo(new[]
+                "def top():\n    t = None\n    for s in query(Spell):\n        t = s\n    if t is not None:\n        t.Spel.effect(t)\n" +
+                "def feed():\n    for u in query(Unit):\n        c = u.Food\n        c.amont = 1\n"), Is.EqualTo(new[]
             {
                 "EVL001 9: a Spell entity has no component or collection 'Spel' | did you mean 'Spell'?",
                 "EVL001 13: 'Food' has no member, sibling component or property 'amont' | did you mean 'amount'?",
@@ -140,7 +140,7 @@ namespace Kesa.Engine.Tests.Loading
         {
             Assert.That(Errors(Free +
                 "def Make(c: Ref[City]):\n    u = spawn(\"Grunt\")\n    u.Lfe.hp = 1\n" +
-                "    rich = [x for x in query(\"Unit\") if x.Food.amont > 1]\n    for r in rich:\n        r.Foodd.amount = 0\n" +
+                "    rich = [x for x in query(Unit) if x.Food.amont > 1]\n    for r in rich:\n        r.Foodd.amount = 0\n" +
                 "    for v in c.units:\n        v.Wonded.turns = 1\n    n = len(c.unts)\n"), Is.EqualTo(new[]
             {
                 "EVL001 7: a Unit entity has no component or collection 'Lfe' | did you mean 'Life'?",
@@ -197,8 +197,8 @@ namespace Kesa.Engine.Tests.Loading
         public void AFunctionsResultHasTheTypeOfItsReturns()
         {
             // 적지 않은 반환, 적은 반환, 부른 자리의 인자로 정해지는 반환 (G231)
-            Assert.That(Errors("def first():\n    for u in query(\"Unit\"):\n        return u\n    return None\n" +
-                               "def annotated() -> Ref[Unit]:\n    return query(\"Unit\")[0]\n" +
+            Assert.That(Errors("def first():\n    for u in query(Unit):\n        return u\n    return None\n" +
+                               "def annotated() -> Ref[Unit]:\n    return query(Unit)[0]\n" +
                                "def same(u):\n    return u\n" +
                                Free + "def Feed(x: Ref[Unit]):\n    a = first()\n    a.Fod.amount += 1\n" +
                                "    annotated().Fod.amount += 1\n    same(x).Fod.amount += 1\n    same(u=x.Food).amout += 1\n"),
@@ -229,7 +229,7 @@ namespace Kesa.Engine.Tests.Loading
         public void UnknownOrMixedReturnsAreLeftAlone()
         {
             // 적은 반환 타입이 본문보다 앞서고(int), 타입이 다른 반환은 모름, 모르는 인자를 넘기면 모름, 반환이 없으면 None
-            Clean("def counted() -> int:\n    return query(\"Unit\")[0]\n" +
+            Clean("def counted() -> int:\n    return query(Unit)[0]\n" +
                   "def mixed(u: Ref[Unit], c: Ref[City]):\n    if u.Food.amount > 0:\n        return u.Food\n    return c\n" +
                   "def same(u):\n    return u\n" +
                   "def nothing(u):\n    u.Food.amount = 0\n" +
@@ -242,7 +242,7 @@ namespace Kesa.Engine.Tests.Loading
         public void TheErrorDisablesTheModThatWroteTheFunction()
         {
             Mod("core", schema: Schema, defs: Data);
-            Mod("addon", defs: "def feed():\n    for u in query(\"Unit\"):\n        u.Fod.amount += 1\n", extra: ", dependencies=[\"core\"]");
+            Mod("addon", defs: "def feed():\n    for u in query(Unit):\n        u.Fod.amount += 1\n", extra: ", dependencies=[\"core\"]");
             var result = Load(out var diags);
             Assert.That(diags.Single(d => d.Severity == Severity.Error).Mod, Is.EqualTo("addon"));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "addon" }));

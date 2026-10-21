@@ -1,12 +1,12 @@
 PRICES = {"Sloop": 8, "Galleon": 15}
 
 def town():
-    for h in query("Harbor"):
+    for h in query(Harbor):
         return h
     return None
 
 def rivals(house):
-    return [s for s in query("Ship") if s.Owner.house != house]
+    return [s for s in query(Ship) if s.Owner.house != house]
 
 # 판을 깐다. 아무나 낼 수 있다(acts_for=None)
 @command(free=True, acts_for=None)
@@ -57,7 +57,7 @@ def insurance(ship, house):
 # 틱마다 항구의 날짜가 간다
 @on(Tick)
 def market_day():
-    for h in query("Harbor"):
+    for h in query(Harbor):
         h.Port.day += 1
 
 # 금화가 50을 넘은 상회는 비밀 계획을 세운다(상회마다 한 번)
@@ -68,6 +68,6 @@ def scheme(h: Ref[House]):
 # 비밀 계획은 그 상회만 본다
 @view_policy
 def may_see(viewer, entity, component):
-    if component == "Secret":
+    if component == Secret:
         return viewer == entity
     return True

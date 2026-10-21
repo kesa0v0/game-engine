@@ -18,7 +18,7 @@ namespace Kesa.Engine.Tests.Runtime
             "def health_max(h):\n" +
             "    return h.base + floor(sum([c.value for c in contribs(h, \"max\")]))\n" +
             "def from_tough(h):\n" +
-            "    return len([c for c in contribs(h, \"max\") if c.component == \"Traits\" and c.key == \"banking:Tough\" and c.id is None])\n" +
+            "    return len([c for c in contribs(h, \"max\") if c.component == Traits and c.key == \"banking:Tough\" and c.id is None])\n" +
             "def stored(h):\n" +
             "    return len([c for c in contribs(h, \"max\") if c.component is None and c.key is None and c.id is not None])\n" +
             "component(\"Health\", base=const(int, default=10), max=derived(int, health_max),\n" +
@@ -125,7 +125,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void AViewerWhoCannotSeeTheDeclaringComponentDoesNotSeeItsLine()
         {
-            NewWorld(Defs + "@view_policy\ndef may_see(viewer, entity, component):\n    return component != \"Armor\"\n");
+            NewWorld(Defs + "@view_policy\ndef may_see(viewer, entity, component):\n    return component != Armor\n");
             _world.Seat(_plain, "A");
             var a = _world.ViewAs("A");
             var max = _world.Member("Health", "max");

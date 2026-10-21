@@ -106,8 +106,8 @@ namespace Kesa.Engine.Tests.Runtime
         {
             // 부른 모드(banking)는 addon에 의존하지 않지만 addon의 배도 나온다. 추상 Hull은 빠진다
             Mod("banking", schema: Schema, defs: Ships + "Ship(\"Hull\", abstract=True)\n" + Command(
-                "    n = 0\n    for k in defs(\"Ship\"):\n        n = n * 10 + defdata(k).Ship.speed\n" +
-                "    s.Mark.n = n * 10 + len(defs(\"Cargo\"))\n"));
+                "    n = 0\n    for k in defs(Ship):\n        n = n * 10 + defdata(k).Ship.speed\n" +
+                "    s.Mark.n = n * 10 + len(defs(Cargo))\n"));
             Mod("addon", defs: "Ship(\"Galleon\", speed=4)\n", extra: ", dependencies=[\"banking\"]");
             _world = new World(LoadClean());
             _sloop = _world.Create("banking:Sloop");
@@ -115,34 +115,55 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(N(), Is.EqualTo(3241));
         }
 
-        [TestCase("Shp", "there is no Def type 'Shp'", "did you mean 'Ship'?")]
-        [TestCase("Mark", "'Mark' is a component, not a Def type", null)]
-        public void ALiteralTypeNameIsCheckedAtLoad(string name, string message, string? hint)
+        // 맨 이름의 오타는 이름 검사가, 컴포넌트 이름은 ⑤ 링크가 잡는다 (G306)
+        [TestCase("Shp", Codes.EvlUnknownName, "name 'Shp' is not defined", "did you mean 'Ship'?")]
+        [TestCase("Mark", Codes.LnkNotFound, "'Mark' is a component, not a Def type", null)]
+        [TestCase("\"Ship\"", Codes.EvlArguments, "defs() takes schema names, not strings", "write defs(Ship) without quotes (spec-gaps G306·G307)")]
+        public void ATypeNameIsCheckedAtLoad(string name, string code, string message, string? hint)
         {
-            Mod("banking", schema: Schema, defs: Ships + Command("    s.Mark.n = len(defs(\"" + name + "\"))\n"));
+            Mod("banking", schema: Schema, defs: Ships + Command("    s.Mark.n = len(defs(" + name + "))\n"));
             Load(out var diags);
             var d = diags.Single();
-            Assert.That(d.Code, Is.EqualTo(Codes.LnkNotFound));
+            Assert.That(d.Code, Is.EqualTo(code));
             Assert.That(d.Message, Is.EqualTo(message));
             if (hint != null) Assert.That(d.Hint, Is.EqualTo(hint));
         }
 
         [Test]
-        public void AnUnknownTypeNameAtRunTimeIsAnError()
+        public void AStringMadeAtRunTimeIsAnError()
         {
+            // 문자열은 이름 자리에 받지 않는다 (G307). 값으로 넘긴 컴포넌트는 Def 타입이 아니다
             Start(Command("    s.Mark.n = len(defs(s.Mark.name))\n"));
-            _world.Set(_sloop, _world.Member("Mark", "name"), new StrValue("Shipp"));
+            _world.Set(_sloop, _world.Member("Mark", "name"), new StrValue("Ship"));
             var r = Check();
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
-            Assert.That(r.Error!.Message, Does.Contain("there is no Def type 'Shipp'"));
-            Assert.That(r.Error!.Hint, Is.EqualTo("did you mean 'Ship'?"));
+            Assert.That(r.Error!.Message, Does.Contain("defs() takes schema names, not strings"));
+            Assert.That(r.Error!.Hint, Is.EqualTo("write defs(Ship) without quotes (spec-gaps G306·G307)"));
+        }
+
+        [Test]
+        public void AComponentValueAtRunTimeIsNotADefType()
+        {
+            Start(Command("    k = Mark\n    s.Mark.n = len(defs(k))\n"));
+            var r = Check();
+            Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(r.Error!.Message, Does.Contain("'Mark' is not a Def type"));
+        }
+
+        [Test]
+        public void ADefTypeValueCanBePassedAround()
+        {
+            // 로직 안의 City는 값이다: 변수에 담아 넘길 수 있다 (G306)
+            Start(Command("    t = Ship\n    s.Mark.n = len(defs(t)) * 10 + len(query(t))\n"));
+            Assert.That(Check().Succeeded, Is.True);
+            Assert.That(N(), Is.EqualTo(21));
         }
 
         [Test]
         public void ItsIdsAreFullNamesSoABareComparisonWarns()
         {
             Mod("banking", schema: Schema, defs: Ships + Command(
-                "    for k in defs(\"Ship\"):\n        if k == \"Sloop\":\n            s.Mark.n = 1\n"));
+                "    for k in defs(Ship):\n        if k == \"Sloop\":\n            s.Mark.n = 1\n"));
             Load(out var diags);
             Assert.That(diags.Select(d => d.Code), Is.EqualTo(new[] { Codes.LnkBareDefId }));
         }
@@ -163,6 +184,25 @@ namespace Kesa.Engine.Tests.Runtime
             _world = loaded.World!;
             _world.Advance(2);
             Assert.That(N(), Is.EqualTo(22));
+        }
+
+        [Test]
+        public void APausedFlowHoldingADefTypeValueSavesAndLoads()
+        {
+            // 로직 안의 Def 타입 값도 스키마 이름으로 저장된다 (G306)
+            Mod("banking", schema: Schema, defs: Ships +
+                "@command(free=True, acts_for=None)\ndef Hold(s: Ref[Ship]):\n" +
+                "    t = Ship\n    wait(ticks=2)\n    s.Mark.n = len(defs(t)) + (10 if t == Ship else 0)\n");
+            var content = LoadClean();
+            _world = new World(content);
+            _sloop = _world.Create("banking:Sloop");
+            Assert.That(_world.Submit("host", "banking.Hold",
+                new Dictionary<string, Value> { ["s"] = new EntityValue(_sloop) }).Succeeded, Is.True);
+            var loaded = World.Load(content, _world.Save());
+            Assert.That(loaded.Diagnostics, Is.Empty);
+            _world = loaded.World!;
+            _world.Advance(2);
+            Assert.That(N(), Is.EqualTo(12));
         }
     }
 }

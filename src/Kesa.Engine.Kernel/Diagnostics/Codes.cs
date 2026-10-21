@@ -48,6 +48,9 @@ namespace Kesa.Engine.Diagnostics
         public const string EvlGuardBody = "EVL007";
         public const string EvlModNotDeclared = "EVL008";
 
+        /// <summary>엔진이 넘긴 컴포넌트 값을 문자열 리터럴과 비교함: 늘 거짓 (경고, spec-gaps G308).</summary>
+        public const string EvlSchemaNameString = "EVL009";
+
         public const string SchDuplicateName = "SCH001";
         public const string SchUnknownName = "SCH002";
         public const string SchNotVisible = "SCH003";

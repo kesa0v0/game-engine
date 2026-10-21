@@ -33,9 +33,9 @@ namespace Kesa.Engine.Tests.Runtime
             "    if entity.Fog is not None:\n" +
             "        return not entity.Fog.hidden or viewer == entity.Owner.party\n" +
             "    if entity.Hand is not None:\n" +
-            "        return component != \"Hand\" or viewer == entity\n" +
+            "        return component != Hand or viewer == entity\n" +
             "    return True\n" +
-            "def enemy_hp(me):\n    return sum([u.Life.hp for u in query(\"Unit\") if u.Owner.party != me])\n" +
+            "def enemy_hp(me):\n    return sum([u.Life.hp for u in query(Unit) if u.Owner.party != me])\n" +
             "def hand(p):\n    return -1 if p.Hand is None else p.Hand.cards\n" +
             "def army(p):\n    return len(p.units)\n" +
             "def spied(u):\n    return u.Spy.on\n" +

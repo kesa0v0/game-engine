@@ -79,7 +79,7 @@ if r.choice == "harbor-charter-accept":   # 답은 감싼 것이 아니라 안�
             case "Attack" if alive(p.Order.next) == 0:
                 g.Match.winner = p
             case "EndTurn":
-                for u in query("Unit"):
+                for u in query(Unit):
                     u.Ready.acted = False
                 p = p.Order.next
                 g.Match.turn += 1

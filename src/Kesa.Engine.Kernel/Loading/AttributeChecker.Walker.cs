@@ -209,7 +209,10 @@ namespace Kesa.Engine.Loading
                         }
                         return StaticType.Unknown;
                     case BinaryExpr bin:
-                        CheckDefIdComparison(bin, Type(bin.Left, scope), Type(bin.Right, scope));
+                        var leftType = Type(bin.Left, scope);
+                        var rightType = Type(bin.Right, scope);
+                        CheckDefIdComparison(bin, leftType, rightType);
+                        CheckSchemaValueComparison(bin, leftType, rightType);
                         return StaticType.Unknown;
                     case UnaryExpr unary:
                         Type(unary.Operand, scope);
@@ -284,9 +287,10 @@ namespace Kesa.Engine.Loading
                 if (_reads != null && _report && candidate == null && call.Callee is NameExpr fn && !scope.ContainsKey(fn.Name))
                     _reads.Follow(_mod, fn.Name, call.Arguments, argTypes, call.Span);
 
-                if (builtin == PureBuiltins.QueryName) return new GroupType(new EntityType(QueriedType(call)));
+                if (builtin == PureBuiltins.QueryName) return new GroupType(new EntityType(QueriedType(call, scope)));
                 if (builtin == PureBuiltins.DefDataName) return DefDataStatic.Instance;
-                // defs("City")의 원소는 전체 이름 Def id다: 맨 문자열과 비교하면 경고 (G261·G305)
+                if (builtin == PureBuiltins.ContribsName) return new GroupType(ContributionStatic.Instance);
+                // defs(City)의 원소는 전체 이름 Def id다: 맨 문자열과 비교하면 경고 (G261·G305)
                 if (builtin == PureBuiltins.DefsName) return new GroupType(DefIdStatic.Instance);
                 if (builtin == PureBuiltins.SpawnName)
                 {
@@ -303,11 +307,12 @@ namespace Kesa.Engine.Loading
                 return StaticType.Unknown;
             }
 
-            /// <summary><c>query("Unit", "Wounded")</c>에 리터럴로 적은 Def 타입 (하나까지, G192). 없으면 아무 엔티티.</summary>
-            private DefType? QueriedType(CallExpr call)
+            /// <summary><c>query(Unit, Wounded)</c>에 맨 이름으로 적은 Def 타입 (하나까지, G192·G306). 없으면 아무 엔티티.</summary>
+            private DefType? QueriedType(CallExpr call, SortedDictionary<string, StaticType?> scope)
             {
                 foreach (var arg in call.Arguments)
-                    if (arg.Value is StringLiteral s && _schema.TryGetType(s.Value, out var type))
+                    if (arg.Value is NameExpr n && !scope.ContainsKey(n.Name) && _globals.Constructors.ContainsKey(n.Name) &&
+                        _schema.TryGetType(n.Name, out var type))
                         return type;
                 return null;
             }
@@ -340,14 +345,59 @@ namespace Kesa.Engine.Loading
                         return StaticType.Unknown;
                     case ConstructorType constructor:
                         return ConstructorAttribute(constructor, attr);
+                    case ContributionStatic _:
+                        return ContributionAttribute(attr);
                 }
                 return StaticType.Unknown;
+            }
+
+            private static readonly string[] ContributionAttributes = { "id", "op", "value", "source", "component", "key" };
+
+            /// <summary>기여 줄의 속성 (실행의 <c>ContributionView</c>와 같은 여섯, G298). <c>component</c>는 컴포넌트 값이다 (G308).</summary>
+            private StaticType? ContributionAttribute(AttributeExpr attr)
+            {
+                switch (attr.Name)
+                {
+                    case "component": return ComponentValueStatic.Instance;
+                    case "source": return new EntityType(null);
+                    case "key": return DefIdStatic.Instance;
+                }
+                if (Array.IndexOf(ContributionAttributes, attr.Name) >= 0) return StaticType.Unknown;
+                if (Reporting)
+                    Error("a contribution has no '" + attr.Name + "'", attr, new List<string>(ContributionAttributes), schemaNames: false);
+                return StaticType.Unknown;
+            }
+
+            /// <summary>
+            /// 엔진이 넘긴 컴포넌트 값(G308)이나 스키마 이름 값을 문자열 리터럴과 비교하는 곳: 늘 거짓이다. 경고다.
+            /// </summary>
+            private void CheckSchemaValueComparison(BinaryExpr bin, StaticType? left, StaticType? right)
+            {
+                if (!Reporting || (bin.Op != "==" && bin.Op != "!=")) return;
+                void Check(StaticType? value, Expr other)
+                {
+                    if (!(value is ComponentValueStatic || value is ConstructorType) || !(other is StringLiteral s)) return;
+                    _stage!.Warning(_mod, Codes.EvlSchemaNameString,
+                        "a component or schema name here is a value, not a string, so it never equals \"" + s.Value + "\"", s.Span,
+                        "write " + (s.Value.Length > 0 ? s.Value : "the name") + " without quotes (spec-gaps G308)");
+                }
+                Check(left, bin.Right);
+                Check(right, bin.Left);
             }
 
             /// <summary>생성자에는 속성이 없다. 같은 이름의 엔진 내장을 쓰려던 것이면 그렇다고 알린다 (G230).</summary>
             private StaticType? ConstructorAttribute(ConstructorType constructor, AttributeExpr attr)
             {
                 if (!Reporting) return StaticType.Unknown;
+                // 로직 안의 Def 타입 이름은 타입 값이다: Def의 const는 엔티티나 defdata로 읽는다 (G306)
+                if (constructor.Kind == ConstructorType.DefTypeKind)
+                {
+                    _stage!.Error(_mod, Codes.EvlUnknownName,
+                        "'" + constructor.Name + "' here is the Def type, which has no attribute '" + attr.Name + "'", attr.Span,
+                        "read a Def's consts from its entity (e." + constructor.Name + "." + attr.Name + ") or with defdata(id)." +
+                        constructor.Name + "." + attr.Name);
+                    return StaticType.Unknown;
+                }
                 string hint = PureBuiltins.IsRuntimeName(constructor.Name)
                     ? "this mod sees a " + constructor.Kind + " named '" + constructor.Name + "', so the built-in " + constructor.Name +
                       " is not available here; rename the " + constructor.Kind + " (spec-gaps G230)"

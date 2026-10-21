@@ -38,13 +38,15 @@
 # 비밀 계획은 그 상회만 본다
 @view_policy
 def may_see(viewer, entity, component):
-    if component == "Secret":
+    if component == Secret:
         return viewer == entity
     return True
 ```
 
 - `viewer`: 보는 연결이 앉은 엔티티. 여러 곳에 앉았으면 자리마다 부르고 하나라도 참이면 보인다. 관전자는 `None`.
-- `entity`: 보일지 묻는 엔티티. `component`가 `None`이면 "엔티티 자체가 보이나", 이름이면 "그 컴포넌트가 보이나"다.
+- `entity`: 보일지 묻는 엔티티. `component`가 `None`이면 "엔티티 자체가 보이나", 컴포넌트면 "그 컴포넌트가 보이나"다.
+  `component`는 컴포넌트 값이라 맨 이름과 비교한다(`component == Secret`, 3장 "이름 쓰는 법"). 문자열 `"Secret"`과 비교하면 늘
+  거짓이라 로드 때 경고 `EVL009`.
 - 참·거짓을 돌려준다. 순수해야 한다(`CMD004`). 오류가 나거나 참거짓이 아니면 "안 보임"으로 치고 `RUN018`.
 - 정책은 모든 모드를 통틀어 하나다. 다른 모드의 정책을 바꾸려면 `@view_policy(override=True)`.
 - 정책이 없으면 모두 보인다.
@@ -59,7 +61,7 @@ def may_see(viewer, entity, component):
 
   ```python
   def plans(me):
-      return [{"house": h, "plan": "?" if h.Secret is None else h.Secret.plan} for h in query("House")]
+      return [{"house": h, "plan": "?" if h.Secret is None else h.Secret.plan} for h in query(House)]
   ```
 
   Gull 자리에서 부르면 자기 계획은 숫자, Crane 것은 `"?"`다.

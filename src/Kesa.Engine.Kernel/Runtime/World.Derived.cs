@@ -176,12 +176,13 @@ namespace Kesa.Engine.Runtime
             public WorldGlobals(World world)
             {
                 _world = world;
+                world.AddDefTypeValues(_schemaNames);
                 world.AddComponentConstructors(_schemaNames);
                 world.AddSignalConstructors(_schemaNames);
                 if (world._mods != null) _visibility = new ModVisibility(world._mods);
             }
 
-            /// <summary>그 이름의 컴포넌트·신호 생성자 (보이는 범위를 따지지 않는다: 저장된 값을 되살릴 때).</summary>
+            /// <summary>그 이름의 Def 타입 값·컴포넌트·신호 생성자 (보이는 범위를 따지지 않는다: 저장된 값을 되살릴 때, 엔진이 넘길 때).</summary>
             public Value? SchemaValue(string name) => _schemaNames.TryGetValue(name, out var owned) ? owned.Value : null;
 
             public Value? Lookup(string mod, string name)

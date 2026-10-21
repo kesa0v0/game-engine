@@ -16,9 +16,10 @@ namespace Kesa.Engine.Script
         /// <param name="isLoadTimeName">콘텐츠 파일에서만 뜻이 있는 이름인가 (<c>field</c>, <c>patch</c>, Def 생성자 등)</param>
         /// <param name="isSchemaRuntimeName">로직에서도 쓰는 스키마 이름인가 (이 모드에 보이는 컴포넌트의 값 생성자, G134)</param>
         /// <param name="notVisible">다른 모드의 것이라 보이지 않는 이름이면 그 안내 (SCH003)</param>
+        /// <param name="isDefTypeName">로직 안에서 부를 수 없는 타입 값인 Def 타입 이름인가 (G306)</param>
         public static void Check(ModFunctions functions, ModScope scope, Func<string, bool> isLoadTimeName,
             CallContext context, Func<string, bool>? isSchemaRuntimeName = null, Func<string, string?>? notVisible = null,
-            IEnumerable<string>? schemaRuntimeNames = null, HostNames? hosts = null)
+            IEnumerable<string>? schemaRuntimeNames = null, HostNames? hosts = null, Func<string, bool>? isDefTypeName = null)
         {
             var globals = new SortedSet<string>(scope.Names, StringComparer.Ordinal);
             globals.UnionWith(functions.TopLevelNames);
@@ -30,6 +31,7 @@ namespace Kesa.Engine.Script
                 {
                     Submits = functions.SubmitUses,
                     DefTypes = functions.DefTypeLiterals,
+                    IsDefType = isDefTypeName ?? (_ => false),
                 };
                 if (function.Definition != null)
                     walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
@@ -53,8 +55,11 @@ namespace Kesa.Engine.Script
             /// <summary><c>submit("커맨드", ...)</c> 리터럴 호출을 모을 곳 (G278).</summary>
             public List<SubmitUse> Submits { get; set; } = new List<SubmitUse>();
 
-            /// <summary><c>defs("City")</c>의 리터럴 타입 이름을 모을 곳 (G305).</summary>
+            /// <summary><c>defs(City)</c>에 맨 이름으로 적은 타입 이름을 모을 곳 (G305·G306).</summary>
             public List<KeyValuePair<string, SourceSpan>> DefTypes { get; set; } = new List<KeyValuePair<string, SourceSpan>>();
+
+            /// <summary>로직 안에서 타입 값인 Def 타입 이름인가 (G306).</summary>
+            public Func<string, bool> IsDefType { get; set; } = _ => false;
 
             private readonly List<List<KeyValuePair<string, SourceSpan>>> _queried;
             private readonly IEnumerable<string> _schemaRuntimeNames;
@@ -188,10 +193,13 @@ namespace Kesa.Engine.Script
                 }
             }
 
-            /// <summary><c>query</c>는 위치 인자로 출처 이름을 하나 이상 받는다. 리터럴 이름은 모아서 ⑤ 링크가 본다 (G192).</summary>
-            private void CheckQuery(CallExpr call)
+            /// <summary>
+            /// <c>query</c>는 위치 인자로 출처를 하나 이상 받는다. 맨 스키마 이름은 모아서 ⑤ 링크가 본다 (G192·G306). 문자열 리터럴은
+            /// 옛 표기라 오류다 (G307).
+            /// </summary>
+            private void CheckQuery(CallExpr call, SortedSet<string> locals)
             {
-                const string usage = "write query(\"Unit\"), query(\"Wounded\") or query(\"Unit\", \"Wounded\")";
+                const string usage = "write query(Unit), query(Wounded) or query(Unit, Wounded)";
                 foreach (var arg in call.Arguments)
                 {
                     if (arg.Name == null) continue;
@@ -205,8 +213,25 @@ namespace Kesa.Engine.Script
                 }
                 var names = new List<KeyValuePair<string, SourceSpan>>();
                 foreach (var arg in call.Arguments)
-                    if (arg.Value is StringLiteral s) names.Add(new KeyValuePair<string, SourceSpan>(s.Value, s.Span));
+                {
+                    if (arg.Value is StringLiteral s)
+                        StringSchemaName(PureBuiltins.QueryName, s);
+                    else if (SchemaNameArgument(arg.Value, locals) is { } n)
+                        names.Add(new KeyValuePair<string, SourceSpan>(n.Name, n.Span));
+                }
                 if (names.Count > 0) _queried.Add(names);
+            }
+
+            /// <summary>맨 스키마 이름 인자(지역 변수나 모드 이름이 가리지 않은 것)면 그 이름 (G306).</summary>
+            private NameExpr? SchemaNameArgument(Expr value, SortedSet<string> locals) =>
+                value is NameExpr n && !locals.Contains(n.Name) && !_globals.Contains(n.Name) && _isSchemaRuntimeName(n.Name) ? n : null;
+
+            /// <summary>스키마 이름 자리의 문자열 리터럴: 맨 이름으로 쓴다 (G307).</summary>
+            private void StringSchemaName(string function, StringLiteral s)
+            {
+                string name = s.Value;
+                _context.Error(Codes.EvlArguments, function + "() takes schema names, not strings", s.Span,
+                    "write " + function + "(" + name + ") without quotes (spec-gaps G306·G307)");
             }
 
             private int _quietPreconditionNames;
@@ -221,7 +246,7 @@ namespace Kesa.Engine.Script
             private bool IsSchemaName(string name) => !_globals.Contains(name) && !Schema.EngineSignals.IsEngine(name) && _isSchemaRuntimeName(name);
 
             private string ShadowKind(string name, SortedSet<string> locals) =>
-                locals.Contains(name) ? "a local variable" : IsSchemaName(name) ? "a component or signal this mod sees" : "this mod's own name";
+                locals.Contains(name) ? "a local variable" : IsSchemaName(name) ? "a Def type, component or signal this mod sees" : "this mod's own name";
 
             public void Expr(Expr expr, SortedSet<string> locals)
             {
@@ -248,10 +273,19 @@ namespace Kesa.Engine.Script
                             !IsShadowed(defid.Name, locals) && call.Arguments.Count == 1 &&
                             call.Arguments[0].Name == null && call.Arguments[0].Value is StringLiteral literal)
                             _defIds.Add(new KeyValuePair<string, SourceSpan>(literal.Value, literal.Span));
-                        // defs("City")의 타입 이름도 링크가 본다 (G305)
+                        // defs(City)의 타입 이름도 링크가 본다 (G305·G306). 문자열은 옛 표기다 (G307)
                         if (call.Callee is NameExpr defs && defs.Name == PureBuiltins.DefsName && !IsShadowed(defs.Name, locals) &&
-                            call.Arguments.Count == 1 && call.Arguments[0].Name == null && call.Arguments[0].Value is StringLiteral typeName)
-                            DefTypes.Add(new KeyValuePair<string, SourceSpan>(typeName.Value, typeName.Span));
+                            call.Arguments.Count == 1 && call.Arguments[0].Name == null)
+                        {
+                            if (call.Arguments[0].Value is StringLiteral typeString) StringSchemaName(PureBuiltins.DefsName, typeString);
+                            else if (SchemaNameArgument(call.Arguments[0].Value, locals) is { } typeName)
+                                DefTypes.Add(new KeyValuePair<string, SourceSpan>(typeName.Name, typeName.Span));
+                        }
+                        // 로직 안의 Def 타입 이름은 부를 수 없는 타입 값이다: 엔티티는 spawn으로 만든다 (G134·G306)
+                        if (call.Callee is NameExpr type && IsDefType(type.Name) && !locals.Contains(type.Name) && !_globals.Contains(type.Name))
+                            _context.Error(Codes.EvlArguments,
+                                "'" + type.Name + "' is a Def type; inside a logic function it names the type and cannot be called",
+                                call.Span, "create an entity with spawn(\"Def id\"); declare Defs at the top level of a Def file");
                         // text("키", ...)의 리터럴 키와 넘긴 이름은 check의 번역 검사가 본다 (G257)
                         if (call.Callee is NameExpr text && text.Name == PureBuiltins.TextName &&
                             !IsShadowed(text.Name, locals) && call.Arguments.Count > 0 &&
@@ -279,7 +313,7 @@ namespace Kesa.Engine.Script
                         }
                         // 덮어쓰지 않은 query에 리터럴로 적은 출처 이름은 ⑤ 링크가 본다 (G192)
                         if (call.Callee is NameExpr query && query.Name == PureBuiltins.QueryName && !IsShadowed(query.Name, locals))
-                            CheckQuery(call);
+                            CheckQuery(call, locals);
                         // 엔진 신호의 값은 스크립트가 만들 수 없다 (G156)
                         if (call.Callee is NameExpr signal && Schema.EngineSignals.IsEngine(signal.Name) && !IsShadowed(signal.Name, locals))
                             _context.Error(Codes.CmdWriteEffect, Schema.EngineSignals.Why(signal.Name), call.Span);

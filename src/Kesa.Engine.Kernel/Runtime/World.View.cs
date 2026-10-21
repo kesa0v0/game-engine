@@ -49,7 +49,8 @@ namespace Kesa.Engine.Runtime
                 var value = OutsideAct(() => RunGateFunction(function, new[]
                 {
                     ToScript(viewer), ToScript(new EntityValue(id)),
-                    component == null ? (Value)NoneValue.Instance : new StrValue(component),
+                    // 컴포넌트는 맨 이름 Face가 뜻하는 것과 같은 값이다: component == Face (G308)
+                    component == null ? NoneValue.Instance : SchemaNameValue(component),
                 }, label));
                 if (value is BoolValue b) return b.Value;
                 diagnostics.Add(new Diagnostic(Codes.RunViewPolicy, Severity.Error,

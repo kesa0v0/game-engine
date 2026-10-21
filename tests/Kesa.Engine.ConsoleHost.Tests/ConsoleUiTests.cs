@@ -25,11 +25,11 @@ namespace Kesa.Engine.ConsoleHost.Tests
             File.WriteAllText(Path.Combine(mod, "defs", "rules.py"),
                 "Bank(\"Vault\")\nToken(\"Penny\")\n" +
                 "@command(free=True, acts_for=None)\ndef Open():\n    with preconditions:\n" +
-                "        require(len(query(\"Bank\")) == 0, text(\"banking.open\"))\n" +
+                "        require(len(query(Bank)) == 0, text(\"banking.open\"))\n" +
                 "    v = spawn(\"Vault\")\n    spawn(\"Penny\", Coin=Coin(bank=v))\n" +
                 "@command(free=True, acts_for=None)\ndef Polish():\n    with preconditions:\n" +
-                "        require(len(query(\"Bank\")) > 0, text(\"banking.closed\"))\n" +
-                "    for t in query(\"Token\"):\n        t.Coin.value += 1\n" +
+                "        require(len(query(Bank)) > 0, text(\"banking.closed\"))\n" +
+                "    for t in query(Token):\n        t.Coin.value += 1\n" +
                 "@command(free=True, acts_for=lambda bank: bank)\ndef Earn(bank: Ref[Bank]):\n    with preconditions:\n" +
                 "        choose(bank, where=lambda b: True)\n    bank.Purse.gold += 5\n" +
                 "def gold(me):\n    return me.Purse.gold\n" +

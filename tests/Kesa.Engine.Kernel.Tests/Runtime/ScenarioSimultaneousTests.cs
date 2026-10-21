@@ -31,12 +31,12 @@ namespace Kesa.Engine.Tests.Runtime
             // 남의 선택은 공개될 때까지 못 본다. 그 밖에는 다 보인다
             "@view_policy\n" +
             "def may_see(viewer, entity, component):\n" +
-            "    if component != \"Pick\":\n" +
+            "    if component != Pick:\n" +
             "        return True\n" +
-            "    return viewer == entity or any(g.Round.revealed for g in query(\"Game\"))\n" +
+            "    return viewer == entity or any(g.Round.revealed for g in query(Game))\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Start():\n" +
-            "    for p in query(\"Party\"):\n" +
+            "    for p in query(Party):\n" +
             "        emit(AskPick(who=p))\n" +
             "@on(AskPick)\n" +
             "def ask_pick(who):\n" +
@@ -44,11 +44,11 @@ namespace Kesa.Engine.Tests.Runtime
             "    who.Pick.choice = r.index\n" +
             "    who.Ready.done = True\n" +
             // 모두 골랐으면 공개하고, 각자 이긴 상대 수만큼 점수
-            "@when(lambda g: not g.Round.revealed and all(p.Ready.done for p in query(\"Party\")))\n" +
+            "@when(lambda g: not g.Round.revealed and all(p.Ready.done for p in query(Party)))\n" +
             "def reveal(g: Ref[Game]):\n" +
             "    g.Round.revealed = True\n" +
-            "    for p in query(\"Party\"):\n" +
-            "        for q in query(\"Party\"):\n" +
+            "    for p in query(Party):\n" +
+            "        for q in query(Party):\n" +
             "            if (p.Pick.choice - q.Pick.choice) % 3 == 1:\n" +
             "                p.Score.wins += 1\n";
 

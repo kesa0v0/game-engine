@@ -68,10 +68,13 @@ namespace Kesa.Engine.Loading
             names.All.UnionWith(mod.Functions.TopLevelNames);
             // 모드가 묶지 않은 보이는 컴포넌트·신호 이름은 그 생성자다 (G230)
             foreach (var c in schema.Components)
-                if (mod.Scope.IsSchemaName(c.Name) && !names.All.Contains(c.Name)) names.Constructors[c.Name] = "component";
+                if (mod.Scope.IsSchemaName(c.Name) && !names.All.Contains(c.Name)) names.Constructors[c.Name] = ConstructorType.ComponentKind;
             foreach (var s in schema.Signals)
                 if (!EngineSignals.IsEngine(s.Name) && mod.Scope.IsSchemaName(s.Name) && !names.All.Contains(s.Name))
-                    names.Constructors[s.Name] = "signal";
+                    names.Constructors[s.Name] = ConstructorType.SignalKind;
+            // Def 타입 이름은 타입 값이다 (G306). 보이지 않는 타입은 이름 검사(SCH003)가 이미 잡는다
+            foreach (var t in schema.Types)
+                if (!names.All.Contains(t.Name)) names.Constructors[t.Name] = ConstructorType.DefTypeKind;
             names.All.UnionWith(names.Constructors.Keys);
             return names;
         }
@@ -133,6 +136,9 @@ namespace Kesa.Engine.Loading
                 contexts.AddByName(command.Function, ByName);
                 if (command.ActsFor != null) contexts.AddByName(command.ActsFor, ByName);
             }
+            // 보기 정책 may_see(viewer, entity, component): 셋째는 엔진이 넘긴 컴포넌트 값이나 None (G308)
+            foreach (var policy in functions.Policies)
+                contexts.Add(policy.Function, new StaticType?[] { new EntityType(null), new EntityType(null), ComponentValueStatic.Instance });
             foreach (var handler in functions.Handlers)
                 contexts.AddByName(handler.Function,
                     name => handler.Signal.TryGetField(name, out var field) ? FromType(field.Type, schema) : null);

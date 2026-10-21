@@ -82,7 +82,7 @@ namespace Kesa.Engine.Tests.Loading
                 "component(\"Loop\", parent=ref(\"Region\", optional=True, inverse=\"children\"), pop=field(int, default=1),\n" +
                 "    total=derived(int, lambda h: h.pop + sum(c.Loop.total for c in h.entity.children)),\n" +
                 "    up=derived(int, lambda h: h.parent.Loop.up + 1 if h.parent else 0),\n" +
-                "    all=derived(int, lambda h: sum(r.Loop.all for r in query(\"Region\") if r != h.entity)))\n" +
+                "    all=derived(int, lambda h: sum(r.Loop.all for r in query(Region) if r != h.entity)))\n" +
                 "component(\"Tally\")\n" +
                 "deftype(\"SkillDef\")\n" +
                 "component(\"Skill\", key=\"SkillDef\", bonus=derived(int, lambda s: s.entity.Skill.Cooking.bonus))\n" +

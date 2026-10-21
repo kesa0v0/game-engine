@@ -49,7 +49,7 @@ namespace Kesa.Engine.Runtime
         {
             if (names.Length == 0)
                 throw new WorldException(Codes.RunScript, "query() needs at least one Def type or component name",
-                    "write query(\"Unit\"), query(\"Wounded\") or query(\"Unit\", \"Wounded\")");
+                    "write query(Unit), query(Wounded) or query(Unit, Wounded)");
             DefType? type = null;
             var components = new List<ComponentType>();
             foreach (var name in names)
@@ -86,18 +86,11 @@ namespace Kesa.Engine.Runtime
             return names;
         }
 
-        /// <summary>스크립트의 <c>query("Unit", "Wounded")</c>: 엔티티 묶음 (G194).</summary>
+        /// <summary>스크립트의 <c>query(Unit, Wounded)</c>: 엔티티 묶음 (G194). 출처는 맨 스키마 이름이다 (G306·G307).</summary>
         private Value QueryBuiltin(IReadOnlyList<Value> positional)
         {
             var names = new string[positional.Count];
-            for (int i = 0; i < positional.Count; i++)
-            {
-                if (!(positional[i] is StrValue s))
-                    throw new ScriptRuntimeException(Codes.RunType,
-                        "query() takes Def type and component names as strings, got " + positional[i].KindName,
-                        "write query(\"Unit\")");
-                names[i] = s.Value;
-            }
+            for (int i = 0; i < positional.Count; i++) names[i] = SchemaNameArgument(PureBuiltins.QueryName, positional[i]);
             var ids = Guard(() => Query(names));
             if (_viewer != null) ids = ViewQueried(ids, names);
             if (_trace != null)

@@ -99,24 +99,20 @@ namespace Kesa.Engine.Runtime
         // ---- defs (G305) ----
 
         /// <summary>
-        /// <c>defs("City")</c>: 그 타입의 Def들의 전체 id. 순서는 등록 순서(모드 로드 순서 뒤 파일 순서), <c>abstract</c>는 동결본에 없어 빠진다(G70).
+        /// <c>defs(City)</c>: 그 타입의 Def들의 전체 id. 순서는 등록 순서(모드 로드 순서 뒤 파일 순서), <c>abstract</c>는 동결본에 없어 빠진다(G70).
         /// 부른 모드가 의존하지 않는 모드의 Def도 나온다.
         /// </summary>
         private Value DefsBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
-            if (positional.Count != 1 || keywords.Count > 0 || !(positional[0] is StrValue name))
+            if (positional.Count != 1 || keywords.Count > 0)
                 throw new ScriptRuntimeException(Codes.RunType,
-                    "defs() takes one Def type name, got " +
-                    (positional.Count == 1 && keywords.Count == 0 ? positional[0].KindName : positional.Count + keywords.Count + " arguments"),
-                    "write defs(\"City\")");
-            if (!_schema.TryGetType(name.Value, out _))
-            {
-                var names = new List<string>();
-                foreach (var t in _schema.Types) names.Add(t.Name);
-                throw new ScriptRuntimeException(Codes.RunScript, "there is no Def type '" + name.Value + "'", Suggest.Hint(name.Value, names));
-            }
+                    "defs() takes one Def type, got " + (positional.Count + keywords.Count) + " arguments", "write defs(City)");
+            // 맨 이름이 뜻하는 타입 값만 받는다 (G306·G307)
+            string name = SchemaNameArgument(PureBuiltins.DefsName, positional[0]);
+            if (!_schema.TryGetType(name, out _))
+                throw new ScriptRuntimeException(Codes.RunType, "'" + name + "' is not a Def type", "write defs(City) with a Def type");
             var ids = new List<Value>();
-            foreach (var def in _defs.OfType(name.Value)) ids.Add(new StrValue(def.Id));
+            foreach (var def in _defs.OfType(name)) ids.Add(new StrValue(def.Id));
             return new ListValue(ids);
         }
 

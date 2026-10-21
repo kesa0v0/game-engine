@@ -32,7 +32,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@view_policy\n" +
             "def may_see(viewer, entity, component):\n" +
             "    if entity.Crest is not None:\n" +
-            "        return component != \"Hand\" or viewer == entity\n" +
+            "        return component != Hand or viewer == entity\n" +
             "    if entity.Fog is not None:\n" +
             "        return not entity.Fog.hidden or viewer == entity.Owner.party\n" +
             "    return True\n";
@@ -263,7 +263,7 @@ namespace Kesa.Engine.Tests.Runtime
                     "component(\"Fog\", hidden=field(bool, default=False))\n" +
                     "def threat(d):\n" +
                     "    total = 0\n" +
-                    "    for u in query(\"Combat\"):\n" +
+                    "    for u in query(Combat):\n" +
                     "        total += u.Combat.atk\n" +
                     "    for r in contribs(d, \"threat\"):\n" +
                     "        total += r.value\n" +
@@ -299,14 +299,14 @@ namespace Kesa.Engine.Tests.Runtime
             w.AddContribution(castle, threat, "add", new IntValue(1), new EntityId(3)); // 보이는 #3에서
             Assert.That(w.Explain(castle, threat).Render(), Is.EqualTo(
                 "Defense.threat of #1 = 15\n" +
-                "  query(\"Combat\") = [#2, #3, #4, #5]\n" +
+                "  query(Combat) = [#2, #3, #4, #5]\n" +
                 "  Combat.atk of #2 = 4\n  Combat.atk of #3 = 3\n  Combat.atk of #4 = 5\n  Combat.atk of #5 = 0\n" +
                 "  contribution add 2.0 from #2\n  contribution add 1.0 from #3"));
 
             var b = w.ViewAs("B");
             Assert.That(b.Explain(castle, threat).Render(), Is.EqualTo(
                 "Defense.threat of #1 = 15\n" +
-                "  query(\"Combat\") = [#3, #5]\n" +
+                "  query(Combat) = [#3, #5]\n" +
                 "  Combat.atk of #3 = 3\n  Combat.atk of #5 = 0\n" +
                 "  contribution add 1.0 from #3\n" +
                 "  (hidden)"));
@@ -343,7 +343,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=lambda party: party)\n" +
             "def Group(party: Ref[Party], units: list[Ref[Unit]]):\n" +
             "    with preconditions:\n" +
-            "        choose(units, from_=[[u] for u in query(\"Unit\")])\n" +
+            "        choose(units, from_=[[u] for u in query(Unit)])\n" +
             "    pass\n";
 
         /// <summary>id 순으로 scout(숨김) · u1 · h(숨김) · u2. 모두 A의 유닛이다.</summary>
@@ -392,7 +392,7 @@ namespace Kesa.Engine.Tests.Runtime
                      "@command(free=True, acts_for=lambda party: party)\n" +
                      "def Concede(party: Ref[Party]):\n" +
                      "    with preconditions:\n" +
-                     "        choose(party, from_=query(\"Party\"))\n" +
+                     "        choose(party, from_=query(Party))\n" +
                      "    pass\n");
             var none = new Dictionary<string, Value>();
             IEnumerable<EntityId> Parties(LegalMoveList list) => Units(list, "party");
@@ -434,7 +434,7 @@ namespace Kesa.Engine.Tests.Runtime
                     "deftype(\"Card\")\ndeftype(\"Party\", components=[\"Label\", \"Known\"])\n",
                 defs: "Card(\"Ace\")\nParty(\"Side\")\n" +
                       "@view_policy\ndef may_see(viewer, entity, component):\n" +
-                      "    if component == \"Tricks\" or component == \"Moods\":\n" +
+                      "    if component == Tricks or component == Moods:\n" +
                       "        return entity == viewer\n" +
                       "    return entity.Label.name != \"ghost\"\n");
             var w = new World(LoadClean());
@@ -576,7 +576,8 @@ namespace Kesa.Engine.Tests.Runtime
         // ---- 닫는 쪽 (G203) ----
 
         [TestCase("    return 1\n", "it must return True or False, not int; treated as not seen")]
-        [TestCase("    return entity.Nope.x\n", "treated as not seen")]
+        // 없는 컴포넌트(entity.Nope)는 이제 로드 때 잡히므로(G308의 매개변수 타입) 실행 중 실패는 다른 것으로 낸다
+        [TestCase("    return [True][3]\n", "treated as not seen")]
         public void ABrokenPolicyHidesAndLeavesADiagnostic(string body, string expected)
         {
             NewWorld(Defs.Replace(Policies, Policies.Substring(0, Policies.IndexOf("@view_policy")) +

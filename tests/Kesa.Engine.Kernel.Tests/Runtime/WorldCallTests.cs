@@ -25,7 +25,7 @@ namespace Kesa.Engine.Tests.Runtime
             "LIMIT = 3\n" +
             "def low(u):\n    return u.Life.hp * 2 < u.Life.max_hp\n" +
             "def unit_row(u):\n    return {\"hp\": u.Life.hp, \"low\": low(u), \"owner\": u.Owner.party}\n" +
-            "def units():\n    return [u for u in query(\"Unit\")]\n" +
+            "def units():\n    return [u for u in query(Unit)]\n" +
             "def broken(u):\n    return u.Life.hp // 0\n" +
             "def forever():\n    n = 0\n    while True:\n        n += 1\n    return n\n" +
             "def heal(u):\n    u.Life.hp = u.Life.max_hp\n" +
@@ -36,7 +36,7 @@ namespace Kesa.Engine.Tests.Runtime
             // 영수증 (G246)
             "def hp(u):\n    return u.Life.hp\n" +
             "def owner_name(u):\n    return u.Owner.party.Side.name\n" +
-            "def marked():\n    return len(query(\"Unit\", \"Mark\"))\n" +
+            "def marked():\n    return len(query(Unit, Mark))\n" +
             "def clock():\n    return now()\n" +
             "@command(free=True, acts_for=None)\ndef Wreck(u: Ref[Unit]):\n    u.Life.hp = 0\n    spawn(\"Soldier\")\n    attach(u, Mark(x=1))\n    u.Life.hp // 0\n";
 

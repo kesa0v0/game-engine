@@ -44,7 +44,7 @@ namespace Kesa.Engine.Loading
         }
     }
 
-    /// <summary>엔티티. Def 타입을 모르면(<c>query("Wounded")</c>, 역방향 컬렉션의 원소) <see cref="Type"/>이 null이다.</summary>
+    /// <summary>엔티티. Def 타입을 모르면(<c>query(Wounded)</c>, 역방향 컬렉션의 원소) <see cref="Type"/>이 null이다.</summary>
     internal sealed class EntityType : StaticType
     {
         public EntityType(DefType? type, bool self = false)
@@ -120,10 +120,15 @@ namespace Kesa.Engine.Loading
     }
 
     /// <summary>
-    /// 컴포넌트·신호의 생성자 (<c>Health</c>, <c>Damaged</c>): 모드가 묶지 않은 보이는 스키마 이름이다(G230). 속성이 없다.
+    /// 로직 안의 스키마 이름 값: 컴포넌트·신호의 생성자 (<c>Health</c>, <c>Damaged</c>)와 Def 타입의 타입 값(<c>City</c>, G306).
+    /// 모드가 묶지 않은 보이는 스키마 이름이다(G230). 속성이 없다.
     /// </summary>
     internal sealed class ConstructorType : StaticType
     {
+        public const string ComponentKind = "component";
+        public const string SignalKind = "signal";
+        public const string DefTypeKind = "Def type";
+
         public ConstructorType(string name, string kind)
         {
             Name = name;
@@ -132,10 +137,27 @@ namespace Kesa.Engine.Loading
 
         public string Name { get; }
 
-        /// <summary><c>component</c>나 <c>signal</c>.</summary>
+        /// <summary><see cref="ComponentKind"/>·<see cref="SignalKind"/>·<see cref="DefTypeKind"/>.</summary>
         public string Kind { get; }
 
         public override bool Same(StaticType other) => other is ConstructorType c && c.Name == Name;
+    }
+
+    /// <summary>
+    /// 엔진이 넘긴 컴포넌트 값이나 None: 보기 정책의 <c>component</c>, 기여 줄의 <c>c.component</c> (G308). 어느 컴포넌트인지는 모른다.
+    /// 문자열 리터럴과 비교하면 늘 거짓이라 경고한다.
+    /// </summary>
+    internal sealed class ComponentValueStatic : StaticType
+    {
+        public static readonly ComponentValueStatic Instance = new ComponentValueStatic();
+        public override bool Same(StaticType other) => other == this;
+    }
+
+    /// <summary>선언에서 모였거나 저장된 기여 줄 하나 (<c>contribs()</c>의 원소, G298). 속성은 정해진 여섯이다.</summary>
+    internal sealed class ContributionStatic : StaticType
+    {
+        public static readonly ContributionStatic Instance = new ContributionStatic();
+        public override bool Same(StaticType other) => other == this;
     }
 
     /// <summary>

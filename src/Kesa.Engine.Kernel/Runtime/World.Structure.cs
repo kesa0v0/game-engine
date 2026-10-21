@@ -64,6 +64,40 @@ namespace Kesa.Engine.Runtime
             }
         }
 
+        /// <summary>
+        /// Def 타입의 타입 값: 로직 안에서 <c>query(City)</c>·<c>defs(City)</c>에 넘기고 부를 수는 없다 (G306). 부르는 것은 로드 때
+        /// 잡히고, 값을 거친 길은 여기서 막는다. 컴포넌트·신호와 같은 스키마 이름 칸이다.
+        /// </summary>
+        private void AddDefTypeValues(SortedDictionary<string, KeyValuePair<string, Value>> names)
+        {
+            foreach (var type in _schema.Types)
+            {
+                string name = type.Name;
+                names.Add(name, new KeyValuePair<string, Value>(type.Mod,
+                    new PureBuiltin(name, (p, k) => throw new ScriptRuntimeException(Codes.RunScript,
+                        "'" + name + "' is a Def type; inside a logic function it names the type and cannot be called",
+                        "create an entity with spawn(\"Def id\")")) { Kind = "Def type " + name }));
+            }
+        }
+
+        /// <summary>스키마 이름(Def 타입·컴포넌트·신호)의 값 (엔진이 스크립트에 넘길 때, G308).</summary>
+        private Value SchemaNameValue(string name) =>
+            ((WorldGlobals)Evaluator.Globals).SchemaValue(name) ??
+            throw new InvalidOperationException("'" + name + "' is not a schema name");
+
+        /// <summary>
+        /// 스키마 이름 자리의 인자(<c>query(City)</c>): 맨 이름이 뜻하는 값이면 그 이름. 문자열은 옛 표기라 오류다 (G306·G307).
+        /// </summary>
+        private string SchemaNameArgument(string function, Value value)
+        {
+            if (value is PureBuiltin b && ReferenceEquals(((WorldGlobals)Evaluator.Globals).SchemaValue(b.Name), b)) return b.Name;
+            if (value is StrValue s)
+                throw new ScriptRuntimeException(Codes.RunType, function + "() takes schema names, not strings",
+                    "write " + function + "(" + s.Value + ") without quotes (spec-gaps G306·G307)");
+            throw new ScriptRuntimeException(Codes.RunType,
+                function + "() takes Def type and component names, got " + value.KindName, "write " + function + "(City)");
+        }
+
         /// <summary><c>spawn("Def id", Component=Component(...), ...)</c>: 엔티티를 만들고 그 엔티티를 돌려준다.</summary>
         private Value Spawn(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {

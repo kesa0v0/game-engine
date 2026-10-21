@@ -1,18 +1,18 @@
 # 질병과 도시는 이름을 박아 두지 않고 Def에서 모두 돈다(defs): 확장 모드가 도시나 질병 Def를 더하면 판에 그대로 깔린다
 def game():
-    for g in query("Game"):
+    for g in query(Game):
         return g
     return None
 
 def city_of(name):
-    for c in query("City"):
+    for c in query(City):
         if c.defid == name:
             return c
     return None
 
 # 질병의 상태를 든 엔티티 (name은 질병의 전체 이름)
 def disease_of(name):
-    for d in query("Disease"):
+    for d in query(Disease):
         if d.defid == name:
             return d
     return None
@@ -31,7 +31,7 @@ def roles(p):
 # 격리 전문가는 있는 도시와 이웃을, 의무병은 있는 도시의 치료제가 있는 질병을 막는다
 def protected(city, disease):
     cured = disease_of(disease).Status.cured
-    for p in query("Player"):
+    for p in query(Player):
         at = p.At.city
         if at is None:
             continue
@@ -98,7 +98,7 @@ def eradicate(d: Ref[Disease]):
 # 규칙(커맨드·derived)은 실제 상태를 다 읽고, 걸러지는 것은 화면과 AI가 받는 쪽뿐이다.
 @view_policy
 def may_see(viewer, entity, component):
-    if component == "Face":
+    if component == Face:
         return entity.Card.pile != 0
     return True
 
@@ -106,7 +106,7 @@ def may_see(viewer, entity, component):
 
 # 버린 더미와 뽑을 더미를 합쳐 다시 섞는다 (카드 순서는 자리 값, 작을수록 위). 더미가 바닥났을 때만 쓰는 안전장치다
 def reshuffle():
-    deck = [c for c in query("InfectionCard")]
+    deck = [c for c in query(InfectionCard)]
     slots = random.sample([i for i in range(len(deck))], len(deck))
     i = 0
     for c in deck:
@@ -116,10 +116,10 @@ def reshuffle():
 
 # 뽑을 더미의 카드들. 비었으면 버린 카드를 다시 섞는다
 def infection_pile():
-    cards = [c for c in query("InfectionCard") if c.Card.pile == 0]
+    cards = [c for c in query(InfectionCard) if c.Card.pile == 0]
     if len(cards) == 0:
         reshuffle()
-        cards = [c for c in query("InfectionCard")]
+        cards = [c for c in query(InfectionCard)]
     return cards
 
 # 맨 위(자리가 가장 작은) 카드를 뽑아 버린 더미에 앞면으로 놓는다
@@ -145,9 +145,9 @@ def draw_infection_bottom():
 # 버린 더미를 섞어 뽑을 더미 맨 위에 올린다: 뽑을 더미 카드는 버린 장수만큼 아래로 밀리고, 버린 카드는 0번부터 새 자리를 받는다.
 # 어떤 도시가 위쪽에 있는지는 모두 안다(앞면으로 버렸으니). 순서만 모른다
 def intensify():
-    discard = [c for c in query("InfectionCard") if c.Card.pile == 1]
+    discard = [c for c in query(InfectionCard) if c.Card.pile == 1]
     n = len(discard)
-    for c in query("InfectionCard"):
+    for c in query(InfectionCard):
         if c.Card.pile == 0:
             c.Card.slot += n
     slots = random.sample([i for i in range(n)], n)
@@ -160,7 +160,7 @@ def intensify():
 # 감염 단계: 카드 한 장마다 연쇄가 따로다 (그래서 장마다 "이번 연쇄에서 터짐" 표시를 지운다). 졌으면 바로 멈춘다
 def infect(g):
     for i in range(g.Match.rate):
-        for c in query("City"):
+        for c in query(City):
             c.Chain.broke = False
         card = draw_infection()
         city = card.Face.city
@@ -174,7 +174,7 @@ def infect(g):
 # 버린 더미를 섞어 맨 위에 올린다
 def epidemic(g):
     g.Match.epidemics += 1
-    for c in query("City"):
+    for c in query(City):
         c.Chain.broke = False
     card = draw_infection_bottom()
     city = card.Face.city
@@ -192,7 +192,7 @@ def epidemic(g):
 
 # 플레이어 덱에서 맨 위 카드를 한 장 뽑는다. 에픽 카드면 바로 치르고 버리고, 도시 카드면 손에 든다. 덱이 비어 못 뽑았으면 False
 def draw_player(g, p):
-    cards = [c for c in query("PlayerCard") if c.Card.pile == 0]
+    cards = [c for c in query(PlayerCard) if c.Card.pile == 0]
     if len(cards) == 0:
         return False
     top = cards[0]
@@ -224,7 +224,7 @@ def discard_card(c):
 # 남은 덱(처음 손패를 나눈 뒤)을 에픽 카드 수만큼 더미로 나누고, 더미마다 에픽 카드 하나를 섞어 넣는다:
 # 에픽이 덱 전체에 고르게 퍼진다. 뒤 더미부터 처리해야 앞 더미의 새 자리가 뒤 더미를 고르는 계산에 섞이지 않는다
 def seed_epidemics():
-    rest = [c for c in query("PlayerCard") if c.Card.pile == 0]
+    rest = [c for c in query(PlayerCard) if c.Card.pile == 0]
     n = len(rest)
     base = rest[0].Card.slot
     for c in rest:
@@ -247,9 +247,9 @@ def seed_epidemics():
 def Start():
     with preconditions:
         require(game() is None, text("pandemic-already-started"))
-    for name in defs("Disease"):
+    for name in defs(Disease):
         spawn(name)
-    cities = defs("City")
+    cities = defs(City)
     for name in cities:
         spawn(name)
     # 카드는 섞은 순서로 만든다: 엔티티 번호 순서가 어느 도시인지를 드러내면 안 된다 (안내서 7장의 알려진 한계)
@@ -332,7 +332,7 @@ def BuildStation(player: Ref[Player], card: Ref[PlayerCard] | None):
 def Treat(player: Ref[Player], disease: DefId[Disease]):
     with preconditions:
         require(player.Actions.left > 0, text("pandemic-no-actions"))
-        choose(disease, from_=[d for d in defs("Disease") if player.At.city.Cubes[d].count > 0])
+        choose(disease, from_=[d for d in defs(Disease) if player.At.city.Cubes[d].count > 0])
     row = player.At.city.Cubes[disease]
     if disease_of(disease).Status.cured or any(r.treat_all for r in roles(player)):
         row.count = 0
@@ -351,7 +351,7 @@ def DiscoverCure(player: Ref[Player], disease: DefId[Disease]):
     with preconditions:
         require(player.Actions.left > 0, text("pandemic-no-actions"))
         require(player.At.city.Research.station, text("pandemic-needs-station"))
-        choose(disease, from_=[d for d in defs("Disease") if len(cards_of(player, d)) >= player.Cure.cards and not disease_of(d).Status.cured])
+        choose(disease, from_=[d for d in defs(Disease) if len(cards_of(player, d)) >= player.Cure.cards and not disease_of(d).Status.cured])
     for k in range(player.Cure.cards):
         best = None
         for c in cards_of(player, disease):

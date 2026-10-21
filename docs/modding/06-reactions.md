@@ -30,7 +30,7 @@ def insurance(ship, house):
 # 틱마다 항구의 날짜가 간다
 @on(Tick)
 def market_day():
-    for h in query("Harbor"):
+    for h in query(Harbor):
         h.Port.day += 1
 ```
 

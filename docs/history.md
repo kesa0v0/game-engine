@@ -1064,3 +1064,14 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **`brink`:** 도시 둘과 이웃 패치(`defs/map.py`), 제너럴리스트 `Role("Generalist", grants=[contrib("Actions.per_turn", "add", 1)])`(`defs/roles.py`), en·ko 도시 이름.
 - **알게 된 것:** 확장이 보너스를 걸려면 코어가 그 값을 `derived`로 열어 둬야 한다(엔진 구멍이 아니라 코어 모드의 설계). 이름을 박은 목록은 확장을 조용히 무시한다.
 - **테스트:** `DefDataTests`에 `defs` 4개(5케이스: 로드 순서·의존하지 않는 모드·abstract, 리터럴 타입 오타와 컴포넌트 이름, 실행 중 모르는 타입, 맨 문자열 비교 경고). `PandemicTests`는 코어 모드만 읽게(`Load(out, 모드들)`), 새 `BrinkTests` 5개(둘 다 깨끗이 로드, 새 도시와 카드, 패치한 이웃이 양쪽, 새 도시로 이동, 제너럴리스트 5행동).
+
+## 이름 쓰는 원칙 구현 (G306~G308, 2026-10-22)
+
+- **원칙:** 선언에서 새로 짓는 이름은 문자열, 로직 안에서 이미 있는 스키마 이름(Def 타입·컴포넌트·신호)은 맨 이름, Def id는 어디서나 문자열. `query(City)`, `query(Unit, Wounded)`, `defs(City)`, `component == Face`.
+- **Def 타입 값(G306):** 실행 중 전역(`WorldGlobals`)에 보이는 Def 타입마다 부를 수 없는 순수 내장 값(`World.AddDefTypeValues`, 저장 태그는 기존 `schema`)을 둔다. 로드 때 이름 검사(`FunctionNameChecker`)는 Def 타입 이름을 보이는 스키마 이름으로 치고(`DefBuiltins.IsVisibleDefTypeName`), 함수 안에서 부르면 `EVL003` "'T' is a Def type; inside a logic function it names the type and cannot be called". 로드 시점의 `City("x")` 선언은 그대로. 속성 검사기는 Def 타입 이름을 `ConstructorType`(`DefTypeKind`)으로 보고 `City.x`는 오류(엔티티나 `defdata`로 읽으라는 힌트).
+- **문자열은 오류(G307):** `query("X")`·`defs("X")`의 리터럴은 로드 때 `EVL003` "takes schema names, not strings"와 "write query(X) without quotes", 실행 중 문자열은 `RUN005` 같은 글(`World.SchemaNameArgument`). 리터럴 이름 확인은 이름 검사로 옮겨 오타는 `EVL001`("혹시 …?"), 안 보이는 이름은 `SCH003`. 데이터 전용 타입·신호·두 Def 타입은 여전히 ⑤ 링크(`LNK001`·`LNK002`). Explain의 `query(...)` 줄도 맨 이름으로.
+- **컴포넌트 값(G308):** 보기 정책의 `component`와 기여 줄의 `c.component`가 `SchemaNameValue(이름)`(로직의 맨 이름과 같은 값). 속성 검사기는 정책의 매개변수를 엔티티·엔티티·컴포넌트 값으로, `contribs()`의 원소를 `ContributionStatic`(속성 여섯, 다른 이름은 오류)으로 보며, 컴포넌트 값이나 스키마 이름을 문자열 리터럴과 `==`/`!=`로 비교하면 새 경고 `EVL009`(`Codes.EvlSchemaNameString`). 정책 매개변수 타입이 생겨 `entity.Nope.x`도 로드 때 잡힘.
+- **스텁:** 모드 스텁 `def query(name: type[T], /, *more: type[Any]) -> list[T]` 겹침, `def defs(t: type[Any], /)`, 스키마 스텁 `query(*names: type[Any])`, 기여 줄 `component: type[Any] | None`.
+- **일괄 고침:** 파이썬 스크립트(따옴표 없는 식별자 리터럴만 `query(...)`/`defs(...)` 안과 `component ==/!= "X"`에서 맨 이름으로, UTF-8·BOM·줄 끝 유지)로 샘플·테스트·벤치·안내서 33개 파일. 결정 기록(`spec-gaps`·`gaps/`·`history`·`spine-spec`)은 건드리지 않음. 오류 글을 확인하는 테스트는 손으로 고침.
+- **안내서:** 3장 "이름 쓰는 법" 표, 내장 표의 `query(타입, 컴포넌트...)`·`defs`·`defdata`, 기여 줄의 `component`, 7장 `may_see`의 `component`, 1장 경고 목록에 `EVL009`.
+- **테스트:** 새 `SchemaNameValueTests` 7개(맨 이름 비교 깨끗함, 정책·기여 줄의 문자열 비교 경고, 이름 오타, 기여 줄 속성 오타, Def 타입 이름의 속성), `DefDataTests`(문자열·맨 이름 오타·컴포넌트 이름 로드 검사, 실행 중 문자열과 컴포넌트 값, Def 타입 값을 변수로, 멈춘 Flow가 든 Def 타입 값 저장), `ContentLoaderTests`(함수 안에서 Def 타입 부르기), `WorldQueryTests`(실행 중 문자열·이름 값). 샘플 `check` 세 곳 오류·경고 0.

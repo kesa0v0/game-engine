@@ -213,19 +213,24 @@ namespace Kesa.Engine.Loading
         }
 
         /// <summary>
-        /// 이 모드에 보이는 컴포넌트나 신호 이름인가. 컴포넌트 값 생성자(spec-gaps G134)와 신호 값 생성자(G145)는 로직 함수에서 쓴다.
+        /// 이 모드에 보이는 Def 타입·컴포넌트·신호 이름 (함수 본문의 이름 오타에 "혹시 …?" 후보로 쓴다). 로직 안에서 Def 타입 이름은
+        /// 부를 수 없는 타입 값이다 (spec-gaps G306).
         /// </summary>
-        /// <summary>이 모드에 보이는 컴포넌트와 신호 이름 (함수 본문의 이름 오타에 "혹시 …?" 후보로 쓴다).</summary>
         public IEnumerable<string> RuntimeSchemaNames
         {
             get
             {
+                foreach (var t in _schema.Types)
+                    if (_visibility.CanSee(_mod, t.Mod)) yield return t.Name;
                 foreach (var c in _schema.Components)
                     if (_visibility.CanSee(_mod, c.Mod)) yield return c.Name;
                 foreach (var s in _schema.Signals)
                     if (_visibility.CanSee(_mod, s.Mod)) yield return s.Name;
             }
         }
+
+        /// <summary>이 모드에 보이는 Def 타입 이름인가 (로직 안의 <c>City(...)</c> 호출은 <c>spawn</c> 안내, G306).</summary>
+        public bool IsVisibleDefTypeName(string name) => _schema.TryGetType(name, out var t) && _visibility.CanSee(_mod, t.Mod);
 
         /// <summary>이 모드에 보이는 컴포넌트·신호 이름의 값 (모드 이름 공간의 스키마 칸, G230). 아니면 null.</summary>
         public Value? SchemaName(string name)
@@ -235,7 +240,9 @@ namespace Kesa.Engine.Loading
             return null;
         }
 
+        /// <summary>로직 함수에서 쓸 수 있는 스키마 이름인가: 보이는 Def 타입(타입 값, G306)·컴포넌트(G134)·신호(G145).</summary>
         public bool IsVisibleRuntimeSchemaName(string name) =>
+            IsVisibleDefTypeName(name) ||
             (_schema.TryGetComponent(name, out var c) && _visibility.CanSee(_mod, c.Mod)) ||
             (_schema.TryGetSignal(name, out var s) && _visibility.CanSee(_mod, s.Mod));
 

@@ -125,11 +125,11 @@ namespace Kesa.Engine.Tests.Loading
             // 그 뒤에 모드와 무관한 로직 이름(아래 테스트), 그리고 Def 타입별 query·spawn
             const string lookups =
                 "@overload\n" +
-                "def query(name: Literal[\"Resource\"], /, *more: str) -> list[Resource]: ...\n" +
+                "def query(name: type[Resource], /, *more: type[Any]) -> list[Resource]: ...\n" +
                 "@overload\n" +
-                "def query(name: Literal[\"Unit\"], /, *more: str) -> list[Unit]: ...\n" +
+                "def query(name: type[Unit], /, *more: type[Any]) -> list[Unit]: ...\n" +
                 "@overload\n" +
-                "def query(name: str, /, *more: str) -> list[Any]: ...\n" +
+                "def query(name: type[Any], /, *more: type[Any]) -> list[Any]: ...\n" +
                 "@overload\n" +
                 "def spawn(def_id: Literal[\"Wood\", \"Iron\", \"core:Wood\", \"core:Iron\"], /, **components: Any) -> Resource: ...\n" +
                 "@overload\n" +
@@ -142,7 +142,7 @@ namespace Kesa.Engine.Tests.Loading
                 "    Resource: _Resource_consts | None\n" +
                 "    Unit: _Unit_consts | None\n" +
                 "def defdata(id: str, /) -> _DefData: ...\n" +
-                "def defs(type: Literal[\"Resource\", \"Unit\"], /) -> list[str]: ...\n" +
+                "def defs(t: type[Any], /) -> list[str]: ...\n" +
                 "\n" +
                 "def Mod(*, id: str, version: str = ..., defaultLanguage: str = ..., dependencies: list[str] = ..., " +
                 "loadAfter: list[str] = ..., optional: list[str] = ...) -> None: ...\n" +
@@ -246,7 +246,7 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(stub, Does.Contain("    def ratio(self) -> int | float: ...\n"));
             Assert.That(stub, Does.Contain("    def label(self) -> str: ...\n"));
             Assert.That(stub, Does.Not.Contain("-> fixed").And.Not.Contain("-> TextKey"));
-            Assert.That(stub, Does.Not.Contain("def query(name: Literal"), "query stays loose in schema files");
+            Assert.That(stub, Does.Not.Contain("def query(name: type[Health]"),"query stays loose in schema files");
             // ②에서 실패해 선언을 모르는 모드는 모드와 무관한 것만
             Assert.That(StubGenerator.GenerateSchema("nope", result), Is.EqualTo(StubGenerator.GenerateSchema()));
         }

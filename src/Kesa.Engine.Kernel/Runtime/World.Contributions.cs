@@ -606,7 +606,8 @@ namespace Kesa.Engine.Runtime
                     case "op": return new StrValue(_op);
                     case "value": return new FixedValue(_amount);
                     case "source": return new EntityView(_world, new EntityId(_source));
-                    case "component": return new StrValue(_component);
+                    // 맨 이름 Traits가 뜻하는 것과 같은 컴포넌트 값 (G308)
+                    case "component": return _world.SchemaNameValue(_component);
                     case "key": return _key == null ? (Value)NoneValue.Instance : new StrValue(_key);
                 }
                 throw NoAttribute(name);

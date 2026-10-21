@@ -15,18 +15,18 @@ def infection_rate(m):
 
 # 이 질병의 큐브가 지금 보드(모든 도시)에 몇 개 있나. 도시들을 건너 읽는 derived다
 def board_cubes(s):
-    return sum([c.Cubes[s.entity.defid].count for c in query("City")])
+    return sum([c.Cubes[s.entity.defid].count for c in query(City)])
 
 def cube_supply(s):
     return CUBE_SUPPLY - s.on_board
 
 # 폭발이 한도에 닿거나, 덱이 바닥나거나, 어느 질병이든 큐브가 모자라면 진다
 def is_lost(m):
-    return m.outbreaks >= OUTBREAK_LIMIT or m.deck_out or any(d.Status.supply < 0 for d in query("Disease"))
+    return m.outbreaks >= OUTBREAK_LIMIT or m.deck_out or any(d.Status.supply < 0 for d in query(Disease))
 
 # 모든 질병의 치료제를 찾으면 이긴다
 def is_won(m):
-    return all(d.Status.cured for d in query("Disease"))
+    return all(d.Status.cured for d in query(Disease))
 
 def is_over(m):
     return m.lost or m.won

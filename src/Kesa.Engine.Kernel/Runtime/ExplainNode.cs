@@ -53,9 +53,8 @@ namespace Kesa.Engine.Runtime
 
         internal static ExplainNode Query(IReadOnlyList<string> names, ListValue result)
         {
-            var quoted = new List<string>();
-            foreach (var n in names) quoted.Add("\"" + n + "\"");
-            return new ExplainNode(ExplainKind.Query, default, "", null, string.Join(", ", quoted), result, new List<ExplainNode>())
+            // 스크립트에 쓰는 대로 맨 이름이다 (G306)
+            return new ExplainNode(ExplainKind.Query, default, "", null, string.Join(", ", names), result, new List<ExplainNode>())
             {
                 Names = names,
             };

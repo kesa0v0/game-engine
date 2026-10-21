@@ -37,7 +37,7 @@ namespace Kesa.Engine.Script
         /// </summary>
         public const string DefDataName = "defdata";
 
-        /// <summary>한 Def 타입의 Def들의 전체 id 목록 (spec-gaps G305): <c>for name in defs("City")</c>. 런타임이 더한다.</summary>
+        /// <summary>한 Def 타입의 Def들의 전체 id 목록 (spec-gaps G305): <c>for name in defs(City)</c>. 런타임이 더한다.</summary>
         public const string DefsName = "defs";
 
         /// <summary>월드의 구조를 바꾸는 내장 (spec-gaps G134, int 키 줄 헬퍼는 G129). 몸체는 월드가 준다.</summary>

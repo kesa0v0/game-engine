@@ -249,8 +249,6 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         [TestCase("def f(h) -> int:\n    return field\n", "field")]
-        // 컴포넌트 값 생성자(C(hp=1))는 로직에서도 쓰는 이름이다 (G134). Def 생성자는 로드 시점에만 있다
-        [TestCase("def f(h) -> int:\n    return T(\"x\")\ndeftype(\"T\")\n", "T")]
         [TestCase("def f(h) -> int:\n    patch.set(\"X\", \"n\", 1)\n    return 1\n", "patch")]
         [TestCase("def f(h) -> int:\n    return int(h)\n", "int")]
         public void LoadTimeNamesInAFunctionBodyAreExplained(string schema, string name)
@@ -261,6 +259,19 @@ namespace Kesa.Engine.Tests.Loading
             var d = diags.Single(x => x.Code == Codes.EvlUnknownName);
             Assert.That(d.Message, Is.EqualTo("'" + name + "' is only available while content files load, not inside a logic function"));
             Assert.That(d.Hint, Does.Contain("contribs"));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
+        }
+
+        [Test]
+        public void ADefTypeCannotBeCalledInsideALogicFunction()
+        {
+            // 로직 안의 Def 타입 이름은 타입 값이다(G306). 부르면 Def 선언이 아니라 오류다
+            Mod("core", schema: "def f(h) -> int:\n    return T(\"x\")\ndeftype(\"T\")\n");
+            var result = Load(out var diags);
+            var d = diags.Single(x => x.Severity == Severity.Error);
+            Assert.That(d.Code, Is.EqualTo(Codes.EvlArguments));
+            Assert.That(d.Message, Is.EqualTo("'T' is a Def type; inside a logic function it names the type and cannot be called"));
+            Assert.That(d.Hint, Does.Contain("spawn(\"Def id\")"));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
         }
 

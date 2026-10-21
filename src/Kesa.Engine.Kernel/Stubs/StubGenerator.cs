@@ -80,7 +80,7 @@ namespace Kesa.Engine.Stubs
             "    op: str\n" +
             "    value: Any\n" +
             "    source: Any\n" +
-            "    component: str | None\n" +
+            "    component: type[Any] | None\n" +
             "    key: str | None\n" +
             "def contribs(component: Any, member: str, /) -> list[Contribution]: ...\n" +
             "def now() -> int: ...\n" +
@@ -199,10 +199,10 @@ namespace Kesa.Engine.Stubs
             "\n" +
             // derived 함수가 쓰는 순수 내장 (G207). 스키마 파일은 모드와 무관하므로 query는 느슨하게
             PureNames +
-            "def query(*names: str) -> list[Any]: ...\n" +
+            "def query(*names: type[Any]) -> list[Any]: ...\n" +
             "def defid(name: str, /) -> str: ...\n" +
             "def defdata(id: str, /) -> Any: ...\n" +
-            "def defs(type: str, /) -> list[str]: ...\n" +
+            "def defs(t: type[Any], /) -> list[str]: ...\n" +
             ContribNames;
 
         /// <summary>선언 보너스 (G295~G297): 스키마 파일(기본값)과 Def 파일에서 쓴다. 로직에서는 <c>add_contrib</c>를 쓴다.</summary>
@@ -689,13 +689,14 @@ namespace Kesa.Engine.Stubs
                 var types = new List<DefType>();
                 foreach (var t in _schema.Types)
                     if (Sees(t.Mod)) types.Add(t);
+                // 출처는 맨 이름이다: 클래스를 받아 pyright가 결과 타입을 안다 (G306)
                 foreach (var t in types)
                 {
                     Line("@overload");
-                    Line("def query(name: " + Literal(new List<string> { t.Name }) + ", /, *more: str) -> list[" + t.Name + "]: ...");
+                    Line("def query(name: type[" + t.Name + "], /, *more: type[Any]) -> list[" + t.Name + "]: ...");
                 }
                 if (types.Count > 0) Line("@overload");
-                Line("def query(name: str, /, *more: str) -> list[Any]: ...");
+                Line("def query(name: type[Any], /, *more: type[Any]) -> list[Any]: ...");
 
                 var spawnable = new List<DefType>();
                 foreach (var t in types)
@@ -726,8 +727,8 @@ namespace Kesa.Engine.Stubs
                 }
                 if (typeNames.Count == 0) Line("    ...");
                 Line("def defdata(id: str, /) -> _DefData: ...");
-                // defs(): 그 타입의 Def 전체 id 목록 (G305)
-                Line("def defs(type: " + (typeNames.Count == 0 ? "Never" : Literal(typeNames)) + ", /) -> list[str]: ...");
+                // defs(City): 그 타입의 Def 전체 id 목록 (G305·G306)
+                Line("def defs(t: type[Any], /) -> list[str]: ...");
                 Line();
             }
 
