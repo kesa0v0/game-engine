@@ -3,6 +3,7 @@ pandemic-no-actions = 이번 차례의 행동을 다 썼습니다.
 pandemic-turn = 차례
 pandemic-discard = 손패 한도까지 버리세요
 pandemic-has-station = 이 도시에는 이미 연구소가 있습니다.
+pandemic-needs-station = 이 도시에 연구소가 있어야 합니다.
 
 def-pandemic-Alice = 앨리스
 def-pandemic-Bob = 밥

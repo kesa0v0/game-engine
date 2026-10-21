@@ -43,6 +43,8 @@ namespace Kesa.Engine.ConsoleHost.Tests
             _bob = _w.All("Player").Single(p => _w.DefOf(p) == "pandemic:Bob");
             _w.Seat(_alice, "alice");
             _w.Seat(_bob, "bob");
+            // 에픽 카드는 따로 시험한다: 다른 시험이 감염 상태를 건드리지 않게 먼저 버려 둔다
+            foreach (var card in Epidemics()) _w.Set(card, _w.Member("Card", "pile"), new IntValue(1));
         }
 
         private string CityOf(EntityId player)
@@ -296,12 +298,15 @@ namespace Kesa.Engine.ConsoleHost.Tests
 
         private IEnumerable<EntityId> PlayerCards() => _w.All("PlayerCard");
 
+        private IEnumerable<EntityId> Epidemics() =>
+            _w.All("PlayerCard").Where(c => ((BoolValue)_w.Get(c, _w.Member("Face", "epidemic"))).Value);
+
         private long PileOf(EntityId card) => ((IntValue)_w.Get(card, _w.Member("Card", "pile"))).Value;
 
         private string FaceCity(EntityId card)
         {
-            var city = (EntityValue)_w.Get(card, _w.Member("Face", "city"));
-            return _w.DefOf(city.Id).Substring("pandemic:".Length);
+            var city = _w.Get(card, _w.Member("Face", "city")) as EntityValue;
+            return city == null ? "" : _w.DefOf(city.Id).Substring("pandemic:".Length);
         }
 
         private List<EntityId> HandOf(EntityId player) =>
@@ -418,15 +423,172 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(Cubes("Atlanta", "Blue"), Is.EqualTo(1));
             Assert.That(Left(_alice), Is.EqualTo(3));
         }
-        [Test]
-        public void TooManyOutbreaksLoseTheGame()
+        // ---- 에픽, 치료제, 박멸, 승리 (4b조각) ----
+
+        private EntityId Disease(string name) => _w.All("Disease").Single(e => _w.DefOf(e) == "pandemic:" + name);
+
+        private IValueAccess Status(string disease, string member) => new IValueAccess(_w, Disease(disease), member);
+
+        private sealed class IValueAccess
         {
-            foreach (var city in _w.All("City"))
-                foreach (var d in new[] { "Blue", "Yellow" })
-                    _w.SetRow(city, _w.Member("Cubes", "count"), "pandemic:" + d, new IntValue(3));
+            private readonly World _w;
+            private readonly EntityId _id;
+            private readonly string _member;
+
+            public IValueAccess(World w, EntityId id, string member)
+            {
+                _w = w;
+                _id = id;
+                _member = member;
+            }
+
+            public bool Bool => ((BoolValue)_w.Get(_id, _w.Member("Status", _member))).Value;
+            public long Int => ((IntValue)_w.Get(_id, _w.Member("Status", _member))).Value;
+            public void Set(Value v) => _w.Set(_id, _w.Member("Status", _member), v);
+        }
+
+        private void Station(string city) =>
+            _w.Set(City(city), _w.Member("Research", "station"), BoolValue.True);
+
+        private AnswerResult Cure(string disease) =>
+            Act("alice", "DiscoverCure", ("player", new EntityValue(_alice)), ("disease", new StrValue("pandemic:" + disease)));
+
+        private static readonly string[] BlueCities = { "Atlanta", "Chicago", "Montreal", "NewYork", "Washington" };
+        private static readonly string[] YellowCities = { "LosAngeles", "MexicoCity", "Miami", "Bogota", "Lima" };
+
+        [Test]
+        public void EpidemicCardsAreSpreadThroughTheDeck()
+        {
+            var w = new World(Load(out _), seed: 3);
+            Assert.That(w.Submit("host", "pandemic.Start", new Dictionary<string, Value>()).Succeeded, Is.True);
+            var deck = w.All("PlayerCard").Where(c => ((IntValue)w.Get(c, w.Member("Card", "pile"))).Value == 0)
+                .OrderBy(c => ((IntValue)w.Get(c, w.Member("Card", "slot"))).Value).ToList();
+            var flags = deck.Select(c => ((BoolValue)w.Get(c, w.Member("Face", "epidemic"))).Value).ToList();
+            Assert.That(flags, Has.Count.EqualTo(6)); // 도시 카드 네 장과 에픽 둘
+            Assert.That(flags.Take(3).Count(f => f), Is.EqualTo(1));
+            Assert.That(flags.Skip(3).Count(f => f), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AnEpidemicRaisesTheRateInfectsTheBottomAndIntensifies()
+        {
+            ClearCubes();
+            // 감염 덱: 뽑을 더미에 립마(위)와 시카고(맨 밑)만, 나머지는 버린 더미
+            DrawOnly("Lima", "Chicago");
+            _w.Set(Cards().Single(c => CardCity(c) == "Lima"), _w.Member("Card", "slot"), new IntValue(0));
+            _w.Set(Cards().Single(c => CardCity(c) == "Chicago"), _w.Member("Card", "slot"), new IntValue(1));
+            SetCubes("Chicago", "Blue", 1);
+            var epidemic = Epidemics().First();
+            _w.Set(epidemic, _w.Member("Card", "pile"), new IntValue(0));
+            _w.Set(epidemic, _w.Member("Card", "slot"), new IntValue(-1)); // 플레이어 덱 맨 위
             Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
-            Assert.That(Outbreaks(), Is.EqualTo(12)); // 첫 카드의 연쇄가 지도 전체를 훑고, 졌으니 둘째 카드는 뽑지 않는다
-            Assert.That(((BoolValue)_w.Get(Game(), _w.Member("Match", "lost"))).Value, Is.True);
+            Assert.That(((IntValue)_w.Get(Game(), _w.Member("Match", "epidemics"))).Value, Is.EqualTo(1));
+            Assert.That(Cubes("Chicago", "Blue"), Is.EqualTo(3)); // 큐브가 있던 도시: 3개로 채우고 터짐
+            Assert.That(Outbreaks(), Is.GreaterThanOrEqualTo(1));
+            Assert.That(PileOf(epidemic), Is.EqualTo(1)); // 에픽은 손에 들지 않고 버려짐
+            // 버린 더미 열한 장이 섞여 맨 위에 올라가고, 립마는 그 밑에 남았다
+            var lima = Cards().Single(c => CardCity(c) == "Lima");
+            Assert.That(((IntValue)_w.Get(lima, _w.Member("Card", "slot"))).Value, Is.EqualTo(11));
+            Assert.That(((IntValue)_w.Get(lima, _w.Member("Card", "pile"))).Value, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ACureNeedsAStationAndFiveCardsOfTheColor()
+        {
+            foreach (var name in BlueCities) Give(name, _alice);
+            Assert.That(Cure("Blue").Succeeded, Is.False); // 연구소가 없다
+            Station("Atlanta");
+            Assert.That(Cure("Yellow").Succeeded, Is.False); // 노랑 카드가 모자라다
+            Assert.That(Cure("Blue").Succeeded, Is.True);
+            Assert.That(Status("Blue", "cured").Bool, Is.True);
+            // 파랑 도시 카드는 여섯 장이라 손에 여섯 번째 파랑 카드가 있을 수 있다: 다섯 장만 버려진다
+            var blue = new[] { "Atlanta", "Chicago", "Montreal", "NewYork", "Washington", "SanFrancisco" };
+            Assert.That(PlayerCards().Count(c => blue.Contains(FaceCity(c)) && PileOf(c) == 1), Is.EqualTo(5));
+            Assert.That(Left(_alice), Is.EqualTo(3));
+        }
+
+        [Test]
+        public void ACuredDiseaseIsTreatedAllAtOnce()
+        {
+            ClearCubes();
+            SetCubes("Atlanta", "Blue", 3);
+            Status("Blue", "cured").Set(BoolValue.True);
+            Assert.That(Act("alice", "Treat", ("player", new EntityValue(_alice)), ("disease", new StrValue("pandemic:Blue"))).Succeeded, Is.True);
+            Assert.That(Cubes("Atlanta", "Blue"), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ACuredDiseaseWithNoCubesLeftIsEradicatedAndStopsSpreading()
+        {
+            ClearCubes();
+            SetCubes("Atlanta", "Blue", 1);
+            Assert.That(Status("Blue", "on_board").Int, Is.EqualTo(1));
+            Status("Blue", "cured").Set(BoolValue.True);
+            Assert.That(Status("Blue", "eradicated").Bool, Is.False);
+            Assert.That(Act("alice", "Treat", ("player", new EntityValue(_alice)), ("disease", new StrValue("pandemic:Blue"))).Succeeded, Is.True);
+            Assert.That(Status("Blue", "eradicated").Bool, Is.True); // @when이 큐브가 0이 된 것을 보고 박멸을 적는다
+            DrawOnly("Chicago", "Lima");
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            Assert.That(Cubes("Chicago", "Blue"), Is.EqualTo(0)); // 박멸한 질병은 더 안 퍼진다
+            Assert.That(Cubes("Lima", "Yellow"), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void NoCubesWithoutACureIsNotEradication()
+        {
+            ClearCubes();
+            Assert.That(Move("alice", _alice, "pandemic:Chicago").Succeeded, Is.True);
+            Assert.That(Status("Blue", "eradicated").Bool, Is.False);
+        }
+
+        [Test]
+        public void CuringBothDiseasesWinsTheGame()
+        {
+            Status("Blue", "cured").Set(BoolValue.True);
+            Station("Atlanta");
+            foreach (var name in YellowCities) Give(name, _alice);
+            Assert.That(((BoolValue)_w.Get(Game(), _w.Member("Match", "won"))).Value, Is.False);
+            Assert.That(Cure("Yellow").Succeeded, Is.True);
+            Assert.That(((BoolValue)_w.Get(Game(), _w.Member("Match", "won"))).Value, Is.True);
+            Assert.That(_w.OpenRequests, Is.Empty);
+        }
+
+        [Test]
+        public void TheBoardAndSupplyCountsAreDerived()
+        {
+            ClearCubes();
+            SetCubes("Atlanta", "Blue", 2);
+            SetCubes("Chicago", "Blue", 1);
+            Assert.That(Status("Blue", "on_board").Int, Is.EqualTo(3));
+            Assert.That(Status("Blue", "supply").Int, Is.EqualTo(13));
+            Assert.That(Status("Yellow", "on_board").Int, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void RunningOutOfCubesLosesTheGame()
+        {
+            ClearCubes();
+            foreach (var name in BlueCities.Concat(new[] { "SanFrancisco" })) SetCubes(name, "Blue", 3);
+            Assert.That(Status("Blue", "supply").Int, Is.EqualTo(-2));
+            Assert.That(Lost(), Is.True);
+        }
+
+        private bool Lost() => ((BoolValue)_w.Get(Game(), _w.Member("Match", "lost"))).Value;
+
+        [Test]
+        public void TheEighthOutbreakLosesTheGame()
+        {
+            ClearCubes();
+            _w.Set(Game(), _w.Member("Match", "outbreaks"), new IntValue(7));
+            SetCubes("Atlanta", "Blue", 3);
+            DrawOnly("Atlanta", "SaoPaulo");
+            var top = Cards().Single(c => CardCity(c) == "Atlanta"); // 애틀랜타 카드가 맨 위
+            _w.Set(top, _w.Member("Card", "slot"), new IntValue(-1));
+            Assert.That(Lost(), Is.False);
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            Assert.That(Outbreaks(), Is.EqualTo(8)); // 졌으니 둘째 카드는 뽑지 않는다
+            Assert.That(Lost(), Is.True);
+            Assert.That(Cubes("SaoPaulo", "Yellow"), Is.EqualTo(0));
             Assert.That(_w.OpenRequests, Is.Empty);
         }
     }

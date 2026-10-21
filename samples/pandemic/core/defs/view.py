@@ -4,7 +4,7 @@ def status(me):
     if g is None:
         return "준비 중"
     return {"turn": g.Match.turn, "you": me, "left": me.Actions.left, "outbreaks": g.Match.outbreaks,
-            "rate": g.Match.rate, "lost": g.Match.lost}
+            "rate": g.Match.rate, "lost": g.Match.lost, "won": g.Match.won}
 
 def players(me):
     return [{"player": p, "at": p.At.city.defid, "left": p.Actions.left} for p in query("Player")]
@@ -26,3 +26,9 @@ def hands(me):
 
 def player_deck(me):
     return {"draw": len([c for c in query("PlayerCard") if c.Card.pile == 0])}
+
+# 질병의 상태: 치료제, 박멸, 보드 위 큐브, 남은 큐브
+def diseases(me):
+    return [{"disease": d.defid, "cured": d.Status.cured, "eradicated": d.Status.eradicated,
+             "on_board": d.Status.on_board, "supply": d.Status.supply}
+            for d in query("Disease")]

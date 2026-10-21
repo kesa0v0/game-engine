@@ -4,14 +4,31 @@
 RATES = [2, 2, 2, 3, 3, 4, 4]
 OUTBREAK_LIMIT = 8
 HAND_LIMIT = 7
+CUBE_SUPPLY = 16   # 질병마다 큐브 수. 실제 판은 24개인데 도시가 12개라 줄였다
+CURE_CARDS = 5     # 치료제에 필요한 같은 색 도시 카드 수
+EPIDEMICS = 2      # 플레이어 덱에 섞는 에픽 카드 수
 
 # 감염 속도: 에픽 카드를 뽑은 수에 따라 2,2,2,3,3,4,4
 def infection_rate(m):
     return RATES[min(m.epidemics, 6)]
 
-# 폭발이 한도에 닿으면 진다
+# 이 질병의 큐브가 지금 보드(모든 도시)에 몇 개 있나. 도시들을 건너 읽는 derived다
+def board_cubes(s):
+    return sum([c.Cubes[s.entity.defid].count for c in query("City")])
+
+def cube_supply(s):
+    return CUBE_SUPPLY - s.on_board
+
+# 폭발이 한도에 닿거나, 덱이 바닥나거나, 어느 질병이든 큐브가 모자라면 진다
 def is_lost(m):
-    return m.outbreaks >= OUTBREAK_LIMIT or m.deck_out
+    return m.outbreaks >= OUTBREAK_LIMIT or m.deck_out or any(d.Status.supply < 0 for d in query("Disease"))
+
+# 모든 질병의 치료제를 찾으면 이긴다
+def is_won(m):
+    return all(d.Status.cured for d in query("Disease"))
+
+def is_over(m):
+    return m.lost or m.won
 
 def hand_size(h):
     return len(h.entity.hand)
@@ -30,7 +47,10 @@ component("At", city=ref("City", optional=True, inverse="here"))
 component("Actions", left=field(int, default=4))
 component("Order", next=ref("Player", optional=True))
 component("Match", turn=field(int, default=1), outbreaks=field(int, default=0), epidemics=field(int, default=0), deck_out=field(bool, default=False),
-    rate=derived(int, infection_rate), lost=derived(bool, is_lost))
+    rate=derived(int, infection_rate), lost=derived(bool, is_lost), won=derived(bool, is_won), over=derived(bool, is_over))
+# 질병의 상태: 치료제를 찾았나, 박멸했나(치료제가 있고 보드에 큐브가 없음), 보드 위 큐브와 남은 큐브
+component("Status", cured=field(bool, default=False), eradicated=field(bool, default=False),
+    on_board=derived(int, board_cubes), supply=derived(int, cube_supply))
 component("Research", station=field(bool, default=False))
 # 질병마다 한 줄(키 컴포넌트). 큐브는 한 도시에 같은 질병이 3개까지다
 component("Cubes", key="Disease", count=field(int, default=0, min=0, max=3))
@@ -46,7 +66,7 @@ component("Held", holder=ref("Player", optional=True, inverse="hand"))
 component("Hand", size=derived(int, hand_size), over=derived(bool, hand_over))
 signal("Outbreak", city=Ref["City"])
 
-deftype("Disease")
+deftype("Disease", components=["Status"])
 deftype("City", components=["Research", "Cubes", "Chain", "Load"], disease=const(DefId["Disease"]), neighbors=const(list[DefId["City"]]))
 deftype("Player", components=["Order", "At", "Actions", "Hand", "Seatable"])
 deftype("Game", components=["Match"])

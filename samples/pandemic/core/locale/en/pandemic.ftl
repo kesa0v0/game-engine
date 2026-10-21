@@ -3,6 +3,7 @@ pandemic-no-actions = No actions left this turn.
 pandemic-turn = Your turn
 pandemic-discard = Discard down to the hand limit
 pandemic-has-station = This city already has a research station.
+pandemic-needs-station = You need a research station here.
 
 def-pandemic-Alice = Alice
 def-pandemic-Bob = Bob
