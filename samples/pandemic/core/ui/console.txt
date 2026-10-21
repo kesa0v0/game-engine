@@ -1,0 +1,4 @@
+# 콘솔 호스트가 자리마다 차례로 부른다. 인자는 그 자리가 앉은 플레이어
+pandemic.status
+pandemic.players
+pandemic.map_rows

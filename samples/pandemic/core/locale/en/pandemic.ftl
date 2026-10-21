@@ -1,0 +1,19 @@
+pandemic-already-started = The game has already started.
+pandemic-no-actions = No actions left this turn.
+pandemic-turn = Your turn
+
+def-pandemic-Alice = Alice
+def-pandemic-Bob = Bob
+def-pandemic-Pandemic = pandemic
+def-pandemic-Atlanta = Atlanta
+def-pandemic-Chicago = Chicago
+def-pandemic-Montreal = Montreal
+def-pandemic-NewYork = New York
+def-pandemic-Washington = Washington
+def-pandemic-SanFrancisco = San Francisco
+def-pandemic-LosAngeles = Los Angeles
+def-pandemic-MexicoCity = Mexico City
+def-pandemic-Miami = Miami
+def-pandemic-Bogota = Bogota
+def-pandemic-Lima = Lima
+def-pandemic-SaoPaulo = Sao Paulo

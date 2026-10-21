@@ -1,0 +1,19 @@
+pandemic-already-started = 게임은 이미 시작했습니다.
+pandemic-no-actions = 이번 차례의 행동을 다 썼습니다.
+pandemic-turn = 차례
+
+def-pandemic-Alice = 앨리스
+def-pandemic-Bob = 밥
+def-pandemic-Pandemic = 판데믹
+def-pandemic-Atlanta = 애틀랜타
+def-pandemic-Chicago = 시카고
+def-pandemic-Montreal = 몬트리올
+def-pandemic-NewYork = 뉴욕
+def-pandemic-Washington = 워싱턴
+def-pandemic-SanFrancisco = 샌프란시스코
+def-pandemic-LosAngeles = 로스앤젤레스
+def-pandemic-MexicoCity = 멕시코시티
+def-pandemic-Miami = 마이애미
+def-pandemic-Bogota = 보고타
+def-pandemic-Lima = 리마
+def-pandemic-SaoPaulo = 상파울루
