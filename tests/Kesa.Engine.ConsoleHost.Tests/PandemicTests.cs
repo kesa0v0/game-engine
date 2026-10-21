@@ -116,5 +116,132 @@ namespace Kesa.Engine.ConsoleHost.Tests
                 foreach (var other in pair.Value)
                     Assert.That(links[other], Does.Contain(pair.Key), pair.Key + " -> " + other);
         }
+
+        // ---- 감염 (2조각) ----
+
+        private EntityId City(string name) => _w.All("City").Single(e => _w.DefOf(e) == "pandemic:" + name);
+
+        private long Cubes(string city, string disease) =>
+            ((IntValue)_w.GetRow(City(city), _w.Member("Cubes", "count"), "pandemic:" + disease)).Value;
+
+        private void SetCubes(string city, string disease, long n) =>
+            _w.SetRow(City(city), _w.Member("Cubes", "count"), "pandemic:" + disease, new IntValue(n));
+
+        private long Total(string city) => ((IntValue)_w.Get(City(city), _w.Member("Load", "total"))).Value;
+
+        private EntityId Game() => _w.All("Game").Single();
+
+        private long Outbreaks() => ((IntValue)_w.Get(Game(), _w.Member("Match", "outbreaks"))).Value;
+
+
+        private IEnumerable<EntityId> Cards() => _w.All("InfectionCard");
+
+        private string CardCity(EntityId card)
+        {
+            var city = (EntityValue)_w.Get(card, _w.Member("Card", "city"));
+            return _w.DefOf(city.Id).Substring("pandemic:".Length);
+        }
+
+        /// <summary>감염 덱을 이 도시들의 카드만 뽑을 더미에 남긴다.</summary>
+        private void DrawOnly(params string[] cities)
+        {
+            foreach (var card in Cards())
+                _w.Set(card, _w.Member("Card", "pile"), new IntValue(cities.Contains(CardCity(card)) ? 0 : 1));
+        }
+
+        private void ClearCubes()
+        {
+            foreach (var city in _w.All("City"))
+                foreach (var d in new[] { "Blue", "Yellow" })
+                    _w.SetRow(city, _w.Member("Cubes", "count"), "pandemic:" + d, new IntValue(0));
+        }
+
+        private AnswerResult EndTurn(string seat, EntityId player) =>
+            _w.Respond(seat, _w.OpenRequests.Single().Id, "pandemic.EndTurn", new Dictionary<string, Value> { ["player"] = new EntityValue(player) });
+
+        [Test]
+        public void TheGameStartsWithNineInfectedCities()
+        {
+            var counts = _w.All("City").Select(c => ((IntValue)_w.Get(c, _w.Member("Load", "total"))).Value).OrderBy(n => n).ToList();
+            Assert.That(counts, Is.EqualTo(new long[] { 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3 }));
+            Assert.That(Cards().Count(c => ((IntValue)_w.Get(c, _w.Member("Card", "pile"))).Value == 1), Is.EqualTo(9));
+        }
+
+        [Test]
+        public void EndingTheTurnInfectsAsManyCitiesAsTheRate()
+        {
+            long before = _w.All("City").Sum(c => ((IntValue)_w.Get(c, _w.Member("Load", "total"))).Value);
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            long after = _w.All("City").Sum(c => ((IntValue)_w.Get(c, _w.Member("Load", "total"))).Value);
+            Assert.That(after - before, Is.EqualTo(2)); // 남은 세 장은 큐브가 없는 도시라 폭발이 없다
+        }
+
+        [Test]
+        public void TheInfectionRateFollowsTheEpidemicsDerived()
+        {
+            var rate = _w.Member("Match", "rate");
+            var epidemics = _w.Member("Match", "epidemics");
+            foreach (var (count, expected) in new[] { (0L, 2L), (3L, 3L), (5L, 4L), (9L, 4L) })
+            {
+                _w.Set(Game(), epidemics, new IntValue(count));
+                Assert.That(((IntValue)_w.Get(Game(), rate)).Value, Is.EqualTo(expected), "epidemics " + count);
+            }
+        }
+
+        [Test]
+        public void ADangerousCityHasThreeOfADisease()
+        {
+            ClearCubes();
+            var danger = _w.Member("Load", "danger");
+            Assert.That(((BoolValue)_w.Get(City("Lima"), danger)).Value, Is.False);
+            SetCubes("Lima", "Yellow", 2);
+            Assert.That(((BoolValue)_w.Get(City("Lima"), danger)).Value, Is.False);
+            SetCubes("Lima", "Yellow", 3);
+            Assert.That(((BoolValue)_w.Get(City("Lima"), danger)).Value, Is.True);
+            Assert.That(Total("Lima"), Is.EqualTo(3));
+        }
+
+        [Test]
+        public void AnOutbreakSpreadsToNeighboursAndChainsOncePerCity()
+        {
+            ClearCubes();
+            SetCubes("Atlanta", "Blue", 3);
+            SetCubes("Washington", "Blue", 3);
+            DrawOnly("Atlanta", "SaoPaulo");
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            // 애틀랜타가 터져 이웃(시카고·워싱턴·마이애미)에 파랑 하나씩, 워싱턴이 넘쳐 터지고(연쇄), 애틀랜타는 다시 안 터진다
+            Assert.That(Outbreaks(), Is.EqualTo(2));
+            Assert.That(Cubes("Chicago", "Blue"), Is.EqualTo(1));
+            Assert.That(Cubes("Miami", "Blue"), Is.EqualTo(2)); // 애틀랜타와 워싱턴 둘 다의 이웃
+            Assert.That(Cubes("Montreal", "Blue"), Is.EqualTo(1));
+            Assert.That(Cubes("NewYork", "Blue"), Is.EqualTo(1));
+            Assert.That(Cubes("Atlanta", "Blue"), Is.EqualTo(3));
+            Assert.That(Cubes("SaoPaulo", "Yellow"), Is.EqualTo(1));
+        }
+
+
+        [Test]
+        public void EachInfectionCardStartsItsOwnChain()
+        {
+            ClearCubes();
+            SetCubes("Atlanta", "Blue", 3);
+            SetCubes("Washington", "Blue", 3);
+            DrawOnly("Atlanta", "Washington");
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            // 첫 카드의 연쇄(애틀랜타·워싱턴 둘) 뒤 둘째 카드가 새 연쇄를 시작해, 이미 터졌던 도시도 다시 터진다
+            // (이어서 마이애미가 3개에서 넘쳐 같이 터진다): 2 + 3
+            Assert.That(Outbreaks(), Is.EqualTo(5));
+        }
+        [Test]
+        public void TooManyOutbreaksLoseTheGame()
+        {
+            foreach (var city in _w.All("City"))
+                foreach (var d in new[] { "Blue", "Yellow" })
+                    _w.SetRow(city, _w.Member("Cubes", "count"), "pandemic:" + d, new IntValue(3));
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            Assert.That(Outbreaks(), Is.EqualTo(12)); // 첫 카드의 연쇄가 지도 전체를 훑고, 졌으니 둘째 카드는 뽑지 않는다
+            Assert.That(((BoolValue)_w.Get(Game(), _w.Member("Match", "lost"))).Value, Is.True);
+            Assert.That(_w.OpenRequests, Is.Empty);
+        }
     }
 }
