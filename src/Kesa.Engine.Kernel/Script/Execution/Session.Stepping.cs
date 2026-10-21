@@ -174,6 +174,15 @@ namespace Kesa.Engine.Script
                 called.Immediate = frame.Immediate;
                 return;
             }
+            if (callee is InnerFunction inner)
+            {
+                // 감싸는 함수의 original(...): 다음 안쪽 함수의 프레임을 쌓는다 (G314)
+                var called = PushInner(inner, positional, keywords, call.Span, frame.Writable, frame.UiWritable);
+                called.Result = target == null ? ResultTo.Discard : ResultTo.Local;
+                called.ResultName = target;
+                called.Immediate = frame.Immediate;
+                return;
+            }
             var value = Invoke(callee, positional, keywords, call.Span, frame.Writable, frame.UiWritable);
             if (callee is PureBuiltin b && b.Suspends)
             {

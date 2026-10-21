@@ -142,7 +142,11 @@ namespace Kesa.Engine.Runtime
         private StepMeter _derivedMeter => _derivedMeterStore ??= new StepMeter(_stepBudget);
 
         private PureEvaluator Evaluator =>
-            _evaluator ??= new PureEvaluator(new WorldGlobals(this), RuntimeBuiltins(), _stepBudget) { ParameterType = CommandParameterType };
+            _evaluator ??= new PureEvaluator(new WorldGlobals(this), RuntimeBuiltins(), _stepBudget)
+            {
+                ParameterType = CommandParameterType,
+                Wrappers = WrappersOf,
+            };
 
         private Dictionary<FunctionValue, CommandDecl>? _commandsByFunction;
 

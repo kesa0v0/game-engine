@@ -56,6 +56,7 @@ namespace Kesa.Engine.Loading
                 var uiActions = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var handlers = new List<HandlerDecl>();
                 var whens = new List<WhenDecl>();
+                var wraps = new List<WrapDecl>();
                 var textUses = new SortedDictionary<string, IReadOnlyList<TextUse>>(StringComparer.Ordinal);
                 var contents = new SortedDictionary<string, ModContent>(StringComparer.Ordinal);
                 var hostFunctions = new SortedDictionary<string, HostSignature>(StringComparer.Ordinal);
@@ -79,6 +80,8 @@ namespace Kesa.Engine.Loading
                     foreach (var action in u.Functions.UiActions) uiActions.Add(action.Id, action);
                     handlers.AddRange(u.Functions.Handlers);
                     whens.AddRange(u.Functions.Whens);
+                    foreach (var w in u.Functions.Wraps)
+                        if (w.Target != null) wraps.Add(w);
                     textUses.Add(u.Manifest.Id, u.Functions.TextUses);
                 }
                 return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
@@ -91,6 +94,7 @@ namespace Kesa.Engine.Loading
                     TextUses = textUses,
                     Handlers = handlers,
                     Whens = whens,
+                    Wraps = wraps,
                     Contents = contents,
                     HostFunctions = hostFunctions,
                 };
@@ -185,6 +189,7 @@ namespace Kesa.Engine.Loading
                 string self = u.Manifest.Id;
                 FunctionEffects.Check(u.Functions, u.Scope, schema, new CallContext(self, u.Bag), hostNames,
                     owner => visibility.CanSee(self, owner), modNames);
+                WrapCheck.Resolve(u.Functions.Wraps, modNames, hostNames, new CallContext(self, u.Bag));
                 CommandSignatures.Resolve(u.Functions.Commands, schema, visibility, u.Scope,
                     new CallContext(u.Manifest.Id, u.Bag));
                 CommandSignatures.Resolve(u.Functions.UiActions, schema, visibility, u.Scope,

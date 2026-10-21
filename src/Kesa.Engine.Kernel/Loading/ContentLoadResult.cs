@@ -99,6 +99,9 @@ namespace Kesa.Engine.Loading
         /// <summary>살아남은 모드의 <c>@when</c> 반응, 모드 로드 순서 → 정의 순서 (spec S5, spec-gaps G169).</summary>
         public IReadOnlyList<WhenDecl> Whens { get; internal set; } = Array.Empty<WhenDecl>();
 
+        /// <summary>대상을 푼 <c>@wrap</c>, 로드 순서 → 정의 순서 (spec-gaps G311): 같은 대상이면 뒤의 것이 바깥이다.</summary>
+        public IReadOnlyList<WrapDecl> Wraps { get; internal set; } = Array.Empty<WrapDecl>();
+
         /// <summary>
         /// 살아남은 모드의 내용 지문 (모드 id → 지문, spec S8, spec-gaps G212). 엔진이 읽은 파일별 지문과 전체 지문이다.
         /// 무엇이 달라도 괜찮은지는 사용처가 이것으로 정한다.

@@ -100,6 +100,24 @@ namespace Kesa.Engine.Script
     }
 
     /// <summary>
+    /// 감싸는 함수의 첫 인자: 바로 안쪽 함수 (spec-gaps G312·G314). <see cref="Level"/>번째 감싸기(안쪽부터 0)이고, 음수면 원래 함수다.
+    /// 부르기만 할 수 있어(로드 검사) 저장에 적지 않고, 불러올 때 지금의 감싸기 순서로 다시 만든다.
+    /// </summary>
+    internal sealed class InnerFunction : Value
+    {
+        public InnerFunction(FunctionValue target, int level)
+        {
+            Target = target;
+            Level = level;
+        }
+
+        public FunctionValue Target { get; }
+        public int Level { get; }
+
+        public override string KindName => "inner function";
+    }
+
+    /// <summary>
     /// <c>emit</c> 문장 하나가 부르는 즉시 핸들러들 (spec-gaps G310). 한 번에 하나씩 프레임을 쌓아, 멈춘 실행에서도 부른 쪽 문장이
     /// <c>emit(...)</c>이고 그 위가 지금 도는 핸들러 하나다.
     /// </summary>

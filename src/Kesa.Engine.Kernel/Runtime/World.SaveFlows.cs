@@ -206,7 +206,12 @@ namespace Kesa.Engine.Runtime
                                                     "' cannot be saved: that name in its mod now holds something else");
 
             var locals = new JsonObject();
-            foreach (var pair in frame.Locals) locals.Add(pair.Key, SaveScriptValue(pair.Value, writer));
+            foreach (var pair in frame.Locals)
+            {
+                // 감싸기의 안쪽 함수는 적지 않는다: 불러올 때 지금의 감싸기 순서로 다시 만든다 (G314)
+                if (pair.Value is InnerFunction) continue;
+                locals.Add(pair.Key, SaveScriptValue(pair.Value, writer));
+            }
 
             var blocks = new JsonArray();
             for (int i = 0; i < frame.Blocks.Count; i++)

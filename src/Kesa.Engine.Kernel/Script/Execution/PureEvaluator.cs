@@ -46,6 +46,11 @@ namespace Kesa.Engine.Script
         /// </summary>
         public Func<FunctionValue, string, Schema.TypeRef?>? ParameterType { get; set; }
 
+        /// <summary>
+        /// 함수를 감싼 <c>@wrap</c>들, 안쪽부터 (spec-gaps G311·G313). 없으면 null. 런타임만 준다: 로드 중의 계산은 원래 함수가 돈다.
+        /// </summary>
+        public Func<FunctionValue, IReadOnlyList<FunctionValue>?>? Wrappers { get; set; }
+
         private void Enter(Session session) => _active.Add(session);
         private void Leave() => _active.RemoveAt(_active.Count - 1);
 

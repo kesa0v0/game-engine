@@ -163,7 +163,10 @@ namespace Kesa.Engine.Script
         /// 제출이나 신호로만 실행되는 입구(커맨드·핸들러·반응, 호스트가 부르는 UI 동작)인가. 로직에서 부르거나 값으로 쓸 수 없다
         /// (G118, 핸들러는 G145, UI 동작은 G280).
         /// </summary>
-        public bool IsEntry => IsCommand || IsHandler || IsWhen || IsUiAction;
+        public bool IsEntry => IsCommand || IsHandler || IsWhen || IsUiAction || IsWrap;
+
+        /// <summary><c>@wrap</c>으로 다른 함수를 감싸는 함수인가 (G311·G312). 대상을 부르는 자리에서만 불린다.</summary>
+        public bool IsWrap => Definition != null && Definition.IsWrap;
 
         /// <summary><c>@when</c> 반응인가 (G169).</summary>
         public bool IsWhen => Definition != null && Definition.IsWhen;
@@ -172,7 +175,8 @@ namespace Kesa.Engine.Script
         public bool IsUiAction => Definition != null && Definition.IsUiAction;
 
         /// <summary>메시지에 쓰는 입구 종류: <c>@command</c>, <c>@on handler</c>, <c>@when reaction</c> 또는 <c>@ui_action</c>.</summary>
-        public string EntryKind => IsHandler ? "@on handler" : IsWhen ? "@when reaction" : IsUiAction ? "@ui_action" : "@command";
+        public string EntryKind => IsHandler ? "@on handler" : IsWhen ? "@when reaction" : IsUiAction ? "@ui_action" :
+            IsWrap ? "@wrap function" : "@command";
 
         /// <summary><c>@view_policy</c> 함수인가 (G197). 순수 자리다.</summary>
         public bool IsViewPolicy => Definition != null && Definition.DecoratorName == Interpreter.ViewPolicyName;

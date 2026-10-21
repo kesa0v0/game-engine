@@ -106,7 +106,8 @@ namespace Kesa.Engine.Stubs
             "def view_policy[F: Callable[..., Any]](f: F, /) -> F: ...\n" +
             "@overload\n" +
             "def view_policy[F: Callable[..., Any]](*, override: bool = ...) -> Callable[[F], F]: ...\n" +
-            "def on[F: Callable[..., Any]](signal: Any, /, *, stage: str = ...) -> Callable[[F], F]: ...\n" +
+            "def on[F: Callable[..., Any]](signal: Any, /, *, stage: str = ..., now: bool = ...) -> Callable[[F], F]: ...\n" +
+            "def wrap[F: Callable[..., Any]](function: Any, /) -> Callable[[F], F]: ...\n" +
             "def when[F: Callable[..., Any]](condition: Callable[..., Any], /, *, stage: str = ..., repeat: bool = ..., " +
             "cooldown: int = ..., once: bool | Literal[\"game\"] = ...) -> Callable[[F], F]: ...\n" +
             "\n" +

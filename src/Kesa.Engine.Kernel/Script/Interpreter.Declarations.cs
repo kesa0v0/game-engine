@@ -128,6 +128,56 @@ namespace Kesa.Engine.Script
                 });
         }
 
+        public const string WrapName = "wrap";
+
+        /// <summary>
+        /// <c>@wrap(pandemic.cure_cost)</c> (spec-gaps G311·G312). 대상은 이름(<c>모드id.이름</c>이나 자기 모드의 맨 이름)으로만 적고 여기서는
+        /// 평가하지 않는다: 다른 모드의 이름은 로드 시점 값이 아니다(G309). 함수는 첫 매개변수(안쪽 함수)가 있어야 하고 매개변수에
+        /// 기본값·타입 표기를 쓰지 않는다(대상의 것을 따른다).
+        /// </summary>
+        private void DeclareWrap(FunctionDef def, FunctionValue function, Expr decorator)
+        {
+            const string usage = "write @wrap(mod.function) above def f(original, ...same parameters...): ... (spec-gaps G312)";
+            if (!(decorator is CallExpr call) || call.Arguments.Count != 1 || call.Arguments[0].Name != null)
+            {
+                _context.Error(Codes.CmdBadDecorator, "@wrap takes the function it wraps", decorator.Span, hint: usage);
+                return;
+            }
+            var target = call.Arguments[0].Value;
+            string? targetMod;
+            string targetName;
+            switch (target)
+            {
+                case NameExpr n:
+                    targetMod = null;
+                    targetName = n.Name;
+                    break;
+                case AttributeExpr { Target: NameExpr root } a:
+                    targetMod = root.Name;
+                    targetName = a.Name;
+                    break;
+                default:
+                    _context.Error(Codes.CmdBadDecorator, "@wrap needs a function name, like @wrap(pandemic.cure_cost)", target.Span,
+                        hint: usage);
+                    return;
+            }
+            if (def.Parameters.Count == 0)
+            {
+                _context.Error(Codes.CmdBadDecorator, "a @wrap function takes the inner function as its first parameter", def.Span,
+                    hint: usage);
+                return;
+            }
+            foreach (var p in def.Parameters)
+            {
+                if (p.Default == null && p.Annotation == null) continue;
+                _context.Error(Codes.CmdBadDecorator,
+                    "a @wrap function's parameter follows the wrapped function, so it has no " +
+                    (p.Default != null ? "default" : "type annotation"), p.Span, hint: usage);
+                return;
+            }
+            _context.Functions.Wraps.Add(new WrapDecl(_context.Mod, function, targetMod, targetName, decorator.Span, target.Span));
+        }
+
         public const string WhenName = "when";
 
         /// <summary>
@@ -307,7 +357,7 @@ namespace Kesa.Engine.Script
 
             string? name = def.DecoratorName;
             if ((name == CommandName || name == SubmitPolicyName || name == ViewPolicyName || name == OnName || name == WhenName ||
-                 name == UiActionName) && !IsBuiltin(name))
+                 name == UiActionName || name == WrapName) && !IsBuiltin(name))
             {
                 bool schema = _scope.IsSchemaName(name);
                 _context.Error(Codes.CmdBadDecorator,
@@ -346,10 +396,15 @@ namespace Kesa.Engine.Script
                 DeclareUiAction(function, decorator);
                 return;
             }
+            if (name == WrapName)
+            {
+                DeclareWrap(def, function, decorator);
+                return;
+            }
             if (name != CommandName)
             {
                 _context.Error(Codes.CmdBadDecorator,
-                    "unknown decorator; only @command, @on, @when, @ui_action and @view_policy are supported",
+                    "unknown decorator; only @command, @on, @when, @ui_action, @wrap and @view_policy are supported",
                     decorator.Span, hint: "write @command or @command(free=True, acts_for=...)");
                 return;
             }

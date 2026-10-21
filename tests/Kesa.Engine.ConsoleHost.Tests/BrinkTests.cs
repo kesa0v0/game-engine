@@ -124,5 +124,39 @@ namespace Kesa.Engine.ConsoleHost.Tests
                 "lost before the second card");
             Assert.That(_w.OpenRequests, Is.Empty, "the game is over");
         }
+
+        private EntityId PlayerCard(string city) => _w.All("PlayerCard").Single(c => FaceCity(c) == city);
+
+        private void Hold(EntityId player, params string[] cities)
+        {
+            foreach (var card in _w.All("PlayerCard"))
+            {
+                bool mine = System.Array.IndexOf(cities, FaceCity(card)) >= 0;
+                var holder = _w.Get(card, _w.Member("Held", "holder"));
+                if (!mine && !(holder is EntityValue e && e.Id.Equals(player))) continue;
+                _w.Set(card, _w.Member("Card", "pile"), new IntValue(mine ? 2 : 1));
+                _w.Set(card, _w.Member("Held", "holder"), mine ? new EntityValue(player) : (Value)NoneValue.Instance);
+            }
+        }
+
+        private AnswerResult Cure(string disease) =>
+            Act("alice", "DiscoverCure", ("player", new EntityValue(_alice)), ("disease", new StrValue("pandemic:" + disease)));
+
+        [Test]
+        public void AVirulentCureNeedsOneMoreCard()
+        {
+            // 코어의 cure_cost를 brink가 감싼다: 변종(파랑)은 여섯 장, 다른 질병은 그대로 다섯 장
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            _w.Set(City("pandemic:Atlanta"), _w.Member("Research", "station"), BoolValue.True);
+            string[] blue = { "pandemic:Atlanta", "pandemic:Chicago", "pandemic:Montreal", "pandemic:NewYork", "pandemic:Washington" };
+            string[] yellow = { "pandemic:LosAngeles", "pandemic:MexicoCity", "pandemic:Miami", "pandemic:Bogota", "pandemic:Lima" };
+            Hold(_alice, blue.Concat(yellow).ToArray());
+            Assert.That(Cure("Blue").Succeeded, Is.False, "five blue cards are not enough for the virulent strain");
+            Assert.That(Cure("Yellow").Succeeded, Is.True);
+            Hold(_alice, blue.Concat(new[] { "pandemic:SanFrancisco" }).ToArray());
+            Assert.That(Cure("Blue").Succeeded, Is.True);
+            Assert.That(blue.Concat(new[] { "pandemic:SanFrancisco" }).Count(c => ((IntValue)_w.Get(PlayerCard(c), _w.Member("Card", "pile"))).Value == 1),
+                Is.EqualTo(6), "six cards are discarded");
+        }
     }
 }

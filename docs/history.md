@@ -1097,3 +1097,16 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
   - 저장: 프레임에 `"dispatch": {"signal", "next"}`, 불러올 때 신호로 핸들러 목록을 다시 찾고 `Relink`가 위 프레임이 그 핸들러인지 보며 부른 위치·`Immediate`를 채움(저장 때 같은 계산으로 검사).
 - **샘플:** `samples/pandemic/brink`에 `schema/virulent.py`(`Virulent` 컴포넌트를 `Disease`에 붙임), `defs/virulent.py`(첫 에픽 뒤 보드에 큐브가 가장 많은 질병이 변종 `@when`, 변종 폭발 한 칸 더 `@on(Outbreak, now=True)`, 코어 함수 `pandemic.disease_of`·`pandemic.game` 사용).
 - **테스트:** 새 `ImmediateHandlerTests` 16개(emit 자리에서 정의 순서로, 낸 쪽과 서로의 쓰기를 봄, 오류면 커맨드 전체 되감김, 즉시 연쇄, 자기 재진입 오류, 사라진 엔티티의 핸들러는 건너뜀, `ask`로 낸 쪽까지 멈추고 이어 감, 멈춘 채 저장·불러오기와 다시 저장한 바이트, `wait`·함수 안의 `wait`·마감 `ask`·`blocks_time=False`·`advance` 오류, 보통 핸들러는 여전히 `wait`, `now=` 오류 둘). `BrinkTests.AVirulentOutbreakCountsTwiceAndCanLoseAtOnce`(재현했던 판). 안내서 6장에 "바로 도는 핸들러" 절과 표 한 줄.
+
+## 다른 모드의 함수를 감싸기 `@wrap` (G311~G314, 2026-10-22)
+
+- **드러난 것:** 변종 바이러스의 "변종의 치료제는 카드가 한 장 더"(Complex Molecular Structure)를 brink가 짤 수 없음: 코어의 치료 카드 수는 플레이어마다 숫자 하나(`Cure.cards`)라 기여로 더하면 모든 질병이 바뀌고, 치료 때 신호도 없다. Chronic Effect(감염 때 큐브 2개)도 같은 종류(코드로 따진 것, 짜 보지는 않음). 코어가 열지 않은 자리는 못 바꾼다.
+- **결정:** G311(원칙: 보이는 모드의 최상위 함수를 감싸고 원래 함수를 부를 수 있음, 모든 호출 자리, 로드 순서대로 겹겹이, 효과는 원래보다 넓을 수 없음), G312(`@wrap(대상)`, 첫 매개변수가 안쪽 함수, 나머지는 대상과 같음, 직접 부를 수 없음), G313(보통 함수와 칸에 걸린 함수만, 입구·호스트·상수는 오류, 게임이 돌 때만 적용), G314(안쪽 함수는 부르기만, 저장에 적지 않고 불러올 때 다시 계산). G176은 `일부 바뀜(G310·G311)`.
+- **구현:**
+  - 선언: `FunctionDef.IsWrap`·`FunctionValue.IsWrap`(입구로 셈, `EntryKind` "@wrap function"), `Interpreter.DeclareWrap`가 대상을 평가하지 않고 이름(`모드id.이름`이나 맨 이름)으로 `WrapDecl`에 적음. 매개변수의 기본값·타입 표기는 오류.
+  - 로드: 새 `Loading/WrapCheck`가 모드의 효과 판정 뒤 대상을 `ModNames`로 풀고 검사(보이지 않는 모드 `SCH003`, 없는 이름 `EVL001`+"혹시 …?", 람다·상수·입구·호스트 함수 `CMD001`, 매개변수 모양 `CMD001`, 더 넓은 효과 `CMD004`, 첫 매개변수를 부르기 외에 쓰거나 람다 안에서 쓰면 `CMD001`, 대상이 쓰기 함수인데 식 안에서 부르면 `CMD004`). 통과하면 감싸는 함수의 효과 표시를 대상의 것으로 맞춤. `ContentLoadResult.Wraps`(로드 순서 → 정의 순서).
+  - 실행: `PureEvaluator.Wrappers`(런타임 평가기에만 → 로드 중 계산은 원래 함수). `Session.Push`가 감싸진 대상을 부르면 맨 바깥 감싸기를 첫 인자 `InnerFunction(대상, 안쪽 번호)`와 함께 쌓고, `InnerFunction` 호출(문장·식)은 다음 안쪽(없으면 원래 함수를 감싸기 없이). 대상을 이름으로 다시 부르면 재귀 검사가 잡음.
+  - 저장: 프레임 지역 변수에서 `InnerFunction`은 빼고, 불러올 때 `World.RestoreInner`가 지금의 감싸기 순서로 다시 넣음.
+  - 스텁: `wrap`, `on(..., now=)`.
+- **샘플:** 코어 `rules.py`에 `cure_cost(player, disease)`를 빼고 `DiscoverCure`가 씀(관례: 바뀔 계산은 함수로). brink `virulent.py`에 `@wrap(pandemic.cure_cost) complex_cure`.
+- **테스트:** 새 `WrapTests` 26개(코어 자신의 호출, 두 모드의 겹침 순서와 이름 인자, 안쪽을 안 부르기, `derived` 함수 감싸기, 쓰기 함수 감싸기, 자기 모드 함수, 이름으로 다시 부르면 재귀, 안쪽 함수 안에서 멈춘 채 저장·불러오기·다시 저장한 바이트, 로드 오류 15가지, 의존 안 함, 직접 부르기, 호스트 함수). `BrinkTests.AVirulentCureNeedsOneMoreCard`. 알 수 없는 데코레이터 메시지 기대값 둘. 안내서 3장에 "다른 모드의 함수를 감싸기" 절.

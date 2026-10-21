@@ -92,6 +92,7 @@ namespace Kesa.Engine.Runtime
             _seed = seed;
             SetHandlers(loaded.Handlers);
             SetWhens(loaded.Whens);
+            SetWraps(loaded.Wraps);
             if (requireViewPolicy && loaded.ViewPolicy == null)
                 throw new WorldException(Codes.RunNoViewPolicy,
                     "the host requires a view policy, but no active mod declares one",

@@ -143,7 +143,10 @@ namespace Kesa.Engine.Runtime
                     }
                 bool broken = false;
                 for (int i = 0; i < frames.Count; i++)
+                {
                     broken |= RestoreFrame(frames[i], frameNodes[i], where, problems) == null;
+                    RestoreInner(frames[i]);
+                }
                 problems.Closures = null;
                 if (broken) return null;
                 if (!Relink(EntrySpan(command, handler), frames, out var answerTo, check: false))

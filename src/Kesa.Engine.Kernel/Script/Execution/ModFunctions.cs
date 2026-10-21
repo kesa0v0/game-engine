@@ -36,6 +36,9 @@ namespace Kesa.Engine.Script
         /// <summary><c>@when(조건)</c> 반응, 정의된 순서대로 (G169).</summary>
         public List<WhenDecl> Whens { get; } = new List<WhenDecl>();
 
+        /// <summary><c>@wrap(대상)</c>으로 감싸는 함수, 정의된 순서대로 (G311~G314). 대상은 로더가 푼다.</summary>
+        public List<WrapDecl> Wraps { get; } = new List<WrapDecl>();
+
         /// <summary>
         /// 함수 본문에서 내장 <c>spawn("Def id", ...)</c>에 리터럴로 적은 Def id (G134). 이름 검사가 모으고 ⑤ 링크가 본다.
         /// </summary>

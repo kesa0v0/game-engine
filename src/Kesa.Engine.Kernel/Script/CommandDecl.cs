@@ -109,6 +109,39 @@ namespace Kesa.Engine.Script
     }
 
     /// <summary>
+    /// <c>@wrap(pandemic.cure_cost)</c>로 다른 함수를 감싸는 함수 (spec-gaps G311~G314). 첫 매개변수가 바로 안쪽 함수이고 나머지는
+    /// 대상과 같다. 대상은 모드의 이름이 다 정해진 뒤 로더가 푼다(<see cref="Target"/>).
+    /// </summary>
+    public sealed class WrapDecl
+    {
+        public WrapDecl(string mod, FunctionValue function, string? targetMod, string targetName, SourceSpan span, SourceSpan targetSpan)
+        {
+            Mod = mod;
+            Function = function;
+            TargetMod = targetMod;
+            TargetName = targetName;
+            Span = span;
+            TargetSpan = targetSpan;
+        }
+
+        public string Mod { get; }
+        public FunctionValue Function { get; }
+
+        /// <summary><c>pandemic.cure_cost</c>의 <c>pandemic</c>. 맨 이름(<c>@wrap(cure_cost)</c>)이면 null: 자기 모드다.</summary>
+        public string? TargetMod { get; }
+
+        public string TargetName { get; }
+
+        /// <summary><c>@wrap</c> 데코레이터의 위치.</summary>
+        public SourceSpan Span { get; }
+
+        public SourceSpan TargetSpan { get; }
+
+        /// <summary>푼 대상 함수. 로드 오류면 null이고 그 감싸기는 쓰이지 않는다.</summary>
+        public FunctionValue? Target { get; internal set; }
+    }
+
+    /// <summary>
     /// <c>@when(조건)</c>으로 선언한 반응 (spec S5, spec-gaps G169). 함수에 매개변수가 없으면 전역 조건, <c>Ref[Def타입]</c> 하나면 그
     /// 타입의 엔티티마다 따로 평가한다. 조건은 같은 수의 매개변수를 받는 순수 함수다. 정착 지점에서 거짓→참이 되면 본문이 Flow로 돈다.
     /// </summary>

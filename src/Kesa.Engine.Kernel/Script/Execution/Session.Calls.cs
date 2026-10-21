@@ -22,6 +22,8 @@ namespace Kesa.Engine.Script
                     return CallFunction(f, null, positional, keywords, site, writable, uiWritable);
                 case ClosureValue c:
                     return CallFunction(c.Function, c.Captured, positional, keywords, site, writable, uiWritable);
+                case InnerFunction i:
+                    return CallFunction(i.Target, null, positional, keywords, site, writable, uiWritable, i);
                 case PureBuiltin b:
                     if (b.WritesUi && !uiWritable)
                     {
@@ -67,10 +69,12 @@ namespace Kesa.Engine.Script
         /// <summary>C# 쪽에서 끝까지 실행하는 호출 (호스트 실행, 식 안의 호출). 돌려준 값을 받는다.</summary>
         private Value CallFunction(FunctionValue fn, LocalTable? captured,
             IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
-            bool writable, bool uiWritable)
+            bool writable, bool uiWritable, InnerFunction? inner = null)
         {
             int depth = _stack.Count;
-            var newFrame = Push(fn, captured, positional, keywords, site, writable, uiWritable);
+            var newFrame = inner != null
+                ? PushInner(inner, positional, keywords, site, writable, uiWritable)
+                : Push(fn, captured, positional, keywords, site, writable, uiWritable);
             newFrame.Result = ResultTo.Host;
             try
             {
@@ -100,10 +104,14 @@ namespace Kesa.Engine.Script
         /// <summary>재귀를 검사하고 인자를 묶은 프레임을 스택에 넣는다. <c>def</c>면 몸체 블록에서 시작한다.</summary>
         private Frame Push(FunctionValue fn, LocalTable? captured,
             IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
-            bool writable, bool uiWritable = false, bool entry = false)
+            bool writable, bool uiWritable = false, bool entry = false, bool direct = false)
         {
-            // 커맨드는 제출로만 실행된다 (G118). 이름으로 잡히지 않은 길(함수 값)의 마지막 방어선. 즉시 핸들러는 emit이 부른다 (G310)
-            if (fn.IsEntry && !entry)
+            // 감싼 함수가 있으면 맨 바깥 것을 부른다: 이 함수를 부르는 모든 자리에 적용된다 (G311·G313)
+            if (!direct && fn.Definition != null && _owner.Wrappers?.Invoke(fn) is { Count: > 0 } chain)
+                return PushWrapped(fn, chain, chain.Count - 1, positional, keywords, site, writable, uiWritable);
+            // 커맨드는 제출로만 실행된다 (G118). 이름으로 잡히지 않은 길(함수 값)의 마지막 방어선.
+            // 즉시 핸들러는 emit이(G310), 감싸는 함수는 대상을 부르는 자리가(G311) 부른다
+            if (fn.IsEntry && !entry && !direct)
             {
                 throw Fail(Codes.RunScript, "'" + fn.Name + "' is a " + fn.EntryKind + ", so logic cannot call it",
                     "a command only runs when it is submitted; move the shared part into a plain function (spec-gaps G118)");
@@ -115,6 +123,28 @@ namespace Kesa.Engine.Script
             if (fn.Definition != null) newFrame.Blocks.Add(BodyBlock(fn.Definition, newFrame.Layout));
             _stack.Add(newFrame);
             return newFrame;
+        }
+
+        /// <summary>
+        /// <paramref name="target"/>을 감싼 <paramref name="level"/>번째 함수를 부른다. 첫 인자는 그 바로 안쪽 함수다 (G312·G314).
+        /// </summary>
+        private Frame PushWrapped(FunctionValue target, IReadOnlyList<FunctionValue> chain, int level,
+            IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site, bool writable, bool uiWritable)
+        {
+            var args = new List<Value>(positional.Count + 1) { new InnerFunction(target, level - 1) };
+            args.AddRange(positional);
+            return Push(chain[level], null, args, keywords, site, writable, uiWritable, direct: true);
+        }
+
+        /// <summary>감싸는 함수가 안쪽 함수(<c>original(...)</c>)를 부른다: 다음 안쪽 감싸기, 없으면 원래 함수.</summary>
+        private Frame PushInner(InnerFunction inner, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords,
+            SourceSpan site, bool writable, bool uiWritable)
+        {
+            if (inner.Level < 0) return Push(inner.Target, null, positional, keywords, site, writable, uiWritable, direct: true);
+            var chain = _owner.Wrappers?.Invoke(inner.Target);
+            if (chain == null || inner.Level >= chain.Count)
+                throw new InvalidOperationException("engine: the wrappers of '" + inner.Target.Name + "' changed during a run");
+            return PushWrapped(inner.Target, chain, inner.Level, positional, keywords, site, writable, uiWritable);
         }
 
         /// <summary>오류로 빠져나갈 때 이 실행 단위가 넣은 프레임을 걷어 낸다.</summary>
