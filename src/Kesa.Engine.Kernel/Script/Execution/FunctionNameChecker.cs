@@ -17,9 +17,11 @@ namespace Kesa.Engine.Script
         /// <param name="isSchemaRuntimeName">로직에서도 쓰는 스키마 이름인가 (이 모드에 보이는 컴포넌트의 값 생성자, G134)</param>
         /// <param name="notVisible">다른 모드의 것이라 보이지 않는 이름이면 그 안내 (SCH003)</param>
         /// <param name="isDefTypeName">로직 안에서 부를 수 없는 타입 값인 Def 타입 이름인가 (G306)</param>
+        /// <param name="mods"><c>모드id.이름</c>으로 쓸 수 있는 모드들의 최상위 이름 (G309)</param>
         public static void Check(ModFunctions functions, ModScope scope, Func<string, bool> isLoadTimeName,
             CallContext context, Func<string, bool>? isSchemaRuntimeName = null, Func<string, string?>? notVisible = null,
-            IEnumerable<string>? schemaRuntimeNames = null, HostNames? hosts = null, Func<string, bool>? isDefTypeName = null)
+            IEnumerable<string>? schemaRuntimeNames = null, HostNames? hosts = null, Func<string, bool>? isDefTypeName = null,
+            ModNames? mods = null)
         {
             var globals = new SortedSet<string>(scope.Names, StringComparer.Ordinal);
             globals.UnionWith(functions.TopLevelNames);
@@ -32,6 +34,7 @@ namespace Kesa.Engine.Script
                     Submits = functions.SubmitUses,
                     DefTypes = functions.DefTypeLiterals,
                     IsDefType = isDefTypeName ?? (_ => false),
+                    Mods = mods ?? ModNames.None,
                 };
                 if (function.Definition != null)
                     walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
@@ -60,6 +63,9 @@ namespace Kesa.Engine.Script
 
             /// <summary>로직 안에서 타입 값인 Def 타입 이름인가 (G306).</summary>
             public Func<string, bool> IsDefType { get; set; } = _ => false;
+
+            /// <summary><c>모드id.이름</c>으로 쓸 수 있는 모드들 (G309).</summary>
+            public ModNames Mods { get; set; } = ModNames.None;
 
             private readonly List<List<KeyValuePair<string, SourceSpan>>> _queried;
             private readonly IEnumerable<string> _schemaRuntimeNames;
@@ -324,7 +330,7 @@ namespace Kesa.Engine.Script
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
                         break;
                     case AttributeExpr attr:
-                        if (!HostChain(attr, locals)) Expr(attr.Target, locals);
+                        if (!ModChain(attr, locals) && !HostChain(attr, locals)) Expr(attr.Target, locals);
                         break;
                     case IndexExpr index:
                         Expr(index.Target, locals);
@@ -362,6 +368,31 @@ namespace Kesa.Engine.Script
             }
 
             /// <summary>
+            /// 이름 검사에서 맨 앞이 보이는 모드 id인가 (G309): 지역·최상위·내장·스키마 이름이 가리지 않은 것. 실행 중 내장 표에서
+            /// 같은 이름의 내장이 이기는 것과 같다.
+            /// </summary>
+            private bool IsModRoot(string name, SortedSet<string> locals) =>
+                Mods.IsRoot(name) && !locals.Contains(name) && !_globals.Contains(name) && !PureBuiltins.IsRuntimeName(name) &&
+                !_isSchemaRuntimeName(name);
+
+            /// <summary>
+            /// 맨 앞이 보이는 모드 id인 속성 줄(<c>pandemic.add_cube</c>)을 본다 (G309): 첫 이름이 그 모드의 최상위 이름이어야 한다.
+            /// 같은 모드 id의 호스트 함수 경로면 <see cref="HostChain"/>에 넘긴다(false). 모드 id가 아니어도 false.
+            /// </summary>
+            private bool ModChain(AttributeExpr attr, SortedSet<string> locals)
+            {
+                if (!HostNames.TryChain(attr, out var root, out var attributes) || !IsModRoot(root.Name, locals)) return false;
+                string first = attributes[0].Name;
+                if (Mods.TryGet(root.Name, first, out _)) return true;
+                // 호스트 함수가 있는 모드 id는 호스트 이름 공간의 검사(오류 글 포함)에 맡긴다
+                if (_hosts.IsRoot(root.Name)) return false;
+                var candidates = new List<string>(Mods.Names(root.Name));
+                _context.Error(Codes.EvlUnknownName, "mod '" + root.Name + "' has no top-level name '" + first + "'",
+                    attributes[0].Span, Suggest.Hint(first, candidates));
+                return true;
+            }
+
+            /// <summary>
             /// 맨 앞이 보이는 호스트 이름 공간인 속성 줄(<c>core.path.find</c>)을 본다 (G218): 함수까지 이어져야 하고, 이름 공간 자체는
             /// 값이 아니며, 함수에는 속성이 없다. 호스트 이름 공간이 아니면(지역·최상위 이름이 가렸거나 다른 이름) false.
             /// </summary>
@@ -394,6 +425,19 @@ namespace Kesa.Engine.Script
             {
                 string n = name.Name;
                 if (locals.Contains(n) || _globals.Contains(n) || PureBuiltins.IsRuntimeName(n) || _isSchemaRuntimeName(n)) return;
+                // 모드 id만은 값이 아니다 (G309). 호스트 함수가 있는 모드 id는 아래 호스트 이름 공간의 글
+                if (Mods.IsRoot(n) && !_hosts.IsRoot(n))
+                {
+                    _context.Error(Codes.EvlType, "'" + n + "' is a mod, not a value", name.Span,
+                        "use one of its functions or constants, such as " + n + "." + FirstName(n) + " (spec-gaps G309)");
+                    return;
+                }
+                if (Mods.IsHidden(n) && !_hosts.IsHidden(n))
+                {
+                    _context.Error(Codes.SchNotVisible, "the names of mod '" + n + "' can only be used by mods that depend on it",
+                        name.Span, "add \"" + n + "\" to dependencies in mod.py (spec-gaps G309)");
+                    return;
+                }
                 if (_hosts.IsRoot(n))
                 {
                     NotAValue(n, name.Span);
@@ -436,8 +480,17 @@ namespace Kesa.Engine.Script
                 candidates.AddRange(PureBuiltins.RuntimeNames);
                 candidates.AddRange(_schemaRuntimeNames);
                 candidates.AddRange(_hosts.Roots);
+                candidates.AddRange(Mods.Roots);
                 _context.Error(Codes.EvlUnknownName, "name '" + n + "' is not defined", name.Span,
                     hint: Suggest.Hint(n, candidates));
+            }
+
+            /// <summary>안내 문구에 쓸 그 모드의 최상위 이름 하나 (없으면 호스트 함수 경로 첫 조각).</summary>
+            private string FirstName(string mod)
+            {
+                foreach (var name in Mods.Names(mod)) return name;
+                foreach (var name in _hosts.Children(mod)) return name;
+                return "name";
             }
         }
     }

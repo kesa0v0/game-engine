@@ -4,6 +4,7 @@ using System.Text;
 using Kesa.Engine.Host;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Schema;
+using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Stubs
 {
@@ -41,11 +42,12 @@ namespace Kesa.Engine.Stubs
         {
             var final = Find(modId, result.Mods);
             if (final != null)
-                return new Writer(final, result.Mods, result.Schema, result.Defs, fromFirstRound: false, result.HostFunctions);
+                return new Writer(final, result.Mods, result.Schema, result.Defs, fromFirstRound: false, result.HostFunctions,
+                    result.Scopes);
             var first = Find(modId, result.FirstRound.Mods);
             if (first != null)
                 return new Writer(first, result.FirstRound.Mods, result.FirstRound.Schema, result.FirstRound.Defs, fromFirstRound: true,
-                    result.HostFunctions);
+                    result.HostFunctions, result.Scopes);
             return null;
         }
 
@@ -219,10 +221,11 @@ namespace Kesa.Engine.Stubs
             private readonly bool _fromFirstRound;
             private readonly ModVisibility _visibility;
             private readonly IReadOnlyDictionary<string, HostSignature> _hosts;
+            private readonly IReadOnlyDictionary<string, ModScope> _scopes;
             private readonly StringBuilder _out = new StringBuilder();
 
             public Writer(ModManifest mod, IReadOnlyList<ModManifest> mods, SchemaSet schema, DefRegistry defs,
-                bool fromFirstRound, IReadOnlyDictionary<string, HostSignature> hosts)
+                bool fromFirstRound, IReadOnlyDictionary<string, HostSignature> hosts, IReadOnlyDictionary<string, ModScope> scopes)
             {
                 _mod = mod;
                 _schema = schema;
@@ -230,6 +233,7 @@ namespace Kesa.Engine.Stubs
                 _fromFirstRound = fromFirstRound;
                 _visibility = new ModVisibility(mods);
                 _hosts = hosts;
+                _scopes = scopes;
             }
 
             private bool Sees(string owner) => _visibility.CanSee(_mod.Id, owner);
@@ -248,23 +252,66 @@ namespace Kesa.Engine.Stubs
                     if (Sees(c.Mod)) WriteComponent(c);
                 foreach (var t in _schema.Types)
                     if (Sees(t.Mod)) WriteDefType(t);
-                WriteHostFunctions();
+                WriteModNamespaces();
                 return _out.ToString();
             }
 
-            // ---- 호스트 함수 (spec S7, spec-gaps G221) ----
+            // ---- 모드 이름 공간: 최상위 이름(G309)과 호스트 함수 (spec S7, spec-gaps G221) ----
 
             /// <summary>
-            /// 이 모드가 부를 수 있는 호스트 함수(소유 모드가 자기이거나 의존한 모드, G218)를 이름 경로를 따라 중첩한 클래스로:
-            /// <c>core.path.find</c>면 <c>class core:</c> 안의 <c>class path:</c> 안의 정적 메서드 <c>find</c>.
+            /// 이 모드가 <c>모드id.…</c>로 쓸 수 있는 것(그 모드가 자기이거나 의존한 모드, G218·G309)을 모드 id 클래스로: 그 모드의
+            /// 최상위 함수·상수, 그리고 호스트 함수를 이름 경로를 따라 중첩한 클래스(<c>core.path.find</c>면 <c>class core:</c> 안의
+            /// <c>class path:</c> 안의 정적 메서드 <c>find</c>).
             /// </summary>
-            private void WriteHostFunctions()
+            private void WriteModNamespaces()
             {
-                var visible = new List<HostSignature>();
-                foreach (var signature in _hosts.Values)
-                    if (Sees(signature.Function.Mod)) visible.Add(signature);
+                var hosts = new SortedDictionary<string, List<HostSignature>>(StringComparer.Ordinal);
                 // 이름 순이라 같은 이름 공간의 함수는 붙어 있다
-                WriteHostGroup(visible, 0, visible.Count, 0, "");
+                foreach (var signature in _hosts.Values)
+                {
+                    string owner = signature.Function.Mod;
+                    if (!Sees(owner)) continue;
+                    if (!hosts.TryGetValue(owner, out var list)) hosts.Add(owner, list = new List<HostSignature>());
+                    list.Add(signature);
+                }
+                var roots = new SortedSet<string>(hosts.Keys, StringComparer.Ordinal);
+                foreach (var pair in _scopes)
+                    if (Sees(pair.Key) && ScriptNames(pair.Value).Count > 0) roots.Add(pair.Key);
+                foreach (var root in roots)
+                {
+                    Line("class " + root + ":");
+                    if (_scopes.TryGetValue(root, out var scope))
+                        foreach (var pair in ScriptNames(scope)) WriteScriptName(pair.Key, pair.Value);
+                    if (hosts.TryGetValue(root, out var signatures)) WriteHostGroup(signatures, 0, signatures.Count, 1, "    ");
+                    Line();
+                }
+            }
+
+            /// <summary>로직에서 <c>모드id.이름</c>으로 쓸 수 있는 최상위 이름 (커맨드 등 입구는 부를 수 없어 뺀다, G118).</summary>
+            private static List<KeyValuePair<string, Value>> ScriptNames(ModScope scope)
+            {
+                var names = new List<KeyValuePair<string, Value>>();
+                foreach (var name in scope.Names)
+                {
+                    scope.TryGet(name, out var value, out _);
+                    if (value is FunctionValue fn && fn.IsEntry) continue;
+                    names.Add(new KeyValuePair<string, Value>(name, value));
+                }
+                return names;
+            }
+
+            private void WriteScriptName(string name, Value value)
+            {
+                if (value is FunctionValue fn)
+                {
+                    var parameters = new List<string>();
+                    foreach (var p in fn.Parameters) parameters.Add(p.Name + ": Any");
+                    Line("    @staticmethod");
+                    Line("    def " + name + "(" + string.Join(", ", parameters) + ") -> Any: ...");
+                    return;
+                }
+                string type = value is IntValue ? "int" : value is StrValue ? "str" : value is BoolValue ? "bool" : "Any";
+                Line("    " + name + ": " + type);
             }
 
             /// <param name="depth">이미 클래스로 연 이름 조각의 수</param>
@@ -286,7 +333,6 @@ namespace Kesa.Engine.Stubs
                     while (end < to && Part(signatures[end], depth) == part) end++;
                     Line(indent + "class " + part + ":");
                     WriteHostGroup(signatures, i, end, depth + 1, indent + "    ");
-                    if (depth == 0) Line();
                     i = end;
                 }
             }

@@ -401,6 +401,8 @@ namespace Kesa.Engine.Cli.Tests
             Assert.That(Stubs("--host", HostFile(), _root), Is.EqualTo(0), _err.ToString());
             string expected =
                 "class core:\n" +
+                "    @staticmethod\n" +
+                "    def count(r: Any) -> Any: ...\n" +
                 "    class stock:\n" +
                 "        @staticmethod\n" +
                 "        def count(resource: Literal[\"Wood\", \"core:Wood\"]) -> int:\n" +

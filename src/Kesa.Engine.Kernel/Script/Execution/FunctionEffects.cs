@@ -7,7 +7,8 @@ namespace Kesa.Engine.Script
 {
     /// <summary>
     /// 함수 효과 판정 (spec S2 함수 효과 표, spec-gaps G117). 본문에 속성 대입(엔티티 쓰기)이 있거나 같은 모드의 쓰기 함수를
-    /// 이름으로 문장 호출하는 함수는 쓰기 함수다(전이적). 모드 사이에는 함수를 가져오는 길이 없으므로 모드 안에서 끝난다.
+    /// 이름으로 문장 호출하는 함수는 쓰기 함수다(전이적). 다른 모드의 함수(<c>pandemic.add_cube</c>, G309)는 의존 대상이라
+    /// 로드 순서상 먼저 판정이 끝나 있어 그 결과를 그대로 쓴다.
     /// 모드의 이름이 다 정해진 ②b 끝에서 한다. 이름으로 알 수 없는 호출(속성 호출, 함수 값)은 실행 중 안전망이 막는다.
     /// <list type="bullet">
     /// <item>쓰기 함수는 문장으로만 부른다: 식 안의 호출은 로드 오류다 (람다 본문은 식이라 늘 오류).</item>
@@ -18,13 +19,16 @@ namespace Kesa.Engine.Script
     public static class FunctionEffects
     {
         public static void Check(ModFunctions functions, ModScope scope, SchemaSet schema, CallContext context,
-            HostNames? hosts = null, Func<string, bool>? sees = null)
+            HostNames? hosts = null, Func<string, bool>? sees = null, ModNames? mods = null)
         {
             var bodies = new List<Body>();
             foreach (var function in functions.Functions)
             {
                 var body = new Body(function);
-                var walker = new Walker(scope, body, hosts ?? HostNames.None, new UiNames(schema, sees ?? (_ => true), context));
+                var walker = new Walker(scope, body, hosts ?? HostNames.None, new UiNames(schema, sees ?? (_ => true), context))
+                {
+                    Mods = mods ?? ModNames.None,
+                };
                 if (function.Definition != null)
                     walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
                 else
@@ -420,6 +424,9 @@ namespace Kesa.Engine.Script
 
             private readonly UiNames _ui;
 
+            /// <summary><c>모드id.이름</c>으로 쓸 수 있는 모드들 (G309).</summary>
+            public ModNames Mods { get; set; } = ModNames.None;
+
             public Walker(ModScope scope, Body body, HostNames hosts, UiNames ui)
             {
                 _scope = scope;
@@ -455,13 +462,29 @@ namespace Kesa.Engine.Script
             /// 커맨드면 쓴 곳을 기록하고 null이다 (호출로도 세지 않는다, G118).
             private FunctionValue? Resolve(Expr callee, SortedSet<string> locals)
             {
-                if (!(callee is NameExpr name) || locals.Contains(name.Name)) return null;
-                if (!_scope.TryGet(name.Name, out var value, out _)) return null;
+                Value value;
+                SourceSpan span;
+                if (callee is AttributeExpr member && member.Target is NameExpr root && IsModRoot(root.Name, locals))
+                {
+                    // 다른 모드(또는 자신)의 최상위 함수 (G309)
+                    if (!Mods.TryGet(root.Name, member.Name, out value)) return null;
+                    span = member.Span;
+                }
+                else
+                {
+                    if (!(callee is NameExpr name) || locals.Contains(name.Name)) return null;
+                    if (!_scope.TryGet(name.Name, out value, out _)) return null;
+                    span = name.Span;
+                }
                 if (!(value is FunctionValue fn) || fn.Definition == null) return null;
                 if (!fn.IsEntry) return fn;
-                _body.CommandUses.Add(new Call(fn, name.Span));
+                _body.CommandUses.Add(new Call(fn, span));
                 return null;
             }
+
+            /// <summary>지역 변수·모드 이름·스키마 이름·내장이 가리지 않은 보이는 모드 id인가 (G309, 이름 검사와 같은 차례).</summary>
+            private bool IsModRoot(string name, SortedSet<string> locals) =>
+                Mods.IsRoot(name) && !locals.Contains(name) && !_scope.TryLookup(name, out _) && !PureBuiltins.IsRuntimeName(name);
 
             /// <summary>덮어쓰지 않은 쓰는 내장의 이름이면 그 이름 (G112의 덮어쓰기와 같은 규칙).</summary>
             private string? WritingBuiltin(Expr callee, SortedSet<string> locals)
@@ -493,9 +516,13 @@ namespace Kesa.Engine.Script
                 {
                     if (_body.FirstWrite == null) _body.FirstWrite = call.Span;
                 }
-                else if (!(call.Callee is NameExpr)) Expr(call.Callee, locals);
+                else if (!IsNamed(call.Callee, locals)) Expr(call.Callee, locals);
                 foreach (var arg in call.Arguments) Expr(arg.Value, locals);
             }
+
+            /// <summary>이름이나 <c>모드id.이름</c>으로 부른 것인가: <see cref="Resolve"/>가 이미 봤으므로 다시 걷지 않는다.</summary>
+            private bool IsNamed(Expr callee, SortedSet<string> locals) =>
+                callee is NameExpr || callee is AttributeExpr member && member.Target is NameExpr root && IsModRoot(root.Name, locals);
 
             public void Block(IReadOnlyList<Stmt> body, SortedSet<string> locals)
             {
@@ -572,7 +599,7 @@ namespace Kesa.Engine.Script
                         }
                         else if (builtin != null)
                             _body.BuiltinExpressionCalls.Add(new KeyValuePair<string, SourceSpan>(builtin, call.Span));
-                        else if (!(call.Callee is NameExpr)) Expr(call.Callee, locals);
+                        else if (!IsNamed(call.Callee, locals)) Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
                         break;
                     case NameExpr name when IsRuntime(name, PureBuiltins.UiName, locals):
@@ -606,6 +633,8 @@ namespace Kesa.Engine.Script
                             _body.TouchUi(attr.Span);
                             _ui.Bare(attr.Span);
                         }
+                        // 값으로 쓴 다른 모드의 커맨드 이름을 기록한다 (G118·G309)
+                        else if (attr.Target is NameExpr root && IsModRoot(root.Name, locals)) Resolve(attr, locals);
                         else Expr(attr.Target, locals);
                         break;
                     case IndexExpr index:

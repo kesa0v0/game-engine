@@ -100,6 +100,11 @@ namespace Kesa.Engine.Tests.Loading
                 "cost: dict[Literal[\"Wood\", \"Iron\", \"core:Wood\", \"core:Iron\"], int] = ..., Health: Health = ..., " +
                 "Skill: dict[Literal[\"Wood\", \"Iron\", \"core:Wood\", \"core:Iron\"], Skill] = ...) -> None: ...\n" +
                 "\n" +
+                // 모드의 최상위 이름: 의존한 모드가 core.hmax로 쓴다 (G309)
+                "class core:\n" +
+                "    @staticmethod\n" +
+                "    def hmax(h: Any) -> Any: ...\n" +
+                "\n" +
                 "class Tick: ...  # sent by the engine; handle it with @on(Tick)\n" +
                 "\n" +
                 // UI 기록이 없어도 ui는 있다 (G207·G282)

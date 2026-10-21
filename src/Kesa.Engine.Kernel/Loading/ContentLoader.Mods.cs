@@ -223,7 +223,7 @@ namespace Kesa.Engine.Loading
         /// 모드의 모든 파일을 실행한 뒤 함수 본문의 이름을 본다 (spec-gaps G108). 스키마 파일의 함수가 Def 파일의 이름을
         /// 써도 되므로 ②b 끝에서 한다. 로드 시점 이름(<c>field</c>, <c>patch</c>, Def 생성자 등)은 따로 안내한다.
         /// </summary>
-        private static void CheckFunctionNames(ModUnit u, DefBuiltins builtins, HostNames hostNames) =>
+        private static void CheckFunctionNames(ModUnit u, DefBuiltins builtins, HostNames hostNames, ModNames modNames) =>
             FunctionNameChecker.Check(u.Functions, u.Scope,
                 name => name == Interpreter.InheritName || builtins.Lookup(name) != null || builtins.Explain(name) != null,
                 new CallContext(u.Manifest.Id, u.Bag), builtins.IsVisibleRuntimeSchemaName,
@@ -231,7 +231,24 @@ namespace Kesa.Engine.Loading
                 name => builtins.Lookup(name) == null && builtins.Explain(name) is { } e && e.Code == Codes.SchNotVisible
                     ? e.Message
                     : null,
-                builtins.RuntimeSchemaNames, hostNames, builtins.IsVisibleDefTypeName);
+                builtins.RuntimeSchemaNames, hostNames, builtins.IsVisibleDefTypeName, modNames);
+
+        /// <summary>
+        /// 이 모드의 함수 본문에서 <c>모드id.이름</c>으로 쓸 수 있는 모드 (G309): 자신과 필수 의존(전이) 중 아직 실패하지 않은 모드.
+        /// 다른 활성 모드는 "의존을 더하라"는 안내를 위해 id만 남긴다. 의존 대상은 로드 순서상 먼저 실행되어 이름이 다 묶여 있다.
+        /// </summary>
+        private static ModNames ModNamesFor(ModUnit u, List<ModUnit> units, ModVisibility visibility)
+        {
+            var visible = new List<KeyValuePair<string, ModScope>>();
+            var hidden = new List<string>();
+            foreach (var owner in units)
+            {
+                if (owner.Excluded) continue;
+                if (!visibility.CanSee(u.Manifest.Id, owner.Manifest.Id)) hidden.Add(owner.Manifest.Id);
+                else if (!owner.Failed) visible.Add(new KeyValuePair<string, ModScope>(owner.Manifest.Id, owner.Scope));
+            }
+            return new ModNames(visible, hidden);
+        }
 
         /// <summary>
         /// 이 모드의 함수 본문에서 보이는 호스트 함수 (G218): 소유 모드가 자신이거나 필수 의존(전이)인 함수. 다른 활성 모드의 함수는
@@ -266,16 +283,30 @@ namespace Kesa.Engine.Loading
             return null;
         }
 
-        /// <summary>모드가 최상위에 호스트 이름 공간과 같은 이름을 묶으면 그 함수들이 가려지므로 로드 오류다 (G218).</summary>
-        private static void CheckHostShadowing(ModUnit u, HostNames hostNames)
+        /// <summary>
+        /// 모드가 최상위에 호스트 이름 공간이나 보이는 모드 id와 같은 이름을 묶으면 그 이름들이 가려지므로 로드 오류다 (G218·G309).
+        /// 자기 모드의 호스트 함수 경로 첫 조각과 같은 이름도 <c>모드id.이름</c>이 둘을 가리키므로 로드 오류다 (G309).
+        /// </summary>
+        private static void CheckHostShadowing(ModUnit u, HostNames hostNames, ModNames modNames)
         {
+            string self = u.Manifest.Id;
             foreach (var name in u.Scope.Names)
             {
-                if (!hostNames.IsRoot(name)) continue;
                 u.Scope.TryGet(name, out _, out var span);
-                u.Bag.Error(Codes.HostName,
-                    "the top-level name '" + name + "' hides the host functions of mod '" + name + "'", span, u.Manifest.Id,
-                    "rename it (spec-gaps G218)");
+                if (hostNames.IsRoot(name))
+                    u.Bag.Error(Codes.HostName,
+                        "the top-level name '" + name + "' hides the host functions of mod '" + name + "'", span, self,
+                        "rename it (spec-gaps G218)");
+                else if (modNames.IsRoot(name))
+                    u.Bag.Error(Codes.EvlNameTaken,
+                        "the top-level name '" + name + "' hides the names of mod '" + name + "' (" + name + ".…)", span, self,
+                        "rename it (spec-gaps G309)");
+                string path = self + "." + name;
+                if (hostNames.IsFunction(path) || hostNames.IsNamespace(path))
+                    u.Bag.Error(Codes.HostName,
+                        "'" + path + "' is both a host function" + (hostNames.IsFunction(path) ? "" : " group") +
+                        " and this mod's top-level name '" + name + "'", span, self,
+                        "rename one of them (spec-gaps G309)");
             }
         }
 

@@ -49,7 +49,24 @@ f-문자열, `**`·비트 연산, 연쇄 비교(`0 < x < 5`는 `0 < x and x < 5`
 ## 함수와 이름
 
 - 한 모드의 함수·상수는 그 모드 안 어디서나 부른다(스키마 파일의 함수도 Def 파일에서 보인다).
-- **다른 모드의 함수는 부를 수 없다.** 다른 모드의 컴포넌트·신호·커맨드 이름은 `dependencies`에 있으면 쓸 수 있다.
+- 다른 모드의 컴포넌트·신호·커맨드 이름은 `dependencies`에 있으면 쓸 수 있다.
+- **다른 모드의 함수와 상수는 `모드id.이름`으로 쓴다**(`import`는 없고 `dependencies`가 그 역할). 확장 모드가 코어 규칙을 베끼지
+  않고 그대로 부를 수 있다:
+
+  ```python
+  # brink 모드 (dependencies=["pandemic"])
+  over = pandemic.add_cube(city, "pandemic:Black")
+  if over:
+      pandemic.spread(city)
+  n = pandemic.ACTIONS
+  ```
+
+  - 보이는 것은 자기 모드와 `dependencies`에 적은 모드(그 의존까지)뿐이다. 아니면 `SCH003`.
+  - 불린 함수는 제 모드 기준으로 돈다(그 안의 이름, 짧은 Def id).
+  - 쓰기 함수는 같은 모드에서처럼 문장으로만(`if pandemic.add_cube(...)`는 `CMD004`), 난수 함수는 `derived`·조건에서 못 쓴다.
+    커맨드·핸들러는 부를 수 없다.
+  - `f = pandemic.add_cube`처럼 값으로 담을 수 있다. `pandemic`만으로는 값이 아니다.
+  - 최상위에 의존한 모드 id와 같은 이름(`pandemic = 1`)을 만들면 로드 오류다.
 - 없는 이름은 로드 때 `EVL001`과 "혹시 …?". 타입을 아는 곳(매개변수에 `Ref[X]`를 붙였거나, `query(X)`로 돌거나, `spawn` 결과 등)에서는
   `u.Lfie.hp` 같은 컴포넌트·멤버 오타도 로드 때 잡힌다.
 

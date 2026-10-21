@@ -259,6 +259,7 @@ namespace Kesa.Engine.Runtime
             AddRandomBuiltins(table);
             AddUiBuiltins(table);
             AddHostBuiltins(table);
+            AddModNamespaces(table);
             return table;
         }
 

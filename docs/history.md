@@ -1075,3 +1075,13 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **일괄 고침:** 파이썬 스크립트(따옴표 없는 식별자 리터럴만 `query(...)`/`defs(...)` 안과 `component ==/!= "X"`에서 맨 이름으로, UTF-8·BOM·줄 끝 유지)로 샘플·테스트·벤치·안내서 33개 파일. 결정 기록(`spec-gaps`·`gaps/`·`history`·`spine-spec`)은 건드리지 않음. 오류 글을 확인하는 테스트는 손으로 고침.
 - **안내서:** 3장 "이름 쓰는 법" 표, 내장 표의 `query(타입, 컴포넌트...)`·`defs`·`defdata`, 기여 줄의 `component`, 7장 `may_see`의 `component`, 1장 경고 목록에 `EVL009`.
 - **테스트:** 새 `SchemaNameValueTests` 7개(맨 이름 비교 깨끗함, 정책·기여 줄의 문자열 비교 경고, 이름 오타, 기여 줄 속성 오타, Def 타입 이름의 속성), `DefDataTests`(문자열·맨 이름 오타·컴포넌트 이름 로드 검사, 실행 중 문자열과 컴포넌트 값, Def 타입 값을 변수로, 멈춘 Flow가 든 Def 타입 값 저장), `ContentLoaderTests`(함수 안에서 Def 타입 부르기), `WorldQueryTests`(실행 중 문자열·이름 값). 샘플 `check` 세 곳 오류·경고 0.
+
+## 다른 모드의 최상위 이름 `모드id.이름` (G309, 2026-10-22)
+
+- **재현:** 판데믹 확장 B단계에서 `brink`가 변종 바이러스 효과로 코어의 `add_cube`·`spread`를 부르자 `EVL001 name 'add_cube' is not defined`(임시 파일로 `check`). G20의 "다른 모드의 함수를 이름으로 쓰는 방법은 아직 없다"(잠정), G218이 같은 모양으로 비워 둔 자리 → G309: 필수 의존한 모드(와 자신)의 최상위 함수·상수를 `pandemic.add_cube(c, d)`·`pandemic.ACTIONS`로.
+- **로드 검사:** `ModNames`(새 파일, 보이는 모드 id → `ModScope`, 안 보이는 활성 모드 id)를 `ContentLoader.ModNamesFor`가 만들어 이름 검사와 효과 판정에 넘김(의존 대상은 로드 순서상 먼저 끝나 이름과 효과가 정해져 있음). 이름 검사(`FunctionNameChecker.ModChain`): 맨 앞이 보이는 모드 id(지역·최상위·내장·스키마 이름이 가리지 않은 것)면 첫 속성이 그 모드의 최상위 이름이어야 하고, 아니면 `EVL001` "mod 'banking' has no top-level name 'bonuss'"와 "혹시 …?". 호스트 함수가 있는 모드 id는 기존 호스트 이름 공간 검사와 글을 그대로 씀. 모드 id만은 `EVL005` "is a mod, not a value", 의존하지 않은 모드는 `SCH003`. 효과 판정(`FunctionEffects.Resolve`)은 `모드id.이름` 호출을 같은 모드 호출처럼 셈(쓰기는 문장으로만, 난수·UI 전이, 커맨드 호출·값은 G118 오류). 한 번 본 호출을 속성으로 다시 걸어 같은 오류가 두 번 나던 것을 재현하고 고침(`IsNamed`).
+- **겹침(`CheckHostShadowing`):** 최상위 이름이 보이는 모드 id와 같으면 `EVL004`, 자기 모드의 호스트 함수 경로 첫 조각과 같으면 `HST002` "'banking.helper' is both a host function group and this mod's top-level name 'helper'".
+- **실행:** `World.ModNames.cs`의 `ModNamespace`를 모드마다 런타임 내장에 넣음(속성은 그 모드의 `ModScope`, 없으면 같은 id의 호스트 이름 공간). 같은 이름의 엔진 내장이 있으면 내장이 이김(이름 검사도 같음). 불린 함수는 제 모드의 전역으로 돌고(`f.Function.Mod`), 짧은 Def id도 맨 위 프레임의 모드 기준(G261). 재귀는 실행 중 안전망이 잡음. 함수 값을 든 멈춘 Flow 저장은 기존 함수 값 저장 그대로 됨.
+- **스텁:** `class 모드id:` 안에 그 모드의 최상위 함수(`@staticmethod def f(a: Any) -> Any`)와 상수(`int`·`str`·`bool`, 나머지 `Any`), 그 뒤에 호스트 함수 경로 클래스. 커맨드 등 입구는 뺌.
+- **하지 않은 것:** Def 파일 최상위(로드 시점)의 `pandemic.f` 값(예: `Cond` 칸에 다른 모드 함수)은 로드 시점 속성 접근이라 여전히 안 됨(호스트 함수만 G291). 사례가 나오면 본다.
+- **테스트:** 새 `ModNamesTests` 14개(함수·상수 부르기와 제 모드 기준 실행, 자기 이름, 함수 값을 든 멈춘 Flow 저장, 식 안의 쓰기 함수, `derived`의 난수 함수, 커맨드 부르기, 오타, 의존 안 함, 모드 id만, 최상위 이름의 가림, 같은 이름의 지역 변수, 호스트 경로와 겹침, 호스트 함수와 한 id 공유, 스텁). 스텁 기대값 둘(커널·CLI)에 모드의 최상위 이름 클래스.
