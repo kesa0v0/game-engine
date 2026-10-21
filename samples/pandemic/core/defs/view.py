@@ -18,3 +18,11 @@ def map_rows(me):
 def infection_deck(me):
     return {"draw": len([c for c in query("InfectionCard") if c.Card.pile == 0]),
             "discard": [c.Face.city.defid for c in query("InfectionCard") if c.Face is not None]}
+
+# 손패는 모두에게 공개다. 플레이어 덱은 장수만 보인다
+def hands(me):
+    return [{"player": p, "cards": [c.Face.city.defid for c in p.hand], "size": p.Hand.size}
+            for p in query("Player")]
+
+def player_deck(me):
+    return {"draw": len([c for c in query("PlayerCard") if c.Card.pile == 0])}

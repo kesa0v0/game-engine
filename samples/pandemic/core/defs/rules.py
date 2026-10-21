@@ -1,3 +1,4 @@
+DISEASES = ["Blue", "Yellow"]
 CITIES = ["Atlanta", "Chicago", "Montreal", "NewYork", "Washington", "SanFrancisco",
           "LosAngeles", "MexicoCity", "Miami", "Bogota", "Lima", "SaoPaulo"]
 
@@ -44,12 +45,12 @@ def spread(start):
             if over:
                 queue = queue + [near]
 
-# 감염 덱은 뒷면이다: 뽑을 더미의 카드는 어느 도시인지(Face)를 아무도 못 본다. 버린 카드는 앞면이라 모두 본다.
+# 덱은 뒷면이다: 뽑을 더미의 카드는 어느 도시인지(Face)를 아무도 못 본다. 버린 카드와 손패는 앞면이라 모두 본다.
 # 규칙(커맨드·derived)은 실제 상태를 다 읽고, 걸러지는 것은 화면과 AI가 받는 쪽뿐이다.
 @view_policy
 def may_see(viewer, entity, component):
     if component == "Face":
-        return entity.Card.pile == 1
+        return entity.Card.pile != 0
     return True
 
 # 버린 더미와 뽑을 더미를 합쳐 다시 섞는다 (카드 순서는 자리 값, 작을수록 위)
@@ -88,6 +89,38 @@ def infect(g):
         if g.Match.lost:
             break
 
+# 플레이어 덱에서 맨 위 카드를 한 장 뽑아 손에 든다. 덱이 비어 못 뽑았으면 False
+def draw_player(p):
+    cards = [c for c in query("PlayerCard") if c.Card.pile == 0]
+    if len(cards) == 0:
+        return False
+    top = cards[0]
+    for c in cards:
+        if c.Card.slot < top.Card.slot:
+            top = c
+    top.Card.pile = 2
+    top.Held.holder = p
+    return True
+
+# 카드 두 장을 뽑는다. 못 뽑으면 진다 (덱이 바닥난 것)
+def draw_phase(g, p):
+    for i in range(2):
+        got = draw_player(p)
+        if not got:
+            g.Match.deck_out = True
+            break
+
+# 이 도시의 카드를 손에 들고 있나
+def card_of(p, city):
+    for c in p.hand:
+        if c.Face.city == city:
+            return c
+    return None
+
+def discard_card(c):
+    c.Card.pile = 1
+    c.Held.holder = None
+
 @command(free=True, acts_for=None)
 def Start():
     with preconditions:
@@ -99,6 +132,10 @@ def Start():
     for name in random.sample(CITIES, len(CITIES)):
         spawn("Infection", Card=Card(slot=slot), Face=Face(city=city_of(defid(name))))
         slot += 1
+    slot = 0
+    for name in random.sample(CITIES, len(CITIES)):
+        spawn("Back", Card=Card(slot=slot), Face=Face(city=city_of(defid(name))))
+        slot += 1
     alice = spawn("Alice")
     bob = spawn("Bob")
     alice.Order.next = bob
@@ -106,16 +143,26 @@ def Start():
     alice.At.city = city_of(defid("Atlanta"))
     bob.At.city = city_of(defid("Atlanta"))
     g = spawn("Pandemic")
+    # 처음 손패: 둘이서 하면 네 장씩
+    for p in [alice, bob]:
+        for i in range(4):
+            got = draw_player(p)
     # 처음 감염: 세 장은 큐브 3개, 세 장은 2개, 세 장은 1개
     for amount in [3, 3, 3, 2, 2, 2, 1, 1, 1]:
         card = draw_infection()
         card.Face.city.Cubes[card.Face.city.City.disease].count = amount
     p = alice
     while not g.Match.lost:
-        r = ask(p, "pandemic-turn", responses=["Move", "EndTurn"], data={"turn": g.Match.turn, "left": p.Actions.left})
+        r = ask(p, "pandemic-turn", responses=["Move", "DirectFlight", "BuildStation", "Treat", "EndTurn"],
+            data={"turn": g.Match.turn, "left": p.Actions.left})
         if r.response == "EndTurn" or p.Actions.left == 0:
             p.Actions.left = 4
-            infect(g)
+            draw_phase(g, p)
+            # 손이 넘치면 한도까지 버려야 한다
+            while p.Hand.over and not g.Match.lost:
+                ask(p, "pandemic-discard", responses=["Discard"], data={"size": p.Hand.size})
+            if not g.Match.lost:
+                infect(g)
             p = p.Order.next
             g.Match.turn += 1
 
@@ -126,6 +173,43 @@ def Move(player: Ref[Player], to: DefId[City]):
         choose(to, from_=reachable(player))
     player.At.city = city_of(to)
     player.Actions.left -= 1
+
+# 직항: 가려는 도시의 카드를 버리고 그 도시로 간다
+@command(acts_for=lambda player: player)
+def DirectFlight(player: Ref[Player], card: Ref[PlayerCard]):
+    with preconditions:
+        require(player.Actions.left > 0, text("pandemic-no-actions"))
+        choose(card, where=lambda c: c.Held.holder == player and c.Face.city is not None and c.Face.city != player.At.city)
+    player.At.city = card.Face.city
+    discard_card(card)
+    player.Actions.left -= 1
+
+# 연구소 짓기: 지금 있는 도시의 카드를 버린다
+@command(acts_for=lambda player: player)
+def BuildStation(player: Ref[Player], card: Ref[PlayerCard]):
+    with preconditions:
+        require(player.Actions.left > 0, text("pandemic-no-actions"))
+        require(not player.At.city.Research.station, text("pandemic-has-station"))
+        choose(card, where=lambda c: c.Held.holder == player and c.Face.city == player.At.city)
+    player.At.city.Research.station = True
+    discard_card(card)
+    player.Actions.left -= 1
+
+# 치료: 지금 있는 도시의 그 질병 큐브 하나를 걷는다
+@command(acts_for=lambda player: player)
+def Treat(player: Ref[Player], disease: DefId[Disease]):
+    with preconditions:
+        require(player.Actions.left > 0, text("pandemic-no-actions"))
+        choose(disease, from_=[defid(d) for d in DISEASES if player.At.city.Cubes[defid(d)].count > 0])
+    player.At.city.Cubes[disease].count -= 1
+    player.Actions.left -= 1
+
+# 손이 넘칠 때 한 장 버린다 (질문 "pandemic-discard"에 대한 답)
+@command(acts_for=lambda player: player)
+def Discard(player: Ref[Player], card: Ref[PlayerCard]):
+    with preconditions:
+        choose(card, where=lambda c: c.Held.holder == player)
+    discard_card(card)
 
 @command(acts_for=lambda player: player)
 def EndTurn(player: Ref[Player]):

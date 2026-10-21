@@ -291,6 +291,133 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(drawn, Is.All.EqualTo(1));
             Assert.That(DrawPile().Select(CardCity), Is.EqualTo(new[] { order[2] }));
         }
+
+        // ---- 플레이어 덱, 손패, 행동 (4a조각) ----
+
+        private IEnumerable<EntityId> PlayerCards() => _w.All("PlayerCard");
+
+        private long PileOf(EntityId card) => ((IntValue)_w.Get(card, _w.Member("Card", "pile"))).Value;
+
+        private string FaceCity(EntityId card)
+        {
+            var city = (EntityValue)_w.Get(card, _w.Member("Face", "city"));
+            return _w.DefOf(city.Id).Substring("pandemic:".Length);
+        }
+
+        private List<EntityId> HandOf(EntityId player) =>
+            PlayerCards().Where(c => PileOf(c) == 2 && ((EntityValue)_w.Get(c, _w.Member("Held", "holder"))).Id.Equals(player)).ToList();
+
+        private long DeckSize() => PlayerCards().Count(c => PileOf(c) == 0);
+
+        /// <summary>그 도시의 플레이어 카드를 이 플레이어의 손에 쥐여 준다 (이미 어디 있든).</summary>
+        private EntityId Give(string city, EntityId player)
+        {
+            var card = PlayerCards().Single(c => FaceCity(c) == city);
+            _w.Set(card, _w.Member("Card", "pile"), new IntValue(2));
+            _w.Set(card, _w.Member("Held", "holder"), new EntityValue(player));
+            return card;
+        }
+
+        private AnswerResult Act(string seat, string command, params (string Name, Value Value)[] args) =>
+            _w.Respond(seat, _w.OpenRequests.Single().Id, "pandemic." + command, args.ToDictionary(a => a.Name, a => a.Value));
+
+        private bool DeckOut() => ((BoolValue)_w.Get(Game(), _w.Member("Match", "deck_out"))).Value;
+
+        [Test]
+        public void EachPlayerStartsWithFourCardsAndTheRestIsTheDeck()
+        {
+            Assert.That(HandOf(_alice), Has.Count.EqualTo(4));
+            Assert.That(HandOf(_bob), Has.Count.EqualTo(4));
+            Assert.That(DeckSize(), Is.EqualTo(4));
+            Assert.That(((IntValue)_w.Get(_alice, _w.Member("Hand", "size"))).Value, Is.EqualTo(4));
+        }
+
+        [Test]
+        public void HandsAreOpenButTheDeckIsFaceDown()
+        {
+            foreach (var card in HandOf(_alice)) Assert.That(_w.ViewAs("bob").Sees(card, "Face"), Is.True);
+            foreach (var card in PlayerCards().Where(c => PileOf(c) == 0)) Assert.That(_w.ViewAs("bob").Sees(card, "Face"), Is.False);
+        }
+
+        [Test]
+        public void EndingTheTurnDrawsTwoPlayerCards()
+        {
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            Assert.That(HandOf(_alice), Has.Count.EqualTo(6));
+            Assert.That(DeckSize(), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void AnEmptyDeckLosesTheGame()
+        {
+            ClearCubes();
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            Assert.That(EndTurn("bob", _bob).Succeeded, Is.True);
+            Assert.That(DeckSize(), Is.EqualTo(0));
+            Assert.That(DeckOut(), Is.False);
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            Assert.That(DeckOut(), Is.True);
+            Assert.That(_w.OpenRequests, Is.Empty);
+        }
+
+        [Test]
+        public void AHandOverTheLimitMustDiscardBeforeTheTurnPasses()
+        {
+            ClearCubes();
+            foreach (var card in HandOf(_bob).Take(3)) // 밥의 카드 셋을 받아 4 + 3 = 7장, 뽑으면 9장
+                _w.Set(card, _w.Member("Held", "holder"), new EntityValue(_alice));
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            var ask = _w.OpenRequests.Single();
+            Assert.That(ask.Who, Does.Contain(_alice));
+            Assert.That(((BoolValue)_w.Get(_alice, _w.Member("Hand", "over"))).Value, Is.True);
+            var first = HandOf(_alice).First();
+            Assert.That(Act("alice", "Discard", ("player", new EntityValue(_alice)), ("card", new EntityValue(first))).Succeeded, Is.True);
+            Assert.That(_w.OpenRequests.Single().Who, Does.Contain(_alice)); // 8장이라 한 장 더
+            var second = HandOf(_alice).First();
+            Assert.That(Act("alice", "Discard", ("player", new EntityValue(_alice)), ("card", new EntityValue(second))).Succeeded, Is.True);
+            Assert.That(_w.OpenRequests.Single().Who, Does.Contain(_bob)); // 7장이 되어 차례가 넘어감
+            Assert.That(HandOf(_alice), Has.Count.EqualTo(7));
+        }
+
+        [Test]
+        public void ADirectFlightSpendsTheCardOfTheDestination()
+        {
+            var miami = Give("Miami", _alice);
+            Assert.That(Act("alice", "DirectFlight", ("player", new EntityValue(_alice)), ("card", new EntityValue(miami))).Succeeded, Is.True);
+            Assert.That(CityOf(_alice), Is.EqualTo("pandemic:Miami"));
+            Assert.That(PileOf(miami), Is.EqualTo(1));
+            Assert.That(Left(_alice), Is.EqualTo(3));
+        }
+
+        [Test]
+        public void ADirectFlightCannotUseTheCardOfTheCurrentCity()
+        {
+            var here = Give("Atlanta", _alice);
+            Assert.That(Act("alice", "DirectFlight", ("player", new EntityValue(_alice)), ("card", new EntityValue(here))).Succeeded, Is.False);
+        }
+
+        [Test]
+        public void ABuildingNeedsTheCardOfTheCurrentCity()
+        {
+            var atlanta = Give("Atlanta", _alice);
+            Assert.That(Act("alice", "BuildStation", ("player", new EntityValue(_alice)), ("card", new EntityValue(atlanta))).Succeeded, Is.True);
+            Assert.That(((BoolValue)_w.Get(City("Atlanta"), _w.Member("Research", "station"))).Value, Is.True);
+            Assert.That(PileOf(atlanta), Is.EqualTo(1));
+            var other = Give("Miami", _alice);
+            Assert.That(Act("alice", "BuildStation", ("player", new EntityValue(_alice)), ("card", new EntityValue(other))).Succeeded, Is.False);
+        }
+
+        [Test]
+        public void TreatingTakesOneCubeOfThatDisease()
+        {
+            ClearCubes();
+            SetCubes("Atlanta", "Blue", 2);
+            var blue = new StrValue("pandemic:Blue");
+            Assert.That(Act("alice", "Treat", ("player", new EntityValue(_alice)), ("disease", new StrValue("pandemic:Yellow"))).Succeeded, Is.False);
+            Assert.That(Act("alice", "Treat", ("player", new EntityValue(_alice)), ("disease", blue)).Succeeded, Is.True);
+            Assert.That(Cubes("Atlanta", "Blue"), Is.EqualTo(1));
+            Assert.That(Left(_alice), Is.EqualTo(3));
+        }
         [Test]
         public void TooManyOutbreaksLoseTheGame()
         {

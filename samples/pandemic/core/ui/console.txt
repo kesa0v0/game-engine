@@ -3,3 +3,5 @@ pandemic.status
 pandemic.players
 pandemic.map_rows
 pandemic.infection_deck
+pandemic.hands
+pandemic.player_deck

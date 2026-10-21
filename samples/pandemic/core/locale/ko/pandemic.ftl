@@ -1,6 +1,8 @@
 pandemic-already-started = 게임은 이미 시작했습니다.
 pandemic-no-actions = 이번 차례의 행동을 다 썼습니다.
 pandemic-turn = 차례
+pandemic-discard = 손패 한도까지 버리세요
+pandemic-has-station = 이 도시에는 이미 연구소가 있습니다.
 
 def-pandemic-Alice = 앨리스
 def-pandemic-Bob = 밥
@@ -17,3 +19,5 @@ def-pandemic-Miami = 마이애미
 def-pandemic-Bogota = 보고타
 def-pandemic-Lima = 리마
 def-pandemic-SaoPaulo = 상파울루
+def-pandemic-Back = 플레이어 카드
+def-pandemic-Infection = 감염 카드

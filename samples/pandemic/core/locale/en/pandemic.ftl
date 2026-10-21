@@ -1,6 +1,8 @@
 pandemic-already-started = The game has already started.
 pandemic-no-actions = No actions left this turn.
 pandemic-turn = Your turn
+pandemic-discard = Discard down to the hand limit
+pandemic-has-station = This city already has a research station.
 
 def-pandemic-Alice = Alice
 def-pandemic-Bob = Bob
@@ -17,3 +19,5 @@ def-pandemic-Miami = Miami
 def-pandemic-Bogota = Bogota
 def-pandemic-Lima = Lima
 def-pandemic-SaoPaulo = Sao Paulo
+def-pandemic-Back = player card
+def-pandemic-Infection = infection card
