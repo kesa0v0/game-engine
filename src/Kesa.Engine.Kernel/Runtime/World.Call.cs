@@ -26,14 +26,12 @@ namespace Kesa.Engine.Runtime
             var args = new List<Value>(arguments.Length);
             foreach (var a in arguments) args.Add(ToScript(a));
             // 목록 출처와 틱은 when 조건과 같은 장치로, 읽은 엔티티는 (엔티티, 칸 이름) 단위로 모은다 (G246·G290)
-            var savedWhenReads = _whenReads;
-            var savedReads = _callReads;
+            var savedReads = _whenReads;
             var savedSources = _whenReadsSources;
             bool savedTick = _whenReadsTick;
             var reads = new SortedSet<CallRead>();
             var sources = new SortedSet<string>(StringComparer.Ordinal);
-            _whenReads = new SortedSet<long>();
-            _callReads = reads;
+            _whenReads = reads;
             _whenReadsSources = sources;
             _whenReadsTick = false;
             Value value;
@@ -45,8 +43,7 @@ namespace Kesa.Engine.Runtime
             finally
             {
                 tick = _whenReadsTick;
-                _whenReads = savedWhenReads;
-                _callReads = savedReads;
+                _whenReads = savedReads;
                 _whenReadsSources = savedSources;
                 _whenReadsTick = savedTick;
             }
@@ -157,15 +154,11 @@ namespace Kesa.Engine.Runtime
         /// <summary><c>controller(e)</c>를 읽었다: 배정이 바뀌면 도장이 찍히는 칸. 칸 이름은 식별자라 겹치지 않는다.</summary>
         private const string SeatRead = "@seat";
 
-        /// <summary>호스트가 부르는 중이면 읽은 것을 모은다. 평소에는 null이라 읽기에 비용이 없다.</summary>
-        private SortedSet<CallRead>? _callReads;
+        /// <summary>when 조건을 평가하거나 호스트가 함수를 부르는 중이면 읽은 것을 모은다. 평소에는 null이라 읽기에 비용이 없다.</summary>
+        private SortedSet<CallRead>? _whenReads;
 
-        /// <summary>엔티티 <paramref name="id"/>의 <paramref name="name"/>을 읽었다 (when 조건에는 엔티티를 읽은 것).</summary>
-        private void Read(long id, string? name)
-        {
-            _whenReads?.Add(id);
-            _callReads?.Add(new CallRead(id, name));
-        }
+        /// <summary>엔티티 <paramref name="id"/>의 <paramref name="name"/>을 읽었다.</summary>
+        private void Read(long id, string? name) => _whenReads?.Add(new CallRead(id, name));
 
         /// <summary>읽은 것의 지금 도장. 죽었거나 없는 엔티티는 0이고, 칸은 아직 찍히지 않았으면 만들어진 때다.</summary>
         internal long ReadVersion(long id, string? name)

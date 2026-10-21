@@ -160,7 +160,7 @@ namespace Kesa.Engine.Runtime
 
         private void DropContributionUnjournaled(Contribution row)
         {
-            Touch(row.Target);
+            Touch(row.Target, row.Component.Name);
             Stamp(row.Target, row.Component.Name);
             _contributions.Remove(row.Id);
             Unindex(_contribByTarget, row.Target, row.Id);
@@ -169,7 +169,7 @@ namespace Kesa.Engine.Runtime
 
         private void PutContribution(Contribution row)
         {
-            Touch(row.Target);
+            Touch(row.Target, row.Component.Name);
             Stamp(row.Target, row.Component.Name);
             _contributions.Add(row.Id, row);
             Index(_contribByTarget, row.Target, row.Id);

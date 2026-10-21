@@ -139,7 +139,7 @@ namespace Kesa.Engine.Runtime
             var record = new RowRecord(attached: true);
             values.CopyTo(record.Values);
             var keyedRows = entity.RowsOf(component);
-            Touch(id.Value);
+            Touch(id.Value, componentName);
             Stamp(id.Value, componentName);
             keyedRows.Put(key, record);
             Journal(() => keyedRows.Remove(key));
@@ -180,7 +180,7 @@ namespace Kesa.Engine.Runtime
                 throw new WorldException(Codes.RunNoRow,
                     "the '" + componentName + "' row " + key + " of " + id + " comes from its Def and cannot be removed");
             var keyedRows = entity.Rows[componentName];
-            Touch(id.Value);
+            Touch(id.Value, componentName);
             Stamp(id.Value, componentName);
             keyedRows.Remove(key);
             Journal(() => keyedRows.Put(key, record));

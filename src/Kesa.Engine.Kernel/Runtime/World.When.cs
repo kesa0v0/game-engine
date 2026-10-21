@@ -173,9 +173,10 @@ namespace Kesa.Engine.Runtime
         {
             int round = fired == null ? 1 : fired.Round + 1;
             var eval = new SortedSet<WhenKey>();
+            foreach (var touched in _whenTouchedReads) WakeReaders(touched, eval);
+            _whenTouchedReads.Clear();
             foreach (long id in _whenTouched)
             {
-                if (_whenReaders.TryGetValue(id, out var readers)) eval.UnionWith(readers);
                 if (_entities.TryGetValue(id, out var entity))
                 {
                     // 새 엔티티(또는 아직 본 적 없는 것)는 그 타입을 보는 반응마다 처음 평가한다
@@ -289,15 +290,16 @@ namespace Kesa.Engine.Runtime
         {
             public bool Ok;
             public bool Value;
-            public long[] Reads = Array.Empty<long>();
+            public CallRead[] Reads = Array.Empty<CallRead>();
             public bool Tick;
             public string[] Sources = Array.Empty<string>();
         }
 
         private readonly Dictionary<WhenKey, WhenCache> _whenCache = new Dictionary<WhenKey, WhenCache>();
 
-        /// <summary>엔티티 → 그 엔티티를 읽은 조건.</summary>
-        private readonly Dictionary<long, SortedSet<WhenKey>> _whenReaders = new Dictionary<long, SortedSet<WhenKey>>();
+        /// <summary>엔티티 → 읽은 칸 이름(<see cref="WholeRead"/>는 엔티티 전체) → 그것을 읽은 조건.</summary>
+        private readonly Dictionary<long, SortedDictionary<string, SortedSet<WhenKey>>> _whenReaders =
+            new Dictionary<long, SortedDictionary<string, SortedSet<WhenKey>>>();
 
         /// <summary><c>now()</c>를 읽은 조건: 틱이 바뀌면 다시 본다.</summary>
         private readonly SortedSet<WhenKey> _whenTickReaders = new SortedSet<WhenKey>();
@@ -335,26 +337,51 @@ namespace Kesa.Engine.Runtime
         /// <summary>반응 id → 반응 자리.</summary>
         private readonly Dictionary<string, int> _whenOrder = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        /// <summary>조건을 평가하는 중이면 읽은 엔티티를 모은다. 평소에는 null이라 읽기에 비용이 없다.</summary>
-        private SortedSet<long>? _whenReads;
-
         private bool _whenReadsTick;
 
         /// <summary>테스트용: 정착 때마다 모든 조건을 다시 평가한다. 고르기가 빠뜨린 것이 없는지 결과를 견주는 데 쓴다.</summary>
         internal bool WhenFullScan { get; set; }
 
-        /// <summary>엔티티에 쓰기가 있었다: 그 엔티티를 읽은 조건을 다음 정착에서 다시 본다.</summary>
-        private void Touch(long id)
+        /// <summary>지난 정착 뒤 쓰기가 있었던 (엔티티, 칸). 칸이 null이면 엔티티 전체(생성·삭제)다.</summary>
+        private readonly SortedSet<CallRead> _whenTouchedReads = new SortedSet<CallRead>();
+
+        /// <summary>읽은 것이 엔티티 전체임을 색인에서 가리키는 이름. 칸 이름은 식별자라 겹치지 않는다.</summary>
+        private const string WholeRead = "*";
+
+        /// <summary>
+        /// 엔티티의 칸 <paramref name="name"/>에 쓰기가 있었다(null이면 엔티티 전체, 생성·삭제): 그 칸이나 엔티티 전체를 읽은 조건을
+        /// 다음 정착에서 다시 본다 (G290).
+        /// </summary>
+        private void Touch(long id, string? name)
         {
-            if (_whens.Count > 0) _whenTouched.Add(id);
+            if (_whens.Count == 0) return;
+            _whenTouched.Add(id);
+            _whenTouchedReads.Add(new CallRead(id, name));
         }
+
+        /// <summary>쓰기 하나가 깨우는 조건: 그 칸을 읽은 것과 엔티티 전체를 읽은 것. 이름이 없으면 그 엔티티를 읽은 모든 조건.</summary>
+        private void WakeReaders(CallRead touched, SortedSet<WhenKey> eval)
+        {
+            if (!_whenReaders.TryGetValue(touched.Id, out var byName)) return;
+            if (touched.Name == null)
+            {
+                foreach (var readers in byName.Values) eval.UnionWith(readers);
+                return;
+            }
+            if (byName.TryGetValue(touched.Name, out var named)) eval.UnionWith(named);
+            if (byName.TryGetValue(WholeRead, out var whole)) eval.UnionWith(whole);
+        }
+
+        /// <summary>테스트용: 조건을 평가한 횟수. 고르기가 좁혀졌는지(필요 없는 평가를 안 하는지) 본다.</summary>
+        internal long WhenEvaluations { get; private set; }
 
         /// <summary>조건 하나를 평가해 값과 읽은 것을 기억한다. 오류면 기억을 "모름"으로 두고 예외를 그대로 던진다.</summary>
         private void Evaluate(WhenKey key, WhenDecl w)
         {
+            WhenEvaluations++;
             if (!_whenCache.TryGetValue(key, out var cache)) _whenCache.Add(key, cache = new WhenCache());
             Unlink(key, cache);
-            var reads = new SortedSet<long>();
+            var reads = new SortedSet<CallRead>();
             var sources = new SortedSet<string>(StringComparer.Ordinal);
             _whenReads = reads;
             _whenReadsSources = sources;
@@ -376,7 +403,7 @@ namespace Kesa.Engine.Runtime
             {
                 _whenReads = null;
                 _whenReadsSources = null;
-                cache.Reads = new long[reads.Count];
+                cache.Reads = new CallRead[reads.Count];
                 reads.CopyTo(cache.Reads);
                 cache.Tick = _whenReadsTick;
                 cache.Sources = new string[sources.Count];
@@ -387,9 +414,12 @@ namespace Kesa.Engine.Runtime
                         _whenSourceReaders.Add(name, readers = new SortedSet<WhenKey>());
                     readers.Add(key);
                 }
-                foreach (long id in cache.Reads)
+                foreach (var read in cache.Reads)
                 {
-                    if (!_whenReaders.TryGetValue(id, out var readers)) _whenReaders.Add(id, readers = new SortedSet<WhenKey>());
+                    if (!_whenReaders.TryGetValue(read.Id, out var byName))
+                        _whenReaders.Add(read.Id, byName = new SortedDictionary<string, SortedSet<WhenKey>>(StringComparer.Ordinal));
+                    string slot = read.Name ?? WholeRead;
+                    if (!byName.TryGetValue(slot, out var readers)) byName.Add(slot, readers = new SortedSet<WhenKey>());
                     readers.Add(key);
                 }
                 if (cache.Tick) _whenTickReaders.Add(key);
@@ -401,11 +431,13 @@ namespace Kesa.Engine.Runtime
         /// <summary>조건의 지난 읽기를 색인에서 뺀다.</summary>
         private void Unlink(WhenKey key, WhenCache cache)
         {
-            foreach (long id in cache.Reads)
-                if (_whenReaders.TryGetValue(id, out var readers))
+            foreach (var read in cache.Reads)
+                if (_whenReaders.TryGetValue(read.Id, out var byName) && byName.TryGetValue(read.Name ?? WholeRead, out var readers))
                 {
                     readers.Remove(key);
-                    if (readers.Count == 0) _whenReaders.Remove(id);
+                    if (readers.Count > 0) continue;
+                    byName.Remove(read.Name ?? WholeRead);
+                    if (byName.Count == 0) _whenReaders.Remove(read.Id);
                 }
             foreach (var name in cache.Sources)
                 if (_whenSourceReaders.TryGetValue(name, out var readers))

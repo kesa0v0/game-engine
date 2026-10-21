@@ -104,7 +104,7 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         private void Assign(long owner, ComponentType component, Dictionary<MemberDecl, Value> values, MemberDecl member, Value value)
         {
-            Touch(owner);
+            Touch(owner, component.Name);
             Stamp(owner, component.Name);
             if (_undo != null) _undo.Add(UndoEntry.Slot(values, member, values.TryGetValue(member, out var old) ? old : null));
             values[member] = value;

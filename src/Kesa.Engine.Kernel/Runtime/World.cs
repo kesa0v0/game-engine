@@ -192,7 +192,7 @@ namespace Kesa.Engine.Runtime
             _entities.Add(id, entity);
             if (!_byType.TryGetValue(def.Type, out var set)) _byType.Add(def.Type, set = new SortedSet<long>());
             set.Add(id);
-            Touch(id);
+            Touch(id, null);
             TouchSources(entity); // 그 타입과 컴포넌트의 query 목록이 바뀐다 (G193)
             StampCreated(id);
             // 되감으면 엔티티도 id도 쓰지 않은 것이 된다 (G133). 색인은 아래에서 따로 기록된다
@@ -236,7 +236,7 @@ namespace Kesa.Engine.Runtime
             foreach (var component in ComponentsOf(entity)) UnindexRefs(entity, component);
             DropContributionsOf(id.Value);
             _destroyedSinceSweep = true; // 멈춘 Flow의 대상을 다음 확인 때 본다 (G164). 되감겨도 한 번 더 볼 뿐이다
-            Touch(id.Value); // 이 엔티티를 읽거나 Ref로 가리킨 조건을 다시 본다
+            Touch(id.Value, null); // 이 엔티티를 읽거나 Ref로 가리킨 조건을 다시 본다
             TouchSources(entity);
             StampDestroyed(id.Value);
             DropSeat(id.Value);
@@ -258,7 +258,7 @@ namespace Kesa.Engine.Runtime
                     {
                         var rows = pair.Value;
                         if (!rows.ByEntity.TryGetValue(id.Value, out var row)) continue;
-                        Touch(holder);
+                        Touch(holder, pair.Key);
                         Stamp(holder, pair.Key);
                         rows.ByEntity.Remove(id.Value);
                         Journal(() => rows.ByEntity.Add(id.Value, row));
@@ -326,7 +326,7 @@ namespace Kesa.Engine.Runtime
             // 키 컴포넌트는 줄 없이 시작한다. 줄의 값은 AddRow가 생성 순간에 검사한다 (keys="all"은 G77·G93이 기본값을 보장)
             if (!component.IsKeyed) PlanMembers(values, component, null, given, "adding '" + componentName + "' to " + id);
 
-            Touch(id.Value);
+            Touch(id.Value, component.Name);
             TouchSource(component.Name);
             Stamp(id.Value, component.Name);
             entity.Runtime.Add(component.Name, component);
@@ -368,7 +368,7 @@ namespace Kesa.Engine.Runtime
             foreach (var member in component.Members)
                 if (entity.Values.TryGetValue(member, out var v)) oldValues.Add(new KeyValuePair<MemberDecl, Value>(member, v));
             entity.Rows.TryGetValue(componentName, out var oldRows);
-            Touch(id.Value);
+            Touch(id.Value, componentName);
             TouchSource(componentName);
             Stamp(id.Value, componentName);
             foreach (var member in component.Members) entity.Values.Remove(member);
@@ -448,7 +448,7 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>
         /// 엔티티의 칸 <paramref name="name"/>(컴포넌트·역방향 컬렉션 이름, <see cref="AliveRead"/>, null이면 전체)을 읽는다. 영수증은
-        /// 그 칸이 바뀔 때만 다시 부르고(G290), when 조건은 엔티티 단위로 기록한다.
+        /// 그 칸이 바뀔 때만 다시 부르고, when 조건도 그 칸이 바뀔 때만 다시 본다 (G290).
         /// </summary>
         private EntityRecord Record(EntityId id, string? name)
         {

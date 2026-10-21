@@ -30,7 +30,7 @@ namespace Kesa.Engine.Runtime
             if (!IsAlive(id)) throw new WorldException(Codes.RunSeat, "cannot seat a connection at " + id + ": it is not alive");
             _seats[id.Value] = (issuer, kind);
             SeatsVersion++;
-            Touch(id.Value); // controller(e)를 읽은 when 조건을 다시 본다
+            Touch(id.Value, SeatRead); // controller(e)를 읽은 when 조건을 다시 본다
             Stamp(id.Value, SeatRead);
         }
 
@@ -40,7 +40,7 @@ namespace Kesa.Engine.Runtime
             NoHostWrites("Unseat");
             if (!_seats.Remove(id.Value)) return;
             SeatsVersion++;
-            Touch(id.Value);
+            Touch(id.Value, SeatRead);
             Stamp(id.Value, SeatRead);
         }
 
