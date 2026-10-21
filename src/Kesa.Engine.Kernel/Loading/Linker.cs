@@ -24,6 +24,9 @@ namespace Kesa.Engine.Loading
         // 같은 값을 물려받은 자식마다 같은 오류가 반복되지 않게 한다
         private readonly HashSet<string> _reported = new HashSet<string>(StringComparer.Ordinal);
 
+        /// <summary>지금 검사하는 값이 Def에 적은 컴포넌트 값이면 그 Def 타입 (선언 보너스를 드는 엔티티의 타입, G300). 아니면 null.</summary>
+        private DefType? _holder;
+
         private Linker(DefRegistry defs, SchemaSet schema, ModVisibility visibility, Func<string, ModManifest?> manifest,
             StageDiagnostics stage)
         {
@@ -155,7 +158,9 @@ namespace Kesa.Engine.Loading
             {
                 def.Components.TryGet(name, out var rc);
                 var component = rc.Component;
+                _holder = def.Type; // 이 컴포넌트 값의 선언 보너스는 이 타입의 엔티티가 든다 (G300의 to= 검사)
                 CheckMembers(rc.Members, component);
+                _holder = null;
                 foreach (var key in rc.Rows.Keys)
                 {
                     rc.Rows.TryGet(key, out var row);
@@ -240,6 +245,7 @@ namespace Kesa.Engine.Loading
                 _stage.Error(mod, code, message, span, hint);
             }
 
+            if (c.To != null) CheckContribTo(blame, c);
             if (!_schema.TryGetComponent(c.Component, out var component))
             {
                 var names = new List<string>();
@@ -291,6 +297,84 @@ namespace Kesa.Engine.Loading
                 return;
             }
             CheckId(blame, c.Key, component.Key!.Name);
+        }
+
+        /// <summary>
+        /// <c>to=</c> (G300): <c>"C.r"</c>면 키 없는 컴포넌트 C의 Ref 칼럼 r(역방향 색인이 있는 것), 아니면 어느 Def 타입의 역방향 컬렉션 이름.
+        /// 선언을 든 타입을 알면(Def에 적은 컴포넌트 값) 역방향 컬렉션은 그 타입의 것이어야 한다. 컴포넌트는 런타임에 붙일 수 있어
+        /// 닿는 엔티티가 대상 컴포넌트를 가질지는 보지 않는다.
+        /// </summary>
+        private void CheckContribTo(ValueBlame blame, ContribValue c)
+        {
+            string mod = blame.Mod;
+            var span = c.ToSpan.File.Length > 0 ? c.ToSpan : blame.Span;
+            string to = c.To!;
+
+            void Fail(string code, string message, string? hint = null)
+            {
+                if (!_reported.Add(mod + "\n" + span + "\n" + code + "\nto=" + to)) return;
+                _stage.Error(mod, code, message, span, hint);
+            }
+
+            int dot = to.IndexOf('.');
+            if (dot >= 0)
+            {
+                string componentName = to.Substring(0, dot), refName = to.Substring(dot + 1);
+                if (!_schema.TryGetComponent(componentName, out var component))
+                {
+                    var names = new List<string>();
+                    foreach (var x in _schema.Components) names.Add(x.Name);
+                    Fail(Codes.LnkNotFound, "contrib(to=\"" + to + "\"): there is no component '" + componentName + "'",
+                        Suggest.Hint(componentName, names));
+                    return;
+                }
+                if (!_visibility.CanSee(mod, component.Mod))
+                {
+                    Fail(Codes.LnkNotVisible,
+                        "component '" + componentName + "' belongs to mod '" + component.Mod + "', which mod '" + mod + "' does not depend on",
+                        "add \"" + component.Mod + "\" to dependencies in mod.py");
+                    return;
+                }
+                if (!component.TryGetMember(refName, out var reference) || reference.Kind != MemberKind.Ref)
+                {
+                    var refs = new List<string>();
+                    foreach (var m in component.Members)
+                        if (m.Kind == MemberKind.Ref) refs.Add(m.Name);
+                    Fail(reference == null ? Codes.LnkNotFound : Codes.LnkWrongType,
+                        "contrib(to=\"" + to + "\"): '" + componentName + "' has no ref column '" + refName + "'",
+                        refs.Count == 0 ? "to= follows a ref(...) column (spec-gaps G300)" : Suggest.Hint(refName, refs));
+                    return;
+                }
+                if (component.IsKeyed)
+                    Fail(Codes.LnkWrongType, "contrib(to=\"" + to + "\"): '" + componentName + "' is a keyed component",
+                        "to= follows a ref column of a component without key= (spec-gaps G300)");
+                return;
+            }
+
+            var owners = new List<DefType>();
+            var all = new List<string>();
+            foreach (var type in _schema.Types)
+            {
+                foreach (var inverse in type.Inverses)
+                {
+                    all.Add(inverse.Name);
+                    if (inverse.Name == to && _visibility.CanSee(mod, inverse.Mod)) owners.Add(type);
+                }
+            }
+            if (owners.Count == 0)
+            {
+                Fail(Codes.LnkNotFound, "contrib(to=\"" + to + "\"): there is no inverse collection '" + to + "'",
+                    Suggest.Hint(to, all) ?? "to= is \"Component.ref\" or the name of an inverse collection (spec-gaps G300)");
+                return;
+            }
+            if (_holder != null && !owners.Contains(_holder))
+            {
+                var mine = new List<string>();
+                foreach (var inverse in _holder.Inverses) mine.Add(inverse.Name);
+                Fail(Codes.LnkNotFound,
+                    "contrib(to=\"" + to + "\") is declared on a " + _holder.Name + ", which has no inverse collection '" + to + "'",
+                    Suggest.Hint(to, mine) ?? "the step starts from the entity that declares the contribution (spec-gaps G300)");
+            }
         }
 
         private void CheckId(ResolvedValue origin, string id, string typeName, SourceSpan literal, SourceSpan fallback) =>

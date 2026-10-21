@@ -1,6 +1,6 @@
 # 인계 메모: 현재 상태와 다음 할 일
 
-마지막 갱신: 2026-10-21. 브랜치 `spec-v0.5-scaffold`, 테스트 2344개 통과(커널 2191, CLI 42, 콘솔 호스트 62, 번역 49). 모더용 안내서는 `docs/modding/`(G252, 예시 모드 `samples/guide`). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
+마지막 갱신: 2026-10-21. 브랜치 `spec-v0.5-scaffold`, 테스트 2353개 통과(커널 2200, CLI 42, 콘솔 호스트 62, 번역 49). 모더용 안내서는 `docs/modding/`(G252, 예시 모드 `samples/guide`). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
 
 ## 한 줄 요약
 
@@ -37,7 +37,7 @@
 
 ## 다음 할 일 (사용자와 고를 것)
 
-**진행 중 (2026-10-21): 기여 행과 선언 보너스(G294).** 보너스를 손으로 넣는 것(값 기여 행)과 있으면 붙는 것(선언 보너스)을 나눴다. 커널은 선언 보너스(붙은 컴포넌트·키 줄의 키 Def가 선언, `contribs()`가 읽을 때 모음)와 스크립트용 기여 행 넣기·빼기, 이름 있는 효과는 `std.stats`. 표기는 G295(보너스 값 타입 목록인 `const` 칸을 모음). 이름은 G296(`contrib(...)` → `Contrib`). 키 줄은 G297(`key="Medicine"`). 출처는 G298(`source`·`component`·`key`). 스크립트 내장은 G299(`add_contrib`·`remove_contrib`·`remove_contribs`). 다른 엔티티는 G300(`to=` 한 걸음). 조건부는 G301(`when=lambda src, dst`). **설계는 끝났다. 구현:** 1단계 스크립트 내장 셋과 `c.id` 끝(G299, `ScriptContributionTests`). 2단계 선언 보너스의 기본 끝(G295~G298: `Contrib`·`contrib(...)`, 로드 검사, `contribs()`가 자기 엔티티의 선언을 모음, `component`·`key`, `Explain`, `DeclaredContributionTests`). 다음 3단계 `to=`(G300, 선언 쪽 Ref나 역방향 컬렉션 한 걸음: `contrib(...)`에 `to=` 인자, 로드 검사, 모으기는 대상 엔티티를 가리키는 엔티티들의 선언까지, `source`는 그 엔티티), 4단계 `when=`(G301), 5단계 남은 스텁·안내서·판데믹 4c. 판데믹 4c 역할(과학자 치료 카드 4장)은 이것을 써 보는 예시로.
+**진행 중 (2026-10-21): 기여 행과 선언 보너스(G294).** 보너스를 손으로 넣는 것(값 기여 행)과 있으면 붙는 것(선언 보너스)을 나눴다. 커널은 선언 보너스(붙은 컴포넌트·키 줄의 키 Def가 선언, `contribs()`가 읽을 때 모음)와 스크립트용 기여 행 넣기·빼기, 이름 있는 효과는 `std.stats`. 표기는 G295(보너스 값 타입 목록인 `const` 칸을 모음). 이름은 G296(`contrib(...)` → `Contrib`). 키 줄은 G297(`key="Medicine"`). 출처는 G298(`source`·`component`·`key`). 스크립트 내장은 G299(`add_contrib`·`remove_contrib`·`remove_contribs`). 다른 엔티티는 G300(`to=` 한 걸음). 조건부는 G301(`when=lambda src, dst`). **설계는 끝났다. 구현:** 1단계 스크립트 내장 셋과 `c.id` 끝(G299, `ScriptContributionTests`). 2단계 선언 보너스의 기본 끝(G295~G298: `Contrib`·`contrib(...)`, 로드 검사, `contribs()`가 자기 엔티티의 선언을 모음, `component`·`key`, `Explain`, `DeclaredContributionTests`). 3단계 `to=` 끝(G300, `ContributionStepTests`; G300이 적은 "닿는 엔티티 타입이 대상 컴포넌트를 가질 수 있는지" 검사는 컴포넌트를 런타임에 아무 엔티티에나 붙일 수 있어 하지 않았다. 사용자에게 물음). 다음 4단계 `when=`(G301), 5단계 남은 스텁·안내서·판데믹 4c. 판데믹 4c 역할(과학자 치료 카드 4장)은 이것을 써 보는 예시로.
 
 **진행 중 (2026-10-21): 예시 게임 키우기, Pandemic 따라 해 보기.** 1조각(지도와 말)과 2조각(감염·연쇄 폭발·`derived`) 끝: `samples/pandemic`, `PandemicTests` 14개. 다음 조각(4b 에픽·치료제·박멸 `@when`·승패 끝, `PandemicTests` 37개): 4c 역할(기여 행은 스크립트 내장이 없어 그때 선택). 그 뒤 치료·역할(기여 행), 확장 모드. 규칙은 일반 지식으로 쓰므로 규칙서와 대조할 것. 드러난 구멍은 `e.defid`(G293)로 메움. 신호 핸들러는 Flow가 멈춘 뒤에 돈다(의도): 순서가 중요한 연쇄는 모드가 작업 목록으로 푼다. 자세한 것은 history의 "예시 게임 키우기".
 

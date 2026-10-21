@@ -125,7 +125,20 @@ component("Fleet", strength=derived(int, lambda f: sum([s.Hull.hp for s in f.ent
   하고 그 줄이 없는 엔티티에서는 건너뛴다. 값이 Def에 있으니 다른 모드가 `patch.append`로 더할 수 있고 옛 세이브에도 반영된다.
   모인 행은 `id`가 `None`(뗄 수 없다. 컴포넌트를 떼거나 줄을 지운다), `source`는 그 엔티티, `component`는 선언이 있던 컴포넌트
   (`"Traits"`), `key`는 키 줄에서 왔으면 그 Def id(`"mymod:Tough"`)다. 저장된 행은 `component`·`key`가 `None`이다.
-  다른 엔티티(든 칼)에서 오는 보너스(`to=`)와 조건부 보너스(`when=`)는 아직 없다(9장).
+  다른 엔티티에 주는 보너스는 `to=`로 한 걸음 간다. `"컴포넌트.ref칼럼"`이면 그 Ref가 가리키는 엔티티에, 역방향 컬렉션 이름이면
+  그 컬렉션의 모든 엔티티에 간다. 없으면 자기 자신이다.
+
+  ```python
+  Sword("Longsword", Blade=Blade(grants=[
+      contrib("Melee.dmg", "add", 5, to="Held.holder"),   # 든 폰에게
+      contrib("Durability.max", "add", 20),               # 칼 자신에게
+  ]))
+  Faction("Rome", Tech=Tech(grants=[contrib("Morale.value", "add", 1, to="units")]))   # 이 진영을 가리키는 유닛들에게
+  ```
+
+  Ref는 키 없는 컴포넌트의 것이어야 하고, 역방향 컬렉션은 선언을 든 타입의 것이어야 한다(로드 때 검사). 칼을 내려놓거나 Ref가
+  비거나 칼이 죽으면 보너스는 저절로 빠진다. 모인 행의 `source`는 칼·진영이다. 여러 걸음(진영 → 지방 → 유닛)과 조건부 보너스
+  (`when=`)는 아직 없다(9장).
 - 같은 엔티티 안에서 자기를 다시 읽는 순환은 로드 때 `SCH009`. 다른 엔티티를 거치는 순환은 실행 때 `RUN014`.
 
 ## 난수

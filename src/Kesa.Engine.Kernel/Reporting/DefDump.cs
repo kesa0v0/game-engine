@@ -175,7 +175,8 @@ namespace Kesa.Engine.Reporting
                     case ContribValue contrib:
                         return new JsonObject().Add("contrib", JsonNode.String(contrib.Target))
                             .Add("op", JsonNode.String(contrib.Op)).Add("value", JsonNode.String(contrib.Amount.ToString()))
-                            .Add("key", contrib.Key == null ? JsonNode.Null : JsonNode.String(contrib.Key));
+                            .Add("key", contrib.Key == null ? JsonNode.Null : JsonNode.String(contrib.Key))
+                            .Add("to", contrib.To == null ? JsonNode.Null : JsonNode.String(contrib.To));
                     case ComponentValue cv:
                         var fields = new JsonObject();
                         foreach (var f in cv.Fields) fields.Add(f.Name, Value(f.Value));

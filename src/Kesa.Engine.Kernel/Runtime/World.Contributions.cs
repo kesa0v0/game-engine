@@ -242,6 +242,69 @@ namespace Kesa.Engine.Runtime
 
         private List<DeclarationSite>? _declarationSites;
 
+        /// <summary>내용에 실제로 적힌 <c>to=</c> 걸음들 (G300): Ref 칼럼과 역방향 컬렉션. 없는 걸음은 읽을 때 찾지 않는다.</summary>
+        private sealed class StepSet
+        {
+            public List<(MemberDecl Member, string To)> Refs { get; } = new List<(MemberDecl, string)>();
+            public List<InverseRelation> Inverses { get; } = new List<InverseRelation>();
+        }
+
+        private StepSet? _contributionSteps;
+
+        private StepSet ContributionSteps()
+        {
+            if (_contributionSteps != null) return _contributionSteps;
+            var names = new SortedSet<string>(StringComparer.Ordinal);
+            foreach (var def in _defs.Defs)
+            {
+                foreach (var name in def.Consts.Keys)
+                {
+                    def.Consts.TryGet(name, out var value);
+                    AddSteps(value.Value, names);
+                }
+                foreach (var name in def.Components.Keys)
+                {
+                    def.Components.TryGet(name, out var rc);
+                    foreach (var m in rc.Members.Keys)
+                    {
+                        rc.Members.TryGet(m, out var value);
+                        AddSteps(value.Value, names);
+                    }
+                }
+            }
+            // 런타임에 붙인 컴포넌트는 스키마 기본값을 쓴다
+            foreach (var component in _schema.Components)
+                foreach (var m in component.Members)
+                    if (m.Spec.Default != null) AddSteps(m.Spec.Default, names);
+            foreach (var type in _schema.Types)
+                foreach (var m in type.Consts)
+                    if (m.Spec.Default != null) AddSteps(m.Spec.Default, names);
+
+            var steps = new StepSet();
+            foreach (var name in names)
+            {
+                int dot = name.IndexOf('.');
+                if (dot >= 0)
+                {
+                    if (_schema.TryGetComponent(name.Substring(0, dot), out var component) && !component.IsKeyed &&
+                        component.TryGetMember(name.Substring(dot + 1), out var reference) && reference.Kind == MemberKind.Ref)
+                        steps.Refs.Add((reference, name));
+                    continue;
+                }
+                foreach (var type in _schema.Types)
+                    foreach (var inverse in type.Inverses)
+                        if (inverse.Name == name) steps.Inverses.Add(inverse);
+            }
+            return _contributionSteps = steps;
+        }
+
+        private static void AddSteps(Value value, SortedSet<string> names)
+        {
+            if (!(value is ListValue list)) return;
+            foreach (var item in list.Items)
+                if (item is ContribValue c && c.To != null) names.Add(c.To);
+        }
+
         private List<DeclarationSite> DeclarationSites()
         {
             if (_declarationSites != null) return _declarationSites;
@@ -263,8 +326,9 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>
-        /// 붙은 컴포넌트와 키 줄의 키 Def가 선언한 보너스 중 이 자리를 겨냥한 것을 저장된 줄 뒤에 붙인다 (컴포넌트 순, 키 id 순).
-        /// 선언이 있을 수 있는 컴포넌트는 모두 읽은 것으로 적어, 나중에 붙거나 떼어져도 <c>@when</c>이 깨어난다.
+        /// 선언 보너스를 저장된 줄 뒤에 붙인다: 먼저 자기 엔티티의 것, 그 뒤 <c>to=</c>로 이 엔티티에 닿는 엔티티들의 것 (G300).
+        /// Ref 걸음(<c>to="Held.holder"</c>)은 역방향 색인으로 나를 가리키는 엔티티를(id 순), 역방향 컬렉션 걸음(<c>to="units"</c>)은
+        /// 내 Ref가 가리키는 엔티티를 찾는다. 관계가 바뀌면 그 쓰기가 이 엔티티를 건드리므로 <c>@when</c>이 깨어난다.
         /// </summary>
         private void CollectDeclared(ComponentView view, MemberDecl member, List<Value> rows)
         {
@@ -274,7 +338,35 @@ namespace Kesa.Engine.Runtime
                 if (view.Row.Value.Kind != KeyKind.Def) return; // 선언의 key=는 Def id뿐이다 (G297)
                 wantKey = view.Row.Value.DefKey;
             }
-            var entity = Record(view.Id);
+            var target = Record(view.Id);
+            CollectFrom(target, null, view, member, wantKey, rows);
+
+            var steps = ContributionSteps();
+            foreach (var step in steps.Refs)
+            {
+                var inverseName = step.Member.Spec.Inverse?.Name;
+                if (inverseName != null) Read(target.Id, inverseName); // 이름 없는 Ref의 변경은 엔티티 전체를 건드린다
+                if (!_inverse.TryGetValue(step.Member, out var byTarget) || !byTarget.TryGetValue(target.Id, out var sources)) continue;
+                foreach (var source in sources)
+                    if (!HiddenFromViewer(source)) CollectFrom(_entities[source], step.To, view, member, wantKey, rows);
+            }
+            foreach (var inverse in steps.Inverses)
+            {
+                Read(target.Id, inverse.Source.Name);
+                if (!Has(target, inverse.Source) || HiddenFromViewer(target.Id, inverse.Source.Name)) continue;
+                if (!target.Values.TryGetValue(inverse.Member, out var value) || !(value is EntityValue holder)) continue;
+                Read(holder.Id.Value, AliveRead);
+                if (!_entities.TryGetValue(holder.Id.Value, out var record) || HiddenFromViewer(holder.Id.Value)) continue;
+                CollectFrom(record, inverse.Name, view, member, wantKey, rows);
+            }
+        }
+
+        /// <summary>
+        /// <paramref name="entity"/>에 붙은 컴포넌트와 키 줄의 키 Def가 선언한 보너스 중, 걸음이 <paramref name="to"/>이고 이 자리를 겨냥한 것
+        /// (컴포넌트 순, 키 id 순). 선언이 있을 수 있는 컴포넌트는 모두 읽은 것으로 적어, 나중에 붙거나 떼어져도 <c>@when</c>이 깨어난다.
+        /// </summary>
+        private void CollectFrom(EntityRecord entity, string? to, ComponentView view, MemberDecl member, string? wantKey, List<Value> rows)
+        {
             foreach (var site in DeclarationSites())
             {
                 var component = site.Component;
@@ -302,7 +394,7 @@ namespace Kesa.Engine.Runtime
                     foreach (var item in ((ListValue)list).Items)
                     {
                         var c = (ContribValue)item;
-                        if (c.Component != view.Component.Name || c.Member != member.Name || c.Key != wantKey) continue;
+                        if (c.To != to || c.Component != view.Component.Name || c.Member != member.Name || c.Key != wantKey) continue;
                         rows.Add(new DeclaredContributionView(this, entity.Id, component.Name, from, c));
                         _trace?.Add(new ExplainNode(ExplainKind.Contribution, view.Id, view.Component.Name, wantKey, member.Name,
                             new FixedValue(c.Amount), new List<ExplainNode>(), c.Op, new EntityId(entity.Id))

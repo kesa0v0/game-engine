@@ -14,7 +14,7 @@ namespace Kesa.Engine.Schema
     {
         public const string Name = "contrib";
 
-        private const string Usage = "contrib(\"Component.derived\", \"op\", value, key=\"Def\")";
+        private const string Usage = "contrib(\"Component.derived\", \"op\", value, key=\"Def\", to=\"Component.ref\")";
 
         public static readonly BuiltinFunction Instance = new BuiltinFunction(Name, Call);
 
@@ -59,8 +59,27 @@ namespace Kesa.Engine.Schema
                     throw ctx.Fail(Codes.DefBadId, "invalid Def id \"" + id + "\" in contrib(key=...): " + problem, ArgReader.SpanOf(keyArg));
                 key = DefIds.Resolve(id, ctx.Mod); // 쓴 모드 기준 전체 이름 (G260·G297)
             }
-            r.RejectRest(new[] { "key" });
-            return new ContribValue(component, member, op, amount, key, ArgReader.SpanOf(targetArg));
+            // to=: 선언을 든 엔티티에서 한 걸음 (G300). "Held.holder"(Ref) 또는 "units"(역방향 컬렉션)
+            string? to = null;
+            var toArg = r.Take("to");
+            if (toArg != null)
+            {
+                to = r.String(toArg, "to");
+                int toDot = to.IndexOf('.');
+                bool ok = toDot < 0
+                    ? SchemaBuiltins.IsIdentifier(to)
+                    : SchemaBuiltins.IsIdentifier(to.Substring(0, toDot)) && SchemaBuiltins.IsIdentifier(to.Substring(toDot + 1));
+                if (!ok)
+                    throw ctx.Fail(Codes.EvlArguments,
+                        "to= is \"Component.ref\" or the name of an inverse collection, not \"" + to + "\"", ArgReader.SpanOf(toArg),
+                        hint: "one step from the entity that declares it, e.g. to=\"Held.holder\" or to=\"units\" (spec-gaps G300)");
+            }
+            r.RejectRest(new[] { "key", "to" });
+            return new ContribValue(component, member, op, amount, key, ArgReader.SpanOf(targetArg))
+            {
+                To = to,
+                ToSpan = toArg == null ? SourceSpan.None : ArgReader.SpanOf(toArg),
+            };
         }
     }
 }
