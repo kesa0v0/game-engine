@@ -501,6 +501,25 @@ namespace Kesa.Engine.Runtime
                             }
                             return new DefView(this, id, defType);
                         }
+                        case "def_data":
+                        {
+                            var v = AsObject(tag.Value, "a Def data view");
+                            string id = Text(Field(v, "def"), "a Def id");
+                            if (!_defs.TryGet(id, out var def))
+                            {
+                                problems.Add(where + ": the Def '" + id + "' no longer exists");
+                                return NoneValue.Instance;
+                            }
+                            var typeNode = Field(v, "type");
+                            if (typeNode is JsonNull) return new DefDataView(this, def, null);
+                            string type = Text(typeNode, "a Def type");
+                            if (!_schema.TryGetType(type, out var defType) || def.Type != defType)
+                            {
+                                problems.Add(where + ": the Def '" + id + "' is no longer a " + type);
+                                return NoneValue.Instance;
+                            }
+                            return new DefDataView(this, def, defType);
+                        }
                         case "answer":
                         {
                             var v = AsObject(tag.Value, "an answer");

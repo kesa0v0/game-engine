@@ -140,7 +140,9 @@ namespace Kesa.Engine.Runtime
             {
                 text.Append(Component).Append('.').Append(Member);
                 if (Key != null) text.Append('[').Append(Key).Append(']');
-                text.Append(" of ").Append(Entity).Append(" = ").Append(World.Show(Value));
+                // defdata(id)로 읽은 Def 상수는 엔티티가 없다 (Key가 Def id, G303)
+                if (Entity.Value != 0) text.Append(" of ").Append(Entity);
+                text.Append(" = ").Append(World.Show(Value));
             }
             text.Append('\n');
             foreach (var read in Reads) read.Append(text, depth + 1);

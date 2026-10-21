@@ -245,6 +245,11 @@ namespace Kesa.Engine.Runtime
                 {
                     CallerBody = DefIdBuiltin,
                 });
+            table.Add(PureBuiltins.DefDataName,
+                new PureBuiltin(PureBuiltins.DefDataName, (p, k) => DefDataBuiltin(_evaluator?.ScriptMod ?? "", p, k))
+                {
+                    CallerBody = DefDataBuiltin,
+                });
             AddStructureBuiltins(table);
             AddContributionBuiltins(table);
             AddSignalBuiltins(table);
@@ -761,83 +766,6 @@ namespace Kesa.Engine.Runtime
             }
             throw new ScriptRuntimeException(Codes.RunScript,
                 id + " (" + entity.Def.Id + ") has no component or collection '" + name + "'", Suggest.Hint(name, candidates));
-        }
-
-        /// <summary>엔티티의 Def 타입 이름으로 그 타입 바로 아래의 <c>const</c>들을 본다 (<c>g.ConflictGoal.succeeded</c>, G107). 다른 타입이면 None.</summary>
-        private Value DefOrNone(EntityRecord entity, DefType type) =>
-            entity.Def.Type == type ? new DefView(this, entity.Id, type) : (Value)NoneValue.Instance;
-
-        private Value DefConst(long id, DefType type, string name)
-        {
-            var entity = Record(new EntityId(id), AliveRead);
-            MemberDecl? found = null;
-            foreach (var decl in type.Consts)
-                if (decl.Name == name) found = decl;
-            if (found == null)
-            {
-                var names = new List<string>();
-                foreach (var decl in type.Consts) names.Add(decl.Name);
-                throw new ScriptRuntimeException(Codes.RunScript, "Def type '" + type.Name + "' has no const '" + name + "'",
-                    Suggest.Hint(name, names));
-            }
-            entity.Def.Consts.TryGet(name, out var raw);
-            var value = Normalize(found.Spec.Type, raw.Value);
-            value = BindHostReferences(value);
-            _trace?.Add(new ExplainNode(ExplainKind.Read, new EntityId(id), type.Name, null, name, value, new List<ExplainNode>()));
-            return value;
-        }
-
-        /// <summary>
-        /// Def 값 자리에 이름으로 적은 호스트 함수(목록 안 포함)를 이 월드의 호스트 함수 값으로 바꾼다 (G291). 없으면 값을 그대로 돌려준다.
-        /// </summary>
-        private Value BindHostReferences(Value value)
-        {
-            switch (value)
-            {
-                case HostReference reference:
-                    return HostValue(reference.Name) ?? throw new ScriptRuntimeException(Codes.RunScript,
-                        "the host function " + reference.Name + " is not registered in this game");
-                case ListValue list:
-                    List<Value>? bound = null;
-                    for (int i = 0; i < list.Items.Count; i++)
-                    {
-                        var item = BindHostReferences(list.Items[i]);
-                        if (bound == null && ReferenceEquals(item, list.Items[i])) continue;
-                        if (bound == null)
-                        {
-                            bound = new List<Value>(list.Items.Count);
-                            for (int j = 0; j < i; j++) bound.Add(list.Items[j]);
-                        }
-                        bound.Add(item);
-                    }
-                    return bound == null ? value : new ListValue(bound);
-            }
-            return value;
-        }
-
-        /// <summary>엔티티의 Def 타입 바로 아래 <c>const</c>들 (Def마다 하나의 값, 엔티티가 공유한다).</summary>
-        private sealed class DefView : Value, IRuntimeAttributes, IValueEquality
-        {
-            /// <summary>같은 엔티티의 같은 Def 타입이면 같다 (G142).</summary>
-            public bool ValueEquals(Value other) => other is DefView v && v._id == _id && v._type == _type;
-
-            private readonly World _world;
-            private readonly long _id;
-            private readonly DefType _type;
-
-            public DefView(World world, long id, DefType type)
-            {
-                _world = world;
-                _id = id;
-                _type = type;
-            }
-
-            public override string KindName => _type.Name;
-
-            public long Id => _id;
-            public DefType Type => _type;
-
-            public Value GetAttribute(string name) => _world.DefConst(_id, _type, name);
         }
 
         private Value SiblingOrNone(EntityRecord entity, ComponentType component)

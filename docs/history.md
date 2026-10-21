@@ -1036,3 +1036,12 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **증상(임시 테스트로 재현):** 커맨드가 `contribs()`에서 받은 선언 줄(2단계의 `DeclaredContributionView`)을 지역 변수에 든 채 `wait`·`ask`로 멈추면 `Save()`가 "a contribution value cannot be saved yet"로 실패했다. 2단계에서 저장된 행(`contribution` 태그)만 저장 쪽에 있었다.
 - **고침:** 지역 변수 값 태그 `declared_contribution`(`source`·`component`·`key`·`op`·`value`)을 더했다. 줄은 Def 값(`ContribValue`)을 붙들지 않고 제 값을 든다(같음 비교도 그 다섯 칸). 저장 형식에 태그 하나가 늘었을 뿐 옛 저장은 그대로 읽힌다.
 - **테스트:** `DeclaredContributionTests`에 1개(멈춘 Flow가 키 줄의 선언 줄을 든 채 저장·불러오기 뒤 값과 `key`가 남음).
+
+## 데이터 전용 Def를 읽는 `defdata(id)` (G303·G304, 2026-10-22)
+
+- **왜:** 판데믹의 의무병·운영 전문가·격리 전문가 같은 능력형 역할은 커맨드가 역할 Def의 데이터를 읽어야 하는데, 엔티티가 없는 Def의 `const`를 읽을 길이 없었다(G107은 엔티티의 Def만).
+- **구현:** 순수 내장 `defdata(id)`(`PureBuiltins.DefDataName`, 등록은 `World.Derived.cs`, 본체는 새 `World.DefData.cs`로 옮김; G107의 `DefView`·`DefConst`·`BindHostReferences`도 함께 옮겨 `World.Derived.cs`가 900줄 아래로). 짧은 이름은 `defid`처럼 부른 함수의 모드 기준, 없는 Def는 실행 오류("혹시 …?"). 값 `DefDataView`는 타입 이름 속성으로 그 타입의 `const` 보기(다른 타입이면 None), 모르는 타입 이름은 실행 오류. `const` 읽기는 `ConstOf(FrozenDef, DefType, 이름)`로 G107과 함께 씀. `Explain`은 엔티티 없이 `Role.x[모드:Medic] = 값`(`ExplainNode` 렌더가 엔티티 0이면 `of`를 뺌).
+- **저장:** 멈춘 Flow의 지역 값 태그 `def_data`(`def`, `type` 또는 null). 불러올 때 Def가 없거나 타입이 바뀌었으면 문제로 적고 None.
+- **로드 검사:** 속성 검사기(G228)에 `DefDataStatic`: `defdata(...).타입이름`은 `DefConstsType`로 이어 `const` 이름 오타까지 잡고, 모르는 타입 이름은 오류. 리터럴 id는 `defid`처럼 링크 검사(`FunctionNameChecker`).
+- **스텁:** 모드 스텁(`defid` 옆)에 `class _DefData`(보이는 Def 타입마다 `타입: _타입_consts | None`)와 `def defdata(id: str, /) -> _DefData`, 스키마 스텁엔 `-> Any`.
+- **테스트:** `DefDataTests` 8개(짧은·전체 이름과 다른 타입의 None, `derived`에서 DefId 값으로 읽기와 `Explain`, 없는 Def의 실행 오류, 로드 때 타입·`const` 오타, 리터럴 id 링크 오류, 리스트를 거쳐 검사를 비켜 간 모르는 타입의 실행 오류, `defdata` 값을 든 멈춘 Flow의 저장·불러오기). `StubGeneratorTests`의 기대 스텁에 새 블록.

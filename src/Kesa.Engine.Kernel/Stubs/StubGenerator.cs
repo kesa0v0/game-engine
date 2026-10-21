@@ -201,6 +201,7 @@ namespace Kesa.Engine.Stubs
             PureNames +
             "def query(*names: str) -> list[Any]: ...\n" +
             "def defid(name: str, /) -> str: ...\n" +
+            "def defdata(id: str, /) -> Any: ...\n" +
             ContribNames;
 
         /// <summary>선언 보너스 (G295~G297): 스키마 파일(기본값)과 Def 파일에서 쓴다. 로직에서는 <c>add_contrib</c>를 쓴다.</summary>
@@ -711,6 +712,19 @@ namespace Kesa.Engine.Stubs
                 foreach (var d in _defs.Defs)
                     if (!d.IsAbstract && VisibleDef(d)) concrete.Add(d.Id);
                 Line("def defid(name: " + (concrete.Count == 0 ? "Never" : Literal(Spellings(concrete))) + ", /) -> str: ...");
+                Line();
+
+                // defdata(): Def 타입 이름으로 그 타입의 const들, 그 타입이 아니면 None (G303)
+                Line("class _DefData:");
+                bool anyType = false;
+                foreach (var t in _schema.Types)
+                {
+                    if (!Sees(t.Mod)) continue;
+                    Line("    " + t.Name + ": " + ConstsName(t) + " | None");
+                    anyType = true;
+                }
+                if (!anyType) Line("    ...");
+                Line("def defdata(id: str, /) -> _DefData: ...");
                 Line();
             }
 

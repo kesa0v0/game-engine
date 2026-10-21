@@ -72,6 +72,7 @@ def rivals(house):
 | `s.Hull.hp` | 컴포넌트 `Hull`의 멤버 |
 | `s.Hull.hp -= 3` | 쓰기(`field`와 `ref`만, 쓰는 곳에서만) |
 | `s.Ship.base_hp` | Def 타입 이름으로 그 엔티티 Def의 `const` 읽기 |
+| `defdata("Medic").Role.treat_all` | 엔티티가 없는 Def의 `const`를 Def id로 읽기 |
 | `house.ships` | 역방향 컬렉션(그 상회를 가리키는 배들) |
 | `house.Stock.Fish.amount`, `house.Stock[k]` | 키 컴포넌트의 줄 |
 | `u.Life is None` | 그 컴포넌트가 붙어 있지 않다(또는 보이지 않는다, 7장) |
@@ -80,6 +81,10 @@ def rivals(house):
 - `query("Ship")`은 살아 있는 Ship 엔티티들, `query("Unit", "Wounded")`는 그중 `Wounded`가 붙은 것. 결과는 인덱싱할 수 없다
   (도중에 죽을 수 있어서). 필요하면 `[u for u in query(...)]`로 복사한다.
 - 순서는 엔티티 id 순(만든 순)이라 결정론적이다.
+- 엔티티를 만들지 않는 데이터 전용 Def(역할·특성처럼 키 줄의 키로만 쓰는 것)는 `defdata(id)`로 읽는다. id는 `defid`처럼
+  짧은 이름이면 쓴 모드 기준이고, 키 줄을 돌 때의 키 같은 Def id 값도 받는다(`for k in p.Roles: defdata(k).Role.moves`).
+  타입 이름 뒤가 그 타입의 `const`들이고, Def가 그 타입이 아니면 `None`이다. 없는 Def는 실행 오류("혹시 …?"),
+  리터럴로 적은 id와 타입·`const` 이름의 오타는 로드 때 잡힌다.
 
 ## `derived`와 기여 행
 

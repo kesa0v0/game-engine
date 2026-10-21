@@ -138,6 +138,11 @@ namespace Kesa.Engine.Tests.Loading
                 "def spawn(def_id: str, /, **components: Any) -> Any: ...\n" +
                 "def defid(name: Literal[\"Wood\", \"Iron\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Scout\"], /) -> str: ...\n" +
                 "\n" +
+                "class _DefData:\n" +
+                "    Resource: _Resource_consts | None\n" +
+                "    Unit: _Unit_consts | None\n" +
+                "def defdata(id: str, /) -> _DefData: ...\n" +
+                "\n" +
                 "def Mod(*, id: str, version: str = ..., defaultLanguage: str = ..., dependencies: list[str] = ..., " +
                 "loadAfter: list[str] = ..., optional: list[str] = ...) -> None: ...\n" +
                 "def use(path: str, /) -> None: ...\n" +

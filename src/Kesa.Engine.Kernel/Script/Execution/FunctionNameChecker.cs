@@ -239,8 +239,8 @@ namespace Kesa.Engine.Script
                             !IsShadowed(callee.Name, locals) && call.Arguments.Count > 0 &&
                             call.Arguments[0].Name == null && call.Arguments[0].Value is StringLiteral id)
                             _spawned.Add(new KeyValuePair<string, SourceSpan>(id.Value, id.Span));
-                        // defid도 같다 (G266)
-                        if (call.Callee is NameExpr defid && defid.Name == PureBuiltins.DefIdName &&
+                        // defid·defdata도 같다 (G266·G304)
+                        if (call.Callee is NameExpr defid && (defid.Name == PureBuiltins.DefIdName || defid.Name == PureBuiltins.DefDataName) &&
                             !IsShadowed(defid.Name, locals) && call.Arguments.Count == 1 &&
                             call.Arguments[0].Name == null && call.Arguments[0].Value is StringLiteral literal)
                             _defIds.Add(new KeyValuePair<string, SourceSpan>(literal.Value, literal.Span));

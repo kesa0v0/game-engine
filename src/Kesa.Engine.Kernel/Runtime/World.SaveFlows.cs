@@ -398,6 +398,10 @@ namespace Kesa.Engine.Runtime
                     return Tag("def_view", new JsonObject()
                         .Add("entity", new JsonNumber(d.Id))
                         .Add("type", new JsonString(d.Type.Name)));
+                case DefDataView d:
+                    return Tag("def_data", new JsonObject()
+                        .Add("def", new JsonString(d.Def.Id))
+                        .Add("type", d.Type == null ? (JsonNode)JsonNull.Instance : new JsonString(d.Type.Name)));
                 case AnswerValue a:
                     var answer = new JsonObject()
                         .Add("response", a.Response == null ? (JsonNode)JsonNull.Instance : new JsonString(a.Response))

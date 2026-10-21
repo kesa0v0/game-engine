@@ -285,6 +285,7 @@ namespace Kesa.Engine.Loading
                     _reads.Follow(_mod, fn.Name, call.Arguments, argTypes, call.Span);
 
                 if (builtin == PureBuiltins.QueryName) return new GroupType(new EntityType(QueriedType(call)));
+                if (builtin == PureBuiltins.DefDataName) return DefDataStatic.Instance;
                 if (builtin == PureBuiltins.SpawnName)
                 {
                     DefType? type = null;
@@ -325,6 +326,16 @@ namespace Kesa.Engine.Loading
                         return new ComponentStatic(rows.Component, rows.Owner, true);
                     case DefConstsType consts:
                         return DefConst(consts, attr);
+                    case DefDataStatic _:
+                        // defdata(k).Role: Def 타입 이름 (그 타입이 아니면 실행 중 None, G107과 같다)
+                        if (_schema.TryGetType(attr.Name, out var dataType)) return new DefConstsType(dataType);
+                        if (Reporting)
+                        {
+                            var types = new List<string>();
+                            foreach (var t in _schema.Types) types.Add(t.Name);
+                            Error("defdata(...) has no Def type '" + attr.Name + "'", attr, types, schemaNames: false);
+                        }
+                        return StaticType.Unknown;
                     case ConstructorType constructor:
                         return ConstructorAttribute(constructor, attr);
                 }

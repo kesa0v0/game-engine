@@ -32,6 +32,11 @@ namespace Kesa.Engine.Script
         /// </summary>
         public const string DefIdName = "defid";
 
+        /// <summary>
+        /// Def id에서 그 Def의 데이터로 가는 내장 (spec-gaps G303·G304): <c>defdata(k).Role.treat_all</c>. 짧은 이름은 <c>defid</c>처럼 푼다.
+        /// </summary>
+        public const string DefDataName = "defdata";
+
         /// <summary>월드의 구조를 바꾸는 내장 (spec-gaps G134, int 키 줄 헬퍼는 G129). 몸체는 월드가 준다.</summary>
         public const string SpawnName = "spawn";
         public const string DestroyName = "destroy";
@@ -109,7 +114,7 @@ namespace Kesa.Engine.Script
 
         private static SortedSet<string> NameSet()
         {
-            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, UiName, SubmitName };
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, DefDataName, UiName, SubmitName };
             set.UnionWith(WritingNameArray);
             return set;
         }

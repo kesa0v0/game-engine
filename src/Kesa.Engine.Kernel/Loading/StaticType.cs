@@ -112,6 +112,13 @@ namespace Kesa.Engine.Loading
         public override bool Same(StaticType other) => other is DefConstsType d && d.Type == Type;
     }
 
+    /// <summary><c>defdata(id)</c>의 값 (G303): 속성은 Def 타입 이름이고 그 뒤가 <see cref="DefConstsType"/>이다.</summary>
+    internal sealed class DefDataStatic : StaticType
+    {
+        public static readonly DefDataStatic Instance = new DefDataStatic();
+        public override bool Same(StaticType other) => other == this;
+    }
+
     /// <summary>
     /// 컴포넌트·신호의 생성자 (<c>Health</c>, <c>Damaged</c>): 모드가 묶지 않은 보이는 스키마 이름이다(G230). 속성이 없다.
     /// </summary>
