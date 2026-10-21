@@ -1110,3 +1110,10 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
   - 스텁: `wrap`, `on(..., now=)`.
 - **샘플:** 코어 `rules.py`에 `cure_cost(player, disease)`를 빼고 `DiscoverCure`가 씀(관례: 바뀔 계산은 함수로). brink `virulent.py`에 `@wrap(pandemic.cure_cost) complex_cure`.
 - **테스트:** 새 `WrapTests` 26개(코어 자신의 호출, 두 모드의 겹침 순서와 이름 인자, 안쪽을 안 부르기, `derived` 함수 감싸기, 쓰기 함수 감싸기, 자기 모드 함수, 이름으로 다시 부르면 재귀, 안쪽 함수 안에서 멈춘 채 저장·불러오기·다시 저장한 바이트, 로드 오류 15가지, 의존 안 함, 직접 부르기, 호스트 함수). `BrinkTests.AVirulentCureNeedsOneMoreCard`. 알 수 없는 데코레이터 메시지 기대값 둘. 안내서 3장에 "다른 모드의 함수를 감싸기" 절.
+
+### 2026-10-22: 판데믹 확장 B단계, Chronic Effect (`@wrap(pandemic.add_cube)`)
+
+- **규칙(일반 지식, 규칙서 대조 전):** 변종 큐브가 없는 도시가 변종에 감염되면 큐브를 두 개 놓는다. 코어의 `add_cube` 하나가 감염 단계와 연쇄 폭발 모두에서 큐브를 올리므로, 감싸면 둘 다에 닿는다. 연쇄 폭발에도 적용되는지는 규칙서로 확인할 것(에픽은 `add_cube`를 거치지 않고 3개로 채우므로 닿지 않음).
+- **샘플:** brink `virulent.py`에 `@wrap(pandemic.add_cube) chronic`: 변종이고 그 도시에 0개면 안쪽을 한 번 먼저 부르고, 터졌는지는 둘째 호출의 답. 박멸·역할의 막기는 안쪽 함수가 두 번 다 본다.
+- **드러난 것:** 새 엔진 구멍 없음. 처음 `return original(...)`으로 써서 `CMD004`(쓰기 함수는 문장으로만, G117)에 걸림 → `over = original(...)`. 진단 메시지가 고칠 방법을 알려 줌.
+- **테스트:** `BrinkTests` 2개 더(빈 도시는 둘·있던 도시는 하나·변종 아닌 질병은 하나, 연쇄 폭발의 빈 이웃도 둘). 모두 2464개 통과.

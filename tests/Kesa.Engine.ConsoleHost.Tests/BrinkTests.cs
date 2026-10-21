@@ -125,6 +125,43 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(_w.OpenRequests, Is.Empty, "the game is over");
         }
 
+        private long CubeCount(string city, string disease) =>
+            ((IntValue)_w.GetRow(City(city), _w.Member("Cubes", "count"), disease)).Value;
+
+        [Test]
+        public void AVirulentInfectionOfACleanCityPlacesTwoCubes()
+        {
+            // 변종(파랑)은 빈 도시에 두 개, 이미 있는 도시에는 하나. 변종이 아닌 노랑은 빈 도시에도 하나
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            _w.SetRow(City("pandemic:Chicago"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(1));
+            DrawOnly("pandemic:Atlanta", "pandemic:Chicago");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(CubeCount("pandemic:Atlanta", "pandemic:Blue"), Is.EqualTo(2));
+            Assert.That(CubeCount("pandemic:Chicago", "pandemic:Blue"), Is.EqualTo(2));
+
+            ClearCubes();
+            DrawOnly("pandemic:Lima", "pandemic:Miami");
+            Assert.That(Act("bob", "EndTurn", ("player", new EntityValue(_bob))).Succeeded, Is.True);
+            Assert.That(CubeCount("pandemic:Lima", "pandemic:Yellow"), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AVirulentOutbreakPlacesTwoCubesOnCleanNeighbours()
+        {
+            // 연쇄 폭발도 add_cube를 거치므로 감싸기가 닿는다: 빈 이웃에 둘, 큐브가 있던 이웃에 하나
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            _w.SetRow(City("pandemic:Atlanta"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(3));
+            _w.SetRow(City("pandemic:Chicago"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(1));
+            DrawOnly("pandemic:Atlanta", "pandemic:Lima");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(CubeCount("pandemic:Atlanta", "pandemic:Blue"), Is.EqualTo(3));
+            Assert.That(CubeCount("pandemic:Chicago", "pandemic:Blue"), Is.EqualTo(2));
+            Assert.That(CubeCount("pandemic:Washington", "pandemic:Blue"), Is.EqualTo(2));
+            Assert.That(Outbreaks(), Is.EqualTo(2), "one outbreak, counted twice by the virulent strain");
+        }
+
         private EntityId PlayerCard(string city) => _w.All("PlayerCard").Single(c => FaceCity(c) == city);
 
         private void Hold(EntityId player, params string[] cities)
