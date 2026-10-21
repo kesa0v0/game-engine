@@ -178,5 +178,37 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(Assert.Throws<WorldException>(() => world.Call("core.bump"))!.Message, Does.Contain("it changes UI state"));
             Assert.That(Assert.Throws<WorldException>(() => world.Call("core.chosen"))!.Message, Does.Contain("it reads UI state"));
         }
+
+        private const string GoalSchema =
+            Units + "deftype(\"Goal\", check=const(Cond[\"Goal\"]), effect=const(Action[\"Goal\"]))\n";
+
+        private const string GoalFunctions =
+            "def ok(g):\n    return True\n" +
+            "def peek(g):\n    return ui.Selection.unit is None\n";
+
+        [Test]
+        public void ADefValueInAGameSlotCannotUseUiState()
+        {
+            Mod("core", schema: GoalSchema, defs: GoalFunctions + "Goal(\"A\", check=peek, effect=ok)\nGoal(\"B\", check=ok, effect=peek)\n");
+            var result = Load(out var diags);
+            Assert.That(diags.Select(d => d.Code), Is.EqualTo(new[] { Codes.ValType, Codes.ValType }));
+            Assert.That(diags[0].Message, Does.StartWith("'check': 'peek' uses UI state (ui.… or submit) (at core/defs/defs.py:4:"));
+            Assert.That(diags[0].Message, Does.EndWith("a game value cannot depend on a screen"));
+            Assert.That(diags[1].Message, Does.StartWith("'effect': 'peek' uses UI state").And.Contain("Action[\"Goal\"]"));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
+        }
+
+        [Test]
+        public void APatchCannotPutAUiFunctionInAGameSlotAndItIsThePatchModsFault()
+        {
+            Mod("core", schema: GoalSchema, defs: "def ok(g):\n    return True\nGoal(\"A\", check=ok, effect=ok)\n");
+            Mod("addon", defs: "def peek(g):\n    return ui.Selection.unit is None\npatch.set(\"core:A\", \"check\", peek)\n",
+                extra: ", dependencies=[\"core\"]");
+            var result = Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(Codes.PatBadValue));
+            Assert.That(d.Message, Does.StartWith("'peek' uses UI state (ui.… or submit) (at addon/defs/defs.py:2:"));
+            Assert.That(result.Disabled, Is.EqualTo(new[] { "addon" }));
+        }
     }
 }

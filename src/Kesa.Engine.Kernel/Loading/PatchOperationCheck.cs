@@ -229,6 +229,10 @@ namespace Kesa.Engine.Loading
                     if (fn.IsEntry)
                         return "'" + fn.Name + "' is a " + fn.EntryKind + ", so it cannot be a value of " + f.Display +
                                "; use a plain function";
+                    // 두 자리 모두 게임 쪽에서 돈다: 화면마다 다른 UI 기록에 기댈 수 없다 (G282)
+                    if (fn.TouchesUi)
+                        return "'" + fn.Name + "' uses UI state (ui.… or submit) (at " + fn.UiTouchWitness + "), but " + f.Display +
+                               " holds functions that run as game code, and a game value cannot depend on a screen";
                     // 확인용 자리에는 쓰기 함수를 둘 수 없다 (G117). 판정은 ②b 끝에 끝나 있다
                     if (f.Kind == FunctionSlotKind.Cond && fn.Writes)
                         return "'" + fn.Name + "' changes the world (at " + fn.WriteWitness + "), but " + f.Display +
