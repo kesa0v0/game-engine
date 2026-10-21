@@ -395,6 +395,8 @@ Trait("SteadyHands", grants=[contrib("Skill.eff", "add", 2, key="Medicine")])
 
 **상태:** 확인
 
+**바뀜:** `component`는 이름 문자열이 아니라 컴포넌트 값이다(`c.component == Traits`) → G308.
+
 ## G299
 
 **위치:** G294에서 이어서: 스크립트가 기여 행을 넣고 빼는 내장

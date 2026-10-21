@@ -146,6 +146,7 @@
 | [G305](gaps/S2-logic.md#g305) | S2·S4 스크립트가 한 Def 타입의 Def를 모두 도는 길 (판데믹 확장에서 드러남) | 내장 `defs("City")`가 그 타입의 Def 전체 id 목록. 순서는 모드 로드 순서 뒤 등록 순서, abstract 빠짐, 의존하지 않는 모드의 Def도 나옴, 리터럴 타입 이름은 로드 때 검사. 코어의 목록 const와 patch.append도 그대로 쓸 수 있음. | 일부 바뀜(G306) |
 | [G306](gaps/S2-logic.md#g306) | S2 이름 쓰는 원칙: 로직 안의 스키마 이름은 맨 이름 (spec S2 보강) | 이름을 지을 때(선언)는 문자열, 이미 있는 스키마 이름(Def 타입·컴포넌트·신호)을 로직에서 쓸 때는 맨 이름(`defs(City)`, `query(Unit, Wounded)`, `@on(Sunk)`), Def 타입 이름은 로직 안에서 부를 수 없는 타입 값, Def id는 언제나 문자열. 남은 것: 문자열 표기를 계속 받을지, `may_see`의 component, 타입 값의 저장. | 확인 |
 | [G307](gaps/S2-logic.md#g307) | G306에서 이어서: 스키마 이름 자리의 문자열 표기 | `query`·`defs`에 문자열 리터럴은 로드 오류(맨 이름 표기 안내), 실행 중 문자열은 실행 오류, 호스트 C# API는 문자열 그대로, 기존 표기는 일괄 수정. | 확인 |
+| [G308](gaps/S2-logic.md#g308) | G306에서 이어서: 엔진이 스크립트에 넘기는 컴포넌트 (`may_see`의 component, 기여 줄의 `c.component`) | 이름 문자열 대신 맨 이름과 같은 컴포넌트 값을 넘김(`component == Face`), 이 자리에서 문자열 리터럴과 비교하면 로드 경고. | 확인 |
 
 ## S3·S4 데이터
 
@@ -179,7 +180,7 @@
 | [G295](gaps/S3-S4-data.md#g295) | G294에서 이어서: 선언 보너스의 표기 | 커널의 보너스 값 타입(이름 미정) 목록인 `const` 칸을 커널이 모은다: 붙은 컴포넌트의 그 칸과 키 줄의 키 Def의 그 칸. 값이 Def에 있어 패치되고 대상은 로드 때 검사. 타입 이름·키 줄 대상 표기·`source`는 이어서. | 확인 |
 | [G296](gaps/S3-S4-data.md#g296) | G295에서 이어서: 보너스 값 타입의 이름 | 만드는 함수 `contrib(대상, op, 값)`, 칸의 타입 `Contrib`(`option`/`Option` 관례). `contribs()`·기여 행과 한 단어. | 확인 |
 | [G297](gaps/S3-S4-data.md#g297) | G296에서 이어서: 선언 보너스가 키 줄을 겨냥하는 표기 | `contrib("Skill.eff", "add", 2, key="Medicine")`. 키는 Def id만(다른 Def 참조처럼 풀고 검사), 키 컴포넌트면 `key=` 필수. 겨냥한 줄이 없으면 조용히 적용 안 됨(저장된 기여 행은 그대로 `RunNoRow`). | 확인 |
-| [G298](gaps/S3-S4-data.md#g298) | G297에서 이어서: 선언에서 모인 기여 줄의 출처 | `source`는 선언을 든 엔티티(지금은 자기 자신), 속성 `component`(컴포넌트 이름)·`key`(키 Def id나 None)를 더함, 저장된 줄은 둘 다 None. `Explain`도 같은 셋. | 확인 |
+| [G298](gaps/S3-S4-data.md#g298) | G297에서 이어서: 선언에서 모인 기여 줄의 출처 | `source`는 선언을 든 엔티티(지금은 자기 자신), 속성 `component`(컴포넌트 이름)·`key`(키 Def id나 None)를 더함, 저장된 줄은 둘 다 None. `Explain`도 같은 셋. | 일부 바뀜(G308) |
 | [G299](gaps/S3-S4-data.md#g299) | G294에서 이어서: 스크립트가 기여 행을 넣고 빼는 내장 | `add_contrib(u.Health, "max", op, 값, source=)`는 int id를 돌려주고(키 줄은 줄 뷰를 넘김), `remove_contrib(id)`·`remove_contribs(source)`. 줄에 `c.id`(선언 줄은 None, 지울 수 없음). 쓰기 자리에서만, 되감김. | 확인 |
 | [G300](gaps/S3-S4-data.md#g300) | G294에서 이어서: 다른 엔티티에서 오는 선언 보너스 | 선언 쪽 `to=`로 한 걸음: `"Held.holder"`(Ref를 따라감, 키 없는 컴포넌트의 Ref만)나 `"units"`(역방향 컬렉션의 모두), 없으면 자기 자신. 관계가 바뀌면 저절로 빠지고 `source`는 선언을 든 엔티티. 여러 걸음은 사례가 생기면. | 일부 바뀜(G302) |
 | [G301](gaps/S3-S4-data.md#g301) | G294에서 이어서: 조건부 선언 보너스 | 선언에 `when=lambda src, dst: ...`(`Cond` 칸과 같은 함수·검사, 거짓이면 그 줄 없음). 선언에만, 오류는 그 `derived` 읽기의 오류, 순환은 실행 중 감지(G100). | 확인 |
@@ -353,7 +354,7 @@
 | # | 위치 | 무엇을 정했나 | 상태 |
 |---|---|---|---|
 | [G196](gaps/hidden-info.md#g196) | 9절 미결 2 공개/비공개 정보 표현 (검증 시나리오 ②에서 이어짐) | 숨긴 정보는 모드가 순수 정책 함수 하나로 "누가 무엇을 보는가"를 선언하고 호스트가 보는 사람을 지정한 거른 읽기를 받음, 스크립트·전체 저장은 전부 봄, 보안에 쓸지는 호스트의 네트워크 방식. | 확인 |
-| [G197](gaps/hidden-info.md#g197) | G196 읽기 정책의 서명과 단위 | `@view_policy def may_see(issuer, entity, component)`(순수), 보는 사람은 issuer, 단위는 엔티티(`component=None`)와 컴포넌트 두 층, Def와 Def 상수는 엔티티 층을 따름. | 일부 바뀜(G238) |
+| [G197](gaps/hidden-info.md#g197) | G196 읽기 정책의 서명과 단위 | `@view_policy def may_see(issuer, entity, component)`(순수), 보는 사람은 issuer, 단위는 엔티티(`component=None`)와 컴포넌트 두 층, Def와 Def 상수는 엔티티 층을 따름. | 일부 바뀜(G238·G308) |
 | [G198](gaps/hidden-info.md#g198) | G196 거른 읽기에서 숨긴 것의 모습 | 숨긴 엔티티는 목록·질의에 없고 숨긴 컴포넌트는 안 붙은 것처럼, 보이는 칸의 Ref가 숨긴 엔티티면 id 없는 "가려짐", Ref 목록·역방향에서는 빠짐, 숨긴 id로 읽으면 죽은 id와 똑같이 응답. | 확인 |
 | [G199](gaps/hidden-info.md#g199) | G196 거른 읽기의 모양과 상태 읽기의 범위 | 거른 읽기 전용 객체 `World.ViewAs(issuer)`(상태 읽기·목록·`Explain`을 거름), `World`의 기존 읽기는 전부 봄, 보이는 `derived` 값은 숨긴 칸으로 계산돼도 보임, 정책은 읽을 때마다 부름. | 확인 |
 | [G200](gaps/hidden-info.md#g200) | G199 거른 읽기에서 열린 질문 | `ViewAs(issuer).OpenRequests`는 그 연결이 답할 수 있는 질문만(`Who` 중 `may_act`가 참인 엔티티가 있으면), 질문 안의 값도 `may_see`로 거름. | 일부 바뀜(G237) |
