@@ -440,3 +440,27 @@ Faction("Rome", Tech=Tech(grants=[contrib("Morale.value", "add", 1, to="units")]
 **이유:** RimWorld는 장비 Def에 `statOffsets`(물건 자신)와 `equippedStatOffsets`(든 폰)를, CK3는 건물에 `character_modifier`·`county_modifier`·`province_modifier`를 따로 두어 "어디에 줄지"를 선언 쪽에서 정한다(일반 지식). 한 물건이 자신과 남에게 다른 보너스를 줄 수 있어야 한다. 한 걸음은 이미 있는 Ref 값과 역방향 색인만으로 읽을 수 있다.
 
 **상태:** 확인
+
+## G301
+
+**위치:** G294에서 이어서: 조건부 선언 보너스
+
+**무엇이 비어 있었나:** "밤에만 근접 피해 +5", "성벽 안에 있을 때 방어 +2"처럼 붙어 있어도 조건이 참일 때만 적용되는 보너스. 커널을 바꾸지 않아도 `derived` 함수가 G298의 `component`·`key`로 거르거나(닫힘) 반응으로 키 줄을 붙였다 떼는(정착 지점까지 늦고 이중 기록) 길은 있었다. 사례가 생길 때까지 미루는 안(추천)과 지금 여는 안 중 사용자가 지금 열기를 골랐다.
+
+**어떻게 정했나:** 선언에 `when=`을 둔다.
+
+```python
+Sword("NightBlade", Blade=Blade(grants=[
+    contrib("Melee.dmg", "add", 5, to="Held.holder", when=lambda src, dst: is_night()),
+]))
+```
+
+- **인자:** `(src, dst)`. `src`는 선언을 든 엔티티(모인 줄의 `source`, G298), `dst`는 보너스를 받는 엔티티. 자기 엔티티 선언이면 둘이 같다.
+- **받는 함수와 검사:** `Cond` 칸과 같다(G291). 순수 스크립트 함수나 읽기 등급 호스트 함수, 난수는 로드 오류(G178). 로드는 두 인자로 부를 수 있는지와 반환이 `bool`인지 본다. 함수의 읽기는 `derived` 계산 안에서 일어나 `@when` 기록·영수증·`Explain`에 그대로 잡힌다. 거짓이면 그 줄은 `contribs()`에 나오지 않는다.
+- **범위:** `when=`은 선언(`contrib`)에만 있다. 저장된 기여 행(`add_contrib`, G299)은 넣는 쪽이 조건을 보고 넣는다.
+- **실패:** 함수가 실행 중 오류를 내면 그 `derived` 읽기 전체가 오류다(거짓으로 치지 않음, spec S9, `derived` 함수의 오류와 같음).
+- **순환:** 조건이 그 스탯 자신을 읽으면 실행 중 재진입 감지(G100)가 오류로 잡는다. G229의 로드 시점 순환 검사를 `when` 함수까지 넓히는 것은 모더가 실제로 걸리는 일이 보이면 연다.
+
+**이유:** 패러독스는 EU4 `triggered_modifier`, Stellaris `triggered_planet_modifier`처럼 조건부 modifier를 선언 쪽에 자주 둔다(일반 지식). 이전 엔진도 `Comp_ModifierProvider.Conditions`와 `StatChange.FilterCondition`을 가졌다(코드 확인). Def 칸에 순수 함수를 담는 길은 `Cond` 칸에 이미 있어 새 장치가 아니다. 두 인자는 받는 쪽 조건(밤의 폰)과 주는 쪽 조건(축복받은 칼)을 함께 덮는다.
+
+**상태:** 확인
