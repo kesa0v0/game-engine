@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -530,6 +531,80 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(Cure("Blue").Succeeded, Is.True);
             Assert.That(Status("Blue", "cured").Bool, Is.True);
             Assert.That(PlayerCards().Count(c => blue.Contains(FaceCity(c)) && PileOf(c) == 1) - before, Is.EqualTo(4));
+        }
+
+        // ---- 능력형 역할: 역할 Def의 데이터를 커맨드가 defdata로 읽는다 (4c조각) ----
+
+        private AnswerResult Treat(string disease) =>
+            Act("alice", "Treat", ("player", new EntityValue(_alice)), ("disease", new StrValue("pandemic:" + disease)));
+
+        [Test]
+        public void AMedicTreatsEveryCubeAtOnce()
+        {
+            ClearCubes();
+            SetCubes("Atlanta", "Blue", 3);
+            _w.AddRow(_alice, "Roles", "pandemic:Medic");
+            Assert.That(Treat("Blue").Succeeded, Is.True);
+            Assert.That(Cubes("Atlanta", "Blue"), Is.EqualTo(0));
+            Assert.That(Left(_alice), Is.EqualTo(3));
+        }
+
+        [Test]
+        public void AMedicClearsACuredDiseaseOnEnteringACity()
+        {
+            ClearCubes();
+            SetCubes("Chicago", "Blue", 2);
+            SetCubes("Chicago", "Yellow", 1);
+            Status("Blue", "cured").Set(BoolValue.True);
+            _w.AddRow(_alice, "Roles", "pandemic:Medic");
+            Assert.That(Move("alice", _alice, "pandemic:Chicago").Succeeded, Is.True);
+            Assert.That(Cubes("Chicago", "Blue"), Is.EqualTo(0), "@when sees the Medic in a city with cured cubes");
+            Assert.That(Cubes("Chicago", "Yellow"), Is.EqualTo(1), "no cure for Yellow");
+            Assert.That(Left(_alice), Is.EqualTo(3), "clearing is not an action");
+        }
+
+        [Test]
+        public void NoCubeOfACuredDiseaseLandsWhereTheMedicIs()
+        {
+            ClearCubes();
+            SetCubes("SanFrancisco", "Blue", 1); // 보드에 파랑이 남아 박멸은 아니다
+            // 걷히기 전의 애틀랜타에 3개: 큐브를 놓았다면 폭발했을 것이다 (@when이 뒤에 걷는 것만으로는 못 막음)
+            SetCubes("Atlanta", "Blue", 3);
+            Status("Blue", "cured").Set(BoolValue.True);
+            _w.AddRow(_alice, "Roles", "pandemic:Medic");
+            DrawOnly("Atlanta", "Lima");
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            Assert.That(Outbreaks(), Is.EqualTo(0));
+            Assert.That(Cubes("Atlanta", "Blue"), Is.EqualTo(0));
+            Assert.That(Cubes("Chicago", "Blue"), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void AnOperationsExpertBuildsAStationWithoutACard()
+        {
+            var build = new Func<AnswerResult>(() =>
+                Act("alice", "BuildStation", ("player", new EntityValue(_alice)), ("card", NoneValue.Instance)));
+            Assert.That(build().Succeeded, Is.False, "others need the card of the city");
+            _w.AddRow(_alice, "Roles", "pandemic:OperationsExpert");
+            int hand = HandOf(_alice).Count;
+            Assert.That(build().Succeeded, Is.True);
+            Assert.That(((BoolValue)_w.Get(City("Atlanta"), _w.Member("Research", "station"))).Value, Is.True);
+            Assert.That(HandOf(_alice), Has.Count.EqualTo(hand));
+            Assert.That(Left(_alice), Is.EqualTo(3));
+        }
+
+        [Test]
+        public void AQuarantineSpecialistShieldsTheirCityAndItsNeighbours()
+        {
+            ClearCubes();
+            _w.AddRow(_alice, "Roles", "pandemic:QuarantineSpecialist"); // 애틀랜타에 있다
+            SetCubes("NewYork", "Blue", 3); // 뉴욕이 터지면 몬트리올과 워싱턴(애틀랜타의 이웃)으로 번진다
+            DrawOnly("NewYork", "Atlanta");
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            Assert.That(Outbreaks(), Is.EqualTo(1));
+            Assert.That(Cubes("Montreal", "Blue"), Is.EqualTo(1));
+            Assert.That(Cubes("Washington", "Blue"), Is.EqualTo(0));
+            Assert.That(Cubes("Atlanta", "Blue"), Is.EqualTo(0));
         }
 
         [Test]

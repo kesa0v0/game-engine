@@ -75,7 +75,12 @@ signal("Outbreak", city=Ref["City"])
 
 deftype("Disease", components=["Status"])
 deftype("City", components=["Research", "Cubes", "Chain", "Load"], disease=const(DefId["Disease"]), neighbors=const(list[DefId["City"]]))
-deftype("Role", grants=const(list[Contrib], default=[]))
+# 역할: 수치 보너스는 grants(엔진이 모음), 규칙을 바꾸는 능력은 켜고 끄는 값(커맨드가 defdata로 읽음, defs/rules.py의 roles)
+deftype("Role", grants=const(list[Contrib], default=[]),
+    treat_all=const(bool, default=False),       # 치료 한 번에 그 질병 큐브를 모두 걷는다
+    clears_cured=const(bool, default=False),    # 있는 도시에 치료제가 있는 질병 큐브가 놓이지 않고, 들어가면 걷힌다
+    free_station=const(bool, default=False),    # 연구소를 카드 없이 짓는다
+    quarantine=const(bool, default=False))      # 있는 도시와 그 이웃에 큐브가 놓이지 않는다
 deftype("Player", components=["Order", "At", "Actions", "Hand", "Cure", "Roles", "Seatable"])
 deftype("Game", components=["Match"])
 deftype("InfectionCard", components=["Card", "Face"])

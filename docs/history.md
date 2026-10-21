@@ -1045,3 +1045,13 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **로드 검사:** 속성 검사기(G228)에 `DefDataStatic`: `defdata(...).타입이름`은 `DefConstsType`로 이어 `const` 이름 오타까지 잡고, 모르는 타입 이름은 오류. 리터럴 id는 `defid`처럼 링크 검사(`FunctionNameChecker`).
 - **스텁:** 모드 스텁(`defid` 옆)에 `class _DefData`(보이는 Def 타입마다 `타입: _타입_consts | None`)와 `def defdata(id: str, /) -> _DefData`, 스키마 스텁엔 `-> Any`.
 - **테스트:** `DefDataTests` 8개(짧은·전체 이름과 다른 타입의 None, `derived`에서 DefId 값으로 읽기와 `Explain`, 없는 Def의 실행 오류, 로드 때 타입·`const` 오타, 리터럴 id 링크 오류, 리스트를 거쳐 검사를 비켜 간 모르는 타입의 실행 오류, `defdata` 값을 든 멈춘 Flow의 저장·불러오기). `StubGeneratorTests`의 기대 스텁에 새 블록.
+
+## 예시 게임 Pandemic 4c조각: 능력형 역할 셋 (2026-10-22)
+
+- **모양:** `Role` Def에 켜고 끄는 `const` 넷(`treat_all`·`clears_cured`·`free_station`·`quarantine`, 이름은 이 모드가 정함). 커맨드와 함수는 `roles(p) = [defdata(k).Role for k in p.Roles]`로 읽고 `any(r.능력 for r in roles(p))`로 묻는다. 수치 보너스(과학자)는 그대로 선언 보너스.
+- **의무병:** `Treat`가 한 번에 모두 걷음. 치료제가 있는 질병은 의무병이 있는 도시에 놓이지 않고(`add_cube`·에픽의 `protected`), 들어가면 걷힘(`@when(lambda p: medic_mess(p))`, 행동을 쓰지 않음). 가드 없이 `@when`만으로는 한 감염 단계 안에서 3개가 차 터지는 것을 못 막아 둘 다 둠(가드를 끈 돌연변이로 시험이 잡는 것을 확인).
+- **운영 전문가:** `BuildStation(player, card: Ref[PlayerCard] | None)`. `choose(card, from_=...)` 목록에 운영 전문가에게만 `None`을 넣는다. `where=`는 None을 늘 후보에서 빼므로 `from_=`로 씀(엔진 동작, 구멍 아님).
+- **격리 전문가:** 있는 도시와 이웃에 큐브가 놓이지 않음(감염·연쇄 폭발·에픽).
+- **간단화:** 처음 감염(판 깔기)은 역할을 보지 않는다. 규칙은 일반 지식으로 씀(규칙서와 대조할 것).
+- **알게 된 것:** 엔진 구멍 새로 없음. `defdata`로 능력형 역할이 데이터로 된다.
+- **테스트:** `PandemicTests` 44개(새 5개: 의무병의 한 번에 치료, 들어가면 걷힘, 놓이지 않음(폭발 없음), 운영 전문가의 카드 없는 연구소, 격리 전문가의 이웃 보호와 연쇄 폭발).

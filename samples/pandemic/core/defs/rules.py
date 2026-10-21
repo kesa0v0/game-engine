@@ -24,11 +24,45 @@ def disease_of(name):
 def reachable(p):
     return p.At.city.City.neighbors
 
+# ---- 역할의 능력 ----
+
+# 플레이어가 든 역할들의 Def 데이터. 능력은 any(r.능력 for r in roles(p))로 묻는다
+def roles(p):
+    return [defdata(k).Role for k in p.Roles]
+
+# 이 도시에 이 질병의 큐브를 놓지 못하게 막는 플레이어가 있나:
+# 격리 전문가는 있는 도시와 이웃을, 의무병은 있는 도시의 치료제가 있는 질병을 막는다
+def protected(city, disease):
+    cured = disease_of(disease).Status.cured
+    for p in query("Player"):
+        at = p.At.city
+        if at is None:
+            continue
+        if any(r.quarantine for r in roles(p)) and (at == city or city.defid in at.City.neighbors):
+            return True
+        if cured and at == city and any(r.clears_cured for r in roles(p)):
+            return True
+    return False
+
+# 의무병이 치료제가 있는 질병의 큐브가 있는 도시에 있으면 걷는다 (들어갈 때, 치료제를 찾았을 때)
+def medic_mess(p):
+    at = p.At.city
+    if at is None or not any(r.clears_cured for r in roles(p)):
+        return False
+    return any(at.Cubes[d].count > 0 and disease_of(d).Status.cured for d in at.Cubes)
+
+@when(lambda p: medic_mess(p))
+def medic_clears(p: Ref[Player]):
+    at = p.At.city
+    for d in at.Cubes:
+        if disease_of(d).Status.cured:
+            at.Cubes[d].count = 0
+
 # ---- 큐브와 폭발 ----
 
-# 큐브 하나를 올린다. 박멸한 질병이면 올리지 않는다. 이미 3개면 올리지 않고, 이번 연쇄에서 처음이면 터져야 한다는 뜻으로 True를 돌려준다
+# 큐브 하나를 올린다. 박멸한 질병이거나 역할이 막는 도시면 올리지 않는다. 이미 3개면 올리지 않고, 이번 연쇄에서 처음이면 터져야 한다는 뜻으로 True를 돌려준다
 def add_cube(city, disease):
-    if disease_of(disease).Status.eradicated:
+    if disease_of(disease).Status.eradicated or protected(city, disease):
         return False
     row = city.Cubes[disease]
     if row.count < 3:
@@ -148,7 +182,7 @@ def epidemic(g):
     card = draw_infection_bottom()
     city = card.Face.city
     disease = city.City.disease
-    if not disease_of(disease).Status.eradicated:
+    if not disease_of(disease).Status.eradicated and not protected(city, disease):
         row = city.Cubes[disease]
         had = row.count
         row.count = 3
@@ -280,25 +314,27 @@ def DirectFlight(player: Ref[Player], card: Ref[PlayerCard]):
     discard_card(card)
     player.Actions.left -= 1
 
-# 연구소 짓기: 지금 있는 도시의 카드를 버린다
+# 연구소 짓기: 지금 있는 도시의 카드를 버린다. 운영 전문가는 카드 없이 짓는다 (card=None)
 @command(acts_for=lambda player: player)
-def BuildStation(player: Ref[Player], card: Ref[PlayerCard]):
+def BuildStation(player: Ref[Player], card: Ref[PlayerCard] | None):
     with preconditions:
         require(player.Actions.left > 0, text("pandemic-no-actions"))
         require(not player.At.city.Research.station, text("pandemic-has-station"))
-        choose(card, where=lambda c: c.Held.holder == player and c.Face.city == player.At.city)
+        choose(card, from_=([None] if any(r.free_station for r in roles(player)) else []) +
+            [c for c in player.hand if c.Face.city == player.At.city])
     player.At.city.Research.station = True
-    discard_card(card)
+    if card is not None:
+        discard_card(card)
     player.Actions.left -= 1
 
-# 치료: 지금 있는 도시의 그 질병 큐브 하나를 걷는다. 치료제가 있는 질병이면 한 번에 모두 걷는다
+# 치료: 지금 있는 도시의 그 질병 큐브 하나를 걷는다. 치료제가 있는 질병이거나 의무병이면 한 번에 모두 걷는다
 @command(acts_for=lambda player: player)
 def Treat(player: Ref[Player], disease: DefId[Disease]):
     with preconditions:
         require(player.Actions.left > 0, text("pandemic-no-actions"))
         choose(disease, from_=[defid(d) for d in DISEASES if player.At.city.Cubes[defid(d)].count > 0])
     row = player.At.city.Cubes[disease]
-    if disease_of(disease).Status.cured:
+    if disease_of(disease).Status.cured or any(r.treat_all for r in roles(player)):
         row.count = 0
     else:
         row.count -= 1
