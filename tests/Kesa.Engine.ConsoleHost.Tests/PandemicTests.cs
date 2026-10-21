@@ -138,7 +138,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
 
         private string CardCity(EntityId card)
         {
-            var city = (EntityValue)_w.Get(card, _w.Member("Card", "city"));
+            var city = (EntityValue)_w.Get(card, _w.Member("Face", "city"));
             return _w.DefOf(city.Id).Substring("pandemic:".Length);
         }
 
@@ -231,6 +231,65 @@ namespace Kesa.Engine.ConsoleHost.Tests
             // 첫 카드의 연쇄(애틀랜타·워싱턴 둘) 뒤 둘째 카드가 새 연쇄를 시작해, 이미 터졌던 도시도 다시 터진다
             // (이어서 마이애미가 3개에서 넘쳐 같이 터진다): 2 + 3
             Assert.That(Outbreaks(), Is.EqualTo(5));
+        }
+
+        // ---- 숨은 덱 (3조각) ----
+
+        private IEnumerable<EntityId> DrawPile() =>
+            Cards().Where(c => ((IntValue)_w.Get(c, _w.Member("Card", "pile"))).Value == 0);
+
+        [Test]
+        public void TheDrawPileIsFaceDownForEveryone()
+        {
+            var pile = DrawPile().ToList();
+            Assert.That(pile, Has.Count.EqualTo(3));
+            foreach (var seat in new[] { "alice", "bob" })
+                foreach (var card in pile)
+                {
+                    Assert.That(_w.ViewAs(seat).Sees(card), Is.True); // 카드가 있다는 것과
+                    Assert.That(_w.ViewAs(seat).Sees(card, "Face"), Is.False); // 어느 도시인지는 모른다
+                }
+            Assert.That(_w.ViewAs("watcher").Sees(pile[0], "Face"), Is.False);
+        }
+
+        [Test]
+        public void TheDiscardPileIsFaceUp()
+        {
+            var discard = Cards().Except(DrawPile()).ToList();
+            Assert.That(discard, Has.Count.EqualTo(9));
+            foreach (var card in discard) Assert.That(_w.ViewAs("alice").Sees(card, "Face"), Is.True);
+        }
+
+        [Test]
+        public void ADrawnCardTurnsFaceUp()
+        {
+            var next = DrawPile().OrderBy(c => ((IntValue)_w.Get(c, _w.Member("Card", "slot"))).Value).First();
+            string city = CardCity(next); // 규칙은 실제 상태를 다 읽는다
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            Assert.That(_w.ViewAs("bob").Sees(next, "Face"), Is.True);
+            Assert.That(CardCity(next), Is.EqualTo(city));
+        }
+
+        [Test]
+        public void TheScreenShowsOnlyTheFaceUpCards()
+        {
+            var seen = _w.ViewAs("alice").Call("pandemic.infection_deck", new EntityValue(_alice)).Value;
+            var items = ((DictValue)seen).Items;
+            Assert.That(((IntValue)items.Single(i => ((StrValue)i.Key).Value == "draw").Value).Value, Is.EqualTo(3));
+            var faces = ((ListValue)items.Single(i => ((StrValue)i.Key).Value == "discard").Value).Items.Select(v => ((StrValue)v).Value).ToList();
+            Assert.That(faces, Has.Count.EqualTo(9));
+            foreach (var card in DrawPile()) Assert.That(faces, Does.Not.Contain("pandemic:" + CardCity(card)));
+        }
+
+        [Test]
+        public void CardsAreDrawnFromTheTopOfTheDeck()
+        {
+            var order = DrawPile().OrderBy(c => ((IntValue)_w.Get(c, _w.Member("Card", "slot"))).Value).Select(CardCity).ToList();
+            Assert.That(EndTurn("alice", _alice).Succeeded, Is.True);
+            var drawn = Cards().Where(c => order.Take(2).Contains(CardCity(c)))
+                .Select(c => ((IntValue)_w.Get(c, _w.Member("Card", "pile"))).Value);
+            Assert.That(drawn, Is.All.EqualTo(1));
+            Assert.That(DrawPile().Select(CardCity), Is.EqualTo(new[] { order[2] }));
         }
         [Test]
         public void TooManyOutbreaksLoseTheGame()

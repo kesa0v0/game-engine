@@ -30,12 +30,14 @@ component("Cubes", key="Disease", count=field(int, default=0, min=0, max=3))
 # 폭발은 한 연쇄에서 도시마다 한 번이다: 이번 연쇄에서 이미 터졌는지
 component("Chain", broke=field(bool, default=False))
 component("Load", total=derived(int, cube_total), danger=derived(bool, is_danger))
-# 감염 덱의 카드: 어느 도시인지와 뽑을 더미(0)인지 버린 더미(1)인지
-component("Card", city=ref("City"), pile=field(int, default=0))
+# 감염 덱의 카드: 뽑을 더미(0)인지 버린 더미(1)인지, 뽑을 더미 안의 자리(작을수록 위)
+component("Card", pile=field(int, default=0), slot=field(int, default=0))
+# 카드가 어느 도시인지: 뽑을 더미에 있는 동안은 아무도 못 본다 (보기 정책, defs/rules.py)
+component("Face", city=ref("City"))
 signal("Outbreak", city=Ref["City"])
 
 deftype("Disease")
 deftype("City", components=["Research", "Cubes", "Chain", "Load"], disease=const(DefId["Disease"]), neighbors=const(list[DefId["City"]]))
 deftype("Player", components=["Order", "At", "Actions", "Seatable"])
 deftype("Game", components=["Match"])
-deftype("InfectionCard", components=["Card"])
+deftype("InfectionCard", components=["Card", "Face"])

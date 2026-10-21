@@ -13,3 +13,8 @@ def map_rows(me):
     return [{"city": c.defid, "disease": c.City.disease, "cubes": c.Load.total, "danger": c.Load.danger,
              "here": [p for p in c.here], "next": c.City.neighbors}
             for c in query("City")]
+
+# 감염 덱: 뽑을 더미는 장수만, 버린 더미는 앞면인 카드의 도시 (뒷면은 Face가 붙지 않은 것으로 읽힌다)
+def infection_deck(me):
+    return {"draw": len([c for c in query("InfectionCard") if c.Card.pile == 0]),
+            "discard": [c.Face.city.defid for c in query("InfectionCard") if c.Face is not None]}
