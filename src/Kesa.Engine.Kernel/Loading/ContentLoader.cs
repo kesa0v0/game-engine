@@ -169,11 +169,16 @@ namespace Kesa.Engine.Loading
             {
                 if (u.Failed || FailDependents(u, units, runDiagnostics)) continue;
                 // mod_loaded: 설치되어 있고 지금까지 실패하지 않은 모드 (spec-gaps G8, G46)
+                // 호스트 함수의 서명을 Def 파일을 실행하기 전에 푼다: Def 값 자리에 이름으로 적을 수 있다 (G291).
+                // 의존 대상은 먼저 풀려 있다
+                if (host != null)
+                    u.Hosts = HostSignatures.Resolve(host.Of(u.Manifest.Id), schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
+                var hostNames = HostNamesFor(u, units, visibility, host);
                 var builtins = new DefBuiltins(schema, visibility, u.Manifest,
-                    id => units.Exists(o => o.Manifest.Id == id && !o.Failed), u.Defs, u.Patches);
+                    id => units.Exists(o => o.Manifest.Id == id && !o.Failed), u.Defs, u.Patches, hostNames,
+                    name => HostSignatureNamed(units, name));
                 u.Scope.SetSchemaNames(builtins.SchemaName);
                 foreach (var file in u.DefFiles) Execute(u, file, builtins);
-                var hostNames = HostNamesFor(u, units, visibility, host);
                 CheckHostShadowing(u, hostNames);
                 CheckFunctionNames(u, builtins, hostNames);
                 string self = u.Manifest.Id;
@@ -186,8 +191,6 @@ namespace Kesa.Engine.Loading
                 HandlerStages.Check(u.Functions.Handlers, schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
                 CommandSignatures.ResolveWhens(u.Functions.Whens, schema, visibility, u.Scope, new CallContext(u.Manifest.Id, u.Bag));
                 HandlerStages.Check(u.Functions.Whens, schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
-                if (host != null)
-                    u.Hosts = HostSignatures.Resolve(host.Of(u.Manifest.Id), schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
                 // 로드되지 않은 모드의 가드 안에서 건너뛴 패치는 조용히 사라지지 않게 알린다 (G38)
                 foreach (var skipped in u.Skipped)
                 {

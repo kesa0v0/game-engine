@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Host;
 using Kesa.Engine.Schema;
 using Kesa.Engine.Script;
 
@@ -23,14 +24,21 @@ namespace Kesa.Engine.Loading
         private readonly BuiltinFunction _defId;
         private readonly PatchNamespace _patch;
         private readonly List<PatchCall> _patchSink;
+        private readonly HostNames? _hostNames;
+        private readonly Func<string, HostSignature?>? _hostSignatures;
 
         /// <param name="manifest">이 모드의 매니페스트 (<c>mod_loaded</c>가 선언된 모드만 받는다)</param>
         /// <param name="isActive">지금 활성인 모드인가 (설치되어 있고 로드에 실패하지 않았음, spec-gaps G8)</param>
         /// <param name="sink">이 모드가 만든 Def를 실행 순서대로 모을 곳</param>
         /// <param name="patchSink">이 모드의 <c>patch.*</c> 호출을 실행 순서대로 모을 곳</param>
+        /// <param name="hostNames">이 모드에 보이는 호스트 함수. 있으면 Def 값 자리에 이름으로 적을 수 있다 (G291)</param>
+        /// <param name="hostSignatures">호스트 함수의 전체 이름 → 풀린 서명</param>
         public DefBuiltins(SchemaSet schema, ModVisibility visibility, ModManifest manifest, Func<string, bool> isActive,
-            List<DefRecord> sink, List<PatchCall> patchSink)
+            List<DefRecord> sink, List<PatchCall> patchSink, HostNames? hostNames = null,
+            Func<string, HostSignature?>? hostSignatures = null)
         {
+            _hostNames = hostNames;
+            _hostSignatures = hostSignatures;
             _schema = schema;
             _visibility = visibility;
             _mod = manifest.Id;
@@ -198,6 +206,8 @@ namespace Kesa.Engine.Loading
             if (_schema.TryGetComponent(name, out var c) && _visibility.CanSee(_mod, c.Mod))
                 return new ComponentConstructor(c);
             if (_schema.TryGetSignal(name, out var s) && _visibility.CanSee(_mod, s.Mod)) return new SignalName(s);
+            if (_hostNames != null && _hostSignatures != null && _hostNames.IsRoot(name))
+                return new HostReferenceNamespace(_hostNames, _hostSignatures, name);
             return null;
         }
 

@@ -258,6 +258,7 @@
 | [G220](gaps/S7-host.md#g220) | S7 결정론 위반 방어 (S7 열린 질문, S9) | 커널의 결정론 검사(금지 목록·분석기)를 호스트도 켤 수 있게 내놓고 문서화, 상태 체크섬은 리플레이·멀티를 만들 때, 실행 중 이중 호출 검증은 안 함. | 확인 |
 | [G221](gaps/S7-host.md#g221) | S7 호스트 함수의 저장, 바뀜 알림, 게임 없이 도는 도구 | 멈춘 Flow의 호스트 함수 값은 `{"host": "core.find_path"}`(없으면 `SAV002`), 저장 메타에 등록 목록을 싣고 다르면 `SAV003`, 선언 파일로 내보내 CLI `--host`가 구현 없이 검사·스텁, 로드 중에는 부를 수 없고 참조만. | 확인 |
 | [G222](gaps/S7-host.md#g222) | S7 호스트 함수의 스크립트 타입과 C# 타입 대응 | C# 타입 대응: `int`는 `long`만, `fixed`는 `Fixed`, `Ref[X]`는 `EntityId`, `DefId[X]`는 `string`, None 허용은 nullable, `list[T]`는 `IReadOnlyList<T>`, `dict`는 엔진 값 `Value`로만. | 확인 |
+| [G291](gaps/S7-host.md#g291) | G221에서 미룬 것: 호스트 함수를 Def 값이나 패치 값으로 | 읽기 등급 호스트 함수는 `Goal("B", check=core.goals.reached)`처럼 `Cond` 칸의 값이 된다. 로드가 등급(읽기)·서명(칸의 Def 하나를 받음)·반환(bool)을 보고, `Action` 칸은 스크립트 함수만 받는다. | 확인 |
 
 ## S8 저장
 

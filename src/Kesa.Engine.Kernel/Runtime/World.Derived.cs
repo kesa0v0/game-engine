@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Host;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Schema;
 using Kesa.Engine.Script;
@@ -777,6 +778,10 @@ namespace Kesa.Engine.Runtime
             }
             entity.Def.Consts.TryGet(name, out var raw);
             var value = Normalize(found.Spec.Type, raw.Value);
+            // Def 값 자리에 이름으로 적은 호스트 함수는 이 월드의 호스트 함수 값으로 읽는다 (G291)
+            if (value is HostReference reference)
+                value = HostValue(reference.Name) ?? throw new ScriptRuntimeException(Codes.RunScript,
+                    "the host function " + reference.Name + " is not registered in this game");
             _trace?.Add(new ExplainNode(ExplainKind.Read, new EntityId(id), type.Name, null, name, value, new List<ExplainNode>()));
             return value;
         }

@@ -257,6 +257,15 @@ namespace Kesa.Engine.Loading
             return new HostNames(visible, hidden);
         }
 
+        /// <summary>풀린 호스트 함수 서명을 전체 이름으로 찾는다 (Def 값 자리의 호스트 함수, G291). 아직 풀리지 않았으면 null.</summary>
+        private static HostSignature? HostSignatureNamed(List<ModUnit> units, string fullName)
+        {
+            foreach (var owner in units)
+                foreach (var signature in owner.Hosts)
+                    if (signature.Function.Name == fullName) return signature;
+            return null;
+        }
+
         /// <summary>모드가 최상위에 호스트 이름 공간과 같은 이름을 묶으면 그 함수들이 가려지므로 로드 오류다 (G218).</summary>
         private static void CheckHostShadowing(ModUnit u, HostNames hostNames)
         {

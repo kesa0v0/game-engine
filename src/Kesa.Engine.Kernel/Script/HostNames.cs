@@ -59,6 +59,12 @@ namespace Kesa.Engine.Script
         /// <summary>호스트 함수가 있지만 이 모드가 의존하지 않아 보이지 않는 소유 모드 id인가.</summary>
         public bool IsHidden(string name) => _hidden.Contains(name);
 
+        /// <summary>이 모드에 보이는 호스트 함수의 전체 이름인가.</summary>
+        public bool IsFunction(string fullName) => _functions.ContainsKey(fullName);
+
+        /// <summary>이 모드에 보이는 이름 공간(소유 모드 id나 경로 중간)의 전체 이름인가.</summary>
+        public bool IsNamespace(string fullName) => _children.ContainsKey(fullName);
+
         public bool IsWriting(string fullName) => _functions.TryGetValue(fullName, out bool writes) && writes;
 
         /// <summary><c>core.path.find</c> 같은 속성 줄을 이름 줄로 편다. 맨 앞이 이름이 아니면 false.</summary>

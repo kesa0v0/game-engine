@@ -1,4 +1,5 @@
 using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Host;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Script;
 
@@ -169,6 +170,8 @@ namespace Kesa.Engine.Reporting
                         return obj;
                     case FunctionValue fn:
                         return new JsonObject().Add("function", JsonNode.String(fn.Name));
+                    case HostReference host:
+                        return new JsonObject().Add("host", JsonNode.String(host.Name));
                     case ComponentValue cv:
                         var fields = new JsonObject();
                         foreach (var f in cv.Fields) fields.Add(f.Name, Value(f.Value));

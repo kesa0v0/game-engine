@@ -127,3 +127,11 @@ component("Fleet", strength=derived(int, lambda f: sum([s.Hull.hp for s in f.ent
 
 호스트(게임 클라이언트)가 C#으로 등록한 함수를 `core.path.find(a, b)`처럼 부를 수 있다(길찾기처럼 무거운 일). 어떤 함수가 있는지는
 호스트가 알려 주고, `engine check --host 선언파일`로 검사한다. 읽기만 하는 함수는 어디서나, 쓰는 함수는 쓰는 곳에서 문장으로만 부른다.
+
+읽기 함수는 `Cond[...]` 칸의 값으로도 이름만 적어 넣을 수 있다(Def 값이든 패치든). 스크립트 함수로 감쌀 필요가 없다.
+
+```python
+Goal("B", check=core.goals.reached)
+```
+
+칸이 부르는 꼴(그 Def 하나를 받아 `bool`을 돌려줌)과 안 맞거나 쓰기 함수이면 로드 오류다. `Action[...]` 칸에는 스크립트 함수만 넣는다.

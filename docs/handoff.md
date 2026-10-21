@@ -1,6 +1,6 @@
 # 인계 메모: 현재 상태와 다음 할 일
 
-마지막 갱신: 2026-10-21. 브랜치 `spec-v0.5-scaffold`, 테스트 2269개 통과(커널 2156, CLI 39, 콘솔 호스트 25, 번역 49). 모더용 안내서는 `docs/modding/`(G252, 예시 모드 `samples/guide`). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
+마지막 갱신: 2026-10-21. 브랜치 `spec-v0.5-scaffold`, 테스트 2277개 통과(커널 2164, CLI 39, 콘솔 호스트 25, 번역 49). 모더용 안내서는 `docs/modding/`(G252, 예시 모드 `samples/guide`). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
 
 ## 한 줄 요약
 
@@ -25,7 +25,7 @@
 | X4 번역 파일·포매터(`src/Kesa.Engine.Text`, `check`의 `LOC`, 콘솔 `--lang`) | 끝남 (G254~G275). 커맨드 이름은 엔진이 번역하지 않음(버튼 글은 호스트 UI 파일, G287) |
 | S10 UI의 행동(`@ui_action`·`ui_state`·`submit`, 콘솔의 `[화면]` 메뉴) | 끝남 (G276~G286). 덮어쓰기·패치는 미룸 |
 
-결정은 `docs/spec-gaps.md`의 G1~G290. 기능을 더하거나 바꾸면 `docs/modding/`의 해당 장과 9장 "아직 없는 것"도 고친다(예시는 `samples/`에서 가져오고 `GuideSampleTests`·`SkirmishTests`가 돌린다).
+결정은 `docs/spec-gaps.md`의 G1~G291. 기능을 더하거나 바꾸면 `docs/modding/`의 해당 장과 9장 "아직 없는 것"도 고친다(예시는 `samples/`에서 가져오고 `GuideSampleTests`·`SkirmishTests`가 돌린다).
 
 ## 핵심 규칙 (자세한 것은 spec-gaps)
 
@@ -64,7 +64,7 @@
 큰 후보:
 
 - 위 "콘솔 호스트에서 드러난 구멍"을 하나씩.
-- 호스트 함수에서 남긴 것: 인자 8개 초과용 이름으로 꺼내기(`call.Int`), 콘텐츠 파일 최상위에서 호스트 함수를 값으로 참조(G221, 지금은 "이름 없음" 오류. Def의 `Cond`·`Action` 칸은 스크립트 함수만 받으므로 따로 정해야 함), 호스트 창구의 `choices`.
+- 호스트 함수에서 남긴 것: 인자 8개 초과용 이름으로 꺼내기(`call.Int`), `Action` 칸에 쓰기 등급 호스트 함수 넣기(사례가 생기면, `Cond` 칸은 끝: 2026-10-21 G291, history의 "호스트 함수를 `Cond` 칸의 값으로"), 호스트 창구의 `choices`. G291을 `engine check --host`와 스텁에서 확인해 보지 않았다(작은 후보).
 - 속도의 작은 후보(이득은 작을 것으로 추정): 람다 없는 함수의 지역 변수 표 다시 쓰기(부를 때마다 약 64B), 문장 수준 호출(`x = f()`)의 결과 칸 번호, 컴프리헨션 이름 공간 프레임 재사용, `contribs()` 빈 목록.
 - ~~영수증을 (엔티티, 컴포넌트) 단위로.~~ **끝(2026-10-21, G290 확인):** `Record(id, 이름)`·`CallRead`, 쓸어 보기 테스트 `CallReceiptNarrowingTests`. `@when` 읽기 기록도 같은 단위로 바꿨다(`Touch(id, 이름)`, `_whenReaders`는 엔티티 → 칸 이름 → 조건, 빠뜨림은 `WhenTrackingTests`의 전체 훑기 견주기, 덜 평가하는지는 `WhenNarrowingTests`). history의 "`@when` 읽기 기록을 (엔티티, 컴포넌트) 단위로".
 - S10 UI 연동(호스트 엔진 결정과 묶임). 아래 "S10 논의 메모" 참고.
@@ -93,6 +93,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 2269개 통과(커널 2156, CLI 39, 콘솔 호스트 25, 번역 49)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
+1. `git pull` 후 `dotnet test`로 2277개 통과(커널 2164, CLI 39, 콘솔 호스트 25, 번역 49)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(색인, 고를 항목의 영역은 `docs/gaps/`의 그 파일), 고를 항목에 맞는 `docs/spine-spec.md` 절을 읽는다. 실행기 구조는 `Script/Execution/PureEvaluator.cs`(입구)·`Session.cs`(+`.Calls`·`.Preconditions`·`.Stepping`)·`Frame.cs`·`Block.cs`·`PureEvaluator.Nodes.cs`(식 노드)·`PureEvaluator.Statements.cs`(문장 노드)·`FrameLayout.cs`·`LocalTable.cs`다. 고른 영역의 지난 기록이 필요하면 `docs/history.md`에서 그 절만 찾아 읽는다(전부 읽을 필요 없음). 옛 커맨드 첫 슬라이스의 읽을 곳: 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`)·`Frame.cs`(`Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.

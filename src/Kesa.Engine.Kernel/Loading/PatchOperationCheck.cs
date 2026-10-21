@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Host;
 using Kesa.Engine.Schema;
 using Kesa.Engine.Script;
 
@@ -224,6 +225,7 @@ namespace Kesa.Engine.Loading
                     return null;
 
                 case FunctionTypeRef f:
+                    if (value is HostReference host) return HostSlotMismatch(f, host);
                     if (!(value is FunctionValue fn)) return "expected a function for " + f.Display + ", found " + value.KindName;
                     // 커맨드는 제출로만 실행된다 (G118)
                     if (fn.IsEntry)
@@ -243,6 +245,31 @@ namespace Kesa.Engine.Loading
                     return null;
             }
             return "values of type " + type.Display + " cannot be written in a patch";
+        }
+
+        /// <summary>
+        /// 호스트 함수를 함수 자리의 값으로 쓸 수 있는가 (G291). <c>Cond</c> 칸만 받고, 읽기 등급이어야 하며, 그 칸을 부르는 꼴
+        /// (칸의 Def 엔티티 하나)로 부를 수 있고 bool을 돌려줘야 한다. <c>Action</c> 칸은 스크립트 함수만 받는다.
+        /// </summary>
+        private static string? HostSlotMismatch(FunctionTypeRef slot, HostReference host)
+        {
+            string name = "'" + host.Name + "'";
+            if (slot.Kind == FunctionSlotKind.Action)
+                return name + " is a host function, but " + slot.Display + " only holds script functions";
+            if (host.Writes)
+                return name + " is a host function that changes the world, but " + slot.Display + " only holds functions that read";
+            var signature = host.Signature;
+            var parameters = signature.Parameters;
+            string wants = "Ref[\"" + slot.Target.Name + "\"]";
+            string called = name + " " + signature.Canonical + " cannot be called with one " + wants + ", as " + slot.Display + " does";
+            if (parameters.Count == 0 || !(parameters[0].Type is EntityRefTypeRef first) || first.Target.Name != slot.Target.Name)
+                return called;
+            for (int i = 1; i < parameters.Count; i++)
+                if (parameters[i].Default == null) return called;
+            if (!ReferenceEquals(signature.Returns, PrimitiveTypeRef.Bool))
+                return name + " returns " + (signature.Returns == null ? "None" : signature.Returns.Display) + ", but " +
+                       slot.Display + " needs a bool";
+            return null;
         }
 
         private static string Expected(TypeRef type, Value value) => "expected " + type.Display + ", found " + value.KindName;
