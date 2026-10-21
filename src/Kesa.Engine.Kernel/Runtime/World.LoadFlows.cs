@@ -411,6 +411,21 @@ namespace Kesa.Engine.Runtime
                 frame.Blocks.Add(block);
             }
             if (frame.Blocks.Count == 0) throw new JsonFormatException("a paused frame has no blocks");
+            var dispatch = obj.Get("dispatch");
+            if (dispatch != null)
+            {
+                // 부른 위치는 Relink가 emit 문장에서 채운다. 핸들러가 바뀌었으면(목록이 짧아짐) 이어 갈 자리가 없다 (G310)
+                var d = AsObject(dispatch, "a dispatch");
+                var signal = LoadScriptValue(Field(d, "signal"), where, problems);
+                long next = Long(Field(d, "next"), "a dispatch position");
+                var handlers = ImmediateHandlers(signal);
+                if (next < 1 || next > handlers.Count)
+                {
+                    problems.Add(changed);
+                    return null;
+                }
+                frame.Dispatch = new ImmediateDispatch(_emit, signal, handlers, default, (int)next);
+            }
             return frame;
         }
 

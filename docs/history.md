@@ -1085,3 +1085,15 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **스텁:** `class 모드id:` 안에 그 모드의 최상위 함수(`@staticmethod def f(a: Any) -> Any`)와 상수(`int`·`str`·`bool`, 나머지 `Any`), 그 뒤에 호스트 함수 경로 클래스. 커맨드 등 입구는 뺌.
 - **하지 않은 것:** Def 파일 최상위(로드 시점)의 `pandemic.f` 값(예: `Cond` 칸에 다른 모드 함수)은 로드 시점 속성 접근이라 여전히 안 됨(호스트 함수만 G291). 사례가 나오면 본다.
 - **테스트:** 새 `ModNamesTests` 14개(함수·상수 부르기와 제 모드 기준 실행, 자기 이름, 함수 값을 든 멈춘 Flow 저장, 식 안의 쓰기 함수, `derived`의 난수 함수, 커맨드 부르기, 오타, 의존 안 함, 모드 id만, 최상위 이름의 가림, 같은 이름의 지역 변수, 호스트 경로와 겹침, 호스트 함수와 한 id 공유, 스텁). 스텁 기대값 둘(커널·CLI)에 모드의 최상위 이름 클래스.
+
+## 즉시 핸들러 `@on(X, now=True)`와 변종 바이러스 첫 효과 (G310, 2026-10-22)
+
+- **드러난 것:** brink B단계에서 변종 바이러스의 "변종의 폭발은 폭발 표시를 두 칸"을 `@on(Outbreak)`로 짜자, 더한 한 칸이 코어가 감염 카드를 다 뽑고 다음 차례 `ask`로 멈춘 뒤에야 들어감을 테스트로 재현(폭발 6에서 변종이 터지면 8에서 져야 하는데 상파울루가 감염되고 질문이 열려 있음). 보통 핸들러는 낸 Flow 뒤에 돈다(S5)는 규칙 때문이다. G176을 다시 보고, 실시간에서 즉시 핸들러가 `ask`하면 어떻게 되는지 논의한 끝에 B3(시간을 막는 `ask`만 허용)으로 정함.
+- **결정:** G310(전문은 `docs/gaps/S5-reactions.md`), G176은 `일부 바뀜(G310)`. 색인 머리말의 "다음 번호"를 G311로 고침.
+- **구현:**
+  - 선언: `@on(..., now=True)`(`HandlerDecl.Now`), `now=`에 bool이 아니면 `CMD001`, 오타 안내에 `now`.
+  - 실행: `emit` 내장(`World._emit`)이 `Immediate`(신호 → 즉시 핸들러 목록, 단계 규칙 순서)와 `ImmediateArguments`(받는 엔티티가 사라졌으면 null)를 듦. 실행기(`Session.StatementCall`)가 `emit` 문장 뒤 프레임에 `ImmediateDispatch`를 달고, `Step`이 다음 문장 전에 핸들러를 하나씩 쌓음(`CallImmediate`, 값은 버림, 쓰기 모드는 낸 쪽 그대로, 입구 검사 우회). 그래서 멈춘 실행에서도 부른 쪽 문장은 `emit(...)`이고 그 위는 핸들러 하나다. 재진입은 기존 재귀 검사(`RUN` 순환)가 잡아 세대 상한이 따로 필요 없음. 보통 핸들러 대기열(`Drain`)은 즉시 핸들러를 건너뜀.
+  - 멈춤: `Frame.Immediate`(즉시 핸들러와 그것이 문장으로 부른 함수)에서 `PureBuiltin.RefusedInImmediate`가 이유를 주면 실행 오류: `wait`·`advance`는 늘, `ask`는 마감이 있거나 `blocks_time=False`일 때.
+  - 저장: 프레임에 `"dispatch": {"signal", "next"}`, 불러올 때 신호로 핸들러 목록을 다시 찾고 `Relink`가 위 프레임이 그 핸들러인지 보며 부른 위치·`Immediate`를 채움(저장 때 같은 계산으로 검사).
+- **샘플:** `samples/pandemic/brink`에 `schema/virulent.py`(`Virulent` 컴포넌트를 `Disease`에 붙임), `defs/virulent.py`(첫 에픽 뒤 보드에 큐브가 가장 많은 질병이 변종 `@when`, 변종 폭발 한 칸 더 `@on(Outbreak, now=True)`, 코어 함수 `pandemic.disease_of`·`pandemic.game` 사용).
+- **테스트:** 새 `ImmediateHandlerTests` 16개(emit 자리에서 정의 순서로, 낸 쪽과 서로의 쓰기를 봄, 오류면 커맨드 전체 되감김, 즉시 연쇄, 자기 재진입 오류, 사라진 엔티티의 핸들러는 건너뜀, `ask`로 낸 쪽까지 멈추고 이어 감, 멈춘 채 저장·불러오기와 다시 저장한 바이트, `wait`·함수 안의 `wait`·마감 `ask`·`blocks_time=False`·`advance` 오류, 보통 핸들러는 여전히 `wait`, `now=` 오류 둘). `BrinkTests.AVirulentOutbreakCountsTwiceAndCanLoseAtOnce`(재현했던 판). 안내서 6장에 "바로 도는 핸들러" 절과 표 한 줄.

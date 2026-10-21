@@ -19,11 +19,24 @@ namespace Kesa.Engine.Runtime
                     Writes = true,
                     Suspends = true,
                     CallerBody = (mod, p, k) => Guard(() => Ask(mod, p, k)),
+                    RefusedInImmediate = payload => payload is AskPayload { DeadlineIn: null, BlocksTime: true }
+                        ? null
+                        : "ask() with a deadline or blocks_time=False cannot be used in an @on(..., now=True) handler",
                 });
             table.Add(PureBuiltins.WaitName,
-                new PureBuiltin(PureBuiltins.WaitName, (p, k) => Wait(p, k)) { Writes = true, Suspends = true });
+                new PureBuiltin(PureBuiltins.WaitName, (p, k) => Wait(p, k))
+                {
+                    Writes = true,
+                    Suspends = true,
+                    RefusedInImmediate = _ => "wait() cannot be used in an @on(..., now=True) handler",
+                });
             table.Add(PureBuiltins.AdvanceName,
-                new PureBuiltin(PureBuiltins.AdvanceName, (p, k) => ScriptAdvance(p, k)) { Writes = true, Suspends = true });
+                new PureBuiltin(PureBuiltins.AdvanceName, (p, k) => ScriptAdvance(p, k))
+                {
+                    Writes = true,
+                    Suspends = true,
+                    RefusedInImmediate = _ => "advance() cannot be used in an @on(..., now=True) handler",
+                });
         }
 
         /// <summary><c>wait(ticks=n)</c> (spec X2·S5): n은 1 이상. 멈추는 것은 실행기가 하고, 깨어나면 None을 돌려준다.</summary>

@@ -253,12 +253,18 @@ namespace Kesa.Engine.Runtime
                 blocks.Add(obj);
             }
 
-            return new JsonObject()
+            var saved = new JsonObject()
                 .Add("mod", new JsonString(fn.Mod))
                 .Add("function", new JsonString(fn.Name))
                 .Add("hash", new JsonString(BodyHash.Of(fn)))
                 .Add("locals", locals)
                 .Add("blocks", blocks);
+            // emit 문장이 즉시 핸들러를 부르던 중이면 그 신호와 다음 핸들러 번호 (G310). 핸들러 목록은 불러올 때 신호로 다시 찾는다
+            if (frame.Dispatch != null)
+                saved.Add("dispatch", new JsonObject()
+                    .Add("signal", SaveScriptValue(frame.Dispatch.Signal, writer))
+                    .Add("next", new JsonNumber(frame.Dispatch.Next)));
+            return saved;
         }
 
         /// <summary>블록을 연 문장 (블록이 방금 실행한 문장). 아직 아무것도 실행하지 않았으면 null.</summary>
@@ -307,6 +313,7 @@ namespace Kesa.Engine.Runtime
                 var result = ResultTo.Discard;
                 string? resultName = null;
                 bool writable;
+                bool immediate = false;
                 if (i == 0)
                 {
                     site = entry;
@@ -322,8 +329,25 @@ namespace Kesa.Engine.Runtime
                         return false;
                     }
                     site = call.Span;
-                    if (resultName != null) result = ResultTo.Local;
-                    writable = caller.Writable && frame.Function.Writes;
+                    if (caller.Dispatch != null)
+                    {
+                        // emit 문장이 부른 즉시 핸들러: 값을 버리고, 낸 쪽의 쓰기 모드를 받는다 (G310)
+                        if (!ReferenceEquals(caller.Dispatch.Handlers[caller.Dispatch.Next - 1], frame.Function))
+                        {
+                            if (check) throw new InvalidOperationException("engine: a paused handler is not the one its emit is running");
+                            return false;
+                        }
+                        if (!check) caller.Dispatch.Site = site;
+                        resultName = null;
+                        writable = caller.Writable;
+                        immediate = true;
+                    }
+                    else
+                    {
+                        if (resultName != null) result = ResultTo.Local;
+                        writable = caller.Writable && frame.Function.Writes;
+                        immediate = caller.Immediate;
+                    }
                 }
 
                 if (!check)
@@ -332,9 +356,10 @@ namespace Kesa.Engine.Runtime
                     frame.Result = result;
                     frame.ResultName = resultName;
                     frame.Writable = writable;
+                    frame.Immediate = immediate;
                 }
                 else if (!frame.CallSite.Equals(site) || frame.Result != result || frame.ResultName != resultName ||
-                         frame.Writable != writable)
+                         frame.Writable != writable || frame.Immediate != immediate)
                 {
                     throw new InvalidOperationException("engine: paused frame " + i + " (" + frame.Function.Name +
                                                         ") is not linked the way its caller's statement says");

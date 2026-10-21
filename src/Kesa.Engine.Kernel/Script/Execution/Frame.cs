@@ -23,6 +23,8 @@ namespace Kesa.Engine.Script
                 UiWritable = UiWritable,
                 Result = Result,
                 ResultName = ResultName,
+                Immediate = Immediate,
+                Dispatch = Dispatch?.Copy(),
             };
             foreach (var block in Blocks) copy.Blocks.Add(block.Copy());
             return copy;
@@ -49,6 +51,8 @@ namespace Kesa.Engine.Script
             Result = ResultTo.Host;
             ResultName = null;
             Returned = NoneValue.Instance;
+            Immediate = false;
+            Dispatch = null;
             Blocks.Clear();
         }
 
@@ -85,6 +89,42 @@ namespace Kesa.Engine.Script
 
         /// <summary><see cref="ResultTo.Host"/>일 때 함수가 돌려준 값.</summary>
         public Value Returned { get; set; } = NoneValue.Instance;
+
+        /// <summary>
+        /// 즉시 핸들러 안인가 (spec-gaps G310): 즉시 핸들러 본문과 그것이 문장으로 부른 함수. 시간을 막는 <c>ask</c>만 멈출 수 있다.
+        /// </summary>
+        public bool Immediate { get; set; }
+
+        /// <summary>이 프레임의 <c>emit</c> 문장이 아직 다 부르지 않은 즉시 핸들러. 없으면 null.</summary>
+        public ImmediateDispatch? Dispatch { get; set; }
+    }
+
+    /// <summary>
+    /// <c>emit</c> 문장 하나가 부르는 즉시 핸들러들 (spec-gaps G310). 한 번에 하나씩 프레임을 쌓아, 멈춘 실행에서도 부른 쪽 문장이
+    /// <c>emit(...)</c>이고 그 위가 지금 도는 핸들러 하나다.
+    /// </summary>
+    internal sealed class ImmediateDispatch
+    {
+        public ImmediateDispatch(PureBuiltin emit, Value signal, IReadOnlyList<FunctionValue> handlers, SourceSpan site, int next = 0)
+        {
+            Emit = emit;
+            Signal = signal;
+            Handlers = handlers;
+            Site = site;
+            Next = next;
+        }
+
+        public PureBuiltin Emit { get; }
+        public Value Signal { get; }
+        public IReadOnlyList<FunctionValue> Handlers { get; }
+
+        /// <summary><c>emit(...)</c> 호출의 위치 (핸들러 프레임의 부른 위치).</summary>
+        public SourceSpan Site { get; set; }
+
+        /// <summary>다음에 부를 핸들러의 번호. 지금 도는 핸들러는 그 앞의 것이다.</summary>
+        public int Next { get; set; }
+
+        public ImmediateDispatch Copy() => new ImmediateDispatch(Emit, Signal, Handlers, Site, Next);
     }
 
     internal enum ResultTo

@@ -101,6 +101,11 @@ namespace Kesa.Engine.Script
         public string? Stage { get; internal set; }
 
         public SourceSpan StageSpan { get; internal set; }
+
+        /// <summary>
+        /// <c>now=True</c>: 즉시 핸들러 (spec-gaps G310). 새 Flow가 아니라 <c>emit</c>한 흐름 안에서 그 자리에서 함수처럼 돈다.
+        /// </summary>
+        public bool Now { get; internal set; }
     }
 
     /// <summary>

@@ -259,6 +259,19 @@ namespace Kesa.Engine.Script
         public bool Suspends { get; set; }
 
         /// <summary>
+        /// 이 멈춤을 즉시 핸들러 안에서 쓸 수 없으면 그 이유, 쓸 수 있으면 null (spec-gaps G310). 몸체가 돌려준 질문 내용을 받는다.
+        /// </summary>
+        public Func<Value, string?>? RefusedInImmediate { get; set; }
+
+        /// <summary>
+        /// <c>emit</c>: 문장 실행 뒤 그 자리에서 부를 즉시 핸들러 (spec-gaps G310). 신호 값을 받아 도는 순서대로 준다.
+        /// </summary>
+        public Func<Value, IReadOnlyList<FunctionValue>>? Immediate { get; set; }
+
+        /// <summary>즉시 핸들러 하나의 인자 (신호 값, 핸들러). null이면 그 핸들러는 돌지 않는다(받는 엔티티가 사라졌다, G151).</summary>
+        public Func<Value, FunctionValue, IReadOnlyDictionary<string, Value>?>? ImmediateArguments { get; set; }
+
+        /// <summary>
         /// 부른 함수의 모드 id도 받는 몸체 (<c>ask</c>가 커맨드 이름 <c>"React"</c>를 그 모드의 커맨드로 푼다). 있으면 이것을 부른다.
         /// </summary>
         public Func<string, IReadOnlyList<Value>, IReadOnlyDictionary<string, Value>, Value>? CallerBody { get; set; }

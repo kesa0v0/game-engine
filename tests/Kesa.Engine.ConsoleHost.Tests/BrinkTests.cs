@@ -84,5 +84,45 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
             Assert.That(Actions(_alice, "left"), Is.EqualTo(5), "the next turn starts with per_turn actions");
         }
+
+        // ---- 변종 바이러스 ----
+
+        private EntityId Game() => _w.All("Game").Single();
+        private long Outbreaks() => ((IntValue)_w.Get(Game(), _w.Member("Match", "outbreaks"))).Value;
+        private EntityId Disease(string id) => _w.All("Disease").Single(e => _w.DefOf(e) == id);
+
+        private void ClearCubes()
+        {
+            foreach (var city in _w.All("City"))
+                foreach (var d in new[] { "pandemic:Blue", "pandemic:Yellow" })
+                    _w.SetRow(city, _w.Member("Cubes", "count"), d, new IntValue(0));
+        }
+
+        /// <summary>감염 덱에서 이 도시들의 카드만 뽑을 더미에 남기고, 순서대로 맨 위부터 놓는다.</summary>
+        private void DrawOnly(params string[] cities)
+        {
+            foreach (var card in _w.All("InfectionCard"))
+            {
+                int i = System.Array.IndexOf(cities, FaceCity(card));
+                _w.Set(card, _w.Member("Card", "pile"), new IntValue(i >= 0 ? 0 : 1));
+                if (i >= 0) _w.Set(card, _w.Member("Card", "slot"), new IntValue(-100 + i));
+            }
+        }
+
+        [Test]
+        public void AVirulentOutbreakCountsTwiceAndCanLoseAtOnce()
+        {
+            // 폭발 6에서 변종(파랑)이 터지면 8: 그 자리에서 지고 둘째 카드는 뽑지 않는다 (코어의 "여덟째 폭발" 시험과 같은 판)
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            _w.Set(Game(), _w.Member("Match", "outbreaks"), new IntValue(6));
+            _w.SetRow(City("pandemic:Atlanta"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(3));
+            DrawOnly("pandemic:Atlanta", "pandemic:SaoPaulo");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(Outbreaks(), Is.EqualTo(8));
+            Assert.That(((IntValue)_w.GetRow(City("pandemic:SaoPaulo"), _w.Member("Cubes", "count"), "pandemic:Yellow")).Value, Is.EqualTo(0),
+                "lost before the second card");
+            Assert.That(_w.OpenRequests, Is.Empty, "the game is over");
+        }
     }
 }

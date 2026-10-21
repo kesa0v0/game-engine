@@ -44,6 +44,36 @@ namespace Kesa.Engine.Runtime
             foreach (var pair in keyed) ordered.Add(pair.Value);
             _handlers = ordered;
             foreach (var h in handlers) _handlerById[HandlerId(h)] = h;
+            foreach (var h in ordered)
+            {
+                if (!h.Now) continue;
+                if (!_immediate.TryGetValue(h.Signal.Name, out var list))
+                    _immediate.Add(h.Signal.Name, list = new List<FunctionValue>());
+                list.Add(h.Function);
+                _immediateDecl[h.Function] = h;
+            }
+        }
+
+        /// <summary>신호 이름 → 즉시 핸들러, 도는 순서대로 (spec-gaps G310).</summary>
+        private readonly Dictionary<string, List<FunctionValue>> _immediate = new Dictionary<string, List<FunctionValue>>(StringComparer.Ordinal);
+
+        private readonly Dictionary<FunctionValue, HandlerDecl> _immediateDecl = new Dictionary<FunctionValue, HandlerDecl>();
+
+        private IReadOnlyList<FunctionValue> ImmediateHandlers(Value signal) =>
+            signal is SignalValue s && _immediate.TryGetValue(s.Signal.Name, out var list) ? list : (IReadOnlyList<FunctionValue>)Array.Empty<FunctionValue>();
+
+        /// <summary>즉시 핸들러 하나의 인자. 받는 엔티티가 이미 사라졌으면 null: 그 핸들러는 돌지 않는다 (G151과 같은 뜻, G310).</summary>
+        private IReadOnlyDictionary<string, Value>? ImmediateArguments(Value signal, FunctionValue handler)
+        {
+            var s = (SignalValue)signal;
+            var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+            foreach (var p in handler.Definition!.Parameters)
+            {
+                var value = s.Value(p.Name);
+                if (value is EntityValue entity && !IsAlive(entity.Id)) return null;
+                args[p.Name] = ToScript(value);
+            }
+            return args;
         }
 
         private static string HandlerId(HandlerDecl h) => h.Mod + "." + h.Function.Name;
@@ -97,7 +127,8 @@ namespace Kesa.Engine.Runtime
                 var e = _emitted[next];
                 foreach (var h in _handlers)
                 {
-                    if (h.Signal.Name != e.Signal.Signal.Name) continue;
+                    // 즉시 핸들러는 emit한 자리에서 이미 돌았다 (G310)
+                    if (h.Signal.Name != e.Signal.Signal.Name || h.Now) continue;
                     string id = HandlerId(h);
                     if (e.Generation > _maxSignalDepth)
                     {

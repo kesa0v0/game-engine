@@ -100,17 +100,17 @@ namespace Kesa.Engine.Script
         /// <summary>재귀를 검사하고 인자를 묶은 프레임을 스택에 넣는다. <c>def</c>면 몸체 블록에서 시작한다.</summary>
         private Frame Push(FunctionValue fn, LocalTable? captured,
             IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
-            bool writable, bool uiWritable = false)
+            bool writable, bool uiWritable = false, bool entry = false)
         {
-            // 커맨드는 제출로만 실행된다 (G118). 이름으로 잡히지 않은 길(함수 값)의 마지막 방어선
-            if (fn.IsEntry)
+            // 커맨드는 제출로만 실행된다 (G118). 이름으로 잡히지 않은 길(함수 값)의 마지막 방어선. 즉시 핸들러는 emit이 부른다 (G310)
+            if (fn.IsEntry && !entry)
             {
                 throw Fail(Codes.RunScript, "'" + fn.Name + "' is a " + fn.EntryKind + ", so logic cannot call it",
                     "a command only runs when it is submitted; move the shared part into a plain function (spec-gaps G118)");
             }
             var newFrame = Enter(fn, captured, positional, keywords);
             newFrame.CallSite = site;
-            newFrame.Writable = writable && fn.Writes;
+            newFrame.Writable = writable && (fn.Writes || entry);
             newFrame.UiWritable = uiWritable && fn.WritesUi;
             if (fn.Definition != null) newFrame.Blocks.Add(BodyBlock(fn.Definition, newFrame.Layout));
             _stack.Add(newFrame);

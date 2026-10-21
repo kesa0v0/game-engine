@@ -23,9 +23,17 @@ namespace Kesa.Engine.Runtime
         private void AddSignalBuiltins(SortedDictionary<string, Value> table)
         {
             // emit(Damaged(...)): 쓰는 내장이라 쓰기 모드 프레임의 문장으로만 불린다 (G146)
-            table.Add(PureBuiltins.EmitName,
-                new PureBuiltin(PureBuiltins.EmitName, (p, k) => Guard(() => Emit(p, k))) { Writes = true });
+            _emit = new PureBuiltin(PureBuiltins.EmitName, (p, k) => Guard(() => Emit(p, k)))
+            {
+                Writes = true,
+                Immediate = ImmediateHandlers,
+                ImmediateArguments = ImmediateArguments,
+            };
+            table.Add(PureBuiltins.EmitName, _emit);
         }
+
+        /// <summary><c>emit</c> 내장. 불러온 멈춘 실행이 즉시 핸들러를 이어 부를 때 쓴다 (G310).</summary>
+        private PureBuiltin _emit = null!;
 
         /// <summary>신호 값 생성자: 컴포넌트 생성자와 같은 스키마 이름 칸이다 (G230).</summary>
         private void AddSignalConstructors(SortedDictionary<string, KeyValuePair<string, Value>> names)

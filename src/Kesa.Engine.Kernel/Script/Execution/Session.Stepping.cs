@@ -20,6 +20,7 @@ namespace Kesa.Engine.Script
 
         private void Step(Frame frame)
         {
+            if (frame.Dispatch != null && CallImmediate(frame)) return;
             if (frame.Blocks.Count == 0)
             {
                 Finish(NoneValue.Instance); // 끝까지 실행했다
@@ -170,17 +171,49 @@ namespace Kesa.Engine.Script
                 var called = Push(fn, null, positional, keywords, call.Span, frame.Writable, frame.UiWritable);
                 called.Result = target == null ? ResultTo.Discard : ResultTo.Local;
                 called.ResultName = target;
+                called.Immediate = frame.Immediate;
                 return;
             }
             var value = Invoke(callee, positional, keywords, call.Span, frame.Writable, frame.UiWritable);
             if (callee is PureBuiltin b && b.Suspends)
             {
+                // 즉시 핸들러 안에서는 시간을 막는 질문만 멈출 수 있다 (G310)
+                if (frame.Immediate && b.RefusedInImmediate?.Invoke(value) is string why)
+                    throw Fail(Codes.RunScript, why,
+                        "an @on(..., now=True) handler runs inside the flow that emits, so it can only pause on an ask() that " +
+                        "stops time; use a plain @on handler to wait (spec-gaps G310)");
                 // 질문을 들고 멈춘다: 실행 고리가 돌아가고, 답은 이어서 실행할 때 target에 들어간다 (G136·G138)
                 _pendingRequest = value;
                 _answerTo = target;
                 return;
             }
             if (target != null) frame.Locals[target] = value;
+            // emit: 즉시 핸들러가 있으면 다음 문장 전에 하나씩 부른다 (G310)
+            if (callee is PureBuiltin { Immediate: { } immediate } emit && positional.Count == 1)
+            {
+                var handlers = immediate(positional[0]);
+                if (handlers.Count > 0) frame.Dispatch = new ImmediateDispatch(emit, positional[0], handlers, call.Span);
+            }
+        }
+
+        /// <summary>
+        /// <c>emit</c> 문장이 남긴 다음 즉시 핸들러를 쌓는다 (G310). 부를 것이 없으면 디스패치를 지우고 false.
+        /// </summary>
+        private bool CallImmediate(Frame frame)
+        {
+            var d = frame.Dispatch!;
+            while (d.Next < d.Handlers.Count)
+            {
+                var fn = d.Handlers[d.Next++];
+                var args = d.Emit.ImmediateArguments!(d.Signal, fn);
+                if (args == null) continue;
+                var called = Push(fn, null, Array.Empty<Value>(), args, d.Site, frame.Writable, entry: true);
+                called.Result = ResultTo.Discard;
+                called.Immediate = true;
+                return true;
+            }
+            frame.Dispatch = null;
+            return false;
         }
 
         public void ExecAssign(AssignStmt assign, Frame frame)

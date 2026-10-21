@@ -35,12 +35,25 @@ namespace Kesa.Engine.Script
             }
             string? stage = null;
             var stageSpan = SourceSpan.None;
+            bool now = false;
             int positional = 0;
             foreach (var arg in call.Arguments)
             {
                 if (arg.Name == null)
                 {
                     positional++;
+                    continue;
+                }
+                if (arg.Name == "now")
+                {
+                    // 즉시 핸들러: emit한 흐름 안에서 그 자리에서 돈다 (spec-gaps G310)
+                    if (!(Evaluate(arg.Value) is BoolValue b))
+                    {
+                        _context.Error(Codes.CmdBadDecorator, "now= takes True or False", arg.Span,
+                            hint: "@on(Signal, now=True) runs inside the flow that emits, right at emit() (spec-gaps G310)");
+                        return;
+                    }
+                    now = b.Value;
                     continue;
                 }
                 if (arg.Name == "stage")
@@ -69,7 +82,7 @@ namespace Kesa.Engine.Script
                     return;
                 }
                 _context.Error(Codes.CmdBadDecorator, "@on has no argument '" + arg.Name + "'", arg.Span,
-                    hint: Suggest.Hint(arg.Name, new[] { "stage" }) ?? usage);
+                    hint: Suggest.Hint(arg.Name, new[] { "stage", "now" }) ?? usage);
                 return;
             }
             if (positional != 1 || call.Arguments[0].Name != null)
@@ -111,6 +124,7 @@ namespace Kesa.Engine.Script
                 {
                     Stage = stage,
                     StageSpan = stageSpan,
+                    Now = now,
                 });
         }
 
