@@ -390,3 +390,27 @@ Trait("SteadyHands", grants=[contrib("Skill.eff", "add", 2, key="Medicine")])
 **이유:** 나중에 관계로 오는 보너스(칼 엔티티가 든 선언)를 열면 `source`가 그 칼이 되어 "이 보너스를 낸 엔티티"라는 뜻이 저장된 줄과 같아진다. ECS로 말하면 어느 엔티티의 어느 컴포넌트(쌍)에서 왔는가이다. 지금 모양에 속성 둘만 더한다.
 
 **상태:** 확인
+
+## G299
+
+**위치:** G294에서 이어서: 스크립트가 기여 행을 넣고 빼는 내장
+
+**무엇이 비어 있었나:** G294는 호스트 API(`AddContribution`·`RemoveContribution`·`RemoveBySource`)와 같은 넣기·빼기를 스크립트에 열기로 했지만 모양과 이름을 미뤘다. 호스트 API는 id(`long`)를 돌려주고, id는 저장되며 불러온 뒤에도 같다.
+
+**어떻게 정했나:**
+
+```python
+row = add_contrib(u.Health, "max", "add", 3, source=wall)
+add_contrib(u.Skill.Medicine, "eff", "add", 2)
+remove_contrib(row)
+remove_contribs(wall)
+```
+
+- **대상은 읽기와 같은 꼴:** 첫 인자는 컴포넌트 뷰나 키 줄 뷰, 둘째는 `derived` 멤버 이름(`contribs(u.Health, "max")`와 같음). 키 줄은 줄 뷰가 키를 들고 있어 `key=`가 없다(선언의 `key=`는 Def 리터럴이라 필요했다, G297). `source`는 선택 키워드이고 엔티티다.
+- **돌려주는 값은 int id:** 표준 모드가 나중에 지울 줄을 엔티티 칸에 적어 두려면 칸에 담을 수 있는 값이어야 한다. `contribs()`의 줄에도 `c.id`를 더한다(저장된 줄은 id, 선언에서 모인 줄은 None).
+- **이름:** `add_contrib`·`remove_contrib(id)`·`remove_contribs(source)`. G296의 단어와 호스트 API의 동사를 그대로 쓴다.
+- **따르는 규칙:** 다른 쓰기 내장처럼 커맨드·핸들러·반응에서만 부르고 식 안이 아니라 `x = add_contrib(...)`로 받는다(CMD004). 실패한 커맨드는 넣고 뺀 것을 되감는다(되돌리기 기록에 이미 있음). 넣는 순간의 검사(대상이 `derived`인지, 줄이 있는지 `RunNoRow`, 값이 수인지)는 호스트 API와 같다. 선언에서 모인 줄은 지울 수 없다: `remove_contrib(None)`이나 없는 id는 실행 오류이고, 선언 줄은 선언이 붙은 컴포넌트나 키 줄을 떼어 없앤다는 안내를 붙인다.
+
+**이유:** 읽기·호스트·문서가 한 이름 짝과 한 꼴로 맞는다. 후보 `contribute`·`withdraw`·`withdraw_all`은 영어로는 자연스럽지만 새 단어가 늘었다.
+
+**상태:** 확인
