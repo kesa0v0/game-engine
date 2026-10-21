@@ -667,3 +667,22 @@
 **이유:** `ask`의 답 가르기가 가장 흔한 자리이고 `if`/`elif`보다 읽기 쉽다. 패러독스 스크립트의 `switch = { trigger = … }`도 같은 쓸모다(일반 지식). 파이썬 `match`의 나머지 힘(클래스·시퀀스 풀기)은 이 언어가 금지한 `class`·튜플에 기대므로 받을 것이 없다. `if`로 바꿔 넣으면 새 실행 경로가 없어 저장 형식과 검사기 여섯 곳을 건드리지 않는다.
 
 **상태:** 확인
+
+## G303
+
+**위치:** S2·S4 스크립트가 데이터 전용 Def의 `const`를 읽는 길 (G107 보강, 판데믹 4c 역할에서 드러남)
+
+**무엇이 비어 있었나:** G107은 엔티티가 자기 Def의 `const`를 Def 타입 이름으로 읽게 했다(`g.ConflictGoal.succeeded`). 엔티티가 되지 않는 Def(역할·특성·기술처럼 키 줄의 키가 되는 데이터 전용 Def, `DefId` 칸이 가리키는 무기 Def 등)의 `const`는 읽을 길이 없었다. 판데믹의 의무병(치료 때 한 번에 다 걷기) 같은 숫자가 아닌 능력을 역할 Def의 데이터로 적으려다 막혔다. 선언 보너스(G295)는 숫자만 엔진이 모아 준다. 닿는 경로는 셋이다: 키 줄의 키(`p.Roles`의 `"pandemic:Medic"`), Def의 `DefId` 칸, 커맨드의 `DefId` 인자. 후보는 (A) 키 줄 보기에서 키 Def로(`p.Roles.Medic.Role.treat_all`, 경로 하나만), (B) Def id 값에서 가는 내장 함수 하나, (C) 둘 다였다.
+
+**어떻게 정했나:** **(B).** 내장 함수 하나(이름 미정, 논의 때는 `defdata`)가 Def id를 받아 그 Def를 보는 값을 주고, 그 뒤는 G107 규칙을 그대로 쓴다: Def 타입 이름 속성으로 그 타입 바로 아래의 `const`를 읽고, 다른 타입 이름이면 `None`, 없는 `const` 이름은 "혹시 …?" 오류.
+
+```python
+any(defdata(k).Role.treat_all for k in p.Roles)
+defdata(u.Unit.weapon).Weapon.range
+```
+
+id의 타입을 로드 때 알면(`DefId[Role]` 자리에서 온 값) 속성 오타를 로드 때 검사하고, 모르면 실행 때 검사한다. **남은 것:** 함수 이름, 없는 id·짧은 이름의 처리.
+
+**이유:** 길 하나로 세 경로를 다 덮는다(키 줄의 키, `DefId` 칸, 커맨드 인자 모두 Def id 문자열이다). (A)만 열면 무기 Def 같은 경우에 결국 (B)가 필요하다. CK3는 특성 정의의 `flag`를 스크립트가 `has_trait_with_flag`로 묻고, RimWorld는 `TraitDef`·`HediffDef` 필드를 코드가 읽으며 Def를 id로 찾는 `DefDatabase<T>.GetNamed`가 있다(일반 지식). 데이터가 Def에 있으면 다른 모드가 역할을 더하거나 패치할 수 있다.
+
+**상태:** 확인
