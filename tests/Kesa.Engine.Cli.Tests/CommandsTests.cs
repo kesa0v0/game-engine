@@ -410,6 +410,48 @@ namespace Kesa.Engine.Cli.Tests
             Assert.That(Read("core/schema/__builtins__.pyi"), Does.Contain(expected));
         }
 
+        private const string GoalSchema =
+            "component(\"Score\", points=field(int, default=0))\n" +
+            "deftype(\"Goal\", components=[\"Score\"], check=const(Cond[\"Goal\"]))\n";
+
+        /// <summary>호스트 함수를 Cond 칸의 값으로 적은 모드와, 그 함수를 선언한 호스트 파일 (G291).</summary>
+        private string GoalHostFile()
+        {
+            Mod("Goal(\"A\", check=core.goals.reached)\n");
+            Write("core/schema/types.py", GoalSchema);
+            var host = new Kesa.Engine.Host.HostFunctions();
+            host.For("core").Pure("def goals.reached(g: Ref[Goal]) -> bool", "목표에 닿았나.",
+                (Kesa.Engine.Runtime.EntityId g) => true);
+            Write("host.json", host.ExportDeclarations());
+            return Path.Combine(_root, "host.json");
+        }
+
+        [Test]
+        public void ACondSlotHostFunctionChecksWithTheHostFileAndNotWithout()
+        {
+            string file = GoalHostFile();
+            Assert.That(Run(_root), Is.EqualTo(1));
+            _out = new StringWriter();
+            Assert.That(Run(_root, "--host", file), Is.EqualTo(0), _out + _err.ToString());
+            Assert.That(_out.ToString(), Is.EqualTo("errors: 0, warnings: 0, info: 0; mods loaded: 1, disabled: 0\n"));
+        }
+
+        [Test]
+        public void DumpShowsTheHostFunctionOfACondSlot()
+        {
+            string file = GoalHostFile();
+            Assert.That(Dump(_root, "--host", file), Is.EqualTo(0), _err.ToString());
+            Assert.That(_out.ToString(), Does.Contain("\"host\": \"core.goals.reached\""));
+        }
+
+        [Test]
+        public void StubsWithACondSlotHostFunctionStillLoad()
+        {
+            string file = GoalHostFile();
+            Assert.That(Stubs("--host", file, _root), Is.EqualTo(0), _err.ToString());
+            Assert.That(Read("core/__builtins__.pyi"), Does.Contain("def reached(g:"));
+        }
+
         [Test]
         public void DumpTakesTheHostFileToo()
         {
