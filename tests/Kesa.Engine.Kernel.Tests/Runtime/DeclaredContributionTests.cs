@@ -38,7 +38,10 @@ namespace Kesa.Engine.Tests.Runtime
             "Trait(\"Lazy\")\n" +
             "Unit(\"Scout\", Armor=Armor(bonus=[contrib(\"Health.max\", \"add\", 2)]), Traits={\"Tough\": Traits()})\n" +
             "Unit(\"Plain\")\n" +
-            "@when(lambda u: u.Health.max >= 16)\ndef strong(u: Ref[Unit]):\n    u.Health.hit = 1\n";
+            "@when(lambda u: u.Health.max >= 16)\ndef strong(u: Ref[Unit]):\n    u.Health.hit = 1\n" +
+            "@command(free=True, acts_for=None)\ndef Hold(u: Ref[Unit]):\n" +
+            "    c = contribs(u.Health, \"max\")[1]\n    wait(ticks=2)\n" +
+            "    u.Health.hit = floor(c.value) + (10 if c.key == \"banking:Tough\" and c.id is None else 0)\n";
 
         private World _world = null!;
         private EntityId _scout, _plain;
@@ -133,6 +136,22 @@ namespace Kesa.Engine.Tests.Runtime
                 "  contribution add 3.0 from " + _scout + " (Traits[banking:Tough])\n" +
                 "  (hidden)"));
             Assert.That(a.Diagnostics, Is.Empty);
+        }
+
+        [Test]
+        public void APausedFlowHoldingADeclaredLineSavesAndLoads()
+        {
+            Mod("banking", schema: Schema, defs: Defs);
+            var content = LoadClean();
+            _world = new World(content);
+            _scout = _world.Create("banking:Scout");
+            Assert.That(_world.Submit("host", "banking.Hold",
+                new Dictionary<string, Value> { ["u"] = new EntityValue(_scout) }).Succeeded, Is.True);
+            var loaded = World.Load(content, _world.Save());
+            Assert.That(loaded.Diagnostics, Is.Empty);
+            _world = loaded.World!;
+            _world.Advance(2);
+            Assert.That(Read(_scout, "Health", "hit"), Is.EqualTo(13), "the Tough line keeps its value and key across the save");
         }
 
         private IReadOnlyList<Diagnostic> Broken(string defs, string schema = Schema)

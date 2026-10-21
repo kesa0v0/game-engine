@@ -558,6 +558,16 @@ namespace Kesa.Engine.Runtime
                             var row = LoadContributionRow(AsObject(tag.Value, "a contribution"), where, problems);
                             return row == null ? (Value)NoneValue.Instance : new ContributionView(this, row);
                         }
+                        case "declared_contribution":
+                        {
+                            var v = AsObject(tag.Value, "a declared contribution");
+                            var keyNode = Field(v, "key");
+                            return new DeclaredContributionView(this, SavedId(Field(v, "source"), "a contribution source"),
+                                Text(Field(v, "component"), "a contribution component"),
+                                keyNode is JsonNull ? null : Text(keyNode, "a contribution key"),
+                                Text(Field(v, "op"), "a contribution op"),
+                                Fixed.FromRaw(Long(Field(v, "value"), "a contribution value")));
+                        }
                         case "range":
                             return LoadRange(tag.Value);
                         case "closure":

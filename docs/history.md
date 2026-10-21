@@ -1030,3 +1030,9 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **모양:** 역할은 데이터 전용 Def 타입 `Role(grants=const(list[Contrib]))`, 플레이어는 키 컴포넌트 `Roles`(키 `Role`, `keys="listed"`, 칸 없음)로 역할을 든다. 치료제에 필요한 카드 수는 `Cure.cards` `derived`(`CURE_CARDS` + `"add"` 기여의 합)이고 `DiscoverCure`가 이것을 읽는다. 과학자는 `Role("Scientist", grants=[contrib("Cure.cards", "add", -1)])`, Bob이 Def에서 과학자다. 역할 모양은 예시 모드의 선택(엔진 결정 아님).
 - **알게 된 것:** 칸이 없는 키 컴포넌트도 된다(`Roles={"Scientist": Roles()}`). 런타임에 `AddRow`로 역할을 붙여도 보너스가 바로 따라온다. `engine check`는 오류·경고 0. 새 엔진 구멍은 없다.
 - **테스트:** `PandemicTests` 39개(새 2개: Bob은 4장·Alice는 5장과 `Explain`의 `(Roles[pandemic:Scientist])`, 런타임에 과학자가 된 Alice가 4장으로 치료).
+
+## 선언 기여 줄을 든 멈춘 Flow의 저장 (2026-10-22, 버그 수정)
+
+- **증상(임시 테스트로 재현):** 커맨드가 `contribs()`에서 받은 선언 줄(2단계의 `DeclaredContributionView`)을 지역 변수에 든 채 `wait`·`ask`로 멈추면 `Save()`가 "a contribution value cannot be saved yet"로 실패했다. 2단계에서 저장된 행(`contribution` 태그)만 저장 쪽에 있었다.
+- **고침:** 지역 변수 값 태그 `declared_contribution`(`source`·`component`·`key`·`op`·`value`)을 더했다. 줄은 Def 값(`ContribValue`)을 붙들지 않고 제 값을 든다(같음 비교도 그 다섯 칸). 저장 형식에 태그 하나가 늘었을 뿐 옛 저장은 그대로 읽힌다.
+- **테스트:** `DeclaredContributionTests`에 1개(멈춘 Flow가 키 줄의 선언 줄을 든 채 저장·불러오기 뒤 값과 `key`가 남음).

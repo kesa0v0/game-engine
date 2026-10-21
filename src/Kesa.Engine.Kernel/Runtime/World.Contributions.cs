@@ -413,7 +413,7 @@ namespace Kesa.Engine.Runtime
                         var c = (ContribValue)item;
                         if (c.To != to || c.Component != view.Component.Name || c.Member != member.Name || c.Key != wantKey) continue;
                         if (c.When != null && !WhenHolds(c, entity.Id, view.Id)) continue;
-                        rows.Add(new DeclaredContributionView(this, entity.Id, component.Name, from, c));
+                        rows.Add(new DeclaredContributionView(this, entity.Id, component.Name, from, c.Op, c.Amount));
                         _trace?.Add(new ExplainNode(ExplainKind.Contribution, view.Id, view.Component.Name, wantKey, member.Name,
                             new FixedValue(c.Amount), new List<ExplainNode>(), c.Op, new EntityId(entity.Id))
                         {
@@ -572,31 +572,39 @@ namespace Kesa.Engine.Runtime
             private readonly long _source;
             private readonly string _component;
             private readonly string? _key;
-            private readonly ContribValue _contrib;
+            private readonly string _op;
+            private readonly Fixed _amount;
 
-            public DeclaredContributionView(World world, long source, string component, string? key, ContribValue contrib)
+            public DeclaredContributionView(World world, long source, string component, string? key, string op, Fixed amount)
             {
                 _world = world;
                 _source = source;
                 _component = component;
                 _key = key;
-                _contrib = contrib;
+                _op = op;
+                _amount = amount;
             }
 
             public override string KindName => "contribution";
 
-            /// <summary>같은 엔티티의 같은 자리에서 온 같은 선언이면 같다 (G142).</summary>
+            public long Source => _source;
+            public string Component => _component;
+            public string? Key => _key;
+            public string Op => _op;
+            public Fixed Amount => _amount;
+
+            /// <summary>같은 엔티티의 같은 자리에서 온 같은 줄이면 같다 (G142).</summary>
             public bool ValueEquals(Value other) =>
                 other is DeclaredContributionView v && v._source == _source && v._component == _component && v._key == _key &&
-                ReferenceEquals(v._contrib, _contrib);
+                v._op == _op && v._amount.Equals(_amount);
 
             public Value GetAttribute(string name)
             {
                 switch (name)
                 {
                     case "id": return NoneValue.Instance;
-                    case "op": return new StrValue(_contrib.Op);
-                    case "value": return new FixedValue(_contrib.Amount);
+                    case "op": return new StrValue(_op);
+                    case "value": return new FixedValue(_amount);
                     case "source": return new EntityView(_world, new EntityId(_source));
                     case "component": return new StrValue(_component);
                     case "key": return _key == null ? (Value)NoneValue.Instance : new StrValue(_key);

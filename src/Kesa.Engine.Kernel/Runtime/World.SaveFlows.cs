@@ -422,6 +422,14 @@ namespace Kesa.Engine.Runtime
                         .Add("values", fields));
                 case ContributionView c:
                     return Tag("contribution", SaveContribution(c.Row));
+                case DeclaredContributionView d:
+                    // 선언에서 모인 줄 (G298): 저장된 행이 없으니 줄의 값을 그대로 적는다
+                    return Tag("declared_contribution", new JsonObject()
+                        .Add("source", new JsonNumber(d.Source))
+                        .Add("component", new JsonString(d.Component))
+                        .Add("key", d.Key == null ? (JsonNode)JsonNull.Instance : new JsonString(d.Key))
+                        .Add("op", new JsonString(d.Op))
+                        .Add("value", new JsonNumber(d.Amount.Raw)));
                 case RangeValue r:
                     return Tag("range", SaveRange(r));
                 case FunctionValue f:
