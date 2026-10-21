@@ -778,11 +778,36 @@ namespace Kesa.Engine.Runtime
             }
             entity.Def.Consts.TryGet(name, out var raw);
             var value = Normalize(found.Spec.Type, raw.Value);
-            // Def 값 자리에 이름으로 적은 호스트 함수는 이 월드의 호스트 함수 값으로 읽는다 (G291)
-            if (value is HostReference reference)
-                value = HostValue(reference.Name) ?? throw new ScriptRuntimeException(Codes.RunScript,
-                    "the host function " + reference.Name + " is not registered in this game");
+            value = BindHostReferences(value);
             _trace?.Add(new ExplainNode(ExplainKind.Read, new EntityId(id), type.Name, null, name, value, new List<ExplainNode>()));
+            return value;
+        }
+
+        /// <summary>
+        /// Def 값 자리에 이름으로 적은 호스트 함수(목록 안 포함)를 이 월드의 호스트 함수 값으로 바꾼다 (G291). 없으면 값을 그대로 돌려준다.
+        /// </summary>
+        private Value BindHostReferences(Value value)
+        {
+            switch (value)
+            {
+                case HostReference reference:
+                    return HostValue(reference.Name) ?? throw new ScriptRuntimeException(Codes.RunScript,
+                        "the host function " + reference.Name + " is not registered in this game");
+                case ListValue list:
+                    List<Value>? bound = null;
+                    for (int i = 0; i < list.Items.Count; i++)
+                    {
+                        var item = BindHostReferences(list.Items[i]);
+                        if (bound == null && ReferenceEquals(item, list.Items[i])) continue;
+                        if (bound == null)
+                        {
+                            bound = new List<Value>(list.Items.Count);
+                            for (int j = 0; j < i; j++) bound.Add(list.Items[j]);
+                        }
+                        bound.Add(item);
+                    }
+                    return bound == null ? value : new ListValue(bound);
+            }
             return value;
         }
 

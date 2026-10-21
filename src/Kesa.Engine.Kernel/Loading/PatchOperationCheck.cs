@@ -248,15 +248,14 @@ namespace Kesa.Engine.Loading
         }
 
         /// <summary>
-        /// 호스트 함수를 함수 자리의 값으로 쓸 수 있는가 (G291). <c>Cond</c> 칸만 받고, 읽기 등급이어야 하며, 그 칸을 부르는 꼴
-        /// (칸의 Def 엔티티 하나)로 부를 수 있고 bool을 돌려줘야 한다. <c>Action</c> 칸은 스크립트 함수만 받는다.
+        /// 호스트 함수를 함수 자리의 값으로 쓸 수 있는가 (G291). 어느 칸이든 그 칸을 부르는 꼴(칸의 Def 엔티티 하나)로 부를 수 있어야
+        /// 한다. <c>Cond</c> 칸은 거기에 더해 읽기 등급이고 bool을 돌려줘야 한다. <c>Action</c> 칸은 등급도 반환도 가리지 않는다.
         /// </summary>
         private static string? HostSlotMismatch(FunctionTypeRef slot, HostReference host)
         {
             string name = "'" + host.Name + "'";
-            if (slot.Kind == FunctionSlotKind.Action)
-                return name + " is a host function, but " + slot.Display + " only holds script functions";
-            if (host.Writes)
+            bool cond = slot.Kind == FunctionSlotKind.Cond;
+            if (cond && host.Writes)
                 return name + " is a host function that changes the world, but " + slot.Display + " only holds functions that read";
             var signature = host.Signature;
             var parameters = signature.Parameters;
@@ -266,7 +265,7 @@ namespace Kesa.Engine.Loading
                 return called;
             for (int i = 1; i < parameters.Count; i++)
                 if (parameters[i].Default == null) return called;
-            if (!ReferenceEquals(signature.Returns, PrimitiveTypeRef.Bool))
+            if (cond && !ReferenceEquals(signature.Returns, PrimitiveTypeRef.Bool))
                 return name + " returns " + (signature.Returns == null ? "None" : signature.Returns.Display) + ", but " +
                        slot.Display + " needs a bool";
             return null;

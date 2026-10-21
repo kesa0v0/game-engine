@@ -70,11 +70,45 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
-        public void AHostFunctionCannotFillAnActionSlot()
+        public void AWritingHostFunctionFillsAnActionSlotAndRunsInACommand()
         {
-            Mod("core", schema: Schema, defs: Goals("done", "core.goals.zero"));
+            Mod("core", schema: Schema, defs: Goals("done", "core.goals.zero") +
+                "@command(free=True, acts_for=None)\ndef Fire(g: Ref[Goal]):\n    g.Goal.effect(g)\n");
+            var result = LoadWithHost(out var diags);
+            Assert.That(diags, Is.Empty, string.Join("\n", diags));
+            var world = new World(result);
+            var goal = world.Create("core:A");
+            var points = world.Member("Score", "points");
+            world.Set(goal, points, new IntValue(9));
+            var fired = world.Submit("host", "core.Fire", new Dictionary<string, Value> { ["g"] = new EntityValue(goal) });
+            Assert.That(fired.Succeeded, Is.True, fired.Error?.ToString());
+            Assert.That(((IntValue)world.Get(goal, points)).Value, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void AnActionListMayHoldHostFunctions()
+        {
+            Mod("core", schema: Schema.Replace("effect=const(Action[\"Goal\"])", "effect=const(list[Action[\"Goal\"]])"),
+                defs: Fns + "Goal(\"A\", check=done, effect=[reward, core.goals.zero])\n" +
+                      "@command(free=True, acts_for=None)\ndef Fire(g: Ref[Goal]):\n" +
+                      "    for act in g.Goal.effect:\n        act(g)\n");
+            var result = LoadWithHost(out var diags);
+            Assert.That(diags, Is.Empty, string.Join("\n", diags));
+            var world = new World(result);
+            var goal = world.Create("core:A");
+            var points = world.Member("Score", "points");
+            world.Set(goal, points, new IntValue(9));
+            var fired = world.Submit("host", "core.Fire", new Dictionary<string, Value> { ["g"] = new EntityValue(goal) });
+            Assert.That(fired.Succeeded, Is.True, fired.Error?.ToString());
+            Assert.That(((IntValue)world.Get(goal, points)).Value, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void AnActionSlotChecksTheSignatureToo()
+        {
+            Mod("core", schema: Schema, defs: Goals("done", "core.goals.two"));
             LoadWithHost(out var diags);
-            Assert.That(diags.First().Message, Does.StartWith("'effect': 'core.goals.zero' is a host function, but Action"));
+            Assert.That(diags.First().Message, Does.StartWith("'effect': 'core.goals.two'").And.Contain("cannot be called with one Ref[\"Goal\"]"));
         }
 
         [Test]
