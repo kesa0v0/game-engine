@@ -507,6 +507,31 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(Left(_alice), Is.EqualTo(3));
         }
 
+        private long CureCards(EntityId player) => ((IntValue)_w.Get(player, _w.Member("Cure", "cards"))).Value;
+
+        [Test]
+        public void TheScientistRoleDeclaresOneCardLessForACure()
+        {
+            Assert.That(CureCards(_alice), Is.EqualTo(5));
+            Assert.That(CureCards(_bob), Is.EqualTo(4), "Bob is the Scientist in the Def");
+            Assert.That(_w.Explain(_bob, _w.Member("Cure", "cards")).Render(),
+                Does.Contain("contribution add -1.0 from " + _bob + " (Roles[pandemic:Scientist])"));
+        }
+
+        [Test]
+        public void AScientistCuresWithFourCards()
+        {
+            _w.AddRow(_alice, "Roles", "pandemic:Scientist"); // 역할은 런타임에 줄을 붙여도 된다
+            Assert.That(CureCards(_alice), Is.EqualTo(4));
+            foreach (var name in BlueCities.Take(4)) Give(name, _alice);
+            Station("Atlanta");
+            var blue = new[] { "Atlanta", "Chicago", "Montreal", "NewYork", "Washington", "SanFrancisco" };
+            int before = PlayerCards().Count(c => blue.Contains(FaceCity(c)) && PileOf(c) == 1);
+            Assert.That(Cure("Blue").Succeeded, Is.True);
+            Assert.That(Status("Blue", "cured").Bool, Is.True);
+            Assert.That(PlayerCards().Count(c => blue.Contains(FaceCity(c)) && PileOf(c) == 1) - before, Is.EqualTo(4));
+        }
+
         [Test]
         public void ACuredDiseaseIsTreatedAllAtOnce()
         {

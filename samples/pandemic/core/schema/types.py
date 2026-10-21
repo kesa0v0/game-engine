@@ -30,6 +30,10 @@ def is_won(m):
 def is_over(m):
     return m.lost or m.won
 
+# 치료제에 필요한 같은 색 카드 수: 기본 CURE_CARDS에 기여("add")를 더한다. 과학자 역할이 -1을 선언한다 (defs/cities.py)
+def cure_cards(c):
+    return CURE_CARDS + floor(sum([x.value for x in contribs(c, "cards") if x.op == "add"]))
+
 def hand_size(h):
     return len(h.entity.hand)
 
@@ -64,11 +68,15 @@ component("Face", city=ref("City", optional=True), epidemic=field(bool, default=
 # 손패: 카드가 누구 손에 있는지. 플레이어 쪽에서는 p.hand로 읽는다
 component("Held", holder=ref("Player", optional=True, inverse="hand"))
 component("Hand", size=derived(int, hand_size), over=derived(bool, hand_over))
+component("Cure", cards=derived(int, cure_cards))
+# 플레이어의 역할: 역할 Def마다 한 줄. 역할의 보너스는 역할 Def에 적고 엔진이 모은다(선언 보너스, 안내서 3장)
+component("Roles", key="Role", keys="listed")
 signal("Outbreak", city=Ref["City"])
 
 deftype("Disease", components=["Status"])
 deftype("City", components=["Research", "Cubes", "Chain", "Load"], disease=const(DefId["Disease"]), neighbors=const(list[DefId["City"]]))
-deftype("Player", components=["Order", "At", "Actions", "Hand", "Seatable"])
+deftype("Role", grants=const(list[Contrib], default=[]))
+deftype("Player", components=["Order", "At", "Actions", "Hand", "Cure", "Roles", "Seatable"])
 deftype("Game", components=["Match"])
 deftype("InfectionCard", components=["Card", "Face"])
 # 플레이어 덱의 카드는 모두 같은 뒷면 Def이고 도시 카드인지 에픽인지는 숨긴 Face에 있다

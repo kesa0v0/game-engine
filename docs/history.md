@@ -1024,3 +1024,9 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **테스트:** `ContributionStepTests` 9개(Ref 걸음과 칼 자신의 보너스, 두 자루, 내려놓기·파괴, 역방향 걸음과 진영 파괴, 칼을 들면 `@when`이 깨어남, 로드 오류 6가지). 처음에 Def가 준 컴포넌트를 `Remove`하려다 엔진이 막아(맞는 동작) 진영 파괴로 바꿈.
 - **구현 4단계(G301, `when=`):** `contrib(..., when=함수)`(`ContribValue.When`, 스크립트 함수는 `contrib()` 때 위치 인자 둘로 부를 수 있는지 봄, 함수가 아니면 `EVL`). 값 검사(`PatchOperationCheck.Mismatch`의 `ContribTypeRef`)가 `Cond` 칸과 같은 검사를 한다: 커맨드·UI·쓰기·난수 함수는 안 됨(검사를 `FunctionMismatch`로 빼 `Cond`·`Action` 칸과 함께 씀), 호스트 함수는 읽기 등급이고 위치 인자 둘로 부를 수 있고 bool을 돌려줘야 함(`WhenMismatch`). 실행: 모으는 줄마다 `WhenHolds`가 `(src, dst)` 엔티티로 부른다(스크립트는 `RunFunction`의 인자 여럿 꼴로 그 `derived` 예산 안에서, 호스트는 `BindHostReferences` 뒤 `Call`). 거짓이면 그 줄 없음, bool이 아니면 `RUN` 타입 오류, 자기 스탯을 읽으면 `RUN014`. 조건의 읽기는 그 `derived`의 읽기라 `@when`·`Explain`에 잡힌다. 덤프에 `"when"`, 스텁 `when:`. 안내서 3장·9장.
 - **테스트:** `ContributionConditionTests` 13개(받는 쪽 조건과 `Explain`에 조건의 읽기, 주는 쪽 조건, 조건이 읽은 칸이 `@when`을 깨움, bool 아님, 순환, 읽기 호스트 함수, 로드 오류 7가지). 모두 첫 실행에 통과.
+
+## 예시 게임 Pandemic 4c조각: 과학자 역할 (2026-10-21)
+
+- **모양:** 역할은 데이터 전용 Def 타입 `Role(grants=const(list[Contrib]))`, 플레이어는 키 컴포넌트 `Roles`(키 `Role`, `keys="listed"`, 칸 없음)로 역할을 든다. 치료제에 필요한 카드 수는 `Cure.cards` `derived`(`CURE_CARDS` + `"add"` 기여의 합)이고 `DiscoverCure`가 이것을 읽는다. 과학자는 `Role("Scientist", grants=[contrib("Cure.cards", "add", -1)])`, Bob이 Def에서 과학자다. 역할 모양은 예시 모드의 선택(엔진 결정 아님).
+- **알게 된 것:** 칸이 없는 키 컴포넌트도 된다(`Roles={"Scientist": Roles()}`). 런타임에 `AddRow`로 역할을 붙여도 보너스가 바로 따라온다. `engine check`는 오류·경고 0. 새 엔진 구멍은 없다.
+- **테스트:** `PandemicTests` 39개(새 2개: Bob은 4장·Alice는 5장과 `Explain`의 `(Roles[pandemic:Scientist])`, 런타임에 과학자가 된 Alice가 4장으로 치료).

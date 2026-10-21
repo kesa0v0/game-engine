@@ -308,15 +308,15 @@ def Treat(player: Ref[Player], disease: DefId[Disease]):
 def cards_of(p, disease):
     return [c for c in p.hand if c.Face.city.City.disease == disease]
 
-# 치료제 찾기: 연구소가 있는 도시에서 같은 색 도시 카드 CURE_CARDS장을 버린다.
+# 치료제 찾기: 연구소가 있는 도시에서 같은 색 도시 카드를 player.Cure.cards장(보통 5, 과학자 4) 버린다.
 # 더 많이 들었으면 자리 값이 작은(먼저 받은) 카드부터 버린다 (간단화: 어떤 카드를 낼지 고르는 입력은 뒤로)
 @command(acts_for=lambda player: player)
 def DiscoverCure(player: Ref[Player], disease: DefId[Disease]):
     with preconditions:
         require(player.Actions.left > 0, text("pandemic-no-actions"))
         require(player.At.city.Research.station, text("pandemic-needs-station"))
-        choose(disease, from_=[defid(d) for d in DISEASES if len(cards_of(player, defid(d))) >= CURE_CARDS and not disease_of(defid(d)).Status.cured])
-    for k in range(CURE_CARDS):
+        choose(disease, from_=[defid(d) for d in DISEASES if len(cards_of(player, defid(d))) >= player.Cure.cards and not disease_of(defid(d)).Status.cured])
+    for k in range(player.Cure.cards):
         best = None
         for c in cards_of(player, disease):
             if best is None or c.Card.slot < best.Card.slot:
