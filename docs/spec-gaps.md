@@ -360,16 +360,17 @@
 | # | 위치 | 무엇을 정했나 | 상태 |
 |---|---|---|---|
 | [G196](gaps/hidden-info.md#g196) | 9절 미결 2 공개/비공개 정보 표현 (검증 시나리오 ②에서 이어짐) | 숨긴 정보는 모드가 순수 정책 함수 하나로 "누가 무엇을 보는가"를 선언하고 호스트가 보는 사람을 지정한 거른 읽기를 받음, 스크립트·전체 저장은 전부 봄, 보안에 쓸지는 호스트의 네트워크 방식. | 확인 |
-| [G197](gaps/hidden-info.md#g197) | G196 읽기 정책의 서명과 단위 | `@view_policy def may_see(issuer, entity, component)`(순수), 보는 사람은 issuer, 단위는 엔티티(`component=None`)와 컴포넌트 두 층, Def와 Def 상수는 엔티티 층을 따름. | 일부 바뀜(G238·G308) |
+| [G197](gaps/hidden-info.md#g197) | G196 읽기 정책의 서명과 단위 | `@view_policy def may_see(issuer, entity, component)`(순수), 보는 사람은 issuer, 단위는 엔티티(`component=None`)와 컴포넌트 두 층, Def와 Def 상수는 엔티티 층을 따름. | 일부 바뀜(G238·G308·G315) |
 | [G198](gaps/hidden-info.md#g198) | G196 거른 읽기에서 숨긴 것의 모습 | 숨긴 엔티티는 목록·질의에 없고 숨긴 컴포넌트는 안 붙은 것처럼, 보이는 칸의 Ref가 숨긴 엔티티면 id 없는 "가려짐", Ref 목록·역방향에서는 빠짐, 숨긴 id로 읽으면 죽은 id와 똑같이 응답. | 확인 |
 | [G199](gaps/hidden-info.md#g199) | G196 거른 읽기의 모양과 상태 읽기의 범위 | 거른 읽기 전용 객체 `World.ViewAs(issuer)`(상태 읽기·목록·`Explain`을 거름), `World`의 기존 읽기는 전부 봄, 보이는 `derived` 값은 숨긴 칸으로 계산돼도 보임, 정책은 읽을 때마다 부름. | 확인 |
 | [G200](gaps/hidden-info.md#g200) | G199 거른 읽기에서 열린 질문 | `ViewAs(issuer).OpenRequests`는 그 연결이 답할 수 있는 질문만(`Who` 중 `may_act`가 참인 엔티티가 있으면), 질문 안의 값도 `may_see`로 거름. | 일부 바뀜(G237) |
 | [G201](gaps/hidden-info.md#g201) | G199 거른 읽기에서 제출·답의 결과 | 거른 결과는 `ViewAs(issuer).Show(result)`: 문구 인자의 숨긴 Ref는 "가려짐"(그 밖의 값은 모드가 쓴 대로), 반응 목록은 빠지고, 스크립트 오류·인자 거부는 코드·종류만 남기고 메시지 본문은 뺌. | 확인 |
 | [G202](gaps/hidden-info.md#g202) | G199 거른 읽기에서 합법 수와 후보 | `ViewAs(issuer).LegalMoves`·`Candidates`는 실제 상태로 평가한 뒤 못 보는 엔티티가 든 수·후보를 뺌(개수 상한과 `Truncated`는 거른 뒤), `Submit` 등은 거르지 않음. | 확인 |
-| [G203](gaps/hidden-info.md#g203) | G197 보기 정책이 없거나 둘이거나 실패할 때 | 보기 정책은 G124처럼(없으면 모두 보임, `requireViewPolicy`, 최대 하나, 교체는 `override=True`), `requireViewPolicy`를 켜면 입구 정책도 필수, 정책 오류나 bool 아닌 값은 "안 보임". | 일부 바뀜(G237) |
+| [G203](gaps/hidden-info.md#g203) | G197 보기 정책이 없거나 둘이거나 실패할 때 | 보기 정책은 G124처럼(없으면 모두 보임, `requireViewPolicy`, 최대 하나, 교체는 `override=True`), `requireViewPolicy`를 켜면 입구 정책도 필수, 정책 오류나 bool 아닌 값은 "안 보임". | 일부 바뀜(G237·G315) |
 | [G204](gaps/hidden-info.md#g204) | G201 거른 결과에서 `cost`의 칸과 가진 양 | `Show`에서 못 보는 칸의 `cost` 결과는 칸 이름 null·가진 양 `HiddenValue`, 필요한 양과 통과 여부는 그대로. | 확인 |
 | [G205](gaps/hidden-info.md#g205) | G199 거른 `Explain`에서 못 보는 근거를 보이는 방법 | 거른 `Explain`은 한 단계 안의 못 보는 읽기를 모두 빼고 그런 것이 있었으면 끝에 `Hidden` 근거 하나만, `query` 근거에서는 못 보는 엔티티가 빠짐, 값 자체는 보임. | 확인 |
 | [G206](gaps/hidden-info.md#g206) | G201 거른 읽기에서 `Advance` 결과의 `BlockedBy` | `ViewAs(issuer).Show(advanceResult)`는 틱·`Blocked`를 그대로 두고 `BlockedBy`는 답할 수 있는 질문만 거른 모양으로, 반응 목록은 빠짐. | 확인 |
 | [G233](gaps/hidden-info.md#g233) | G202 거른 합법 수에 그 연결이 낼 수 없는 수가 섞임 (콘솔 호스트에서 드러남) | `ViewAs(issuer).LegalMoves`는 못 보는 엔티티가 든 수에 더해 제출 때처럼 `acts_for` → `may_act`를 통과하지 못한 수도 뺌(상한과 `Truncated`는 거른 뒤), `acts_for`·정책이 실패하면 그 수는 빼고 진단, `Candidates`는 그대로. | 일부 바뀜(G237) |
 | [G234](gaps/hidden-info.md#g234) | G200 여럿에게 함께 물은 질문에서 거른 대상 목록 (콘솔 호스트에서 드러남) | `ViewAs(issuer)`가 보이는 질문(`OpenRequests`, `Show`의 열린 질문, `BlockedBy`)의 `Who`에는 그 연결이 답할 수 있고 보이는 대상만 남김, 남도 물었다는 것은 G200처럼 숨음, 알리고 싶으면 모드가 공개 상태로. | 일부 바뀜(G237) |
-| [G238](gaps/hidden-info.md#g238) | G237 이후 보기 정책 `may_see`의 서명 (G197) | 보기 정책은 `may_see(viewer, entity, component)`로 보는 쪽 엔티티를 받음, `ViewAs(issuer)`는 그 연결이 앉은 엔티티마다 불러 하나라도 참이면 보임, 앉은 곳이 없으면 `viewer=None`, 연결 꼬리표는 스크립트에 안 나옴. | 확인 |
+| [G238](gaps/hidden-info.md#g238) | G237 이후 보기 정책 `may_see`의 서명 (G197) | 보기 정책은 `may_see(viewer, entity, component)`로 보는 쪽 엔티티를 받음, `ViewAs(issuer)`는 그 연결이 앉은 엔티티마다 불러 하나라도 참이면 보임, 앉은 곳이 없으면 `viewer=None`, 연결 꼬리표는 스크립트에 안 나옴. | 일부 바뀜(G315) |
+| [G315](gaps/hidden-info.md#g315) | G197·G203·G238 보기 정책을 여러 모드가 함께 정하기 (판데믹 확장에서 드러남) | 정책 하나 대신 `@view_rule(컴포넌트나 Def 타입)` 규칙들, 매개변수 `(viewer, entity)`, 답은 `True`·`False`·`None`(앞 규칙에 맡김), 같은 대상은 나중에 로드된 모드부터 물어 처음 나온 참·거짓, 없거나 모두 `None`이면 보임, 한 모드 한 대상에 하나, 순서 없는 두 모드가 같은 대상이면 둘 다 로드 오류, `@view_policy`·`override=` 없앰, `requireViewRules`, 한 번 보여 준 사건은 이어서. | 확인 |
