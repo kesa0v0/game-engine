@@ -1125,3 +1125,10 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **교훈:** 감싸기는 코어가 나눈 단위만큼만 정확하다. 규칙서가 이름 붙인 동작마다 함수를 두는 관례를 안내서 3장에 한 줄 더함.
 - **함께 드러난 차이(남김):** 변종은 규칙서에서 첫 변종 에픽의 Infect 단계 직후에 정하고 동점은 무작위(brink는 에픽 뒤 `@when`, 동점은 먼저 등록된 질병). 규칙서는 변종 에픽 카드마다 효과가 하나씩 붙음(brink는 세 효과가 늘 켜짐).
 - **테스트:** `BrinkTests.AVirulentOutbreakPlacesOneCubeOnCleanNeighbours`(빈 이웃에도 하나). 모두 2464개 통과.
+
+### 2026-10-22: 변종을 정하는 때를 규칙서대로 (`@wrap(pandemic.epidemic_infect)`)
+
+- **규칙서:** 첫 변종 에픽의 Infect 단계를 마친 뒤 보드에 큐브가 가장 많은 질병이 변종, 동점은 무작위. 그다음 Intensify와 그 카드의 효과를 마저 치른다.
+- **재현(임시 테스트):** brink의 `@when(epidemics >= 1 and strain() is None)`은 흐름이 멈춘 뒤에 돌아, 같은 차례의 감염 단계가 끝난 다음에 변종을 정했다. 에픽 뒤 감염 카드로 빈 LosAngeles를 감염시켰을 때 Chronic Effect가 안 닿아 1개(규칙서대로면 2개). 차례 끝에는 노랑이 변종으로 정해져 있었다.
+- **고침:** 코어 `epidemic(g)`를 규칙서의 세 단계로 나눔: `epidemics += 1`, `epidemic_infect(g)`, `intensify()`. brink는 `@wrap(pandemic.epidemic_infect) choose_strain`: 안쪽을 부르고 변종이 없으면 가장 많은 질병들 중 `random.choice`. 엔진 변경 없음. 이 자리(Infect 뒤, Intensify 전)는 카드마다 다른 즉시 효과를 붙일 자리이기도 하다.
+- **테스트:** 임시 테스트를 `BrinkTests.TheStrainIsChosenRightAfterTheEpidemicsInfectStep`으로 남김, `ATieForTheStrainIsBrokenAtRandom`(시드 12개에서 둘 다 나옴). 모두 2466개 통과.

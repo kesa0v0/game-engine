@@ -4,14 +4,17 @@ def strain():
             return d
     return None
 
-# 첫 에픽을 치르면 보드에 큐브가 가장 많은 질병이 변종이 된다 (같으면 먼저 등록된 질병)
-@when(lambda g: g.Match.epidemics >= 1 and strain() is None)
-def choose_strain(g: Ref[Game]):
-    best = None
-    for d in query(Disease):
-        if best is None or d.Status.on_board > best.Status.on_board:
-            best = d
-    best.Virulent.on = True
+# 첫 에픽의 Infect 단계를 마친 그 자리에서(Intensify 전) 보드에 큐브가 가장 많은 질병이 변종이 된다. 같으면 무작위.
+# 반응(@when)은 흐름이 멈춘 뒤에 돌아 같은 차례의 감염 단계보다 늦으므로, 코어의 단계 함수를 감싼다 (G311)
+@wrap(pandemic.epidemic_infect)
+def choose_strain(original, g):
+    original(g)
+    if strain() is None:
+        most = 0
+        for d in query(Disease):
+            if d.Status.on_board > most:
+                most = d.Status.on_board
+        random.choice([d for d in query(Disease) if d.Status.on_board == most]).Virulent.on = True
 
 # Complex Molecular Structure: 변종의 치료제는 같은 색 카드가 한 장 더 든다. 코어의 계산을 감싼다 (G311)
 @wrap(pandemic.cure_cost)

@@ -162,6 +162,56 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(Outbreaks(), Is.EqualTo(2), "one outbreak, counted twice by the virulent strain");
         }
 
+        private bool IsVirulent(string disease) => ((BoolValue)_w.Get(Disease(disease), _w.Member("Virulent", "on"))).Value;
+
+        /// <summary>감염 덱을 모두 뽑을 더미에 두고, <paramref name="bottom"/>을 맨 밑, <paramref name="top"/>을 맨 위에 놓는다. 플레이어 덱 맨 위는 에픽.</summary>
+        private void EpidemicNext(string bottom, string top)
+        {
+            foreach (var card in _w.All("InfectionCard"))
+            {
+                var c = FaceCity(card);
+                _w.Set(card, _w.Member("Card", "pile"), new IntValue(0));
+                _w.Set(card, _w.Member("Card", "slot"), new IntValue(c == top ? -100 : c == bottom ? 100 : 0));
+            }
+            var epidemic = _w.All("PlayerCard").First(c => ((BoolValue)_w.Get(c, _w.Member("Face", "epidemic"))).Value
+                && ((IntValue)_w.Get(c, _w.Member("Card", "pile"))).Value == 0);
+            _w.Set(epidemic, _w.Member("Card", "slot"), new IntValue(-100));
+        }
+
+        [Test]
+        public void TheStrainIsChosenRightAfterTheEpidemicsInfectStep()
+        {
+            // 에픽이 Lima를 노랑 3개로 채우면 그 자리에서 노랑이 변종이다. 같은 차례의 감염 단계(Lima는 Intensify로 맨 위에 와서 터지고,
+            // 다음 카드 LosAngeles)에서 이미 Chronic Effect가 닿아 빈 LosAngeles에 둘 (규칙서: Infect 단계 직후에 정한다)
+            ClearCubes();
+            EpidemicNext("pandemic:Lima", "pandemic:LosAngeles");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(IsVirulent("pandemic:Yellow"), Is.True);
+            Assert.That(IsVirulent("pandemic:Blue"), Is.False);
+            Assert.That(CubeCount("pandemic:LosAngeles", "pandemic:Yellow"), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void ATieForTheStrainIsBrokenAtRandom()
+        {
+            // 파랑 3(Montreal)과 노랑 3(에픽의 Lima)이 같다: 시드마다 둘 중 하나가 무작위로 변종이 되고, 둘 다 나온다
+            var picked = new HashSet<string>();
+            for (int seed = 1; seed <= 12; seed++)
+            {
+                _w = new World(PandemicTests.Load(out _, "pandemic", "brink"), seed: seed);
+                Assert.That(_w.Submit("host", "pandemic.Start", new Dictionary<string, Value>()).Succeeded, Is.True);
+                _alice = _w.All("Player").Single(p => _w.DefOf(p) == "pandemic:Alice");
+                _w.Seat(_alice, "alice");
+                ClearCubes();
+                _w.SetRow(City("pandemic:Montreal"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(3));
+                EpidemicNext("pandemic:Lima", "pandemic:SanFrancisco");
+                Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+                Assert.That(IsVirulent("pandemic:Blue") ^ IsVirulent("pandemic:Yellow"), Is.True, "exactly one strain");
+                picked.Add(IsVirulent("pandemic:Blue") ? "Blue" : "Yellow");
+            }
+            Assert.That(picked, Is.EquivalentTo(new[] { "Blue", "Yellow" }));
+        }
+
         private EntityId PlayerCard(string city) => _w.All("PlayerCard").Single(c => FaceCity(c) == city);
 
         private void Hold(EntityId player, params string[] cities)

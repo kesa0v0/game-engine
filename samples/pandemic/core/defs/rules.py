@@ -174,10 +174,15 @@ def infect(g):
         if g.Match.lost:
             break
 
-# 에픽 카드: 속도를 올리고, 맨 밑 카드의 도시에 큐브를 3개까지 채우고(이미 큐브가 있으면 3개로 채운 뒤 터진다),
-# 버린 더미를 섞어 맨 위에 올린다
+# 에픽 카드: 속도를 올리고(Increase), 맨 밑 카드의 도시를 감염시키고(Infect), 버린 더미를 섞어 맨 위에 올린다(Intensify).
+# 규칙서의 세 단계를 따로 두어 확장이 단계 사이에 끼어들 수 있게 한다 (안내서 3장)
 def epidemic(g):
     g.Match.epidemics += 1
+    epidemic_infect(g)
+    intensify()
+
+# 에픽의 Infect 단계: 맨 밑 카드의 도시에 큐브를 3개까지 채운다(이미 큐브가 있으면 3개로 채운 뒤 터진다)
+def epidemic_infect(g):
     for c in query(City):
         c.Chain.broke = False
     card = draw_infection_bottom()
@@ -190,7 +195,6 @@ def epidemic(g):
         if had > 0:
             city.Chain.broke = True
             spread(city)
-    intensify()
 
 # ---- 플레이어 덱 ----
 
