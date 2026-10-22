@@ -157,16 +157,20 @@ def intensify():
         c.Card.slot = slots[i]
         i += 1
 
+# 감염 카드 한 장으로 도시를 감염시킨다: 그 도시 질병의 큐브 하나, 넘치면 폭발. 연쇄 폭발이 이웃에 올리는 큐브는 감염이 아니다(spread).
+# 확장이 "감염시킬 때만" 바뀌는 효과를 감쌀 수 있게 함수로 둔다 (안내서 3장)
+def infect_city(city):
+    over = add_cube(city, city.City.disease)
+    if over:
+        spread(city)
+
 # 감염 단계: 카드 한 장마다 연쇄가 따로다 (그래서 장마다 "이번 연쇄에서 터짐" 표시를 지운다). 졌으면 바로 멈춘다
 def infect(g):
     for i in range(g.Match.rate):
         for c in query(City):
             c.Chain.broke = False
         card = draw_infection()
-        city = card.Face.city
-        over = add_cube(city, city.City.disease)
-        if over:
-            spread(city)
+        infect_city(card.Face.city)
         if g.Match.lost:
             break
 

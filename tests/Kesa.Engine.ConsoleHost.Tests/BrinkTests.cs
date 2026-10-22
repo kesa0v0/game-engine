@@ -147,9 +147,9 @@ namespace Kesa.Engine.ConsoleHost.Tests
         }
 
         [Test]
-        public void AVirulentOutbreakPlacesTwoCubesOnCleanNeighbours()
+        public void AVirulentOutbreakPlacesOneCubeOnCleanNeighbours()
         {
-            // 연쇄 폭발도 add_cube를 거치므로 감싸기가 닿는다: 빈 이웃에 둘, 큐브가 있던 이웃에 하나
+            // Chronic Effect는 폭발에 닿지 않는다(규칙서 카드 문구): 빈 이웃에도 하나, 큐브가 있던 이웃에도 하나
             ClearCubes();
             _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
             _w.SetRow(City("pandemic:Atlanta"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(3));
@@ -158,7 +158,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
             Assert.That(CubeCount("pandemic:Atlanta", "pandemic:Blue"), Is.EqualTo(3));
             Assert.That(CubeCount("pandemic:Chicago", "pandemic:Blue"), Is.EqualTo(2));
-            Assert.That(CubeCount("pandemic:Washington", "pandemic:Blue"), Is.EqualTo(2));
+            Assert.That(CubeCount("pandemic:Washington", "pandemic:Blue"), Is.EqualTo(1));
             Assert.That(Outbreaks(), Is.EqualTo(2), "one outbreak, counted twice by the virulent strain");
         }
 

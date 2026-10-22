@@ -1117,3 +1117,11 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **샘플:** brink `virulent.py`에 `@wrap(pandemic.add_cube) chronic`: 변종이고 그 도시에 0개면 안쪽을 한 번 먼저 부르고, 터졌는지는 둘째 호출의 답. 박멸·역할의 막기는 안쪽 함수가 두 번 다 본다.
 - **드러난 것:** 새 엔진 구멍 없음. 처음 `return original(...)`으로 써서 `CMD004`(쓰기 함수는 문장으로만, G117)에 걸림 → `over = original(...)`. 진단 메시지가 고칠 방법을 알려 줌.
 - **테스트:** `BrinkTests` 2개 더(빈 도시는 둘·있던 도시는 하나·변종 아닌 질병은 하나, 연쇄 폭발의 빈 이웃도 둘). 모두 2464개 통과.
+
+### 2026-10-22: Chronic Effect를 규칙서대로 고침 (`@wrap(pandemic.infect_city)`)
+
+- **규칙서 대조:** On the Brink 규칙서의 카드 문구는 "During Infections, when a Virulent Strain city is drawn, place 2 … if the city has no Virulent Strain cubes … This does not affect Epidemics or Outbreaks." 앞 슬라이스는 `add_cube`를 감싸 연쇄 폭발의 빈 이웃에도 둘을 놓았다(틀림).
+- **고침:** 코어 `rules.py`에 카드 한 장의 감염 `infect_city(city)`(큐브 하나, 넘치면 `spread`)를 빼고 `infect`가 부름. brink는 `@wrap(pandemic.infect_city) chronic`: 변종이고 0개면 `pandemic.add_cube`로 하나 먼저 올리고 안쪽을 부름. 엔진 변경 없음.
+- **교훈:** 감싸기는 코어가 나눈 단위만큼만 정확하다. 규칙서가 이름 붙인 동작마다 함수를 두는 관례를 안내서 3장에 한 줄 더함.
+- **함께 드러난 차이(남김):** 변종은 규칙서에서 첫 변종 에픽의 Infect 단계 직후에 정하고 동점은 무작위(brink는 에픽 뒤 `@when`, 동점은 먼저 등록된 질병). 규칙서는 변종 에픽 카드마다 효과가 하나씩 붙음(brink는 세 효과가 늘 켜짐).
+- **테스트:** `BrinkTests.AVirulentOutbreakPlacesOneCubeOnCleanNeighbours`(빈 이웃에도 하나). 모두 2464개 통과.
