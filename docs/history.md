@@ -1132,3 +1132,15 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **재현(임시 테스트):** brink의 `@when(epidemics >= 1 and strain() is None)`은 흐름이 멈춘 뒤에 돌아, 같은 차례의 감염 단계가 끝난 다음에 변종을 정했다. 에픽 뒤 감염 카드로 빈 LosAngeles를 감염시켰을 때 Chronic Effect가 안 닿아 1개(규칙서대로면 2개). 차례 끝에는 노랑이 변종으로 정해져 있었다.
 - **고침:** 코어 `epidemic(g)`를 규칙서의 세 단계로 나눔: `epidemics += 1`, `epidemic_infect(g)`, `intensify()`. brink는 `@wrap(pandemic.epidemic_infect) choose_strain`: 안쪽을 부르고 변종이 없으면 가장 많은 질병들 중 `random.choice`. 엔진 변경 없음. 이 자리(Infect 뒤, Intensify 전)는 카드마다 다른 즉시 효과를 붙일 자리이기도 하다.
 - **테스트:** 임시 테스트를 `BrinkTests.TheStrainIsChosenRightAfterTheEpidemicsInfectStep`으로 남김, `ATieForTheStrainIsBrokenAtRandom`(시드 12개에서 둘 다 나옴). 모두 2466개 통과.
+
+### 2026-10-22: 보기 규칙 `@view_rule` (G315, 보기 정책 하나를 대신함)
+
+- **드러난 곳:** 판데믹 brink의 변종 에픽 카드(카드마다 효과)를 실물처럼 덱에 섞어 숨기려 하자, 보기 정책이 모드 전체에 하나뿐이라(G203) 확장이 제 컴포넌트를 숨길 길이 없었다(코어 정책은 모르는 컴포넌트를 보이게 두고, 둘째 정책은 로드 오류, `override`는 코어 규칙을 베껴야 함). "모두 참이어야 보임"이나 "코어가 판정 함수를 빼 두면 감쌈"은 사용자가 땜빵이라 물리고 엔진 차원의 답을 정함.
+- **결정:** G315. `@view_rule(컴포넌트나 Def 타입) def f(viewer, entity)`, 답은 `True`·`False`·`None`(앞 규칙에 맡김), 같은 대상은 나중에 로드된 모드부터, 없거나 모두 `None`이면 보임, 한 모드 한 대상에 하나, 순서 없는 두 모드가 같은 대상이면 둘 다 로드 오류. `@view_policy`·`override=` 없앰, `requireViewPolicy` → `requireViewRules`. 한 번 보여 준 사건(몰래 보기)은 이어서 정함.
+- **구현:**
+  - 선언: `ViewRuleDecl`(대상 이름·컴포넌트인가), `Interpreter.DeclareViewRule`(맨 이름 하나, 매개변수 둘). `@view_policy`는 `CMD006`으로 새 표기를 알림.
+  - 로드: 새 `Loading/ViewRuleCheck`. `Resolve`가 모드마다 대상을 풂(모드가 묶은 이름·신호·없는 이름 + "혹시 …?"·안 보이는 모드 `SCH003`), 같은 대상 둘째 규칙 오류. `Collect`가 `BuildDefs` 고정점 안에서 순서 없는 모드 쌍을 충돌 오류로. `ContentLoadResult.ViewRules`(로드 순서). 순수·난수 검사와 정적 타입(Def 타입 규칙의 entity는 그 타입)은 정책 자리를 그대로 옮김.
+  - 실행: `World.View`가 대상마다 규칙 사슬(나중 것이 앞)을 들고, 엔티티 층은 엔티티의 Def 타입, 컴포넌트 층은 컴포넌트로 사슬을 찾음. 사슬이 없으면 시트 조회도 없이 보임.
+  - 스텁 `view_rule(target)`.
+- **옮긴 것:** 테스트 정책 11곳을 규칙으로(대개 `@view_rule(Unit)`의 안개, `@view_rule(Hand)`의 손패), `SchemaNameValueTests`의 컴포넌트 비교는 기여 줄 `c.component`로, 옛 정책 교체 테스트 6개 지움. 샘플 harbor·pandemic 코어, 안내서 7장(겹치는 규칙 절 더함), spine-spec 두 곳.
+- **테스트:** 새 `ViewRuleTests` 19개(대상만 정함, 확장이 제 컴포넌트 숨기기, 뒤 규칙이 보이게 하고 `None`으로 맡김, 모두 `None`이면 보임, 안개·탐지·은신 세 층, 순서 없는 충돌, 다른 대상은 괜찮음, `loadAfter`면 됨, 대상 오류 7가지, 철자 제안, 안 보이는 모드, override 힌트, 로직에서 규칙 함수 부르기). 모두 2479개 통과.

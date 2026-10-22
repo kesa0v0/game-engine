@@ -283,8 +283,8 @@ namespace Kesa.Engine.Tests.Runtime
         [TestCase(Schema, "def d6():\n    return random.randint(1, 6)\n@command(free=True, acts_for=None)\ndef Try(u: Ref[Unit]):\n" +
                           "    with preconditions:\n        x = d6()\n    u.Roll.a = x\n",
             "'d6' draws random numbers, so it cannot be used in 'with preconditions:'")]
-        [TestCase(Schema, "@view_policy\ndef may_see(viewer, entity, component):\n    return random.randint(0, 1) == 1\n",
-            "the view policy 'may_see' draws random numbers")]
+        [TestCase(Schema, "@view_rule(Unit)\ndef coin(viewer, entity):\n    return random.randint(0, 1) == 1\n",
+            "the view rule 'coin' draws random numbers")]
         [TestCase(
             "component(\"Roll\", a=field(int, default=0))\ndeftype(\"Unit\", ok=const(Cond[\"Unit\"]), components=[\"Roll\"])\n",
             "Unit(\"Lucky\", ok=lambda u: random.randint(0, 1) == 1)\n", "draws random numbers")]

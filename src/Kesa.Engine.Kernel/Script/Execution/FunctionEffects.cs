@@ -157,8 +157,8 @@ namespace Kesa.Engine.Script
 
             CheckUiEffects(functions, bodies, context);
 
-            // 정책 함수는 순수하다: 입구의 거부(C10, G122)도 거른 읽기(G197)도 상태를 건드리지 않는다
-            foreach (var policy in functions.Policies)
+            // 보기 규칙은 순수하다: 거른 읽기(G197·G315)는 상태를 건드리지 않는다
+            foreach (var policy in functions.ViewRules)
             {
                 if (policy.Function.Random)
                     context.Error(Codes.CmdWriteEffect,
@@ -243,7 +243,7 @@ namespace Kesa.Engine.Script
             foreach (var command in functions.Commands) Game(command.ActsFor, "the acts_for of '" + command.Id + "'", command.Span);
             foreach (var when in functions.Whens)
                 Game(when.Condition, "the condition of @when on '" + when.Function.Name + "'", when.Span);
-            foreach (var policy in functions.Policies)
+            foreach (var policy in functions.ViewRules)
                 Game(policy.Function, "the " + policy.Noun + " '" + policy.Function.Name + "'", policy.Function.Definition!.Span);
         }
 

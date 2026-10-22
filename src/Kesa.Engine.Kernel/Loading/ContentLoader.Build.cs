@@ -77,90 +77,25 @@ namespace Kesa.Engine.Loading
         }
 
         /// <summary>
-        /// Def와 정책 함수(제출 G124, 보기 G203)를 로드 순서대로 등록한다. 정책은 종류마다 따로 센다. 고정점은 <see cref="BuildSchema"/>와 같다.
+        /// Def를 로드 순서대로 등록하고, 같은 대상에 보기 규칙을 건 모드들 사이의 순서를 본다 (G315). 고정점은 <see cref="BuildSchema"/>와 같다.
         /// </summary>
         private static DefRegistry BuildDefs(List<ModUnit> units, ModVisibility visibility, LoadOrder order,
-            DiagnosticBag diagnostics, out PolicyDecl? viewPolicy)
+            DiagnosticBag diagnostics)
         {
             while (true)
             {
                 var stage = new StageDiagnostics(SurvivorIds(units));
                 var registry = new DefRegistry();
-                viewPolicy = null;
+                var viewRules = new List<List<ViewRuleDecl>>();
                 foreach (var u in units)
                 {
                     if (u.Failed) continue;
                     foreach (var record in u.Defs) Register(registry, record, visibility, order, stage);
-                    foreach (var p in u.Functions.Policies) viewPolicy = RegisterPolicy(viewPolicy, p, visibility, order, stage);
+                    viewRules.Add(u.Functions.ViewRules);
                 }
+                ViewRuleCheck.Collect(viewRules, order, stage);
                 if (!Settle(units, stage, diagnostics)) return registry;
             }
-        }
-
-        /// <summary>
-        /// 보기 정책 함수는 활성 모드 전체에서 최대 하나이고 교체는 <c>override=True</c>다 (spec-gaps G203). 판정은 Def 교체
-        /// (<see cref="Register"/>, spec S1)와 같다. 돌려주는 값은 지금까지의 정책이다.
-        /// </summary>
-        private static PolicyDecl? RegisterPolicy(PolicyDecl? current, PolicyDecl record,
-            ModVisibility visibility, LoadOrder order, StageDiagnostics stage)
-        {
-            string code = Codes.CmdViewPolicy;
-            string noun = record.Noun;
-            if (current == null)
-            {
-                if (!record.IsOverride) return record;
-                stage.Error(record.Mod, code, "override=True but there is no " + noun + " to replace", record.Span,
-                    "remove override=True to declare the game's " + noun);
-                return null;
-            }
-
-            var original = current;
-            while (original.Replaced != null) original = original.Replaced;
-            bool own = original.Mod == record.Mod || current.Mod == record.Mod;
-            var at = new[] { current.Span };
-
-            if (!record.IsOverride)
-            {
-                bool canReplace = !own && visibility.CanSee(record.Mod, original.Mod);
-                string message = own
-                    ? "a mod can declare only one " + noun
-                    : "a " + noun + " is already declared by mod '" + original.Mod + "'";
-                if (own || canReplace)
-                {
-                    stage.Error(record.Mod, code, message, record.Span,
-                        canReplace ? "add override=True to replace it (spec-gaps G203)" : null, new[] { original.Span });
-                    return current;
-                }
-                // 서로 의존하지 않는 두 모드: 어느 정책이 맞는지 근거가 없으므로 둘 다 오류 (Def와 같은 규칙)
-                stage.ConflictError(record.Mod, code, message, record.Span, related: new[] { original.Span });
-                stage.ConflictError(original.Mod, code, "a " + noun + " is also declared by mod '" + record.Mod + "'",
-                    original.Span, related: new[] { record.Span });
-                return current;
-            }
-
-            if (own)
-            {
-                stage.Error(record.Mod, code, "a mod cannot override its own " + noun, record.Span, related: at);
-                return current;
-            }
-            if (!visibility.CanSee(record.Mod, original.Mod))
-            {
-                stage.Error(record.Mod, Codes.SchNotVisible,
-                    "the " + noun + " belongs to mod '" + original.Mod + "', which mod '" + record.Mod +
-                    "' does not depend on", record.Span, "add \"" + original.Mod + "\" to dependencies in mod.py", at);
-                return current;
-            }
-            if (current.IsOverride && !order.IsOrdered(current.Mod, record.Mod))
-            {
-                string message = "the " + noun + " is overridden by both mod '" + current.Mod + "' and mod '" +
-                                 record.Mod + "', which have no load order between them";
-                stage.ConflictError(record.Mod, code, message, record.Span, "declare loadAfter in one of them", at);
-                stage.ConflictError(current.Mod, code, message, current.Span, "declare loadAfter in one of them",
-                    new[] { record.Span });
-                return current;
-            }
-            record.Replaced = current;
-            return record;
         }
 
         /// <summary>

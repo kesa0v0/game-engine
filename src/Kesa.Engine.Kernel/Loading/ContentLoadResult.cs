@@ -76,10 +76,10 @@ namespace Kesa.Engine.Loading
             new SortedDictionary<string, CommandDecl>(System.StringComparer.Ordinal);
 
         /// <summary>
-        /// 보기 정책 함수 <c>may_see(viewer, entity, component)</c> (spec-gaps G196·G197·G203·G238). 활성 모드 전체에서 최대 하나이고
-        /// 교체됐으면 마지막 것이다. 없으면 null이고 그때 거른 읽기는 모두 보인다.
+        /// 보기 규칙 <c>@view_rule(대상) def f(viewer, entity)</c> (spec-gaps G196·G197·G203·G238·G315), 로드 순서대로(모드 안에서는 정의
+        /// 순서). 같은 대상의 규칙은 뒤의 것부터 묻는다. 비었으면 거른 읽기는 모두 보인다.
         /// </summary>
-        public PolicyDecl? ViewPolicy { get; internal set; }
+        public IReadOnlyList<ViewRuleDecl> ViewRules { get; internal set; } = new List<ViewRuleDecl>();
 
         /// <summary>
         /// ①의 정렬 결과. 두 모드 사이에 선언된 순서가 있는지(<see cref="LoadOrder.IsOrdered"/>)를 번역의 같은 키 경고가 쓴다 (spec-gaps G256).

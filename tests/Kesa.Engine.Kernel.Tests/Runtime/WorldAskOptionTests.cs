@@ -23,9 +23,9 @@ namespace Kesa.Engine.Tests.Runtime
 
         private const string Defs =
             "Party(\"Red\")\nParty(\"Blue\")\nUnit(\"Scout\")\n" +
-            "@view_policy\n" +
-            "def may_see(viewer, entity, component):\n" +
-            "    return entity.Fog is None or not entity.Fog.hidden\n" +
+            "@view_rule(Unit)\n" +
+            "def fog(viewer, entity):\n" +
+            "    return not entity.Fog.hidden\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Offer(p: Ref[Party], u: Ref[Unit]):\n" +
             "    opts = [option(\"accept\", label=\"cult-accept\", desc=text(\"cult-accept-desc\", unit=u), style=\"purple-fire\"," +

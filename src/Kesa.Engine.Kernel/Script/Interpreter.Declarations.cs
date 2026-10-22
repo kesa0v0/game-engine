@@ -9,6 +9,7 @@ namespace Kesa.Engine.Script
         public const string CommandName = "command";
         public const string SubmitPolicyName = "submit_policy";
         public const string ViewPolicyName = "view_policy";
+        public const string ViewRuleName = "view_rule";
         public const string ActsForName = "acts_for";
         public const string UiActionName = "ui_action";
 
@@ -356,7 +357,7 @@ namespace Kesa.Engine.Script
             }
 
             string? name = def.DecoratorName;
-            if ((name == CommandName || name == SubmitPolicyName || name == ViewPolicyName || name == OnName || name == WhenName ||
+            if ((name == CommandName || name == SubmitPolicyName || name == ViewPolicyName || name == ViewRuleName || name == OnName || name == WhenName ||
                  name == UiActionName || name == WrapName) && !IsBuiltin(name))
             {
                 bool schema = _scope.IsSchemaName(name);
@@ -378,7 +379,15 @@ namespace Kesa.Engine.Script
             }
             if (name == ViewPolicyName)
             {
-                DeclarePolicy(def, function, decorator);
+                _context.Error(Codes.CmdViewPolicy,
+                    "@view_policy was replaced by view rules: each rule names the component or Def type it decides", decorator.Span,
+                    hint: "write @view_rule(Hand) def f(viewer, entity): return True, False, or None to leave it to earlier rules " +
+                          "(spec-gaps G315)");
+                return;
+            }
+            if (name == ViewRuleName)
+            {
+                DeclareViewRule(def, function, decorator);
                 return;
             }
             if (name == OnName)
@@ -404,7 +413,7 @@ namespace Kesa.Engine.Script
             if (name != CommandName)
             {
                 _context.Error(Codes.CmdBadDecorator,
-                    "unknown decorator; only @command, @on, @when, @ui_action, @wrap and @view_policy are supported",
+                    "unknown decorator; only @command, @on, @when, @ui_action, @wrap and @view_rule are supported",
                     decorator.Span, hint: "write @command or @command(free=True, acts_for=...)");
                 return;
             }
@@ -498,47 +507,51 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary>
-        /// <c>@view_policy</c> / <c>@view_policy(override=True)</c> (G197·G203·G238): 기본값 없는 매개변수 셋
-        /// <c>(viewer, entity, component)</c>. 개수와 교체는 모든 모드를 모은 뒤 본다.
+        /// <c>@view_rule(Hand)</c> (G315): 대상은 맨 이름 하나(컴포넌트나 Def 타입)이고 무엇인지는 로더가 스키마로 푼다. 기본값 없는 매개변수 둘
+        /// <c>(viewer, entity)</c>. 같은 대상에 건 규칙의 개수와 모드 사이 순서는 모든 모드를 모은 뒤 본다.
         /// </summary>
-        private void DeclarePolicy(FunctionDef def, FunctionValue function, Expr decorator)
+        private void DeclareViewRule(FunctionDef def, FunctionValue function, Expr decorator)
         {
-            string at = "@" + ViewPolicyName;
-            bool isOverride = false;
-            if (decorator is CallExpr call)
+            const string usage = "write @view_rule(Hand) for a component, or @view_rule(Unit) for whether entities of a Def type are seen " +
+                                 "(spec-gaps G315)";
+            if (!(decorator is CallExpr call) || call.Arguments.Count == 0)
             {
-                foreach (var arg in call.Arguments)
-                {
-                    if (arg.Name != "override")
-                    {
-                        _context.Error(Codes.CmdBadDecorator,
-                            arg.Name == null
-                                ? at + " takes no positional arguments"
-                                : at + " has no argument '" + arg.Name + "'",
-                            arg.Span, hint: at + " accepts override=True");
-                        return;
-                    }
-                    if (!(arg.Value is BoolLiteral literal))
-                    {
-                        _context.Error(Codes.CmdBadDecorator, "override= must be True or False", arg.Value.Span);
-                        return;
-                    }
-                    isOverride = literal.Value;
-                }
+                _context.Error(Codes.CmdBadDecorator, "@view_rule needs the component or Def type it decides", decorator.Span, hint: usage);
+                return;
+            }
+            foreach (var arg in call.Arguments)
+            {
+                if (arg.Name == null) continue;
+                _context.Error(Codes.CmdBadDecorator, "@view_rule has no argument '" + arg.Name + "'", arg.Span,
+                    hint: arg.Name == "override"
+                        ? "a later mod's rule on the same target is asked first; return None to leave it to earlier rules (spec-gaps G315)"
+                        : usage);
+                return;
+            }
+            if (call.Arguments.Count != 1)
+            {
+                _context.Error(Codes.CmdBadDecorator, "@view_rule takes one component or Def type", call.Arguments[1].Span, hint: usage);
+                return;
+            }
+            if (!(call.Arguments[0].Value is NameExpr target))
+            {
+                _context.Error(Codes.CmdBadDecorator, "@view_rule needs the bare name of a component or Def type",
+                    call.Arguments[0].Span, hint: usage);
+                return;
             }
 
-            bool shapeOk = def.Parameters.Count == 3;
+            bool shapeOk = def.Parameters.Count == 2;
             foreach (var p in def.Parameters)
                 if (p.Default != null) shapeOk = false;
             if (!shapeOk)
             {
                 _context.Error(Codes.CmdViewPolicy,
-                    "a view policy takes exactly three parameters without defaults: (viewer, entity, component)", def.Span,
-                    hint: "viewer is an entity the connection sits at, or None for a spectator; component is a component name, " +
-                          "or None when asking whether the entity itself is seen (spec-gaps G197·G238)");
+                    "a view rule takes exactly two parameters without defaults: (viewer, entity)", def.Span,
+                    hint: "viewer is an entity the connection sits at, or None for a spectator; return True to show, False to hide, " +
+                          "or None to leave it to earlier rules (spec-gaps G238·G315)");
                 return;
             }
-            _context.Functions.Policies.Add(new PolicyDecl(_context.Mod, function, isOverride, decorator.Span));
+            _context.Functions.ViewRules.Add(new ViewRuleDecl(_context.Mod, function, target.Name, target.Span, decorator.Span));
         }
     }
 }

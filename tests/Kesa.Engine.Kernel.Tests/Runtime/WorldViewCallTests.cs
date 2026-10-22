@@ -26,15 +26,14 @@ namespace Kesa.Engine.Tests.Runtime
 
         private const string Defs =
             "Party(\"Side\")\nUnit(\"Soldier\")\n" +
-            "@view_policy\n" +
-            "def may_see(viewer, entity, component):\n" +
-            "    if viewer is not None and viewer.Hand.cards >= 100:\n" +
-            "        return True\n" +
-            "    if entity.Fog is not None:\n" +
-            "        return not entity.Fog.hidden or viewer == entity.Owner.party\n" +
-            "    if entity.Hand is not None:\n" +
-            "        return component != Hand or viewer == entity\n" +
-            "    return True\n" +
+            "def omniscient(viewer):\n" +
+            "    return viewer is not None and viewer.Hand.cards >= 100\n" +
+            "@view_rule(Unit)\n" +
+            "def fog(viewer, entity):\n" +
+            "    return omniscient(viewer) or not entity.Fog.hidden or viewer == entity.Owner.party\n" +
+            "@view_rule(Hand)\n" +
+            "def own_hand(viewer, entity):\n" +
+            "    return omniscient(viewer) or viewer == entity\n" +
             "def enemy_hp(me):\n    return sum([u.Life.hp for u in query(Unit) if u.Owner.party != me])\n" +
             "def hand(p):\n    return -1 if p.Hand is None else p.Hand.cards\n" +
             "def army(p):\n    return len(p.units)\n" +

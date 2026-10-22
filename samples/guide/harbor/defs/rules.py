@@ -66,8 +66,6 @@ def scheme(h: Ref[House]):
     h.Secret.plan = 1
 
 # 비밀 계획은 그 상회만 본다
-@view_policy
-def may_see(viewer, entity, component):
-    if component == Secret:
-        return viewer == entity
-    return True
+@view_rule(Secret)
+def own_secret(viewer, entity):
+    return viewer == entity

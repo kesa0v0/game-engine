@@ -30,26 +30,48 @@
 
 한 연결이 여러 엔티티에 앉을 수 있다(핫시트). 한 엔티티에 여러 연결(공동 조종)은 아직 없다.
 
-## 숨긴 정보: 보기 정책
+## 숨긴 정보: 보기 규칙
 
-카드 게임의 손패, 안개 속 유닛처럼 **누가 무엇을 보는지**는 모드가 함수 하나로 정한다. `samples/guide/harbor/defs/rules.py`:
+카드 게임의 손패, 안개 속 유닛처럼 **누가 무엇을 보는지**는 모드가 보기 규칙으로 정한다. 규칙마다 무엇에 대한 규칙인지를 적는다.
+`samples/guide/harbor/defs/rules.py`:
 
 ```python
 # 비밀 계획은 그 상회만 본다
-@view_policy
-def may_see(viewer, entity, component):
-    if component == Secret:
-        return viewer == entity
-    return True
+@view_rule(Secret)
+def own_secret(viewer, entity):
+    return viewer == entity
 ```
 
-- `viewer`: 보는 연결이 앉은 엔티티. 여러 곳에 앉았으면 자리마다 부르고 하나라도 참이면 보인다. 관전자는 `None`.
-- `entity`: 보일지 묻는 엔티티. `component`가 `None`이면 "엔티티 자체가 보이나", 컴포넌트면 "그 컴포넌트가 보이나"다.
-  `component`는 컴포넌트 값이라 맨 이름과 비교한다(`component == Secret`, 3장 "이름 쓰는 법"). 문자열 `"Secret"`과 비교하면 늘
-  거짓이라 로드 때 경고 `EVL009`.
-- 참·거짓을 돌려준다. 순수해야 한다(`CMD004`). 오류가 나거나 참거짓이 아니면 "안 보임"으로 치고 `RUN018`.
-- 정책은 모든 모드를 통틀어 하나다. 다른 모드의 정책을 바꾸려면 `@view_policy(override=True)`.
-- 정책이 없으면 모두 보인다.
+- 대상: 컴포넌트(`@view_rule(Secret)`)면 "그 컴포넌트가 보이나", Def 타입(`@view_rule(Unit)`)이면 "그 타입의 엔티티 자체가 보이나"
+  (안개 속 유닛)다. 엔티티가 안 보이면 그 컴포넌트도 모두 안 보인다. 규칙은 자기 대상에 대해서만 불린다.
+- `viewer`: 보는 연결이 앉은 엔티티. 여러 곳에 앉았으면 자리마다 묻고 하나라도 보이면 보인다. 관전자는 `None`.
+- `entity`: 보일지 묻는 엔티티.
+- 답은 셋이다: `True` 보임, `False` 안 보임, `None` "상관없음, 앞 규칙에 맡김". 순수해야 한다(`CMD004`). 오류가 나거나 셋 밖의 값이면
+  "안 보임"으로 치고 `RUN018`.
+- 규칙이 없거나 모두 `None`이면 보인다.
+
+### 여러 모드의 규칙이 겹칠 때
+
+확장 모드는 코어를 고치지 않고 숨기기를 더하거나 바꾼다. 같은 대상의 규칙은 **나중에 로드된 모드부터** 묻고, 처음 나온
+`True`/`False`를 쓴다.
+
+```python
+# 확장: 제 컴포넌트를 숨긴다 (코어의 규칙과 상관없음)
+@view_rule(Strain)
+def strain_down(viewer, entity):
+    return entity.Card.pile != 0
+
+# 확장: 코어가 숨긴 앞면을 첩자에게는 보여 준다. 첩자가 아니면 코어에 맡긴다
+@view_rule(Face)
+def spy_peeks(viewer, entity):
+    if viewer is not None and viewer.Spy is not None:
+        return True
+    return None
+```
+
+- 한 모드는 한 대상에 규칙을 하나만 건다.
+- 같은 대상에 규칙을 건 두 모드 사이에 순서(의존이나 `loadAfter`)가 없으면 둘 다 로드 오류다. 어느 쪽을 먼저 물을지 근거가 없기 때문이다.
+- 다른 모드의 결정을 통째로 바꾸려면 `None`을 돌려주지 않으면 된다(옛 `override=True`는 없다).
 
 ### 규칙은 다 보고, 화면과 AI만 거른다
 

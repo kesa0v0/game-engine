@@ -26,9 +26,9 @@ namespace Kesa.Engine.Script
         public List<CommandDecl> UiActions { get; } = new List<CommandDecl>();
 
         /// <summary>
-        /// <c>@view_policy</c>(G197)로 선언한 보기 정책 함수. 모드 안에서 둘 이상이면 로드 오류다.
+        /// <c>@view_rule(대상)</c>(G315)으로 선언한 보기 규칙, 정의된 순서대로. 한 모드가 한 대상에 둘을 걸면 로드 오류다.
         /// </summary>
-        public List<PolicyDecl> Policies { get; } = new List<PolicyDecl>();
+        public List<ViewRuleDecl> ViewRules { get; } = new List<ViewRuleDecl>();
 
         /// <summary><c>@on(신호)</c>로 붙인 핸들러, 정의된 순서대로 (G145).</summary>
         public List<HandlerDecl> Handlers { get; } = new List<HandlerDecl>();

@@ -29,10 +29,8 @@ namespace Kesa.Engine.Tests.Runtime
         private const string Defs =
             "Party(\"Player\")\nGame(\"Match\")\n" +
             // 남의 선택은 공개될 때까지 못 본다. 그 밖에는 다 보인다
-            "@view_policy\n" +
-            "def may_see(viewer, entity, component):\n" +
-            "    if component != Pick:\n" +
-            "        return True\n" +
+            "@view_rule(Pick)\n" +
+            "def secret_pick(viewer, entity):\n" +
             "    return viewer == entity or any(g.Round.revealed for g in query(Game))\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Start():\n" +
@@ -67,7 +65,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private World NewGame()
         {
-            var w = new World(_content, seed: 3, requireViewPolicy: true);
+            var w = new World(_content, seed: 3, requireViewRules: true);
             foreach (var conn in Conns)
                 w.Seat(w.Create("core:Player"), conn);
             w.Create("core:Match");
@@ -204,7 +202,7 @@ namespace Kesa.Engine.Tests.Runtime
             var w = NewGame();
             Choose(w, "A", Rock);
             var before = Render(w, "B");
-            var loaded = World.Load(_content, w.Save(), requireViewPolicy: true);
+            var loaded = World.Load(_content, w.Save(), requireViewRules: true);
             Assert.That(loaded.Diagnostics, Is.Empty);
             w = loaded.World!;
             Assert.That(Render(w, "B"), Is.EqualTo(before));

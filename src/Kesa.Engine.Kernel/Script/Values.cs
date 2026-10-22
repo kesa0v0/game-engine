@@ -178,8 +178,8 @@ namespace Kesa.Engine.Script
         public string EntryKind => IsHandler ? "@on handler" : IsWhen ? "@when reaction" : IsUiAction ? "@ui_action" :
             IsWrap ? "@wrap function" : "@command";
 
-        /// <summary><c>@view_policy</c> 함수인가 (G197). 순수 자리다.</summary>
-        public bool IsViewPolicy => Definition != null && Definition.DecoratorName == Interpreter.ViewPolicyName;
+        /// <summary><c>@view_rule</c> 함수인가 (G315). 순수 자리다.</summary>
+        public bool IsViewRule => Definition != null && Definition.DecoratorName == Interpreter.ViewRuleName;
 
         public override string KindName => "function";
     }

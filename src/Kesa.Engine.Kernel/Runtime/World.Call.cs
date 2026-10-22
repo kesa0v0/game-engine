@@ -187,7 +187,7 @@ namespace Kesa.Engine.Runtime
             var sourceVersions = new long[names.Length];
             for (int i = 0; i < names.Length; i++) sourceVersions[i] = SourceVersion(names[i]);
             return new CallResult(function, value, this, ids, readNames, versions, names, sourceVersions, tick ? _tick : (long?)null,
-                _viewer != null && _viewPolicy != null ? SeatsVersion : (long?)null);
+                _viewer != null && _viewRules.Count > 0 ? SeatsVersion : (long?)null);
         }
 
         /// <summary>

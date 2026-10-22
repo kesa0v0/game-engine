@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace Kesa.Engine.Tests.Loading
 {
     /// <summary>
-    /// 엔진이 넘기는 컴포넌트는 이름 문자열이 아니라 컴포넌트 값이다 (spec-gaps G306·G308): 보기 정책의 <c>component</c>,
+    /// 엔진이 넘기는 컴포넌트는 이름 문자열이 아니라 컴포넌트 값이다 (spec-gaps G306·G308): 보기 정책의 <c>component</c>(G315로 없어짐),
     /// 기여 줄의 <c>c.component</c>. 맨 이름과 비교하고, 문자열 리터럴과 비교하면 경고한다.
     /// </summary>
     public class SchemaNameValueTests : LoaderTestBase
@@ -17,21 +17,22 @@ namespace Kesa.Engine.Tests.Loading
             "component(\"Armor\", bonus=const(list[Contrib], default=[contrib(\"Health.max\", \"add\", 1)]))\n" +
             "deftype(\"Card\", components=[\"Face\", \"Health\", \"Armor\"])\n";
 
-        private static string Policy(string body) =>
-            "@view_policy\ndef may_see(viewer, entity, component):\n" + body;
+        // 로직 파일의 함수가 기여 줄을 거르는 조건 (보기 정책의 component는 G315로 없어졌다)
+        private static string Rows(string condition) =>
+            "def f(h):\n    return len([c for c in contribs(h, \"max\") if " + condition + "])\n";
 
         [Test]
         public void ComparingWithBareNamesIsClean()
         {
-            Mod("banking", schema: Schema, defs: Policy("    return component != Face\n"));
+            Mod("banking", schema: Schema, defs: Rows("c.component != Face"));
             LoadClean();
         }
 
-        [TestCase("    return component != \"Face\"\n", "Face")]
-        [TestCase("    return \"Face\" == component\n", "Face")]
-        public void ComparingAPolicyComponentWithAStringWarns(string body, string name)
+        [TestCase("c.component != \"Face\"", "Face")]
+        [TestCase("\"Face\" == c.component", "Face")]
+        public void ComparingARowComponentInADefsFileWithAStringWarns(string body, string name)
         {
-            Mod("banking", schema: Schema, defs: Policy(body));
+            Mod("banking", schema: Schema, defs: Rows(body));
             var result = Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.EvlSchemaNameString));
@@ -52,7 +53,7 @@ namespace Kesa.Engine.Tests.Loading
         [Test]
         public void AMisspelledComponentNameIsCaughtByTheNameCheck()
         {
-            Mod("banking", schema: Schema, defs: Policy("    return component != Fcae\n"));
+            Mod("banking", schema: Schema, defs: Rows("c.component != Fcae"));
             Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.EvlUnknownName));

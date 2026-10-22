@@ -21,9 +21,9 @@ namespace Kesa.Engine.Tests.Runtime
 
         private const string Defs =
             "Party(\"Side\")\nUnit(\"Scout\")\n" +
-            "@view_policy\n" +
-            "def may_see(viewer, entity, component):\n" +
-            "    return entity.Fog is None or not entity.Fog.hidden\n" +
+            "@view_rule(Unit)\n" +
+            "def fog(viewer, entity):\n" +
+            "    return not entity.Fog.hidden\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Open(a: Ref[Party], b: Ref[Party], u: Ref[Unit]):\n" +
             "    r = ask([a, b], \"go\", choices=[\"left\", u], responses=[\"Wait\"])\n" +

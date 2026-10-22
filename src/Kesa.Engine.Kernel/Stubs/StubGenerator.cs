@@ -102,10 +102,7 @@ namespace Kesa.Engine.Stubs
             "def command[F: Callable[..., Any]](*, free: bool = ..., acts_for: Any = ..., on_stale: Any = ...) -> Callable[[F], F]: ...\n" +
             "def ui_action[F: Callable[..., Any]](f: F, /) -> F: ...\n" +
             "def submit(command: str, /, **args: Any) -> None: ...\n" +
-            "@overload\n" +
-            "def view_policy[F: Callable[..., Any]](f: F, /) -> F: ...\n" +
-            "@overload\n" +
-            "def view_policy[F: Callable[..., Any]](*, override: bool = ...) -> Callable[[F], F]: ...\n" +
+            "def view_rule[F: Callable[..., Any]](target: Any, /) -> Callable[[F], F]: ...\n" +
             "def on[F: Callable[..., Any]](signal: Any, /, *, stage: str = ..., now: bool = ...) -> Callable[[F], F]: ...\n" +
             "def wrap[F: Callable[..., Any]](function: Any, /) -> Callable[[F], F]: ...\n" +
             "def when[F: Callable[..., Any]](condition: Callable[..., Any], /, *, stage: str = ..., repeat: bool = ..., " +

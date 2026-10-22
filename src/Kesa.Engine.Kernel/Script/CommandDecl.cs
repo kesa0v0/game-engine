@@ -50,31 +50,37 @@ namespace Kesa.Engine.Script
     }
 
     /// <summary>
-    /// <c>@view_policy</c>로 선언한 보기 정책 함수 (spec-gaps G196·G197·G203·G238). 순수 함수이고 활성 모드 전체에서 최대 하나다.
-    /// 교체는 <c>override=True</c>. 입구 정책 <c>@submit_policy</c>는 없어졌다(입구는 커널의 배정 표, G237).
+    /// <c>@view_rule(대상)</c>으로 선언한 보기 규칙 (spec-gaps G315). 순수 함수 <c>(viewer, entity)</c>이고 답은 <c>True</c>·<c>False</c>·
+    /// <c>None</c>(앞 규칙에 맡김)이다. 대상이 컴포넌트면 그 컴포넌트 층, Def 타입이면 그 타입 엔티티의 엔티티 층(G197)이다.
+    /// 같은 대상의 규칙은 나중에 로드된 모드부터 묻는다.
     /// </summary>
-    public sealed class PolicyDecl
+    public sealed class ViewRuleDecl
     {
-        public PolicyDecl(string mod, FunctionValue function, bool isOverride, SourceSpan span)
+        public ViewRuleDecl(string mod, FunctionValue function, string target, SourceSpan targetSpan, SourceSpan span)
         {
             Mod = mod;
             Function = function;
-            IsOverride = isOverride;
+            Target = target;
+            TargetSpan = targetSpan;
             Span = span;
         }
 
         /// <summary>메시지에 쓰는 이름.</summary>
-        public string Noun => "view policy";
+        public string Noun => "view rule";
 
         public string Mod { get; }
         public FunctionValue Function { get; }
-        public bool IsOverride { get; }
 
-        /// <summary><c>@view_policy</c> 데코레이터의 위치.</summary>
+        /// <summary>대상의 이름 (컴포넌트나 Def 타입). 무엇인지는 로더가 푼다(<see cref="IsComponent"/>).</summary>
+        public string Target { get; }
+
+        public SourceSpan TargetSpan { get; }
+
+        /// <summary>대상이 컴포넌트인가 (아니면 Def 타입). 로더가 대상을 푼 뒤에 정해진다.</summary>
+        public bool IsComponent { get; internal set; }
+
+        /// <summary><c>@view_rule</c> 데코레이터의 위치.</summary>
         public SourceSpan Span { get; }
-
-        /// <summary>교체한 정책 (교체가 아니면 null).</summary>
-        public PolicyDecl? Replaced { get; internal set; }
     }
 
     /// <summary>

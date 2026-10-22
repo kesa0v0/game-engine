@@ -136,9 +136,13 @@ namespace Kesa.Engine.Loading
                 contexts.AddByName(command.Function, ByName);
                 if (command.ActsFor != null) contexts.AddByName(command.ActsFor, ByName);
             }
-            // 보기 정책 may_see(viewer, entity, component): 셋째는 엔진이 넘긴 컴포넌트 값이나 None (G308)
-            foreach (var policy in functions.Policies)
-                contexts.Add(policy.Function, new StaticType?[] { new EntityType(null), new EntityType(null), ComponentValueStatic.Instance });
+            // 보기 규칙 (viewer, entity): Def 타입에 건 규칙의 entity는 그 타입이다 (G315)
+            foreach (var rule in functions.ViewRules)
+                contexts.Add(rule.Function, new StaticType?[]
+                {
+                    new EntityType(null),
+                    new EntityType(!rule.IsComponent && schema.TryGetType(rule.Target, out var type) ? type : null),
+                });
             foreach (var handler in functions.Handlers)
                 contexts.AddByName(handler.Function,
                     name => handler.Signal.TryGetField(name, out var field) ? FromType(field.Type, schema) : null);

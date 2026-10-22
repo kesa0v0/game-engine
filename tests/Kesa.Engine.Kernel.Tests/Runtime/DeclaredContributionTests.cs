@@ -125,7 +125,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void AViewerWhoCannotSeeTheDeclaringComponentDoesNotSeeItsLine()
         {
-            NewWorld(Defs + "@view_policy\ndef may_see(viewer, entity, component):\n    return component != Armor\n");
+            NewWorld(Defs + "@view_rule(Armor)\ndef armor(viewer, entity):\n    return False\n");
             _world.Seat(_plain, "A");
             var a = _world.ViewAs("A");
             var max = _world.Member("Health", "max");

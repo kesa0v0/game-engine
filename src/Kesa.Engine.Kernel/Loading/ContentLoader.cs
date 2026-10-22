@@ -57,6 +57,7 @@ namespace Kesa.Engine.Loading
                 var handlers = new List<HandlerDecl>();
                 var whens = new List<WhenDecl>();
                 var wraps = new List<WrapDecl>();
+                var viewRules = new List<ViewRuleDecl>();
                 var textUses = new SortedDictionary<string, IReadOnlyList<TextUse>>(StringComparer.Ordinal);
                 var contents = new SortedDictionary<string, ModContent>(StringComparer.Ordinal);
                 var hostFunctions = new SortedDictionary<string, HostSignature>(StringComparer.Ordinal);
@@ -80,6 +81,7 @@ namespace Kesa.Engine.Loading
                     foreach (var action in u.Functions.UiActions) uiActions.Add(action.Id, action);
                     handlers.AddRange(u.Functions.Handlers);
                     whens.AddRange(u.Functions.Whens);
+                    viewRules.AddRange(u.Functions.ViewRules);
                     foreach (var w in u.Functions.Wraps)
                         if (w.Target != null) wraps.Add(w);
                     textUses.Add(u.Manifest.Id, u.Functions.TextUses);
@@ -87,7 +89,7 @@ namespace Kesa.Engine.Loading
                 return new ContentLoadResult(mods, new List<string>(disabled), run.Schema, run.Defs, patches, run.Resolved,
                     run.Log, run.Expanded, DefSet.Freeze(run.Expanded), firstRound, scopes, commands)
                 {
-                    ViewPolicy = run.ViewPolicy,
+                    ViewRules = viewRules,
                     UiActions = uiActions,
                     Order = order,
                     ModsRoot = modsRoot,
@@ -122,9 +124,6 @@ namespace Kesa.Engine.Loading
             public SchemaSet Schema { get; }
             public DefRegistry Defs { get; }
             public ModVisibility Visibility { get; }
-
-            /// <summary>보기 정책 함수 (G203). 없으면 null.</summary>
-            public PolicyDecl? ViewPolicy { get; set; }
 
             /// <summary>③이 검사를 통과시킨 패치 (③을 돌린 뒤에 채워진다).</summary>
             public IReadOnlyList<ResolvedPatch> Resolved { get; set; } = new List<ResolvedPatch>();
@@ -190,6 +189,8 @@ namespace Kesa.Engine.Loading
                 FunctionEffects.Check(u.Functions, u.Scope, schema, new CallContext(self, u.Bag), hostNames,
                     owner => visibility.CanSee(self, owner), modNames);
                 WrapCheck.Resolve(u.Functions.Wraps, modNames, hostNames, new CallContext(self, u.Bag));
+                ViewRuleCheck.Resolve(u.Functions.ViewRules, schema, u.Scope, owner => visibility.CanSee(self, owner),
+                    new CallContext(self, u.Bag));
                 CommandSignatures.Resolve(u.Functions.Commands, schema, visibility, u.Scope,
                     new CallContext(u.Manifest.Id, u.Bag));
                 CommandSignatures.Resolve(u.Functions.UiActions, schema, visibility, u.Scope,
@@ -209,13 +210,13 @@ namespace Kesa.Engine.Loading
             }
 
             // ②b 끝: Def 등록 (고정점). 모드가 더 빠졌으면 스키마도 그 모드의 확장 없이 다시 만든다.
-            var defs = BuildDefs(units, visibility, order, runDiagnostics, out var viewPolicy);
+            var defs = BuildDefs(units, visibility, order, runDiagnostics);
             if (CountSurvivors(units) != survivorsBefore)
             {
                 schema = BuildSchema(units, visibility, runDiagnostics);
                 Rebind(defs, schema);
             }
-            return new DefinitionRun(schema, defs, visibility) { ViewPolicy = viewPolicy };
+            return new DefinitionRun(schema, defs, visibility);
         }
 
         /// <summary>

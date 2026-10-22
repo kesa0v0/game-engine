@@ -10,7 +10,7 @@ using NUnit.Framework;
 namespace Kesa.Engine.Tests.Runtime
 {
     /// <summary>
-    /// 거른 읽기 <c>ViewAs(issuer)</c>와 보기 정책 <c>@view_policy</c> (spec-gaps G196~G203·G238). 연결은 진영에 앉고(배정 표, G236)
+    /// 거른 읽기 <c>ViewAs(issuer)</c>와 보기 규칙 <c>@view_rule</c> (spec-gaps G196~G203·G238·G315). 연결은 진영에 앉고(배정 표, G236)
     /// 남의 <c>Hand</c>와 안개 속(<c>Fog.hidden</c>) 유닛은 못 본다.
     /// </summary>
     public class WorldViewTests : LoaderTestBase
@@ -27,15 +27,14 @@ namespace Kesa.Engine.Tests.Runtime
             "deftype(\"Unit\", components=[\"Owner\", \"Fog\", \"Spy\"])\n" +
             "deftype(\"Field\", components=[\"Battle\"])\n";
 
-        // 보는 이(viewer)는 연결이 앉은 엔티티다. 앉은 데가 없는 구경꾼은 None (G238)
+        // 보는 이(viewer)는 연결이 앉은 엔티티다. 앉은 데가 없는 구경꾼은 None (G238). 손패는 컴포넌트 층, 안개는 Unit의 엔티티 층 (G315)
         private const string Policies =
-            "@view_policy\n" +
-            "def may_see(viewer, entity, component):\n" +
-            "    if entity.Crest is not None:\n" +
-            "        return component != Hand or viewer == entity\n" +
-            "    if entity.Fog is not None:\n" +
-            "        return not entity.Fog.hidden or viewer == entity.Owner.party\n" +
-            "    return True\n";
+            "@view_rule(Hand)\n" +
+            "def own_hand(viewer, entity):\n" +
+            "    return viewer == entity\n" +
+            "@view_rule(Unit)\n" +
+            "def fog(viewer, entity):\n" +
+            "    return not entity.Fog.hidden or viewer == entity.Owner.party\n";
 
         private const string Defs =
             "Party(\"Side\")\nUnit(\"Scout\")\nField(\"Plain\")\n" + Policies +
@@ -53,7 +52,7 @@ namespace Kesa.Engine.Tests.Runtime
         private void NewWorld(string defs = Defs, bool requireView = false)
         {
             Mod("banking", schema: Schema, defs: defs);
-            _w = new World(LoadClean(), requireViewPolicy: requireView);
+            _w = new World(LoadClean(), requireViewRules: requireView);
             _a = Party("A", 3);
             _b = Party("B", 5);
             _scout = _w.Create("banking:Scout", new Init(M("Owner", "party"), new EntityValue(_a)));
@@ -272,8 +271,8 @@ namespace Kesa.Engine.Tests.Runtime
                     "deftype(\"Unit\", components=[\"Side\", \"Combat\", \"Fog\"])\n" +
                     "deftype(\"Castle\", components=[\"Side\", \"Defense\"])\n",
                 defs: "Unit(\"Raider\")\nCastle(\"Keep\")\n" +
-                      "@view_policy\ndef may_see(viewer, entity, component):\n" +
-                      "    return entity.Fog is None or not entity.Fog.hidden or (viewer is not None and entity.Side.conn == viewer.Side.conn)\n");
+                      "@view_rule(Unit)\ndef fog(viewer, entity):\n" +
+                      "    return not entity.Fog.hidden or (viewer is not None and entity.Side.conn == viewer.Side.conn)\n");
             var w = new World(LoadClean());
             var castle = w.Create("scouts:Keep");
             w.Set(castle, w.Member("Side", "conn"), new StrValue("B"));
@@ -433,9 +432,10 @@ namespace Kesa.Engine.Tests.Runtime
                     "component(\"Known\", key=Ref[\"Party\"], n=field(int, default=0))\n" +
                     "deftype(\"Card\")\ndeftype(\"Party\", components=[\"Label\", \"Known\"])\n",
                 defs: "Card(\"Ace\")\nParty(\"Side\")\n" +
-                      "@view_policy\ndef may_see(viewer, entity, component):\n" +
-                      "    if component == Tricks or component == Moods:\n" +
-                      "        return entity == viewer\n" +
+                      "def own(viewer, entity):\n    return entity == viewer\n" +
+                      "@view_rule(Tricks)\ndef tricks(viewer, entity):\n    return own(viewer, entity)\n" +
+                      "@view_rule(Moods)\ndef moods(viewer, entity):\n    return own(viewer, entity)\n" +
+                      "@view_rule(Party)\ndef ghost(viewer, entity):\n" +
                       "    return entity.Label.name != \"ghost\"\n");
             var w = new World(LoadClean());
             EntityId P(string conn)
@@ -565,9 +565,9 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
-        public void WithoutAViewPolicyEverythingIsSeen()
+        public void WithoutViewRulesEverythingIsSeen()
         {
-            NewWorld(Defs.Replace("@view_policy\n", ""));
+            NewWorld(Defs.Replace(Policies, ""));
             var b = _w.ViewAs("B");
             Assert.That(((IntValue)b.Get(_a, M("Hand", "cards"))).Value, Is.EqualTo(3));
             Assert.That(b.All("Unit"), Is.EqualTo(new[] { _scout }));
@@ -575,13 +575,12 @@ namespace Kesa.Engine.Tests.Runtime
 
         // ---- 닫는 쪽 (G203) ----
 
-        [TestCase("    return 1\n", "it must return True or False, not int; treated as not seen")]
+        [TestCase("    return 1\n", "it must return True, False or None, not int; treated as not seen")]
         // 없는 컴포넌트(entity.Nope)는 이제 로드 때 잡히므로(G308의 매개변수 타입) 실행 중 실패는 다른 것으로 낸다
         [TestCase("    return [True][3]\n", "treated as not seen")]
         public void ABrokenPolicyHidesAndLeavesADiagnostic(string body, string expected)
         {
-            NewWorld(Defs.Replace(Policies, Policies.Substring(0, Policies.IndexOf("@view_policy")) +
-                                            "@view_policy\ndef may_see(viewer, entity, component):\n" + body));
+            NewWorld(Defs.Replace(Policies, Policies + "@view_rule(Party)\ndef broken(viewer, entity):\n" + body));
             var b = _w.ViewAs("B");
             Assert.That(b.All("Party"), Is.Empty);
             Assert.That(b.Diagnostics.Select(d => d.Code), Has.All.EqualTo(Codes.RunViewPolicy));
@@ -598,19 +597,19 @@ namespace Kesa.Engine.Tests.Runtime
             return diags.ToList();
         }
 
-        [TestCase("@view_policy\ndef may_see(viewer, entity):\n    return True\n",
-            "CMD006 a view policy takes exactly three parameters without defaults: (viewer, entity, component)")]
-        [TestCase("@view_policy\ndef may_see(viewer, entity, component=None):\n    return True\n",
-            "CMD006 a view policy takes exactly three parameters without defaults: (viewer, entity, component)")]
-        [TestCase("@view_policy\ndef a(i, e, c):\n    return True\n@view_policy\ndef b(i, e, c):\n    return True\n",
-            "CMD006 a mod can declare only one view policy")]
-        [TestCase("@view_policy(override=True)\ndef a(i, e, c):\n    return True\n",
-            "CMD006 override=True but there is no view policy to replace")]
-        [TestCase("@view_policy\ndef a(i, e, c):\n    e.Hand.cards = 1\n    return True\n",
-            "CMD004 the view policy 'a' changes the world; it can only read")]
-        [TestCase("@view_policy(sneaky=True)\ndef a(i, e, c):\n    return True\n",
-            "CMD001 @view_policy has no argument 'sneaky'")]
-        public void PolicyDeclarationsAreChecked(string defs, string expected)
+        [TestCase("@view_rule(Hand)\ndef a(viewer, entity, component):\n    return True\n",
+            "CMD006 a view rule takes exactly two parameters without defaults: (viewer, entity)")]
+        [TestCase("@view_rule(Hand)\ndef a(viewer, entity=None):\n    return True\n",
+            "CMD006 a view rule takes exactly two parameters without defaults: (viewer, entity)")]
+        [TestCase("@view_rule(Hand)\ndef a(v, e):\n    return True\n@view_rule(Hand)\ndef b(v, e):\n    return True\n",
+            "CMD006 a mod can put only one view rule on 'Hand'")]
+        [TestCase("@view_rule(Hand)\ndef a(v, e):\n    e.Hand.cards = 1\n    return True\n",
+            "CMD004 the view rule 'a' changes the world; it can only read")]
+        [TestCase("@view_rule(Hand, sneaky=True)\ndef a(v, e):\n    return True\n",
+            "CMD001 @view_rule has no argument 'sneaky'")]
+        [TestCase("@view_policy\ndef may_see(viewer, entity, component):\n    return True\n",
+            "CMD006 @view_policy was replaced by view rules: each rule names the component or Def type it decides")]
+        public void ViewRuleDeclarationsAreChecked(string defs, string expected)
         {
             var diags = Diags(defs);
             Assert.That(diags.Select(d => d.Code + " " + d.Message), Has.Some.EqualTo(expected),
@@ -618,24 +617,25 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
-        public void TheViewPolicyIsInTheResult()
+        public void TheViewRulesAreInTheResult()
         {
             Mod("banking", schema: Schema, defs: Defs);
             var loaded = LoadClean();
-            Assert.That(loaded.ViewPolicy!.Function.Name, Is.EqualTo("may_see"));
-            Assert.That(loaded.ViewPolicy.Function.IsViewPolicy, Is.True);
-            Assert.That(loaded.ViewPolicy.Function.IsCommand, Is.False);
-            Assert.That(loaded.Commands.Keys, Has.None.EqualTo("banking.may_see"));
+            Assert.That(loaded.ViewRules.Select(r => r.Function.Name + " " + r.Target + " " + r.IsComponent),
+                Is.EqualTo(new[] { "own_hand Hand True", "fog Unit False" }));
+            Assert.That(loaded.ViewRules[0].Function.IsViewRule, Is.True);
+            Assert.That(loaded.ViewRules[0].Function.IsCommand, Is.False);
+            Assert.That(loaded.Commands.Keys, Has.None.EqualTo("banking.own_hand"));
         }
 
         [Test]
-        public void TheHostCanRequireAViewPolicy()
+        public void TheHostCanRequireViewRules()
         {
             Mod("banking", schema: Schema, defs: "Party(\"Side\")\n");
-            var none = Assert.Throws<WorldException>(() => new World(LoadClean(), requireViewPolicy: true))!;
+            var none = Assert.Throws<WorldException>(() => new World(LoadClean(), requireViewRules: true))!;
             Assert.That(none.Code, Is.EqualTo(Codes.RunNoViewPolicy));
-            Assert.That(none.Message, Is.EqualTo("the host requires a view policy, but no active mod declares one"));
-            Assert.That(none.Hint, Does.Contain("may_see(viewer, entity, component)"));
+            Assert.That(none.Message, Is.EqualTo("the host requires view rules, but no active mod declares one"));
+            Assert.That(none.Hint, Does.Contain("@view_rule(Hand)"));
 
             NewWorld(requireView: true); // 있으면 된다 (입구 정책은 없어졌다, G237)
         }
@@ -671,7 +671,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void ABrokenPolicyNamesTheViewerInItsDiagnostic()
         {
-            NewWorld(Defs.Replace(Policies, "@view_policy\ndef may_see(viewer, entity, component):\n    return viewer.Hand.cards > 0\n"));
+            NewWorld(Defs.Replace(Policies, "@view_rule(Party)\ndef cards(viewer, entity):\n    return viewer.Hand.cards > 0\n"));
             var c = _w.ViewAs("C");
             Assert.That(c.All("Party"), Is.Empty);
             Assert.That(c.Diagnostics.Select(d => d.Message), Has.Some.Contains("seen by a spectator"));

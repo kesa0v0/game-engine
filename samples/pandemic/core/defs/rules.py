@@ -96,11 +96,9 @@ def eradicate(d: Ref[Disease]):
 
 # 덱은 뒷면이다: 뽑을 더미의 카드는 어느 도시인지(Face)를 아무도 못 본다. 버린 카드와 손패는 앞면이라 모두 본다.
 # 규칙(커맨드·derived)은 실제 상태를 다 읽고, 걸러지는 것은 화면과 AI가 받는 쪽뿐이다.
-@view_policy
-def may_see(viewer, entity, component):
-    if component == Face:
-        return entity.Card.pile != 0
-    return True
+@view_rule(Face)
+def face_down(viewer, entity):
+    return entity.Card.pile != 0
 
 # ---- 감염 덱 ----
 

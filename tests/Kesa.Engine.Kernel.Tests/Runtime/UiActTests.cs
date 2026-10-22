@@ -24,7 +24,8 @@ namespace Kesa.Engine.Tests.Runtime
         private const string Defs =
             "Party(\"Red\")\nUnit(\"Soldier\")\nUnit(\"Ghost\", Cloak=Cloak(on=True))\n" +
             // 망토를 두른 유닛은 아무에게도 안 보인다
-            "@view_policy\ndef may_see(viewer, entity, component):\n    return not entity.Cloak.on\n" +
+            "@view_rule(Party)\ndef cloaked_party(viewer, entity):\n    return not entity.Cloak.on\n" +
+            "@view_rule(Unit)\ndef cloaked_unit(viewer, entity):\n    return not entity.Cloak.on\n" +
             "@ui_action\ndef grow(u: Ref[Unit]):\n    ui.Selection.group += [u]\n" +
             "@command(free=True, acts_for=None)\ndef Hide(target: Ref[Unit]):\n    target.Cloak.on = True\n" +
             // 회색 버튼: 먼저 골라야 누를 수 있고, 고른 유닛은 대상 후보에서 빠진다

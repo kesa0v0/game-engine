@@ -260,7 +260,7 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, int stepBudget = DefaultStepBudget,
             int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
-            int maxSettleRounds = DefaultMaxSettleRounds, bool requireViewPolicy = false, bool dropRemoved = false,
+            int maxSettleRounds = DefaultMaxSettleRounds, bool requireViewRules = false, bool dropRemoved = false,
             bool cancelBrokenFlows = false, int actionStepBudget = DefaultActionStepBudget)
         {
             var diagnostics = new List<Diagnostic>();
@@ -268,7 +268,7 @@ namespace Kesa.Engine.Runtime
             try
             {
                 world = new World(loaded, stepBudget, maxSignalDepth, maxAdvancePerCall, maxSettleRounds,
-                    requireViewPolicy: requireViewPolicy, actionStepBudget: actionStepBudget);
+                    requireViewRules: requireViewRules, actionStepBudget: actionStepBudget);
             }
             catch (WorldException e)
             {
