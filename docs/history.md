@@ -1144,3 +1144,10 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
   - 스텁 `view_rule(target)`.
 - **옮긴 것:** 테스트 정책 11곳을 규칙으로(대개 `@view_rule(Unit)`의 안개, `@view_rule(Hand)`의 손패), `SchemaNameValueTests`의 컴포넌트 비교는 기여 줄 `c.component`로, 옛 정책 교체 테스트 6개 지움. 샘플 harbor·pandemic 코어, 안내서 7장(겹치는 규칙 절 더함), spine-spec 두 곳.
 - **테스트:** 새 `ViewRuleTests` 19개(대상만 정함, 확장이 제 컴포넌트 숨기기, 뒤 규칙이 보이게 하고 `None`으로 맡김, 모두 `None`이면 보임, 안개·탐지·은신 세 층, 순서 없는 충돌, 다른 대상은 괜찮음, `loadAfter`면 됨, 대상 오류 7가지, 철자 제안, 안 보이는 모드, override 힌트, 로직에서 규칙 함수 부르기). 모두 2479개 통과.
+
+### 2026-10-25: 판데믹 brink의 변종 에픽 카드 (효과를 카드에 붙여 덱에 숨김)
+
+- **규칙서 대조(On the Brink 공식 규칙서 PDF, Z-Man 2024판):** 일반 에픽 카드 대신 변종 에픽 카드 여덟 장을 뒤집어 섞고 필요한 수만 쓴다. 카드마다 효과가 하나이고 변종에만 닿는다. 지속 효과(Chronic Effect·Complex Molecular Structure·Government Interference·Rate Effect·Slippery Slope)는 "에픽을 마친 뒤부터", 즉시 효과(Hidden Pocket·Unacceptable Loss·Uncounted Populations)는 "이 카드의 Intensify 단계 전에". 남은 넷의 문구: Government Interference "변종 큐브가 있는 도시를 떠나려면 그 차례에 먼저 그 도시의 변종 큐브를 하나 이상 Treat해야 한다", Rate Effect "감염 단계에서 뽑은 카드 중 변종 도시가 하나라도 있으면(변종이 박멸 전이면) 감염 속도보다 한 장 더 뽑는다", Hidden Pocket "변종이 박멸됐고 감염 버린 더미에 변종 카드가 하나라도 있으면 박멸을 되돌리고 그 카드들의 도시마다 큐브 하나", Unacceptable Loss "변종 큐브 4개를 공급에서 상자로(4개 미만이면 모두)".
+- **샘플:** brink `schema/virulent.py`에 데이터 Def 타입 `StrainEffect`와 컴포넌트 `StrainCard(effect, done)`. `defs/virulent.py`: 효과 Def 넷(지속 셋과 즉시 Uncounted Populations), `@wrap(pandemic.seed_epidemics)`가 코어가 만든 에픽 카드마다 서로 다른 효과를 `random.sample`로 골라 `attach`, `@view_rule(StrainCard)`는 코어의 `Face`와 같이 덮인 동안 숨김. `@wrap(pandemic.intensify)`가 앞에서 즉시 효과를 치르고 뒤에서 `done`을 켬(지금 치르는 카드 = 버린 더미에서 아직 안 마친 것). 지속 효과 셋은 `strain_has(질병, 효과)`(변종이고 그 효과 카드가 `done`)일 때만. 번역 en·ko에 효과 이름.
+- **인계 메모와 달라진 것:** 즉시 효과 자리를 `epidemic_infect` 감싸기 끝이 아니라 `intensify` 감싸기의 앞으로 함. 규칙서 문구가 "Intensify 전"이고 지속 효과를 켜는 "에픽을 마친 뒤"가 같은 감싸기의 뒤라서. 코어 변경 없음, 새 엔진 구멍 없음.
+- **테스트:** `BrinkTests` 4개 더(에픽 카드마다 다른 효과가 숨겨져 붙음, 효과 카드를 안 뽑았으면 꺼짐, 지속 효과는 그 에픽의 Infect 단계에는 안 닿고 같은 차례 감염 단계부터, Uncounted Populations). 옛 효과 테스트는 `InEffect`로 효과를 켜게 고침. `in_effect`의 `done` 검사를 빼면 새 테스트 둘이 실패함을 확인.

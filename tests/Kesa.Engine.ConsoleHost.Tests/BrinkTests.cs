@@ -91,6 +91,21 @@ namespace Kesa.Engine.ConsoleHost.Tests
         private long Outbreaks() => ((IntValue)_w.Get(Game(), _w.Member("Match", "outbreaks"))).Value;
         private EntityId Disease(string id) => _w.All("Disease").Single(e => _w.DefOf(e) == id);
 
+        private IEnumerable<EntityId> EpidemicCards() =>
+            _w.All("PlayerCard").Where(c => ((BoolValue)_w.Get(c, _w.Member("Face", "epidemic"))).Value);
+
+        private string EffectOf(EntityId card) => ((StrValue)_w.Get(card, _w.Member("StrainCard", "effect"))).Value;
+
+        private bool Done(EntityId card) => ((BoolValue)_w.Get(card, _w.Member("StrainCard", "done"))).Value;
+
+        /// <summary>아직 마치지 않은 에픽 카드 하나에 이 효과를 붙이고 마친 것으로 둔다: 그 지속 효과가 켜진 판.</summary>
+        private void InEffect(string effect)
+        {
+            var card = EpidemicCards().First(c => !Done(c));
+            _w.Set(card, _w.Member("StrainCard", "effect"), new StrValue("brink:" + effect));
+            _w.Set(card, _w.Member("StrainCard", "done"), BoolValue.True);
+        }
+
         private void ClearCubes()
         {
             foreach (var city in _w.All("City"))
@@ -115,6 +130,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
             // 폭발 6에서 변종(파랑)이 터지면 8: 그 자리에서 지고 둘째 카드는 뽑지 않는다 (코어의 "여덟째 폭발" 시험과 같은 판)
             ClearCubes();
             _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            InEffect("SlipperySlope");
             _w.Set(Game(), _w.Member("Match", "outbreaks"), new IntValue(6));
             _w.SetRow(City("pandemic:Atlanta"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(3));
             DrawOnly("pandemic:Atlanta", "pandemic:SaoPaulo");
@@ -134,6 +150,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
             // 변종(파랑)은 빈 도시에 두 개, 이미 있는 도시에는 하나. 변종이 아닌 노랑은 빈 도시에도 하나
             ClearCubes();
             _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            InEffect("ChronicEffect");
             _w.SetRow(City("pandemic:Chicago"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(1));
             DrawOnly("pandemic:Atlanta", "pandemic:Chicago");
             Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
@@ -152,6 +169,8 @@ namespace Kesa.Engine.ConsoleHost.Tests
             // Chronic Effect는 폭발에 닿지 않는다(규칙서 카드 문구): 빈 이웃에도 하나, 큐브가 있던 이웃에도 하나
             ClearCubes();
             _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            InEffect("ChronicEffect");
+            InEffect("SlipperySlope");
             _w.SetRow(City("pandemic:Atlanta"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(3));
             _w.SetRow(City("pandemic:Chicago"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(1));
             DrawOnly("pandemic:Atlanta", "pandemic:Lima");
@@ -164,8 +183,9 @@ namespace Kesa.Engine.ConsoleHost.Tests
 
         private bool IsVirulent(string disease) => ((BoolValue)_w.Get(Disease(disease), _w.Member("Virulent", "on"))).Value;
 
-        /// <summary>감염 덱을 모두 뽑을 더미에 두고, <paramref name="bottom"/>을 맨 밑, <paramref name="top"/>을 맨 위에 놓는다. 플레이어 덱 맨 위는 에픽.</summary>
-        private void EpidemicNext(string bottom, string top)
+        /// <summary>감염 덱을 모두 뽑을 더미에 두고, <paramref name="bottom"/>을 맨 밑, <paramref name="top"/>을 맨 위에 놓는다.
+        /// 플레이어 덱 맨 위는 <paramref name="effect"/>가 붙은 에픽.</summary>
+        private EntityId EpidemicNext(string bottom, string top, string effect = "ChronicEffect")
         {
             foreach (var card in _w.All("InfectionCard"))
             {
@@ -176,6 +196,69 @@ namespace Kesa.Engine.ConsoleHost.Tests
             var epidemic = _w.All("PlayerCard").First(c => ((BoolValue)_w.Get(c, _w.Member("Face", "epidemic"))).Value
                 && ((IntValue)_w.Get(c, _w.Member("Card", "pile"))).Value == 0);
             _w.Set(epidemic, _w.Member("Card", "slot"), new IntValue(-100));
+            _w.Set(epidemic, _w.Member("StrainCard", "effect"), new StrValue("brink:" + effect));
+            return epidemic;
+        }
+
+        [Test]
+        public void EachEpidemicCardCarriesADifferentHiddenEffect()
+        {
+            // 규칙서: 변종 에픽 카드를 뒤집어 섞고 필요한 수만 쓴다. 덮인 동안은 효과도 앞면처럼 아무도 못 본다
+            var cards = EpidemicCards().ToList();
+            Assert.That(cards, Has.Count.EqualTo(2));
+            Assert.That(cards.Select(EffectOf).Distinct().Count(), Is.EqualTo(2));
+            Assert.That(_w.All("PlayerCard").Except(cards).Any(c => _w.Has(c, "StrainCard")), Is.False, "city cards have no effect");
+            foreach (var card in cards)
+            {
+                Assert.That(Done(card), Is.False);
+                Assert.That(_w.ViewAs("alice").Sees(card, "StrainCard"), Is.False);
+            }
+        }
+
+        [Test]
+        public void TheEffectsAreOffUntilTheirCardIsDrawn()
+        {
+            // 변종이 정해져도 그 효과 카드를 아직 안 뽑았으면 빈 도시에 하나, 폭발은 한 칸
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            _w.SetRow(City("pandemic:Atlanta"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(3));
+            DrawOnly("pandemic:Atlanta", "pandemic:Montreal");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(CubeCount("pandemic:Montreal", "pandemic:Blue"), Is.EqualTo(1));
+            Assert.That(Outbreaks(), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AContinuingEffectStartsWhenItsEpidemicIsDone()
+        {
+            // 규칙서: 지속 효과는 에픽을 마친 뒤부터. 에픽의 Infect 단계가 Atlanta(파랑 2)를 채워 터진 것은 한 칸,
+            // 같은 차례의 감염 단계에서 맨 위로 온 Atlanta가 다시 터진 것은 Slippery Slope로 두 칸
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            _w.SetRow(City("pandemic:Atlanta"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(2));
+            var card = EpidemicNext("pandemic:Atlanta", "pandemic:Lima", "SlipperySlope");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(Outbreaks(), Is.EqualTo(3));
+            Assert.That(Done(card), Is.True);
+            Assert.That(_w.ViewAs("bob").Sees(card, "StrainCard"), Is.True, "a drawn card is face up as a reminder");
+        }
+
+        [Test]
+        public void UncountedPopulationsAddsACubeWhereThereIsExactlyOne()
+        {
+            // 규칙서: 이 카드의 Intensify 전에 변종 큐브가 꼭 하나인 도시마다 하나 더. 둘인 도시와 다른 색은 그대로
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            _w.SetRow(City("pandemic:Chicago"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(1));
+            _w.SetRow(City("pandemic:Montreal"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(2));
+            _w.SetRow(City("pandemic:Atlanta"), _w.Member("Cubes", "count"), "pandemic:Yellow", new IntValue(1));
+            var card = EpidemicNext("pandemic:Bogota", "pandemic:SanFrancisco", "UncountedPopulations");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(CubeCount("pandemic:Chicago", "pandemic:Blue"), Is.EqualTo(2));
+            Assert.That(CubeCount("pandemic:Montreal", "pandemic:Blue"), Is.EqualTo(2));
+            Assert.That(CubeCount("pandemic:Atlanta", "pandemic:Yellow"), Is.EqualTo(1));
+            Assert.That(CubeCount("pandemic:SanFrancisco", "pandemic:Blue"), Is.EqualTo(1), "the infection after the epidemic is not doubled");
+            Assert.That(Done(card), Is.True);
         }
 
         [Test]
@@ -234,6 +317,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             // 코어의 cure_cost를 brink가 감싼다: 변종(파랑)은 여섯 장, 다른 질병은 그대로 다섯 장
             _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            InEffect("ComplexMolecularStructure");
             _w.Set(City("pandemic:Atlanta"), _w.Member("Research", "station"), BoolValue.True);
             string[] blue = { "pandemic:Atlanta", "pandemic:Chicago", "pandemic:Montreal", "pandemic:NewYork", "pandemic:Washington" };
             string[] yellow = { "pandemic:LosAngeles", "pandemic:MexicoCity", "pandemic:Miami", "pandemic:Bogota", "pandemic:Lima" };
