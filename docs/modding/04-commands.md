@@ -25,6 +25,7 @@ def Buy(house: Ref[House], kind: str):
 - `acts_for`: 이 커맨드가 **누구로서** 행동하는지. 매개변수 이름을 받는 람다다(`lambda house: house`, `lambda unit: unit.Owner.party`).
   엔진은 그 엔티티에 앉은 연결만 이 커맨드를 내게 한다(7장). `acts_for=None`은 "아무나"이고 `free` 커맨드에만 쓸 수 있다.
 - 로직 함수는 커맨드를 부를 수 없다(`CMD004`). 커맨드는 밖에서 들어오는 입력이다.
+- 다른 모드의 커맨드에 조건이나 효과를 더하려면 그 커맨드를 감싼다(`@wrap(pandemic.Move)`, 3장 "커맨드 감싸기").
 
 ## 사전 조건 `with preconditions:`
 
