@@ -1151,3 +1151,10 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **샘플:** brink `schema/virulent.py`에 데이터 Def 타입 `StrainEffect`와 컴포넌트 `StrainCard(effect, done)`. `defs/virulent.py`: 효과 Def 넷(지속 셋과 즉시 Uncounted Populations), `@wrap(pandemic.seed_epidemics)`가 코어가 만든 에픽 카드마다 서로 다른 효과를 `random.sample`로 골라 `attach`, `@view_rule(StrainCard)`는 코어의 `Face`와 같이 덮인 동안 숨김. `@wrap(pandemic.intensify)`가 앞에서 즉시 효과를 치르고 뒤에서 `done`을 켬(지금 치르는 카드 = 버린 더미에서 아직 안 마친 것). 지속 효과 셋은 `strain_has(질병, 효과)`(변종이고 그 효과 카드가 `done`)일 때만. 번역 en·ko에 효과 이름.
 - **인계 메모와 달라진 것:** 즉시 효과 자리를 `epidemic_infect` 감싸기 끝이 아니라 `intensify` 감싸기의 앞으로 함. 규칙서 문구가 "Intensify 전"이고 지속 효과를 켜는 "에픽을 마친 뒤"가 같은 감싸기의 뒤라서. 코어 변경 없음, 새 엔진 구멍 없음.
 - **테스트:** `BrinkTests` 4개 더(에픽 카드마다 다른 효과가 숨겨져 붙음, 효과 카드를 안 뽑았으면 꺼짐, 지속 효과는 그 에픽의 Infect 단계에는 안 닿고 같은 차례 감염 단계부터, Uncounted Populations). 옛 효과 테스트는 `InEffect`로 효과를 켜게 고침. `in_effect`의 `done` 검사를 빼면 새 테스트 둘이 실패함을 확인.
+
+### 2026-10-25: 판데믹 brink의 Rate Effect
+
+- **규칙서:** 감염 단계에서 뽑은 카드 중 변종 도시가 하나라도 있으면(변종이 박멸 전이면) 감염 속도보다 한 장 더 뽑는다. 덧뽑은 장은 한 장뿐.
+- **걸린 곳:** 뽑은 카드는 코어 `infect`의 지역 변수에만 있어 감싸는 쪽이 "변종 카드가 나왔나"를 모른다. 사용자와 고른 것: brink가 두 곳을 감싸고 본 것을 엔티티에 적음(코어 변경 없음). 뽑을 장수를 코어 함수로 빼는 길은 "코어가 미리 열어 둔다" 관례 논의로 미룸. 감염 단계 전후의 덱 비교는 덱이 다시 섞이면 틀려서 버림.
+- **샘플:** brink 스키마에 `RateWatch(seen)`을 `Game`에 `extend`. `@wrap(pandemic.infect_city) rate_watch`가 변종 도시 감염 때 `seen`, `@wrap(pandemic.infect) rate_effect`가 표시를 지우고 원래 단계를 부른 뒤, 봤고·안 졌고·박멸 전이고·효과가 켜졌으면 한 장 더 뽑아 `pandemic.infect_city`(다른 감싸기도 거침). 한 모드가 같은 함수를 두 번 감싸도 됨(정의 순서대로 겹침).
+- **테스트:** `BrinkTests` 3개 더(변종 도시 뒤 한 장만 더, 변종 도시 없으면 그대로, 박멸 뒤에는 그대로). 모두 2486개 통과.

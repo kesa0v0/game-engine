@@ -2,6 +2,7 @@
 StrainEffect("ChronicEffect")              # 지속
 StrainEffect("ComplexMolecularStructure")  # 지속
 StrainEffect("SlipperySlope")              # 지속
+StrainEffect("RateEffect")                 # 지속
 StrainEffect("UncountedPopulations")       # 즉시
 
 def strain():
@@ -102,3 +103,23 @@ def chronic(original, city):
 def slippery(city):
     if strain_has(city.City.disease, defid("SlipperySlope")):
         pandemic.game().Match.outbreaks += 1
+
+# Rate Effect: 감염 단계에서 뽑은 카드 중 변종 도시가 하나라도 있으면(변종이 박멸 전이면) 감염 속도보다 한 장 더 뽑는다.
+# 덧뽑은 장은 한 장뿐이다. 뽑은 카드는 코어의 감염 단계 안에만 있으므로, 카드 한 장의 감염을 감싸 변종 도시를 봤다고 적어 둔다
+@wrap(pandemic.infect_city)
+def rate_watch(original, city):
+    if pandemic.disease_of(city.City.disease).Virulent.on:
+        pandemic.game().RateWatch.seen = True
+    original(city)
+
+# 감염 단계를 마친 뒤 한 장 더. 그 장도 감염이라 infect_city를 거친다(Chronic Effect 등이 닿는다)
+@wrap(pandemic.infect)
+def rate_effect(original, g):
+    g.RateWatch.seen = False
+    original(g)
+    s = strain()
+    if g.RateWatch.seen and not g.Match.lost and not s.Status.eradicated and strain_has(s.defid, defid("RateEffect")):
+        for c in query(City):
+            c.Chain.broke = False
+        card = pandemic.draw_infection()
+        pandemic.infect_city(card.Face.city)

@@ -244,6 +244,47 @@ namespace Kesa.Engine.ConsoleHost.Tests
         }
 
         [Test]
+        public void RateEffectDrawsOneMoreCardAfterAStrainCity()
+        {
+            // 감염 속도 2: Atlanta(변종 파랑)를 뽑았으니 Lima 다음에 한 장 더(Miami). 그 한 장이 노랑이든 아니든 더는 안 뽑는다
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            InEffect("RateEffect");
+            DrawOnly("pandemic:Atlanta", "pandemic:Lima", "pandemic:Miami", "pandemic:Chicago");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(CubeCount("pandemic:Atlanta", "pandemic:Blue"), Is.EqualTo(1));
+            Assert.That(CubeCount("pandemic:Lima", "pandemic:Yellow"), Is.EqualTo(1));
+            Assert.That(CubeCount("pandemic:Miami", "pandemic:Yellow"), Is.EqualTo(1));
+            Assert.That(CubeCount("pandemic:Chicago", "pandemic:Blue"), Is.EqualTo(0), "only one extra card");
+        }
+
+        [Test]
+        public void RateEffectDrawsNothingMoreWithoutAStrainCity()
+        {
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            InEffect("RateEffect");
+            DrawOnly("pandemic:Lima", "pandemic:Miami", "pandemic:Atlanta");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(CubeCount("pandemic:Atlanta", "pandemic:Blue"), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void RateEffectStopsOnceTheStrainIsEradicated()
+        {
+            // 규칙서: 변종이 박멸 전일 때만. 박멸된 파랑의 Atlanta를 뽑아도 한 장 더 뽑지 않는다
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Status", "cured"), BoolValue.True);
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Status", "eradicated"), BoolValue.True);
+            InEffect("RateEffect");
+            DrawOnly("pandemic:Atlanta", "pandemic:Lima", "pandemic:Miami");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(CubeCount("pandemic:Lima", "pandemic:Yellow"), Is.EqualTo(1));
+            Assert.That(CubeCount("pandemic:Miami", "pandemic:Yellow"), Is.EqualTo(0));
+        }
+
+        [Test]
         public void UncountedPopulationsAddsACubeWhereThereIsExactlyOne()
         {
             // 규칙서: 이 카드의 Intensify 전에 변종 큐브가 꼭 하나인 도시마다 하나 더. 둘인 도시와 다른 색은 그대로
