@@ -3,6 +3,7 @@ StrainEffect("ChronicEffect")              # 지속
 StrainEffect("ComplexMolecularStructure")  # 지속
 StrainEffect("SlipperySlope")              # 지속
 StrainEffect("RateEffect")                 # 지속
+StrainEffect("GovernmentInterference")     # 지속
 StrainEffect("UncountedPopulations")       # 즉시
 
 def strain():
@@ -123,3 +124,32 @@ def rate_effect(original, g):
             c.Chain.broke = False
         card = pandemic.draw_infection()
         pandemic.infect_city(card.Face.city)
+
+# Government Interference: 변종 큐브가 있는 도시를 떠나려면 그 차례에 먼저 그 도시의 변종 큐브를 하나 이상 Treat해야 한다.
+# 코어의 커맨드를 감싼다 (G316): 떠나는 커맨드에는 조건을 더하고(합법 수에도 보인다), Treat는 마친 뒤에 적어 둔다
+def may_leave(player):
+    s = strain()
+    city = player.At.city
+    if s is None or city is None or city.Cubes[s.defid].count == 0 or not in_effect(defid("GovernmentInterference")):
+        return True
+    return player.Interference.city == city and player.Interference.turn == pandemic.game().Match.turn
+
+@wrap(pandemic.Move)
+def interfere_move(original, player, to):
+    with preconditions:
+        require(may_leave(player), text("brink-treat-first"))
+    original(player, to)
+
+@wrap(pandemic.DirectFlight)
+def interfere_flight(original, player, card):
+    with preconditions:
+        require(may_leave(player), text("brink-treat-first"))
+    original(player, card)
+
+@wrap(pandemic.Treat)
+def note_treat(original, player, disease):
+    city = player.At.city
+    original(player, disease)
+    if pandemic.disease_of(disease).Virulent.on:
+        player.Interference.city = city
+        player.Interference.turn = pandemic.game().Match.turn

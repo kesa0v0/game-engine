@@ -284,6 +284,64 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(CubeCount("pandemic:Miami", "pandemic:Yellow"), Is.EqualTo(0));
         }
 
+        /// <summary>Alice가 Atlanta에 있고 그곳에 변종(파랑) 큐브 둘, Government Interference가 켜진 판.</summary>
+        private void HeldInAtlanta()
+        {
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            InEffect("GovernmentInterference");
+            _w.SetRow(City("pandemic:Atlanta"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(2));
+            _w.Set(_alice, _w.Member("At", "city"), new EntityValue(City("pandemic:Atlanta")));
+        }
+
+        private AnswerResult MoveTo(string city) =>
+            Act("alice", "Move", ("player", new EntityValue(_alice)), ("to", new StrValue(city)));
+
+        private AnswerResult TreatBlue() =>
+            Act("alice", "Treat", ("player", new EntityValue(_alice)), ("disease", new StrValue("pandemic:Blue")));
+
+        [Test]
+        public void GovernmentInterferenceHoldsAPawnUntilItTreats()
+        {
+            // 규칙서: 변종 큐브가 있는 도시를 떠나려면 그 차례에 먼저 그 도시의 변종 큐브를 Treat해야 한다. 코어 커맨드를 감싼 조건이다 (G316)
+            HeldInAtlanta();
+            var refused = MoveTo("pandemic:Chicago");
+            Assert.That(refused.Succeeded, Is.False);
+            Assert.That(refused.Preconditions!.Failures.Single().MessageKey, Is.EqualTo("brink-treat-first"));
+            Assert.That(_w.LegalResponses(_w.OpenRequests.Single().Id, _alice, 100).Moves.Any(m => m.Command == "pandemic.Move"), Is.False,
+                "the legal moves keep the added condition");
+            Assert.That(TreatBlue().Succeeded, Is.True);
+            Assert.That(MoveTo("pandemic:Chicago").Succeeded, Is.True);
+        }
+
+        [Test]
+        public void GovernmentInterferenceAlsoHoldsADirectFlight()
+        {
+            HeldInAtlanta();
+            Hold(_alice, "pandemic:Lima");
+            var flight = Act("alice", "DirectFlight", ("player", new EntityValue(_alice)), ("card", new EntityValue(PlayerCard("pandemic:Lima"))));
+            Assert.That(flight.Succeeded, Is.False);
+            Assert.That(flight.Preconditions!.Failures.Single().MessageKey, Is.EqualTo("brink-treat-first"));
+        }
+
+        [Test]
+        public void ATreatmentOnlyCountsForItsTurn()
+        {
+            HeldInAtlanta();
+            Assert.That(TreatBlue().Succeeded, Is.True);
+            _w.Set(Game(), _w.Member("Match", "turn"), new IntValue(2));
+            Assert.That(MoveTo("pandemic:Chicago").Succeeded, Is.False, "treated on an earlier turn");
+        }
+
+        [Test]
+        public void GovernmentInterferenceIgnoresOtherDiseasesAndCleanCities()
+        {
+            HeldInAtlanta();
+            _w.SetRow(City("pandemic:Atlanta"), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(0));
+            _w.SetRow(City("pandemic:Atlanta"), _w.Member("Cubes", "count"), "pandemic:Yellow", new IntValue(2));
+            Assert.That(MoveTo("pandemic:Chicago").Succeeded, Is.True);
+        }
+
         [Test]
         public void UncountedPopulationsAddsACubeWhereThereIsExactlyOne()
         {

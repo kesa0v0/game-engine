@@ -10,3 +10,7 @@ component("StrainCard", effect=field(DefId["StrainEffect"]), done=field(bool, de
 # Rate Effect가 보는 것: 이번 감염 단계에서 변종 도시 카드를 뽑았나. 뽑은 카드는 코어의 감염 단계 안에만 있어서 여기에 적어 둔다
 component("RateWatch", seen=field(bool, default=False))
 extend("Game", components=["RateWatch"])
+
+# Government Interference가 보는 것: 플레이어가 변종 큐브를 마지막으로 Treat한 도시와 그 차례 번호
+component("Interference", city=ref("City", optional=True), turn=field(int, default=0))
+extend("Player", components=["Interference"])

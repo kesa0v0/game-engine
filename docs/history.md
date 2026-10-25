@@ -1167,4 +1167,11 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
   - 검사: `FunctionChecker`가 `@wrap`에도 사전 조건 블록을 열고 `choose`·`cost`는 `CMD002`. `WrapCheck`가 커맨드 대상을 받아 `CommandWrap`(UI 상태 `CMD007`, `original`을 담기·식 안 호출 금지, 호출 인자는 매개변수 이름 그대로 `CMD001`), 함수 대상인데 사전 조건 블록이 있으면 `CMD002`. 통과하면 `FunctionValue.WrapsCommand`(`RunsAsCommand`).
   - 실행: `Session.Command`가 원래 커맨드의 블록을 평가한 뒤 감싸기마다(안쪽부터) 프레임을 만들어 첫 인자로 `InnerFunction(대상, 층, 바로 안쪽의 프레임)`을 주고 블록을 평가(앞에서 실패했으면 뒤의 실행 오류는 "평가 안 됨"), 본문은 맨 바깥부터. `original(...)`은 `PushInnerCommand`가 인자를 사전 조건 때 값과 견주고, 미리 검사한 프레임의 사본을 본문부터 쌓으며, 부른 쪽의 안쪽 함수를 `AsUsed()`로 바꿈(두 번째는 실행 오류).
   - 저장: 커맨드 감싸기 프레임은 `"inner"`에 아직 안 부른 안쪽 프레임의 지역 변수(그 안쪽도 이어서, 함수 이름·해시 포함)나 `{"used": true}`. 불러올 때 `RestoreInner`가 지금의 감싸기 순서와 해시를 견주어 되살림. `Relink`는 안쪽 커맨드·감싸기 프레임을 쓰기 모드로.
-- **테스트:** 새 `CommandWrapTests` 19개(조건 더하기, 합법 수, 순서와 모두 보고, 본문 앞뒤, 겹침 순서, 안 부르기, `pass` 커맨드 감싸 쓰기, 사전 조건 지역 변수 유지, 두 번 부르기, 인자 바꾸기, 원래 커맨드 전·안에서 멈춘 채 저장·불러오기, 로드 오류 7가지, 키워드 인자). `WrapTests`의 "커맨드는 못 감쌈" 경우를 "함수 감싸기의 사전 조건 블록"으로 바꿈. 모두 2506개 통과.
+- **테스트:** 새 `CommandWrapTests` 20개(조건 더하기, 합법 수, 순서와 모두 보고, 본문 앞뒤, 겹침 순서, 안 부르기, `pass` 커맨드 감싸 쓰기, 사전 조건 지역 변수 유지, 두 번 부르기, 인자 바꾸기, 원래 커맨드 전·안에서 멈춘 채 저장·불러오기, 로드 오류 7가지, 키워드 인자). `WrapTests`의 "커맨드는 못 감쌈" 경우를 "함수 감싸기의 사전 조건 블록"으로 바꿈. 모두 2506개 통과.
+
+### 2026-10-25: 판데믹 brink의 Government Interference (커맨드 감싸기의 첫 사례)
+
+- **규칙서:** 변종 큐브가 있는 도시를 떠나려면 그 차례에 먼저 그 도시의 변종 큐브를 하나 이상 Treat해야 한다. 코어에서 떠나는 커맨드는 `Move`·`DirectFlight`.
+- **샘플:** brink 스키마에 `Interference(city, turn)`를 `Player`에 `extend`. `@wrap(pandemic.Treat) note_treat`가 원래 커맨드를 마친 뒤 변종이면 도시와 차례 번호를 적고, `@wrap(pandemic.Move)`·`@wrap(pandemic.DirectFlight)`가 `require(may_leave(player), text("brink-treat-first"))`를 더함. 차례 번호로 적어 차례가 바뀌면 저절로 무효(차례 끝 감싸기 불필요). 번역 en·ko.
+- **안내서:** 3장 감싸기 절에 "커맨드 감싸기" 소절(이 코드를 예시로), 관례 문단을 "함수와 커맨드의 경계에서만 끼어든다"로 고침, 앞 예시 `complex_cure`를 지금 코드로.
+- **테스트:** `BrinkTests` 4개 더(Treat 전에는 거절·합법 수에서도 빠짐·Treat 뒤 이동, 직항도 막음, 앞 차례의 Treat는 무효, 다른 질병·빈 도시는 상관없음). 모두 2510개 통과.

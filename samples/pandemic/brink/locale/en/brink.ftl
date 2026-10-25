@@ -5,3 +5,5 @@ def-brink-ComplexMolecularStructure = Complex Molecular Structure
 def-brink-SlipperySlope = Slippery Slope
 def-brink-UncountedPopulations = Uncounted Populations
 def-brink-RateEffect = Rate Effect
+def-brink-GovernmentInterference = Government Interference
+brink-treat-first = Treat at least one cube of the virulent strain here before leaving.

@@ -78,7 +78,7 @@ f-문자열, `**`·비트 연산, 연쇄 비교(`0 < x < 5`는 `0 < x and x < 5`
 # 변종의 치료제는 같은 색 카드가 한 장 더 든다
 @wrap(pandemic.cure_cost)
 def complex_cure(original, player, disease):
-    return original(player, disease) + (1 if pandemic.disease_of(disease).Virulent.on else 0)
+    return original(player, disease) + (1 if strain_has(disease, defid("ComplexMolecularStructure")) else 0)
 ```
 
 - 감싼 뒤에는 그 함수를 부르는 **모든 자리**가 감싼 것을 부른다: 코어 자신의 호출, `derived`·Def 칸에 걸어 둔 함수도.
@@ -87,12 +87,43 @@ def complex_cure(original, player, disease):
   담기·넘기기·돌려주기는 로드 오류다. 나머지 매개변수는 대상과 이름·개수가 같아야 한다.
 - 여러 모드가 같은 함수를 감싸면 로드 순서대로 겹친다(나중 것이 바깥).
 - 감싸는 함수는 대상보다 더 많은 일을 할 수 없다: 순수 함수를 감싸며 쓰거나 난수를 뽑으면 로드 오류다.
-- 감쌀 수 있는 것은 `def`로 만든 보통 함수뿐이다. 커맨드·핸들러·반응·정책·호스트 함수·상수는 안 된다. 감싸는 함수 자체는
+- 감쌀 수 있는 것은 `def`로 만든 보통 함수와 커맨드(아래)다. 핸들러·반응·정책·호스트 함수·상수는 안 된다. 감싸는 함수 자체는
   로직에서 부를 수 없다. 안에서 대상을 이름으로 다시 부르면(`pandemic.cure_cost(...)`) 재귀 오류다.
-- **코어를 쓰는 쪽의 관례:** 확장이 바꿀 만한 규칙 계산(비용, 개수, 판정)은 커맨드 본문에 바로 적지 말고 함수로 빼 둔다.
-  함수로 빠진 것만 감쌀 수 있다. 감싸기는 코어가 나눈 단위만큼만 정확하다: 판데믹의 `add_cube`는 감염 카드와 연쇄 폭발이
+- **코어를 쓰는 쪽의 관례:** 감싸기는 함수와 커맨드의 경계에서만 끼어든다. 커맨드 본문 한가운데의 계산(비용, 개수, 판정)을
+  확장이 바꾸게 하려면 함수로 빼 둔다. 감싸기는 코어가 나눈 단위만큼만 정확하다: 판데믹의 `add_cube`는 감염 카드와 연쇄 폭발이
   함께 쓰므로, "감염 카드로 올릴 때만" 바뀌는 효과는 `add_cube`가 아니라 카드 한 장의 감염인 `infect_city`를 감싼다.
   규칙서가 이름 붙인 동작(감염시키기, 폭발 처리하기)마다 함수를 하나씩 두면 확장이 고르기 쉽다.
+
+#### 커맨드 감싸기
+
+커맨드를 감싸면 조건을 더하고 본문 앞뒤에 덧붙일 수 있다. 판데믹 확장의 Government Interference("변종 큐브가 있는 도시를
+떠나려면 그 차례에 먼저 그곳의 변종 큐브를 Treat해야 한다", `samples/pandemic/brink/defs/virulent.py`):
+
+```python
+@wrap(pandemic.Move)
+def interfere_move(original, player, to):
+    with preconditions:
+        require(may_leave(player), text("brink-treat-first"))
+    original(player, to)
+
+@wrap(pandemic.Treat)
+def note_treat(original, player, disease):
+    city = player.At.city
+    original(player, disease)
+    if pandemic.disease_of(disease).Virulent.on:
+        player.Interference.city = city
+        player.Interference.turn = pandemic.game().Match.turn
+```
+
+- 감싸는 쪽의 `with preconditions:`에는 `require`와 `이름 = 식`만 쓴다. 조건을 **더하기만** 하고, 매개변수의 후보(`choose`)와
+  비용(`cost`)은 원래 커맨드의 것이다. 후보를 좁히려면 매개변수를 읽는 `require`를 쓴다. 더한 조건은 거절 이유와 합법 수(AI·UI)에도
+  그대로 쓰인다.
+- 사전 조건은 원래 커맨드의 것부터, 그다음 먼저 로드된 감싸기부터 모두 평가하고 실패한 것을 모두 알려 준다. 본문은 나중에 로드된
+  감싸기부터 돌다 `original(...)`에서 안쪽으로 들어간다.
+- `original(...)`에는 감싸는 함수의 매개변수를 그대로(같은 순서로) 넘긴다. 커맨드는 그 인자로 사전 조건을 검사받았기 때문이다.
+  많아야 한 번 부르고, 부르지 않으면 원래 본문은 돌지 않는다. 원래 본문은 사전 조건에서 계산한 값을 그대로 쓴다.
+- 감싸는 쪽 본문은 커맨드 본문과 같은 일을 할 수 있다(쓰기·난수·`emit`·`ask`). 원래 커맨드가 아무것도 안 해도 된다.
+- 커맨드 id·`acts_for`·`free`는 원래 커맨드의 것이다. 낼 수 있는 쪽을 좁히는 것은 `require`로 한다.
 
 **이름 쓰는 법.** 선언에서 새로 짓는 이름은 문자열이고, 함수 안에서 이미 있는 스키마 이름(Def 타입·컴포넌트·신호)을 가리킬 때는
 따옴표 없는 맨 이름이다. Def id는 어디서나 문자열이다.
