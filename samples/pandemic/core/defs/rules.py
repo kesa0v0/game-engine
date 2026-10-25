@@ -286,13 +286,13 @@ def Start():
         card = draw_infection()
         card.Face.city.Cubes[card.Face.city.City.disease].count = amount
     p = alice
+    begin_turn(g, p)
     while not g.Match.over:
         r = ask(p, "pandemic-turn", responses=["Move", "DirectFlight", "BuildStation", "Treat", "DiscoverCure", "EndTurn"],
             data={"turn": g.Match.turn, "left": p.Actions.left})
         if g.Match.over:
             break
         if r.response == "EndTurn" or p.Actions.left == 0:
-            p.Actions.left = p.Actions.per_turn
             draw_phase(g, p)
             # 손이 넘치면 한도까지 버려야 한다
             while p.Hand.over and not g.Match.over:
@@ -301,6 +301,12 @@ def Start():
                 infect(g)
             p = p.Order.next
             g.Match.turn += 1
+            if not g.Match.over:
+                begin_turn(g, p)
+
+# 플레이어의 차례가 시작될 때: 행동을 채운다. 확장 역할이 "차례를 시작할 때" 능력을 감쌀 수 있게 함수로 둔다 (안내서 3장)
+def begin_turn(g, p):
+    p.Actions.left = p.Actions.per_turn
 
 @command(acts_for=lambda player: player)
 def Move(player: Ref[Player], to: DefId[City]):

@@ -73,6 +73,36 @@ def spy_peeks(viewer, entity):
 - 같은 대상에 규칙을 건 두 모드 사이에 순서(의존이나 `loadAfter`)가 없으면 둘 다 로드 오류다. 어느 쪽을 먼저 물을지 근거가 없기 때문이다.
 - 다른 모드의 결정을 통째로 바꾸려면 `None`을 돌려주지 않으면 된다(옛 `override=True`는 없다).
 
+### 몰래 보기: 누가 아는지를 상태에 적는다
+
+"덱 위 카드를 보고 되돌려 놓는다"처럼 한 번 보는 것은 엔진의 따로 된 기능이 아니다(G322). 카드는 그대로 덮여 있고 달라진
+것은 "그 사람이 안다"는 사실뿐이니, 그 사실을 상태에 적고 보기 규칙이 그것을 본다. 저장·리플레이·핫시트·AI는 그대로 따라온다.
+On the Brink의 트러블슈터(`samples/pandemic/brink`)가 이렇게 한다.
+
+```python
+# 스키마: 아는 플레이어마다 줄 하나 (엔티티 키)
+component("Known", key=Ref["Player"])
+extend("InfectionCard", components=["Known"])
+
+# 차례를 시작할 때 위 카드들을 본다: 카드는 움직이지 않고 본 사람만 적는다
+@wrap(pandemic.begin_turn)
+def troubleshoot(original, g, p):
+    original(g, p)
+    if troubleshooter(p):
+        for c in top_infection(g.Match.rate):
+            if not knows(c, p):
+                add_row(c.Known, p)
+
+# 아는 사람에게는 보이고, 아니면 코어의 규칙에 맡긴다
+@view_rule(Face)
+def troubleshooter_sees(viewer, entity):
+    if viewer is not None and entity.Known is not None and knows(entity, viewer):
+        return True
+    return None
+```
+
+언제 잊는지도 모드가 정한다. 트러블슈터는 카드가 뽑히거나 덱을 다시 섞을 때 그 줄을 지운다. Intensify는 뽑을 더미의 순서를 바꾸지 않으므로 그대로 둔다.
+
 ### 규칙은 다 보고, 화면과 AI만 거른다
 
 커맨드·핸들러·`derived`는 **실제 상태를 다 읽는다.** 거르는 것은 호스트가 연결에게 보여 주는 쪽이다.

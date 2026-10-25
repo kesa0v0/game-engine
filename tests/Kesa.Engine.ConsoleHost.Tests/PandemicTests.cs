@@ -99,7 +99,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
         {
             foreach (var to in new[] { "Chicago", "Atlanta", "Chicago", "Atlanta" })
                 Assert.That(Move("alice", _alice, "pandemic:" + to).Succeeded, Is.True);
-            Assert.That(Left(_alice), Is.EqualTo(4));
+            Assert.That(Left(_alice), Is.EqualTo(0), "actions are filled when a turn begins");
             Assert.That(Move("bob", _bob, "pandemic:Miami").Succeeded, Is.True);
             Assert.That(Left(_bob), Is.EqualTo(3));
         }

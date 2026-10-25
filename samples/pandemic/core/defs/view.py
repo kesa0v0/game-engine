@@ -14,10 +14,30 @@ def map_rows(me):
              "here": [p for p in c.here], "next": c.City.neighbors}
             for c in query(City)]
 
-# 감염 덱: 뽑을 더미는 장수만, 버린 더미는 앞면인 카드의 도시 (뒷면은 Face가 붙지 않은 것으로 읽힌다)
+# 감염 덱: 뽑을 더미는 장수와 이 자리가 아는 위 카드(확장의 역할이 몰래 본 것, 위부터), 버린 더미는 카드의 도시.
+# 뒷면은 Face가 붙지 않은 것으로 읽힌다
 def infection_deck(me):
-    return {"draw": len([c for c in query(InfectionCard) if c.Card.pile == 0]),
-            "discard": [c.Face.city.defid for c in query(InfectionCard) if c.Face is not None]}
+    pile = [c for c in query(InfectionCard) if c.Card.pile == 0]
+    known = []
+    for c in by_slot(pile):
+        if c.Face is None:
+            break
+        known = known + [c.Face.city.defid]
+    return {"draw": len(pile), "known": known,
+            "discard": [c.Face.city.defid for c in query(InfectionCard) if c.Card.pile == 1]}
+
+# 카드들을 자리 순(위부터)으로
+def by_slot(cards):
+    rest = cards
+    out = []
+    while len(rest) > 0:
+        top = rest[0]
+        for c in rest:
+            if c.Card.slot < top.Card.slot:
+                top = c
+        out = out + [top]
+        rest = [c for c in rest if c != top]
+    return out
 
 # 손패는 모두에게 공개다. 플레이어 덱은 장수만 보인다
 def hands(me):

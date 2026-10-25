@@ -82,7 +82,95 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(Actions(_alice, "per_turn"), Is.EqualTo(5));
             Assert.That(Actions(_bob, "per_turn"), Is.EqualTo(4));
             Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(Act("bob", "EndTurn", ("player", new EntityValue(_bob))).Succeeded, Is.True);
             Assert.That(Actions(_alice, "left"), Is.EqualTo(5), "the next turn starts with per_turn actions");
+        }
+
+        // ---- 트러블슈터: 몰래 보기 (G322) ----
+
+        private List<EntityId> InfectionPile() => _w.All("InfectionCard")
+            .Where(c => ((IntValue)_w.Get(c, _w.Member("Card", "pile"))).Value == 0)
+            .OrderBy(c => ((IntValue)_w.Get(c, _w.Member("Card", "slot"))).Value).ToList();
+
+        private void BobTroubleshoots()
+        {
+            foreach (var city in _w.All("City"))
+                foreach (var d in new[] { "pandemic:Blue", "pandemic:Yellow" })
+                    _w.SetRow(city, _w.Member("Cubes", "count"), d, new IntValue(0));
+            _w.AddRow(_bob, "Roles", "brink:Troubleshooter");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+        }
+
+        [Test]
+        public void ATroubleshooterSeesTheTopInfectionCardsWhenTheTurnBegins()
+        {
+            BobTroubleshoots();
+            var pile = InfectionPile();
+            Assert.That(pile, Has.Count.EqualTo(3));
+            Assert.That(_w.ViewAs("bob").Sees(pile[0], "Face"), Is.True);
+            Assert.That(_w.ViewAs("bob").Sees(pile[1], "Face"), Is.True, "as many as the infection rate");
+            Assert.That(_w.ViewAs("bob").Sees(pile[2], "Face"), Is.False);
+            Assert.That(_w.ViewAs("alice").Sees(pile[0], "Face"), Is.False, "only the one who looked knows");
+            Assert.That(_w.ViewAs("watcher").Sees(pile[0], "Face"), Is.False);
+            Assert.That(InfectionPile(), Is.EqualTo(pile), "the cards go back in the same order");
+        }
+
+        [Test]
+        public void TheScreenListsTheKnownTopCardsInOrder()
+        {
+            BobTroubleshoots();
+            var pile = InfectionPile();
+            var items = ((DictValue)_w.ViewAs("bob").Call("pandemic.infection_deck", new EntityValue(_bob)).Value).Items;
+            var known = ((ListValue)items.Single(i => ((StrValue)i.Key).Value == "known").Value).Items.Select(v => ((StrValue)v).Value);
+            Assert.That(known, Is.EqualTo(new[] { FaceCity(pile[0]), FaceCity(pile[1]) }));
+            var discard = ((ListValue)items.Single(i => ((StrValue)i.Key).Value == "discard").Value).Items.Select(v => ((StrValue)v).Value);
+            Assert.That(discard, Does.Not.Contain(FaceCity(pile[0])), "a known card is still in the draw pile");
+        }
+
+        [Test]
+        public void ADrawnCardIsForgotten()
+        {
+            // 뽑힌 카드는 앞면이 되고, Intensify로 돌아오면 섞인 뒤라 모른다: 뽑을 때 지운다
+            BobTroubleshoots();
+            foreach (var card in EpidemicCards()) _w.Set(card, _w.Member("Card", "pile"), new IntValue(1)); // 에픽 없이
+            var seen = InfectionPile().Take(2).ToList();
+            Assert.That(_w.HasRow(seen[0], "Known", _bob), Is.True);
+            Assert.That(Act("bob", "EndTurn", ("player", new EntityValue(_bob))).Succeeded, Is.True);
+            foreach (var card in seen)
+            {
+                Assert.That(((IntValue)_w.Get(card, _w.Member("Card", "pile"))).Value, Is.EqualTo(1), "the infect step drew the known cards");
+                Assert.That(_w.HasRow(card, "Known", _bob), Is.False);
+            }
+        }
+
+        [Test]
+        public void KnownCardsStayKnownThroughIntensify()
+        {
+            // Intensify는 버린 카드를 뽑을 더미 위에 올릴 뿐 그 아래 순서를 바꾸지 않는다: 본 카드는 그대로 안다
+            BobTroubleshoots();
+            var seen = InfectionPile().Take(2).ToList();
+            var epidemic = EpidemicCards().First(c => ((IntValue)_w.Get(c, _w.Member("Card", "pile"))).Value == 0);
+            _w.Set(epidemic, _w.Member("Card", "slot"), new IntValue(-100));
+            Assert.That(Act("bob", "EndTurn", ("player", new EntityValue(_bob))).Succeeded, Is.True);
+            Assert.That(((IntValue)_w.Get(Game(), _w.Member("Match", "epidemics"))).Value, Is.EqualTo(1));
+            foreach (var card in seen)
+            {
+                Assert.That(((IntValue)_w.Get(card, _w.Member("Card", "pile"))).Value, Is.EqualTo(0), "still in the draw pile, under the reshuffled discards");
+                Assert.That(_w.ViewAs("bob").Sees(card, "Face"), Is.True);
+            }
+        }
+
+        [Test]
+        public void ATroubleshooterKeepsTheDirectFlightCard()
+        {
+            BobTroubleshoots();
+            Hold(_bob, "pandemic:Lima");
+            var card = PlayerCard("pandemic:Lima");
+            Assert.That(Act("bob", "DirectFlight", ("player", new EntityValue(_bob)), ("card", new EntityValue(card))).Succeeded, Is.True);
+            Assert.That(((EntityValue)_w.Get(_bob, _w.Member("At", "city"))).Id, Is.EqualTo(City("pandemic:Lima")));
+            Assert.That(((EntityValue)_w.Get(card, _w.Member("Held", "holder"))).Id, Is.EqualTo(_bob), "not discarded");
+            Assert.That(Act("bob", "DirectFlight", ("player", new EntityValue(_bob)), ("card", new EntityValue(card))).Succeeded, Is.False,
+                "flying to the city the pawn is in is still not allowed");
         }
 
         // ---- 변종 바이러스 ----
