@@ -1,6 +1,6 @@
 # 인계 메모: 현재 상태와 다음 할 일
 
-마지막 갱신: 2026-10-25. 브랜치 `spec-v0.5-scaffold`, 테스트 2512개 통과(커널 2328, CLI 42, 콘솔 호스트 93, 번역 49). 모더용 안내서는 `docs/modding/`(G252, 예시 모드 `samples/guide`). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
+마지막 갱신: 2026-10-25. 브랜치 `spec-v0.5-scaffold`, 테스트 2514개 통과(커널 2328, CLI 42, 콘솔 호스트 95, 번역 49). 모더용 안내서는 `docs/modding/`(G252, 예시 모드 `samples/guide`). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
 
 ## 한 줄 요약
 
@@ -37,7 +37,7 @@
 
 ## 다음 할 일 (사용자와 고를 것)
 
-**바로 이어서 할 것 (2026-10-25):** 판데믹 brink의 변종 에픽 카드 첫 판은 끝났다(에픽 카드마다 숨긴 효과, 지속 효과는 그 에픽을 마친 뒤부터, 즉시 효과는 `@wrap(pandemic.intensify)`의 앞, 효과 일곱: Chronic·Complex Molecular·Slippery Slope·Uncounted Populations·Rate Effect·Government Interference·Hidden Pocket; history의 "변종 에픽 카드"·"Rate Effect"·"Government Interference"·"Hidden Pocket"). Government Interference에서 커맨드 감싸기가 필요해 G316~G321로 정하고 구현함(감싸는 쪽 사전 조건은 `require`만 더해지고 합법 수에도, `original(...)`은 낸 인자 그대로 한 번, 안내서 3장). 이로써 "코어가 바뀔 계산을 미리 함수로 빼 둔다" 관례는 커맨드 단위로는 필요 없어졌고 함수 한가운데만 남음(값이 바뀌는 순간의 즉시 반응은 사례가 나오면). 남은 효과 하나(Unacceptable Loss). 규칙서 문구는 history의 "변종 에픽 카드" 절. 그 뒤 사용자와 고를 것: 몰래 보기(G315에서 이어 정하기로 함).
+**바로 이어서 할 것 (2026-10-25):** 판데믹 brink의 변종 바이러스(Virulent Strain)는 규칙서의 여덟 카드를 모두 짰다(에픽 카드마다 숨긴 효과, 지속 효과는 그 에픽을 마친 뒤부터, 즉시 효과는 `@wrap(pandemic.intensify)`의 앞; history의 "변종 에픽 카드"·"Rate Effect"·"Government Interference"·"Hidden Pocket"·"Unacceptable Loss"). Government Interference에서 커맨드 감싸기가 필요해 G316~G321로 정하고 구현함(감싸는 쪽 사전 조건은 `require`만 더해지고 합법 수에도, `original(...)`은 낸 인자 그대로 한 번, 안내서 3장). 이로써 "코어가 바뀔 계산을 미리 함수로 빼 둔다" 관례는 커맨드 단위로는 필요 없어졌고 함수 한가운데만 남음(값이 바뀌는 순간의 즉시 반응은 사례가 나오면). 다음은 사용자와 고를 것: 몰래 보기(한 번 보여 준 사건, G315에서 이어 정하기로 함), 판데믹의 다른 확장 규칙(Mutation 등, 규칙서는 history의 "변종 에픽 카드" 절의 같은 PDF), 아래 "큰 후보".
 
 **끝남 (2026-10-21): 기여 행과 선언 보너스(G294~G302).** 보너스를 손으로 넣는 것(값 기여 행)과 있으면 붙는 것(선언 보너스)을 나눴다. 커널은 선언 보너스(붙은 컴포넌트·키 줄의 키 Def가 선언, `contribs()`가 읽을 때 모음)와 스크립트용 기여 행 넣기·빼기, 이름 있는 효과는 `std.stats`. 표기는 G295(보너스 값 타입 목록인 `const` 칸을 모음). 이름은 G296(`contrib(...)` → `Contrib`). 키 줄은 G297(`key="Medicine"`). 출처는 G298(`source`·`component`·`key`). 스크립트 내장은 G299(`add_contrib`·`remove_contrib`·`remove_contribs`). 다른 엔티티는 G300(`to=` 한 걸음). 조건부는 G301(`when=lambda src, dst`). **설계는 끝났다. 구현:** 1단계 스크립트 내장 셋과 `c.id` 끝(G299, `ScriptContributionTests`). 2단계 선언 보너스의 기본 끝(G295~G298: `Contrib`·`contrib(...)`, 로드 검사, `contribs()`가 자기 엔티티의 선언을 모음, `component`·`key`, `Explain`, `DeclaredContributionTests`). 3단계 `to=` 끝(G300, `ContributionStepTests`; 닿는 엔티티의 컴포넌트는 로드 때 안 봄, G302). 4단계 `when=` 끝(G301, `ContributionConditionTests`). 5단계 판데믹 4c 역할 끝(과학자 = `Role` Def의 `contrib("Cure.cards", "add", -1)`, 새 엔진 구멍 없음). 미룸: 여러 걸음 `to=`, 기여 행의 만료(`std.stats`), `when` 함수까지 넓힌 로드 시점 순환 검사(G301).
 
@@ -100,6 +100,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 2512개 통과(커널 2328, CLI 42, 콘솔 호스트 93, 번역 49)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
+1. `git pull` 후 `dotnet test`로 2514개 통과(커널 2328, CLI 42, 콘솔 호스트 95, 번역 49)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(색인, 고를 항목의 영역은 `docs/gaps/`의 그 파일), 고를 항목에 맞는 `docs/spine-spec.md` 절을 읽는다. 실행기 구조는 `Script/Execution/PureEvaluator.cs`(입구)·`Session.cs`(+`.Calls`·`.Preconditions`·`.Stepping`)·`Frame.cs`·`Block.cs`·`PureEvaluator.Nodes.cs`(식 노드)·`PureEvaluator.Statements.cs`(문장 노드)·`FrameLayout.cs`·`LocalTable.cs`다. 고른 영역의 지난 기록이 필요하면 `docs/history.md`에서 그 절만 찾아 읽는다(전부 읽을 필요 없음). 옛 커맨드 첫 슬라이스의 읽을 곳: 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`)·`Frame.cs`(`Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.

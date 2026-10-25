@@ -6,6 +6,7 @@ StrainEffect("RateEffect")                 # 지속
 StrainEffect("GovernmentInterference")     # 지속
 StrainEffect("UncountedPopulations")       # 즉시
 StrainEffect("HiddenPocket")               # 즉시
+StrainEffect("UnacceptableLoss")           # 즉시
 
 def strain():
     for d in query(Disease):
@@ -71,6 +72,8 @@ def strain_effect(original):
         uncounted_populations()
     elif effect == defid("HiddenPocket"):
         hidden_pocket()
+    elif effect == defid("UnacceptableLoss"):
+        unacceptable_loss()
     original()
     if card is not None:
         card.StrainCard.done = True
@@ -97,6 +100,18 @@ def hidden_pocket():
     s.Status.eradicated = False
     for city in cities:
         pandemic.add_cube(city, s.defid)
+
+# Unacceptable Loss: 변종 큐브 4개를 공급에서 상자로 뺀다. 공급에 4개 미만이면 모두. 공급이 0 밑으로 내려가면 지는 것은 코어 규칙이다
+def unacceptable_loss():
+    s = strain()
+    if s is None:
+        return
+    s.Boxed.cubes += min(4, max(0, s.Status.supply))
+
+# 남은 큐브는 상자로 뺀 만큼 적다. derived에 걸린 코어 함수를 감싼다 (G313)
+@wrap(pandemic.cube_supply)
+def boxed_supply(original, s):
+    return original(s) - s.entity.Boxed.cubes
 
 # ---- 지속 효과 ----
 

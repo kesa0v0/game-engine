@@ -1181,3 +1181,9 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **규칙서:** 이 카드의 Intensify 전에, 변종이 박멸됐고 감염 버린 더미에 변종 카드가 하나라도 있으면 박멸을 되돌리고(치료제는 그대로) 그 카드들의 도시마다 큐브 하나.
 - **샘플:** brink `hidden_pocket()`을 `@wrap(pandemic.intensify)`의 즉시 효과 자리에서 부름(Uncounted Populations와 같은 자리). 큐브는 `pandemic.add_cube`로 놓아 역할의 막기를 따름. 박멸 `@when`은 큐브가 생겨 다시 걸리지 않음. 새 엔진 구멍 없음. 번역 en·ko.
 - **테스트:** `BrinkTests` 2개 더(되돌리고 버린 더미의 도시에만, 버린 더미에 변종 카드가 없으면 그대로). 모두 2512개 통과.
+
+### 2026-10-25: 판데믹 brink의 Unacceptable Loss (변종 바이러스 여덟 카드 끝)
+
+- **규칙서:** 이 카드의 Intensify 전에 변종 큐브 4개를 공급에서 상자로(4개 미만이면 모두).
+- **샘플:** brink 스키마에 `Boxed(cubes)`를 `Disease`에 `extend`. `unacceptable_loss()`가 즉시 효과 자리에서 `min(4, 남은 공급)`만큼 늘리고, `@wrap(pandemic.cube_supply) boxed_supply`가 코어의 `derived` 함수를 감싸 그만큼 뺌(G313: `derived`에 걸린 함수도 감쌈). 공급이 0 밑이면 지는 것은 코어 규칙 그대로. 새 엔진 구멍 없음. 번역 en·ko.
+- **테스트:** `BrinkTests` 2개 더(넷을 빼고 변종만 줄어듦, 남은 것이 넷보다 적으면 그만큼만). "그다음 큐브로 진다"도 넣으려 했으나 그 판은 상자 없이도 연쇄 폭발로 져서 효과를 가려내지 못해 뺌. 모두 2514개 통과.

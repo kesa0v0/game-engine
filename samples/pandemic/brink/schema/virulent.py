@@ -1,6 +1,8 @@
 # 변종 바이러스 (On the Brink의 Virulent Strain): 첫 에픽 때 보드에 큐브가 가장 많은 질병이 변종이 된다
 component("Virulent", on=field(bool, default=False))
-extend("Disease", components=["Virulent"])
+# Unacceptable Loss로 공급에서 상자로 뺀 큐브 수. 코어의 남은 큐브 계산(cube_supply)을 감싸 뺀다 (defs/virulent.py)
+component("Boxed", cubes=field(int, default=0))
+extend("Disease", components=["Virulent", "Boxed"])
 
 # 변종 에픽 카드의 효과. 규칙서의 카드마다 Def 하나 (defs/virulent.py)
 deftype("StrainEffect")

@@ -387,6 +387,37 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(IsEradicated("pandemic:Blue"), Is.True);
         }
 
+        private long Supply(string disease) => ((IntValue)_w.Get(Disease(disease), _w.Member("Status", "supply"))).Value;
+
+        [Test]
+        public void UnacceptableLossBoxesFourStrainCubes()
+        {
+            // 에픽이 Atlanta에 셋을 놓고 Intensify 전에 넷을 상자로. 남은 큐브는 16 - 4 - 보드 위 큐브이고, 변종이 아닌 노랑은 상자와 상관없다
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            var card = EpidemicNext("pandemic:Atlanta", "pandemic:Lima", "UnacceptableLoss");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(((IntValue)_w.Get(Disease("pandemic:Blue"), _w.Member("Boxed", "cubes"))).Value, Is.EqualTo(4));
+            long OnBoard(string d) => ((IntValue)_w.Get(Disease(d), _w.Member("Status", "on_board"))).Value;
+            Assert.That(Supply("pandemic:Blue"), Is.EqualTo(16 - 4 - OnBoard("pandemic:Blue")));
+            Assert.That(Supply("pandemic:Yellow"), Is.EqualTo(16 - OnBoard("pandemic:Yellow")));
+            Assert.That(Done(card), Is.True);
+        }
+
+        [Test]
+        public void UnacceptableLossTakesOnlyWhatIsLeft()
+        {
+            // 공급이 넷보다 적으면 남은 것만 모두 뺀다
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            foreach (var c in new[] { "pandemic:Chicago", "pandemic:Montreal", "pandemic:NewYork", "pandemic:Washington" })
+                _w.SetRow(City(c), _w.Member("Cubes", "count"), "pandemic:Blue", new IntValue(3));
+            // 보드에 12, 에픽이 SanFrancisco에 셋 → 15, 공급 1 → 상자로 1
+            EpidemicNext("pandemic:SanFrancisco", "pandemic:Lima", "UnacceptableLoss");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(((IntValue)_w.Get(Disease("pandemic:Blue"), _w.Member("Boxed", "cubes"))).Value, Is.EqualTo(1));
+        }
+
         [Test]
         public void UncountedPopulationsAddsACubeWhereThereIsExactlyOne()
         {
