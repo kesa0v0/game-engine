@@ -4,10 +4,13 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Kesa.Engine.Analyzers/Kesa.Engine.Analyzers.csproj" />
+    <Project Path="src/Kesa.Engine.Bridge.Local/Kesa.Engine.Bridge.Local.csproj" />
+    <Project Path="src/Kesa.Engine.Bridge/Kesa.Engine.Bridge.csproj" />
     <Project Path="src/Kesa.Engine.Cli/Kesa.Engine.Cli.csproj" />
     <Project Path="src/Kesa.Engine.ConsoleHost/Kesa.Engine.ConsoleHost.csproj" />
     <Project Path="src/Kesa.Engine.Kernel/Kesa.Engine.Kernel.csproj" />
     <Project Path="src/Kesa.Engine.Text/Kesa.Engine.Text.csproj" />
+    <Project Path="tests/Kesa.Engine.Bridge.Tests/Kesa.Engine.Bridge.Tests.csproj" />
     <Project Path="tests/Kesa.Engine.Cli.Tests/Kesa.Engine.Cli.Tests.csproj" />
     <Project Path="tests/Kesa.Engine.ConsoleHost.Tests/Kesa.Engine.ConsoleHost.Tests.csproj" />
     <Project Path="tests/Kesa.Engine.Kernel.Tests/Kesa.Engine.Kernel.Tests.csproj" />

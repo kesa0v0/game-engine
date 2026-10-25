@@ -1205,3 +1205,9 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 
 - 큰 후보 중 S10(호스트 엔진 결정과 묶임)을 고름. 첫 호스트 Unity(G323). Unreal은 C#을 바로 부를 수 없어 별도 프로세스 다리를 논의하다 Unity 연결부도 같은 일을 한다는 사용자 지적에서 엔진 무관한 경계(G324), 연결 세션·운영 둘(G325), 값 모양(G326), 비동기(G327), DLL 패키지(G328)를 차례로 정함. 커널 크기(파일 172개, 38,474줄, 빈 줄·주석 빼고 약 30,500줄)를 재고 러스트였다면 어땠을지도 이야기함(결론: 첫 호스트가 Unity라 C#이 맞음, 다른 엔진은 다리로).
 - 실수: 영수증·UI 파일을 새 문제처럼 꺼냈다가 사용자가 "이미 이야기했던 것 같다"고 짚음. G244·G246·G249에 이미 있었다(닫힌 영수증, UI 파일은 호스트의 UXML/USS). 영수증은 경계에 맞게 구현만 하고, 번역도 G269·G270대로 호스트 쪽이라 묻지 않고 구현하기로 함.
+
+### 2026-10-26: 호스트 경계 ① 값 타입과 커널 값 바꾸기 (G326 구현)
+
+- **새 어셈블리 둘:** `src/Kesa.Engine.Bridge`(커널을 참조하지 않음, netstandard2.1·C# 9, 결정론 분석기 켬): 닫힌 값 목록 `BridgeValue`(`BridgeNone`·`Bool`·`Int`·`Fixed`(raw, 눈금 10^6)·`Str`·`List`·`Dict`(넣은 순)·`Entity`(id와 Def id, 모르면 null)·`Hidden`·`Text`(인자 이름 순)·`Option`), 같은 모양이면 같음(엔티티는 id로), 호스트가 쓰기 쉬운 꺼내기(`v["draw"].AsInt`, 종류가 다르면 `InvalidOperationException`), 정규형 JSON `BridgeJson.Write`·`Read`(저장 형식의 값 규칙에 `{"entity": id, "def": …}`·`{"hidden": true}`를 더함, 빈칸 없이, 읽기는 빈칸 허용, 실수·모르는 태그는 `FormatException`). `src/Kesa.Engine.Bridge.Local`(커널과 경계를 참조, 같은 프로세스 구현이 들어갈 곳): `KernelValues.ToBridge(값, defOf)`(엔티티는 `defOf`로 Def, 글의 엔티티 인자는 `text()` 때 적어 둔 `EntityDefs`, 함수 값·범위 등은 `BridgeValueException`)와 `ToKernel`(인자: 엔티티는 id만, 숨김·글·선택지는 거절).
+- 분석기가 `Dictionary` 순회를 막아(KE0002) 인자 묶음을 `SortedDictionary`로.
+- **테스트:** 새 `tests/Kesa.Engine.Bridge.Tests` 18개(종류마다 한 글자, 글 인자 순서, 왕복이 같은 글자, 빈칸 읽기, 틀린 글 6가지, 호스트의 꺼내기, 엔티티 같음, 커널 화면 값의 Def, 글의 적어 둔 Def, 선택지, 데이터 아닌 값, 인자 들어오기, 인자가 될 수 없는 것). 모두 2537개 통과.

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 호스트(Unity 등)가 커널 없이 이 어셈블리만 알면 되는 경계 (spec-gaps G324·G326). 커널처럼 netstandard2.1, C# 9 -->
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <RootNamespace>Kesa.Engine.Bridge</RootNamespace>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+  </PropertyGroup>
+
+  <!-- 경계 값은 결정론 값을 그대로 나른다: 고정소수점은 원래 정수값, 실수로 바꾸는 것은 호스트의 화면 표시 때 (G326) -->
+  <Import Project="..\Kesa.Engine.Analyzers\Determinism.props" />
+
+</Project>

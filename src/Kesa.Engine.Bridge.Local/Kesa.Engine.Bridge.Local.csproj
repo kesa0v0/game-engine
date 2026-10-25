@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 호스트 경계의 같은 프로세스 구현: 경계 뒤에서 커널 World를 바로 부른다 (spec-gaps G324) -->
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <RootNamespace>Kesa.Engine.Bridge.Local</RootNamespace>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+  </PropertyGroup>
+
+  <Import Project="..\Kesa.Engine.Analyzers\Determinism.props" />
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kesa.Engine.Bridge.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kesa.Engine.Kernel\Kesa.Engine.Kernel.csproj" />
+    <ProjectReference Include="..\Kesa.Engine.Bridge\Kesa.Engine.Bridge.csproj" />
+  </ItemGroup>
+
+</Project>
