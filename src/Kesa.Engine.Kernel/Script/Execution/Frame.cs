@@ -105,14 +105,28 @@ namespace Kesa.Engine.Script
     /// </summary>
     internal sealed class InnerFunction : Value
     {
-        public InnerFunction(FunctionValue target, int level)
+        public InnerFunction(FunctionValue target, int level, Frame? prepared = null, bool used = false)
         {
             Target = target;
             Level = level;
+            Prepared = prepared;
+            Used = used;
         }
 
         public FunctionValue Target { get; }
         public int Level { get; }
+
+        /// <summary>
+        /// 커맨드 감싸기(G321)에서 사전 조건을 마친 안쪽 프레임: 원래 본문은 그 지역 변수 그대로 돈다. 함수 감싸기면 null.
+        /// 불러올 때 저장에서 다시 만든다(지역 변수만, 블록은 아직 없음).
+        /// </summary>
+        public Frame? Prepared { get; }
+
+        /// <summary>커맨드 감싸기의 안쪽을 이미 불렀나 (G321: 많아야 한 번).</summary>
+        public bool Used { get; }
+
+        /// <summary>부른 뒤의 값: 같은 안쪽을 가리키되 다시 부를 수 없다.</summary>
+        public InnerFunction AsUsed() => new InnerFunction(Target, Level, null, used: true);
 
         public override string KindName => "inner function";
     }

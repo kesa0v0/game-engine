@@ -145,7 +145,7 @@ namespace Kesa.Engine.Runtime
                 for (int i = 0; i < frames.Count; i++)
                 {
                     broken |= RestoreFrame(frames[i], frameNodes[i], where, problems) == null;
-                    RestoreInner(frames[i]);
+                    broken |= !RestoreInner(frames[i], frameNodes[i], where, problems);
                 }
                 problems.Closures = null;
                 if (broken) return null;

@@ -22,6 +22,10 @@ namespace Kesa.Engine.Script
                     return CallFunction(f, null, positional, keywords, site, writable, uiWritable);
                 case ClosureValue c:
                     return CallFunction(c.Function, c.Captured, positional, keywords, site, writable, uiWritable);
+                case InnerFunction i when i.Target.IsCommand:
+                    // 로드 검사가 문장으로만 부르게 했다 (G321): 식 안의 길의 방어선
+                    throw Fail(Codes.RunScript, "the inner command '" + i.Target.Name + "' can only be called as a statement",
+                        "call it on its own line (spec-gaps G321)");
                 case InnerFunction i:
                     return CallFunction(i.Target, null, positional, keywords, site, writable, uiWritable, i);
                 case PureBuiltin b:
@@ -145,6 +149,40 @@ namespace Kesa.Engine.Script
             if (chain == null || inner.Level >= chain.Count)
                 throw new InvalidOperationException("engine: the wrappers of '" + inner.Target.Name + "' changed during a run");
             return PushWrapped(inner.Target, chain, inner.Level, positional, keywords, site, writable, uiWritable);
+        }
+
+        /// <summary>
+        /// 커맨드를 감싼 함수의 <c>original(...)</c> (G321): 사전 조건을 마친 안쪽 프레임을 그 지역 변수 그대로 본문부터 잇는다.
+        /// 낸 인자 그대로 한 번만 부를 수 있다. 부른 쪽의 안쪽 함수는 "이미 부름"으로 바꾼다(저장에도 남는다).
+        /// </summary>
+        private Frame PushInnerCommand(InnerFunction inner, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords,
+            SourceSpan site, Frame caller)
+        {
+            var prepared = inner.Prepared;
+            if (prepared == null)
+            {
+                throw Fail(Codes.RunScript, "the command '" + inner.Target.Name + "' already ran in this wrapper; a command runs once",
+                    "call the inner command at most once in a @wrap of a command (spec-gaps G321)");
+            }
+            var parameters = inner.Target.Parameters;
+            for (int i = 0; i < parameters.Count; i++)
+            {
+                string name = parameters[i].Name;
+                var passed = i < positional.Count ? positional[i] : keywords.TryGetValue(name, out var k) ? k : null;
+                if (passed != null && prepared.Locals.TryGetValue(name, out var checkedValue) && PureOps.ValuesEqual(passed, checkedValue))
+                    continue;
+                throw Fail(Codes.RunScript, "the inner command '" + inner.Target.Name + "' must get the submitted '" + name + "'",
+                    "the command's preconditions were checked with the submitted arguments; do not assign to the parameter " +
+                    "before calling it (spec-gaps G321)");
+            }
+            caller.Locals[caller.Function.Definition!.Parameters[0].Name] = inner.AsUsed();
+            var called = prepared.Copy();
+            called.CallSite = site;
+            called.Writable = caller.Writable;
+            var def = called.Function.Definition!;
+            called.Blocks.Add(BodyBlock(def, called.Layout, HasBlock(def) ? 1 : 0));
+            _stack.Add(called);
+            return called;
         }
 
         /// <summary>오류로 빠져나갈 때 이 실행 단위가 넣은 프레임을 걷어 낸다.</summary>

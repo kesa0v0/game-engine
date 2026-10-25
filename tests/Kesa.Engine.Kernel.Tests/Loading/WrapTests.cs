@@ -153,8 +153,9 @@ namespace Kesa.Engine.Tests.Loading
             Codes.CmdBadDecorator, "after the inner function, a @wrap function takes the same parameters as 'base'")]
         [TestCase("@wrap(banking.base)\ndef more(original):\n    return 1\n",
             Codes.CmdBadDecorator, "after the inner function, a @wrap function takes the same parameters as 'base'")]
-        [TestCase("@wrap(banking.Use)\ndef more(original, s):\n    pass\n",
-            Codes.CmdBadDecorator, "@wrap: 'banking.Use' is a @command, so it cannot be wrapped")]
+        [TestCase("@wrap(banking.base)\ndef more(original, s):\n    with preconditions:\n        require(True, text(\"scouts-ok\"))\n" +
+                  "    return original(s)\n",
+            Codes.CmdPreconditions, "'base' is a plain function, so a @wrap of it cannot open 'with preconditions:'")]
         [TestCase("@wrap(banking.LIMIT)\ndef more(original):\n    return 1\n",
             Codes.CmdBadDecorator, "@wrap needs a function defined with def, but 'banking.LIMIT' is a int")]
         [TestCase("@wrap(banking.bse)\ndef more(original, s):\n    return 1\n",

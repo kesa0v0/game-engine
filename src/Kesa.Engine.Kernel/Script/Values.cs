@@ -168,6 +168,12 @@ namespace Kesa.Engine.Script
         /// <summary><c>@wrap</c>으로 다른 함수를 감싸는 함수인가 (G311·G312). 대상을 부르는 자리에서만 불린다.</summary>
         public bool IsWrap => Definition != null && Definition.IsWrap;
 
+        /// <summary>커맨드를 감싸는 <c>@wrap</c> 함수인가 (G316). 로드 검사가 대상을 푼 뒤에 정해진다.</summary>
+        public bool WrapsCommand { get; internal set; }
+
+        /// <summary>커맨드 본문처럼 도는가: 커맨드와 커맨드를 감싸는 함수 (G320). 쓰기 함수가 아니어도 문장으로 불리면 쓰기 모드다.</summary>
+        public bool RunsAsCommand => IsCommand || WrapsCommand;
+
         /// <summary><c>@when</c> 반응인가 (G169).</summary>
         public bool IsWhen => Definition != null && Definition.IsWhen;
 

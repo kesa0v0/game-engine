@@ -264,11 +264,41 @@ namespace Kesa.Engine.Runtime
                 .Add("hash", new JsonString(BodyHash.Of(fn)))
                 .Add("locals", locals)
                 .Add("blocks", blocks);
+            var inner = SaveInner(frame, writer);
+            if (inner != null) saved.Add("inner", inner);
             // emit 문장이 즉시 핸들러를 부르던 중이면 그 신호와 다음 핸들러 번호 (G310). 핸들러 목록은 불러올 때 신호로 다시 찾는다
             if (frame.Dispatch != null)
                 saved.Add("dispatch", new JsonObject()
                     .Add("signal", SaveScriptValue(frame.Dispatch.Signal, writer))
                     .Add("next", new JsonNumber(frame.Dispatch.Next)));
+            return saved;
+        }
+
+        /// <summary>
+        /// 커맨드를 감싼 함수 프레임의 안쪽 (G321): 아직 안 불렀으면 사전 조건을 마친 안쪽 프레임의 지역 변수(그 안쪽도 이어서),
+        /// 불렀으면 <c>{"used": true}</c>. 커맨드 감싸기가 아니면 null.
+        /// </summary>
+        private JsonObject? SaveInner(Frame frame, FlowWriter writer)
+        {
+            var def = frame.Function.Definition;
+            if (def == null || !frame.Function.WrapsCommand) return null;
+            if (!frame.Locals.TryGetValue(def.Parameters[0].Name, out var value) || !(value is InnerFunction inner))
+                throw new InvalidOperationException("engine: a command wrapper frame has no inner command");
+            if (inner.Prepared == null) return new JsonObject().Add("used", new JsonBool(true));
+            var prepared = inner.Prepared;
+            var locals = new JsonObject();
+            foreach (var pair in prepared.Locals)
+            {
+                if (pair.Value is InnerFunction) continue;
+                locals.Add(pair.Key, SaveScriptValue(pair.Value, writer));
+            }
+            var saved = new JsonObject()
+                .Add("mod", new JsonString(prepared.Function.Mod))
+                .Add("function", new JsonString(prepared.Function.Name))
+                .Add("hash", new JsonString(BodyHash.Of(prepared.Function)))
+                .Add("locals", locals);
+            var nested = SaveInner(prepared, writer);
+            if (nested != null) saved.Add("inner", nested);
             return saved;
         }
 
@@ -350,7 +380,8 @@ namespace Kesa.Engine.Runtime
                     else
                     {
                         if (resultName != null) result = ResultTo.Local;
-                        writable = caller.Writable && frame.Function.Writes;
+                        // 커맨드 감싸기의 안쪽(커맨드나 안쪽 감싸기)은 커맨드 본문처럼 돈다 (G320)
+                        writable = caller.Writable && (frame.Function.Writes || frame.Function.RunsAsCommand);
                         immediate = caller.Immediate;
                     }
                 }

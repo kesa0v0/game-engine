@@ -34,13 +34,26 @@ namespace Kesa.Engine.Script
             var results = new List<RequireOutcome>();
             try
             {
-                var body = command.Definition!.Body;
-                bool hasBlock = body.Count > 0 && body[0] is WithStmt;
-                bool failed = hasBlock && EvaluateBlock((WithStmt)body[0], frame, results);
+                bool failed = EvaluateBlock(frame, results, false);
+                // 감싸기의 사전 조건은 원래 것 뒤에 안쪽부터 (G318). 층마다 바로 안쪽 층의 프레임을 안쪽 함수로 들고(G321),
+                // 본문은 맨 바깥 층부터 돈다
+                var chain = uiAction ? null : _owner.Wrappers?.Invoke(command);
+                for (int level = 0; chain != null && level < chain.Count; level++)
+                {
+                    _stack.RemoveAt(_stack.Count - 1);
+                    var outer = Enter(chain[level], null, new Value[] { new InnerFunction(command, level - 1, frame) }, args);
+                    outer.CallSite = site;
+                    outer.Result = ResultTo.Discard;
+                    _stack.Add(outer);
+                    failed = EvaluateBlock(outer, results, failed);
+                    frame = outer;
+                }
+                var def = frame.Function.Definition!;
+                int start = HasBlock(def) ? 1 : 0;
                 if (runBody && !failed && uiAction)
                 {
                     frame.UiWritable = true;
-                    frame.Blocks.Add(BodyBlock(command.Definition!, frame.Layout, hasBlock ? 1 : 0));
+                    frame.Blocks.Add(BodyBlock(def, frame.Layout, start));
                     RunUntil(depth);
                 }
                 else if (runBody && !failed)
@@ -48,7 +61,7 @@ namespace Kesa.Engine.Script
                     bodyStarts?.Invoke(); // 사전 조건을 통과해 본문이 시작된다: 새 Flow (난수열을 연다, G182)
                     frame.Writable = true;
                     PayCosts();
-                    frame.Blocks.Add(BodyBlock(command.Definition!, frame.Layout, hasBlock ? 1 : 0));
+                    frame.Blocks.Add(BodyBlock(def, frame.Layout, start));
                     RunUntil(depth);
                     if (depth == 0) Detach();
                 }
@@ -88,10 +101,17 @@ namespace Kesa.Engine.Script
             }
         }
 
-        /// <summary><c>with preconditions:</c> 블록 안의 문장들. 실패한 <c>require</c>가 있으면 true.</summary>
-        private bool EvaluateBlock(WithStmt with, Frame frame, List<RequireOutcome> results)
+        private static bool HasBlock(FunctionDef def) => def.Body.Count > 0 && def.Body[0] is WithStmt;
+
+        /// <summary>
+        /// 프레임 함수의 <c>with preconditions:</c> 블록 안의 문장들 (없으면 그대로). 실패한 <c>require</c>가 있으면 true.
+        /// <paramref name="failed"/>는 앞 층(감싸기, G318)에서 이미 실패했나: 그 뒤의 실행 오류는 "평가 안 됨"이 된다.
+        /// </summary>
+        private bool EvaluateBlock(Frame frame, List<RequireOutcome> results, bool failed)
         {
-            bool failed = false;
+            var def = frame.Function.Definition!;
+            if (!HasBlock(def)) return failed;
+            var with = (WithStmt)def.Body[0];
             int depth = _stack.Count;
             foreach (var stmt in with.Body)
             {

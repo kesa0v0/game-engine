@@ -24,7 +24,15 @@ namespace Kesa.Engine.Loading
             foreach (var w in wraps)
             {
                 var target = Target(w, mods, hosts, context);
-                if (target == null || !Shape(w, target, context) || !Effects(w, target, context)) continue;
+                if (target == null || !Shape(w, target, context)) continue;
+                if (target.IsCommand)
+                {
+                    if (!CommandWrap(w, target, context)) continue;
+                    w.Function.WrapsCommand = true;
+                    w.Target = target;
+                    continue;
+                }
+                if (!Preconditions(w, target, context) || !Effects(w, target, context)) continue;
                 if (!InnerUses(w, target, context)) continue;
                 var fn = w.Function;
                 fn.WriteWitness = target.WriteWitness;
@@ -68,13 +76,80 @@ namespace Kesa.Engine.Loading
                     "only top-level functions can be wrapped (spec-gaps G313)");
                 return null;
             }
-            if (fn.IsEntry)
+            if (fn.IsEntry && !fn.IsCommand)
             {
                 context.Error(Codes.CmdBadDecorator, "@wrap: '" + shown + "' is a " + fn.EntryKind + ", so it cannot be wrapped",
-                    w.TargetSpan, "wrap a plain function it calls instead; rules worth changing belong in plain functions (spec-gaps G313)");
+                    w.TargetSpan, "wrap a plain function or a @command it calls instead (spec-gaps G313, G316)");
                 return null;
             }
             return fn;
+        }
+
+        /// <summary>사전 조건 블록은 커맨드를 감쌀 때만 연다 (G316): 함수에는 사전 조건이 없다.</summary>
+        private static bool Preconditions(WrapDecl w, FunctionValue target, CallContext context)
+        {
+            var body = w.Function.Definition!.Body;
+            if (body.Count == 0 || !(body[0] is WithStmt with)) return true;
+            context.Error(Codes.CmdPreconditions,
+                "'" + target.Name + "' is a plain function, so a @wrap of it cannot open 'with preconditions:'", with.Span,
+                "only a @wrap of a @command adds preconditions; check the condition in the body instead (spec-gaps G316)");
+            return false;
+        }
+
+        /// <summary>
+        /// 커맨드 감싸기 (G316~G321). 효과는 커맨드 본문의 규칙이라 대상과 견주지 않지만 UI 상태는 못 쓴다(G320).
+        /// <c>original(...)</c>은 문장으로, 감싸는 함수의 매개변수를 그대로 넘긴다(G321).
+        /// </summary>
+        private static bool CommandWrap(WrapDecl w, FunctionValue target, CallContext context)
+        {
+            var fn = w.Function;
+            bool ok = true;
+            if (fn.TouchesUi)
+            {
+                context.Error(Codes.CmdUiEffect, "the @wrap '" + fn.Name + "' of the command '" + target.Name +
+                                                 "' uses UI state (ui.… or submit), so it cannot run as game code",
+                    fn.Definition!.Span, "a command wrapper runs like the command's body (spec-gaps G320)", new[] { fn.UiTouchWitness!.Value });
+                ok = false;
+            }
+            var walker = new InnerWalker(fn.Parameters[0].Name);
+            walker.Block(fn.Definition!.Body);
+            foreach (var span in walker.Misused)
+            {
+                context.Error(Codes.CmdBadDecorator, "'" + walker.Name + "' is the inner command of @wrap, so it can only be called", span,
+                    "call it as " + walker.Name + "(...); it cannot be stored, passed, returned or used in a lambda (spec-gaps G314)");
+                ok = false;
+            }
+            foreach (var span in walker.ExpressionCalls)
+            {
+                context.Error(Codes.CmdWriteEffect, "'" + target.Name + "' is a command, so the inner command can only be called as a statement",
+                    span, "call it on its own line (spec-gaps G321)");
+                ok = false;
+            }
+            var names = new List<string>();
+            foreach (var p in target.Parameters) names.Add(p.Name);
+            string shape = walker.Name + "(" + string.Join(", ", names) + ")";
+            foreach (var call in walker.Calls)
+            {
+                if (PassesParameters(call, names)) continue;
+                context.Error(Codes.CmdBadDecorator, "the inner command must get the submitted arguments as they are: " + shape, call.Span,
+                    "the command's preconditions were checked with those arguments; to act on other values, call a plain " +
+                    "function (spec-gaps G321)");
+                ok = false;
+            }
+            return ok;
+        }
+
+        /// <summary>호출이 매개변수 이름을 그 순서 그대로 넘기나: 위치 인자 <c>p</c>나 키워드 <c>p=p</c>.</summary>
+        private static bool PassesParameters(CallExpr call, List<string> names)
+        {
+            if (call.Arguments.Count != names.Count) return false;
+            for (int i = 0; i < names.Count; i++)
+            {
+                var arg = call.Arguments[i];
+                if (!(arg.Value is NameExpr n) || n.Name != names[i]) return false;
+                if (arg.Name != null && arg.Name != names[i]) return false;
+            }
+            return true;
         }
 
         private static bool Shape(WrapDecl w, FunctionValue target, CallContext context)
@@ -138,6 +213,9 @@ namespace Kesa.Engine.Loading
             public List<SourceSpan> Misused { get; } = new List<SourceSpan>();
             public List<SourceSpan> ExpressionCalls { get; } = new List<SourceSpan>();
 
+            /// <summary>문장으로 부른 <c>original(...)</c>들.</summary>
+            public List<CallExpr> Calls { get; } = new List<CallExpr>();
+
             private int _lambdas;
 
             public void Block(IReadOnlyList<Stmt> body)
@@ -150,10 +228,12 @@ namespace Kesa.Engine.Loading
                 switch (stmt)
                 {
                     case ExprStmt { Expr: CallExpr call } when IsInner(call.Callee):
+                        Calls.Add(call);
                         Arguments(call);
                         return;
                     case AssignStmt { Op: "=", Target: NameExpr t, Value: CallExpr call } when IsInner(call.Callee):
                         Target(t);
+                        Calls.Add(call);
                         Arguments(call);
                         return;
                     case ExprStmt s:
