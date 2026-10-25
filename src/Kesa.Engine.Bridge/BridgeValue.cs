@@ -91,6 +91,22 @@ namespace Kesa.Engine.Bridge
         public const long Scale = 1_000_000;
         public BridgeFixed(long raw) => Raw = raw;
         public long Raw { get; }
+
+        /// <summary>십진 표기: 커널 <c>Fixed</c>와 같은 글자(<c>2.5</c>, <c>-0.25</c>, <c>3.0</c>).</summary>
+        public string Decimal
+        {
+            get
+            {
+                long whole = Raw / Scale;
+                long frac = Raw % Scale;
+                if (frac < 0) frac = -frac;
+                string sign = Raw < 0 && whole == 0 ? "-" : "";
+                string fracText = frac.ToString("D6", System.Globalization.CultureInfo.InvariantCulture).TrimEnd('0');
+                if (fracText.Length == 0) fracText = "0";
+                return sign + whole.ToString(System.Globalization.CultureInfo.InvariantCulture) + "." + fracText;
+            }
+        }
+
         public override BridgeKind Kind => BridgeKind.Fixed;
         public override bool Equals(object? obj) => obj is BridgeFixed f && f.Raw == Raw;
         public override int GetHashCode() => Raw.GetHashCode();

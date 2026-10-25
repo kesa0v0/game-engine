@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Runtime;
@@ -18,12 +19,12 @@ namespace Kesa.Engine.Bridge.Local
         /// <param name="load">저장을 불러오는 법(불러오기 선택지를 정할 때). 없으면 <see cref="World.Load"/>의 기본값.</param>
         public LocalHost(ContentLoadResult content, World world, Func<byte[], WorldLoadResult>? load = null)
         {
-            Content = content;
+            Loaded = content;
             World = world;
             _load = load ?? (save => World.Load(content, save));
         }
 
-        public ContentLoadResult Content { get; }
+        public ContentLoadResult Loaded { get; }
 
         /// <summary>지금 판. 불러오면 갈아 끼워진다.</summary>
         public World World { get; private set; }
@@ -36,6 +37,17 @@ namespace Kesa.Engine.Bridge.Local
                 _sessions[connection] = session;
             }
             return new ValueTask<IHostSession>(session);
+        }
+
+        public ValueTask<BridgeContent> Content()
+        {
+            var mods = new List<BridgeMod>(Loaded.Mods.Count);
+            foreach (var mod in Loaded.Mods)
+                mods.Add(new BridgeMod(mod.Id, mod.Directory, Path.Combine(Loaded.ModsRoot, mod.Directory), mod.DefaultLanguage));
+            var defs = new List<string>(Loaded.Frozen.Defs.Count);
+            foreach (var def in Loaded.Frozen.Defs) defs.Add(def.Id);
+            defs.Sort(StringComparer.Ordinal);
+            return new ValueTask<BridgeContent>(new BridgeContent(mods, defs));
         }
 
         public ValueTask<IReadOnlyList<BridgeSeat>> SeatChoices()

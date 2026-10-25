@@ -238,6 +238,39 @@ namespace Kesa.Engine.Bridge
         public bool Blocked { get; }
     }
 
+    /// <summary>불린 모드 하나: 호스트가 번역 파일(<c>locale/</c>)과 UI 파일을 찾는 곳 (G256·G269).</summary>
+    public sealed class BridgeMod
+    {
+        public BridgeMod(string id, string directory, string folder, string? defaultLanguage)
+        {
+            Id = id;
+            Directory = directory;
+            Folder = folder;
+            DefaultLanguage = defaultLanguage;
+        }
+
+        public string Id { get; }
+        /// <summary>모드 뿌리 아래의 폴더 이름 (진단에 보이는 경로).</summary>
+        public string Directory { get; }
+        /// <summary>모드 폴더의 실제 경로.</summary>
+        public string Folder { get; }
+        public string? DefaultLanguage { get; }
+    }
+
+    /// <summary>판의 내용 중 호스트가 알아야 하는 것: 로드 순서대로의 모드와 Def의 전체 이름(이름 순).</summary>
+    public sealed class BridgeContent
+    {
+        public BridgeContent(IReadOnlyList<BridgeMod> mods, IReadOnlyList<string> defs)
+        {
+            Mods = mods;
+            Defs = defs;
+        }
+
+        public IReadOnlyList<BridgeMod> Mods { get; }
+        /// <summary>문자열 값이 이 중 하나와 같으면 번역기가 그 Def의 이름을 보인다 (G267·G270).</summary>
+        public IReadOnlyList<string> Defs { get; }
+    }
+
     /// <summary>저장 불러오기 결과. 실패하면 판은 그대로이고 <see cref="Problems"/>에 이유.</summary>
     public sealed class BridgeLoad
     {

@@ -42,9 +42,9 @@ namespace Kesa.Engine.Bridge.Local
 
         public ValueTask<long> Tick() => Done(World.Tick);
 
-        public ValueTask<IReadOnlyList<BridgeCommand>> Commands() => Done(KernelResults.Commands(_host.Content.Commands));
+        public ValueTask<IReadOnlyList<BridgeCommand>> Commands() => Done(KernelResults.Commands(_host.Loaded.Commands));
 
-        public ValueTask<IReadOnlyList<BridgeCommand>> UiActions() => Done(KernelResults.Commands(_host.Content.UiActions));
+        public ValueTask<IReadOnlyList<BridgeCommand>> UiActions() => Done(KernelResults.Commands(_host.Loaded.UiActions));
 
         public ValueTask<string?> CheckCall(string function, int argumentCount) =>
             Done(View.CheckCall(function, argumentCount, withUi: true));

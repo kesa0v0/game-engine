@@ -1,6 +1,6 @@
 # 인계 메모: 현재 상태와 다음 할 일
 
-마지막 갱신: 2026-10-26. 브랜치 `spec-v0.5-scaffold`, 테스트 2553개 통과(커널 2328, CLI 42, 콘솔 호스트 100, 번역 49, 경계 34). 모더용 안내서는 `docs/modding/`(G252, 예시 모드 `samples/guide`). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
+마지막 갱신: 2026-10-26. 브랜치 `spec-v0.5-scaffold`, 테스트 2560개 통과(커널 2329, CLI 42, 콘솔 호스트 100, 번역 55, 경계 34). 모더용 안내서는 `docs/modding/`(G252, 예시 모드 `samples/guide`). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
 
 ## 한 줄 요약
 
@@ -37,14 +37,9 @@
 
 ## 다음 할 일 (사용자와 고를 것)
 
-**바로 이어서 할 것 (2026-10-26): Unity 호스트(S10).** 첫 실제 호스트를 Unity로 정함(G323). 호스트는 엔진 무관한 좁은 경계로만 커널을 부른다(G324): 연결 세션과 운영 둘(G325), 경계 너머 값은 작은 어셈블리의 닫힌 값 목록이고 엔티티는 id와 Def id(G326), 호출은 비동기 `ValueTask`이고 같은 프로세스 구현은 이미 끝난 결과(G327), Unity에는 빌드한 DLL을 담은 저장소 안의 로컬 UPM 패키지(G328). 이미 정한 것을 경계에 맞게 구현할 것(묻지 않음): 닫힌 영수증(G246)은 세션이 들고 해석기가 붙인 내부 키로 "바뀐 키 목록"을 받음, 번역은 호스트 쪽(G269·G270)이고 번역기가 `World` 대신 경계 값을 받음(엔티티의 Def가 값에 있음), `Translations.Load`는 운영이 주는 모드 목록으로. UI 파일은 G249대로 UXML/USS를 실행 중 모드 폴더에서 읽는 해석기(이전 엔진 `UIInterpreter`·`RuntimeStyleSheet`처럼, 경로 대신 화면 함수 이름). **다음:** 구현을 조각으로(① 값 타입·JSON, ② 세션·운영 인터페이스(`IHostSession`·`IHostOperator`)와 같은 프로세스 구현(`LocalHost`) 끝남. 남은 것: ③ 번역기를 경계 값으로 ④ 콘솔 호스트를 경계로 옮김 ⑤ UPM 패키지와 빌드 복사), 그 뒤 UXML 해석기의 속성 모양(호스트가 정할 몫)과 첫 화면을 사용자와 정함. 스키마를 뒤지는 콘솔의 엔티티 늘어놓기는 경계 밖이라 디버그 도구로 둘지 따로 물을 것.
+**바로 이어서 할 것 (2026-10-26): Unity 호스트(S10).** 첫 실제 호스트를 Unity로 정함(G323). 호스트는 엔진 무관한 좁은 경계로만 커널을 부른다(G324): 연결 세션과 운영 둘(G325), 경계 너머 값은 작은 어셈블리의 닫힌 값 목록이고 엔티티는 id와 Def id(G326), 호출은 비동기 `ValueTask`이고 같은 프로세스 구현은 이미 끝난 결과(G327), Unity에는 빌드한 DLL을 담은 저장소 안의 로컬 UPM 패키지(G328). 이미 정한 것을 경계에 맞게 구현할 것(묻지 않음): 닫힌 영수증(G246)은 세션이 들고 해석기가 붙인 내부 키로 "바뀐 키 목록"을 받음, 번역은 호스트 쪽(G269·G270)이고 번역기가 `World` 대신 경계 값을 받음(엔티티의 Def가 값에 있음), `Translations.Load`는 운영이 주는 모드 목록으로. UI 파일은 G249대로 UXML/USS를 실행 중 모드 폴더에서 읽는 해석기(이전 엔진 `UIInterpreter`·`RuntimeStyleSheet`처럼, 경로 대신 화면 함수 이름). **다음:** 구현을 조각으로(① 값 타입·JSON, ② 세션·운영 인터페이스(`IHostSession`·`IHostOperator`)와 같은 프로세스 구현(`LocalHost`), ③ 번역기를 경계 값으로(`Translator`가 `BridgeValue`를 받음, `Translations.Load(BridgeContent)`, 운영의 `Content()`) 끝남. 남은 것: ④ 콘솔 호스트를 경계로 옮김 ⑤ UPM 패키지와 빌드 복사), 그 뒤 UXML 해석기의 속성 모양(호스트가 정할 몫)과 첫 화면을 사용자와 정함. 스키마를 뒤지는 콘솔의 엔티티 늘어놓기는 경계 밖이라 디버그 도구로 둘지 따로 물을 것.
 
-**끊긴 곳 (2026-10-26, ② 커밋 `efac595` 뒤):** ③을 사용자에게 "진행할까요?"로 물은 상태. 아직 손대지 않음. ③에서 할 일:
-- `src/Kesa.Engine.Text/Translator.cs`의 `Label`·`Attr`·`Value`가 `Value`와 `World`를 받는다(48·56·61행, Def는 233행 `DefOf(World)`). 경계 값 `BridgeValue`를 받는 오버로드를 더한다. `BridgeEntity.Def`와 `BridgeText` 인자의 Def가 이미 값에 있으므로 월드가 필요 없다.
-- Text가 Bridge를 참조해야 한다. Text는 결정론 분석기 밖(G254)이고, Bridge는 커널을 참조하지 않아 순환이 없다.
-- `Translations.Load(ContentLoadResult, …)`(`Translations.cs` 58행)는 모드 목록만 받는 길을 더한다. 운영(`IHostOperator`)이 모드 목록(id·폴더)을 주는 멤버는 아직 없으니 함께 더한다. 이것은 G325에서 "모드 목록은 ③으로 미룸"이라고 한 몫이다.
-- `TranslationCheck.Run`은 `ContentLoadResult`가 필요한 로드 검사라 그대로 둔다.
-- 콘솔 호스트는 ④에서 경계로 옮기므로, ③에서는 커널 값 오버로드를 지우지 말고 둔다.
+**이어 할 곳 (2026-10-26, ③ 뒤):** ④ 콘솔 호스트를 경계로 옮긴다. `src/Kesa.Engine.ConsoleHost/ConsoleGame.cs`가 지금 `World`·`WorldView`를 바로 부른다. 이것을 `IHostOperator`·`IHostSession`(`Bridge.Local`의 `LocalHost`)과 경계 값 번역(`Translator.Value(BridgeValue)` 등)으로 바꾼다. 패널은 `session.Call(키, …)`과 `Changed()`로 다시 그린다. 경계에 없는 것: `ConsoleGame`의 스키마를 뒤지는 엔티티 늘어놓기(`Version`·`All`·`Has`·`Get`·`Member`)는 경계 밖이다. 이것을 디버그 도구로 둘지, 경계에 넣을지, 뺄지 먼저 사용자에게 묻는다(G325에서 미룬 몫). 다 옮기면 `Translator`의 커널 값 오버로드와 `Bridge.Local` 참조를 거둘지도 본다.
 
 **그 전 (2026-10-25):** 판데믹 brink의 변종 바이러스(Virulent Strain)는 규칙서의 여덟 카드를 모두 짰다(에픽 카드마다 숨긴 효과, 지속 효과는 그 에픽을 마친 뒤부터, 즉시 효과는 `@wrap(pandemic.intensify)`의 앞; history의 "변종 에픽 카드"·"Rate Effect"·"Government Interference"·"Hidden Pocket"·"Unacceptable Loss"). Government Interference에서 커맨드 감싸기가 필요해 G316~G321로 정하고 구현함(감싸는 쪽 사전 조건은 `require`만 더해지고 합법 수에도, `original(...)`은 낸 인자 그대로 한 번, 안내서 3장). 이로써 "코어가 바뀔 계산을 미리 함수로 빼 둔다" 관례는 커맨드 단위로는 필요 없어졌고 함수 한가운데만 남음(값이 바뀌는 순간의 즉시 반응은 사례가 나오면). 몰래 보기는 G322(엔진 기능 없이 "누가 아는가"를 상태에 적고 `@view_rule`이 봄)로 정하고 brink의 트러블슈터로 확인함(history의 "몰래 보기"; 샘플 코어에 차례 시작 함수 `begin_turn`). 다음은 사용자와 고를 것: 판데믹의 다른 확장 규칙(Mutation 등, 규칙서는 history의 "변종 에픽 카드" 절의 같은 PDF), 아래 "큰 후보".
 
@@ -109,6 +104,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 `dotnet test`로 2553개 통과(커널 2328, CLI 42, 콘솔 호스트 100, 번역 49, 경계 34)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
+1. `git pull` 후 `dotnet test`로 2560개 통과(커널 2329, CLI 42, 콘솔 호스트 100, 번역 55, 경계 34)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
 2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(색인, 고를 항목의 영역은 `docs/gaps/`의 그 파일), 고를 항목에 맞는 `docs/spine-spec.md` 절을 읽는다. 실행기 구조는 `Script/Execution/PureEvaluator.cs`(입구)·`Session.cs`(+`.Calls`·`.Preconditions`·`.Stepping`)·`Frame.cs`·`Block.cs`·`PureEvaluator.Nodes.cs`(식 노드)·`PureEvaluator.Statements.cs`(문장 노드)·`FrameLayout.cs`·`LocalTable.cs`다. 고른 영역의 지난 기록이 필요하면 `docs/history.md`에서 그 절만 찾아 읽는다(전부 읽을 필요 없음). 옛 커맨드 첫 슬라이스의 읽을 곳: 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`)·`Frame.cs`(`Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.

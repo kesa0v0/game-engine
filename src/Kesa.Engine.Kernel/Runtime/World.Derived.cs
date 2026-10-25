@@ -380,6 +380,14 @@ namespace Kesa.Engine.Runtime
                     var entries = new List<DictItem>(dict.Items.Count);
                     foreach (var item in dict.Items) entries.Add(new DictItem(item.Key, ToPlain(display, item.Value), item.Span));
                     return new DictValue(entries);
+                // 글의 인자와 선택지 안의 엔티티도 호스트 값으로 (G244·G267·G271)
+                case TextValue text:
+                    var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+                    foreach (var pair in text.Args) args[pair.Key] = ToPlain(display, pair.Value);
+                    return new TextValue(text.Key, args, text.EntityDefs);
+                case OptionValue o:
+                    return new OptionValue(ToPlain(display, o.Value), o.Label == null ? null : ToPlain(display, o.Label),
+                        o.Desc == null ? null : ToPlain(display, o.Desc), o.Style, o.Data == null ? null : ToPlain(display, o.Data));
                 case ComponentViewBase _:
                     throw new ScriptRuntimeException(Codes.RunType,
                         "'" + display + "' returned a component, which cannot be a value", "return one of its members");

@@ -12,6 +12,9 @@ namespace Kesa.Engine.Bridge
         /// <summary>그 연결의 세션. 같은 연결이면 같은 세션이다(UI 기록과 영수증을 함께 쓴다).</summary>
         ValueTask<IHostSession> Open(string connection);
 
+        /// <summary>불린 모드와 Def 이름. 호스트는 이것으로 번역(<c>Translations.Load</c>)과 UI 파일을 읽는다.</summary>
+        ValueTask<BridgeContent> Content();
+
         /// <summary>앉을 후보(<c>Seatable</c>)와 지금 앉은 연결, id 순.</summary>
         ValueTask<IReadOnlyList<BridgeSeat>> SeatChoices();
 

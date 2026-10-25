@@ -37,6 +37,9 @@ namespace Kesa.Engine.Tests.Runtime
             "def hp(u):\n    return u.Life.hp\n" +
             "def owner_name(u):\n    return u.Owner.party.Side.name\n" +
             "def marked():\n    return len(query(Unit, Mark))\n" +
+            "def named(u):\n    return text(\"ranks-named\", who=u)\n" +
+            "def offer(u):\n    return option(u, label=text(\"ranks-named\", who=u), data={\"by\": u})\n" +
+            "def keyed(u):\n    return {u: 1}\n" +
             "def clock():\n    return now()\n" +
             "@command(free=True, acts_for=None)\ndef Wreck(u: Ref[Unit]):\n    u.Life.hp = 0\n    spawn(\"Soldier\")\n    attach(u, Mark(x=1))\n    u.Life.hp // 0\n";
 
@@ -62,6 +65,20 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(((EntityValue)row.Items[2].Value).Id, Is.EqualTo(((EntityValue)red).Id));
             var list = (ListValue)world.Call("ranks.units").Value;
             Assert.That(list.Items.Select(i => ((EntityValue)i).Id), Is.EqualTo(new[] { unit }));
+        }
+
+        [Test]
+        public void EntitiesInsideTextsAndOptionsArePlainToo()
+        {
+            var world = Make(out var unit);
+            var text = (TextValue)world.Call("ranks.named", new EntityValue(unit)).Value;
+            Assert.That(((EntityValue)text.Args["who"]).Id, Is.EqualTo(unit));
+            Assert.That(text.EntityDefs["who"], Is.EqualTo("ranks:Soldier"));
+
+            var option = (OptionValue)world.Call("ranks.offer", new EntityValue(unit)).Value;
+            Assert.That(((EntityValue)option.Value).Id, Is.EqualTo(unit));
+            Assert.That(((EntityValue)((TextValue)option.Label!).Args["who"]).Id, Is.EqualTo(unit));
+            Assert.That(((EntityValue)((DictValue)option.Data!).Items[0].Value).Id, Is.EqualTo(unit));
         }
 
         [Test]

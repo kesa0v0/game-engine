@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using Kesa.Engine.Bridge;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Loading;
 using Linguini.Bundle;
@@ -24,7 +25,7 @@ namespace Kesa.Engine.Text
         private readonly IReadOnlyDictionary<string, FluentBundle> _bundles;
         private readonly IReadOnlyDictionary<string, string> _ownerLanguages;
 
-        private Translations(Merge merge, DefSet defs)
+        private Translations(Merge merge, HashSet<string> defs)
         {
             _bundles = merge.Build();
             _ownerLanguages = merge.OwnerLanguages;
@@ -44,7 +45,7 @@ namespace Kesa.Engine.Text
         internal HashSet<string> ProvidedKeys { get; }
 
         /// <summary>불린 Def: 문자열이 Def의 전체 이름과 같으면 그 Def의 이름을 보인다 (G267·G270).</summary>
-        internal DefSet Defs { get; }
+        internal HashSet<string> Defs { get; }
 
         /// <summary>번역 파일이 있는 언어 태그 (서수 순).</summary>
         public IEnumerable<string> Languages => _bundles.Keys;
@@ -58,15 +59,35 @@ namespace Kesa.Engine.Text
         public static Translations Load(ContentLoadResult content, DiagnosticBag diagnostics, string? hostFolder = null,
             string hostLanguage = EngineTexts.Language)
         {
-            var merge = new Merge(content.Order, diagnostics);
+            var mods = new List<BridgeMod>(content.Mods.Count);
+            foreach (var mod in content.Mods)
+                mods.Add(new BridgeMod(mod.Id, mod.Directory, Path.Combine(content.ModsRoot, mod.Directory), mod.DefaultLanguage));
+            var defs = new List<string>(content.Frozen.Defs.Count);
+            foreach (var def in content.Frozen.Defs) defs.Add(def.Id);
+            var order = content.Order;
+            return Load(mods, defs, (a, b) => order != null && order.IsOrdered(a, b), diagnostics, hostFolder, hostLanguage);
+        }
+
+        /// <summary>
+        /// 호스트 경계로 받은 내용(<c>IHostOperator.Content</c>)에서 읽는다 (G324·G325): 커널의 로드 결과 없이 모드 목록과 Def 이름만으로.
+        /// 로드 순서가 없는 두 모드가 같은 키를 덮어쓰는 경고(<c>LOC</c>)는 내지 않는다. 그것은 <c>check</c>가 로드 결과로 알린다.
+        /// </summary>
+        public static Translations Load(BridgeContent content, DiagnosticBag diagnostics, string? hostFolder = null,
+            string hostLanguage = EngineTexts.Language) =>
+            Load(content.Mods, content.Defs, null, diagnostics, hostFolder, hostLanguage);
+
+        /// <param name="isOrdered">두 모드 사이에 로드 순서가 있나. null이면 겹침 경고를 내지 않는다</param>
+        private static Translations Load(IReadOnlyList<BridgeMod> mods, IEnumerable<string> defs, Func<string, string, bool>? isOrdered,
+            DiagnosticBag diagnostics, string? hostFolder, string hostLanguage)
+        {
+            var merge = new Merge(isOrdered, diagnostics);
             foreach (var pair in EngineTexts.Files)
                 merge.AddFile(EngineTexts.Owner, EngineTexts.Language, pair.Key, "<engine>/" + pair.Key + ".ftl", pair.Value);
             if (hostFolder != null && Directory.Exists(hostFolder))
                 merge.AddFolder(null, hostLanguage, hostFolder, hostFolder.Replace('\\', '/'));
-            foreach (var mod in content.Mods)
+            foreach (var mod in mods)
             {
-                string modFolder = Path.Combine(content.ModsRoot, mod.Directory);
-                string folder = Path.Combine(modFolder, LocaleFolder);
+                string folder = Path.Combine(mod.Folder, LocaleFolder);
                 if (!Directory.Exists(folder)) continue;
                 var languages = merge.AddFolder(mod.Id, mod.DefaultLanguage, folder, mod.Directory + "/" + LocaleFolder);
                 // locale/이 있으면 defaultLanguage를 적고 그 폴더를 가져야 한다 (G257)
@@ -80,7 +101,7 @@ namespace Kesa.Engine.Text
                         mod.DefaultLanguage + "/ folder", new SourceSpan(mod.Directory + "/" + ModDiscovery.ManifestFileName, 1, 1),
                         mod.Id);
             }
-            return new Translations(merge, content.Frozen);
+            return new Translations(merge, new HashSet<string>(defs, StringComparer.Ordinal));
         }
 
         /// <summary>플레이어의 언어 목록(앞이 먼저, 예: <c>["ko", "en"]</c>)에 맞춘 번역기 (G257). 언어를 바꾸면 새로 얻는다.</summary>
@@ -113,14 +134,14 @@ namespace Kesa.Engine.Text
         /// <summary>한 번의 <see cref="Load"/>: 언어 → 키 → 이긴 글, 키 → 주인의 기본 언어.</summary>
         private sealed class Merge
         {
-            private readonly LoadOrder? _order;
+            private readonly Func<string, string, bool>? _isOrdered;
             private readonly DiagnosticBag _diagnostics;
             private readonly SortedDictionary<string, Dictionary<string, Entry>> _byLanguage =
                 new SortedDictionary<string, Dictionary<string, Entry>>(StringComparer.Ordinal);
 
-            public Merge(LoadOrder? order, DiagnosticBag diagnostics)
+            public Merge(Func<string, string, bool>? isOrdered, DiagnosticBag diagnostics)
             {
-                _order = order;
+                _isOrdered = isOrdered;
                 _diagnostics = diagnostics;
             }
 
@@ -192,7 +213,7 @@ namespace Kesa.Engine.Text
                         }
                         // 서로 순서가 없는 두 모드면 알린다. 나중이 이기는 것은 같다 (G256)
                         if (before.Mod != null && mod != null && before.Mod != EngineTexts.Owner &&
-                            (_order == null || !_order.IsOrdered(before.Mod, mod)))
+                            _isOrdered != null && !_isOrdered(before.Mod, mod))
                             _diagnostics.Warning(Codes.LocOverridden,
                                 "mods '" + before.Mod + "' and '" + mod + "' both define '" + key + "' for " + language +
                                 " and have no load order between them; '" + mod + "' wins", entry.Span, mod,
