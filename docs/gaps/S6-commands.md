@@ -677,3 +677,20 @@
 **이유:** 셋 중 고른 것: 비동기 경계(이것), 동기 경계(지금 가장 단순하나 원격에서 메인 스레드가 멈추거나 클라이언트 거울 상태가 따로 필요하고 해석기를 다시 고치게 됨), 보내고 매 프레임 꺼내는 메시지 방식(`await`는 없으나 요청·응답 짝짓기를 해석기가 상태 기계로 다룸). 근거: 이전 엔진은 커맨드 처리와 틱 진행을 비동기(UniTask)로 했다(`SessionCommandRouter.RouteCommandAsync`, `AdvanceTickAsync`, use-cases). LSP의 요청·응답도 비동기 메시지다(일반 지식). `netstandard2.1`의 `ValueTask`와 Unity 6의 `Awaitable`로 같은 프로세스일 때의 비용은 작다.
 
 **상태:** 확인
+
+## G328
+
+**위치:** G323에서 이어서: 커널을 Unity에 넣는 방법
+
+**무엇이 비어 있었나:** 커널은 `dotnet build`로 빌드되고 그때 결정론 분석기와 금지 목록이 돈다(spec P2, `Determinism.props`). 이전 엔진 `uk.kesa.engine`은 C# 소스를 asmdef로 묶은 로컬 UPM 패키지였고 게임들이 `manifest.json`의 `file:` 경로로 가져다 써 Unity가 직접 컴파일했다. 같은 방식으로 커널 소스를 넣으면 Unity의 컴파일에서는 분석기가 돌지 않는다.
+
+**어떻게 정했나:** **빌드한 DLL을 담은 로컬 UPM 패키지.**
+
+- 저장소 안에 Unity 패키지 폴더를 둔다(자리는 구현 때, 예: `hosts/unity/`).
+- `dotnet build`가 커널, 경계(G326의 작은 어셈블리), 번역, Linguini의 DLL과 pdb를 그 패키지의 `Plugins/`로 복사한다. 커널 DLL은 같은 프로세스 구현이 쓴다.
+- Unity 연결부(UXML/USS 해석기, 세션 사용)만 패키지 안의 C# 소스와 asmdef로 두고, 경계와 번역 어셈블리만 참조한다.
+- 게임들은 이전처럼 `manifest.json`에 `file:` 경로로 쓴다.
+
+**이유:** 셋 중 고른 것: DLL 패키지(이것), 커널 소스를 asmdef로(Unity에서 바로 고치나 분석기가 빠지고 `.csproj`와 asmdef를 둘 다 맞춰야 함, Linguini는 어차피 DLL), 별도 저장소(저장소가 둘이 되어 여러 컴퓨터에서 이어 하는 작업이 무거워짐). 엔진의 핵심 약속이 결정론이라 그 검사를 거친 빌드만 들어가게 한다. Unity 쪽 코드는 소스라 빠른 반복을 그대로 쓴다. 미리 빌드한 DLL을 패키지의 `Plugins/`에 담는 것은 Unity 라이브러리의 흔한 배포 방식이다(일반 지식). 커널을 고치면 `dotnet build`를 한 번 해야 Unity에 반영되는 것이 대가다.
+
+**상태:** 확인
