@@ -1175,3 +1175,9 @@ Pandemic 1조각에서 도시 엔티티에 `Site.city`(DefId 필드)를 따로 �
 - **샘플:** brink 스키마에 `Interference(city, turn)`를 `Player`에 `extend`. `@wrap(pandemic.Treat) note_treat`가 원래 커맨드를 마친 뒤 변종이면 도시와 차례 번호를 적고, `@wrap(pandemic.Move)`·`@wrap(pandemic.DirectFlight)`가 `require(may_leave(player), text("brink-treat-first"))`를 더함. 차례 번호로 적어 차례가 바뀌면 저절로 무효(차례 끝 감싸기 불필요). 번역 en·ko.
 - **안내서:** 3장 감싸기 절에 "커맨드 감싸기" 소절(이 코드를 예시로), 관례 문단을 "함수와 커맨드의 경계에서만 끼어든다"로 고침, 앞 예시 `complex_cure`를 지금 코드로.
 - **테스트:** `BrinkTests` 4개 더(Treat 전에는 거절·합법 수에서도 빠짐·Treat 뒤 이동, 직항도 막음, 앞 차례의 Treat는 무효, 다른 질병·빈 도시는 상관없음). 모두 2510개 통과.
+
+### 2026-10-25: 판데믹 brink의 Hidden Pocket
+
+- **규칙서:** 이 카드의 Intensify 전에, 변종이 박멸됐고 감염 버린 더미에 변종 카드가 하나라도 있으면 박멸을 되돌리고(치료제는 그대로) 그 카드들의 도시마다 큐브 하나.
+- **샘플:** brink `hidden_pocket()`을 `@wrap(pandemic.intensify)`의 즉시 효과 자리에서 부름(Uncounted Populations와 같은 자리). 큐브는 `pandemic.add_cube`로 놓아 역할의 막기를 따름. 박멸 `@when`은 큐브가 생겨 다시 걸리지 않음. 새 엔진 구멍 없음. 번역 en·ko.
+- **테스트:** `BrinkTests` 2개 더(되돌리고 버린 더미의 도시에만, 버린 더미에 변종 카드가 없으면 그대로). 모두 2512개 통과.

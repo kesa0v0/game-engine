@@ -5,6 +5,7 @@ StrainEffect("SlipperySlope")              # 지속
 StrainEffect("RateEffect")                 # 지속
 StrainEffect("GovernmentInterference")     # 지속
 StrainEffect("UncountedPopulations")       # 즉시
+StrainEffect("HiddenPocket")               # 즉시
 
 def strain():
     for d in query(Disease):
@@ -65,8 +66,11 @@ def drawn_strain_card():
 @wrap(pandemic.intensify)
 def strain_effect(original):
     card = drawn_strain_card()
-    if card is not None and card.StrainCard.effect == defid("UncountedPopulations"):
+    effect = None if card is None else card.StrainCard.effect
+    if effect == defid("UncountedPopulations"):
         uncounted_populations()
+    elif effect == defid("HiddenPocket"):
+        hidden_pocket()
     original()
     if card is not None:
         card.StrainCard.done = True
@@ -80,6 +84,19 @@ def uncounted_populations():
     for city in query(City):
         if city.Cubes[s.defid].count == 1:
             pandemic.add_cube(city, s.defid)
+
+# Hidden Pocket: 변종이 박멸됐고 감염 버린 더미에 변종 도시 카드가 하나라도 있으면, 박멸을 되돌리고(치료제는 그대로)
+# 그 카드들의 도시마다 변종 큐브를 하나 놓는다. 박멸된 질병은 보드에 큐브가 없어 하나씩 놓아도 넘치지 않는다
+def hidden_pocket():
+    s = strain()
+    if s is None or not s.Status.eradicated:
+        return
+    cities = [c.Face.city for c in query(InfectionCard) if c.Card.pile == 1 and c.Face.city.City.disease == s.defid]
+    if len(cities) == 0:
+        return
+    s.Status.eradicated = False
+    for city in cities:
+        pandemic.add_cube(city, s.defid)
 
 # ---- 지속 효과 ----
 

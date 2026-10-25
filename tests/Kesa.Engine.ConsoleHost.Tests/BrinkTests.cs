@@ -342,6 +342,51 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(MoveTo("pandemic:Chicago").Succeeded, Is.True);
         }
 
+        private void Eradicated(string disease)
+        {
+            _w.Set(Disease(disease), _w.Member("Status", "cured"), BoolValue.True);
+            _w.Set(Disease(disease), _w.Member("Status", "eradicated"), BoolValue.True);
+        }
+
+        private bool IsEradicated(string disease) => ((BoolValue)_w.Get(Disease(disease), _w.Member("Status", "eradicated"))).Value;
+
+        private void Discarded(params string[] cities)
+        {
+            foreach (var card in _w.All("InfectionCard").Where(c => System.Array.IndexOf(cities, FaceCity(c)) >= 0))
+                _w.Set(card, _w.Member("Card", "pile"), new IntValue(1));
+        }
+
+        [Test]
+        public void HiddenPocketBringsBackAnEradicatedStrain()
+        {
+            // 규칙서: 박멸된 변종의 카드가 감염 버린 더미에 있으면 박멸을 되돌리고 그 도시마다 하나. 치료제는 그대로.
+            // 에픽 뒤 감염 단계가 버린 카드를 다시 뽑을 수 있어 Atlanta·Chicago는 하나 이상, 버린 더미에 없던 Washington은 0
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            Eradicated("pandemic:Blue");
+            var card = EpidemicNext("pandemic:Bogota", "pandemic:Lima", "HiddenPocket");
+            Discarded("pandemic:Atlanta", "pandemic:Chicago", "pandemic:MexicoCity");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(IsEradicated("pandemic:Blue"), Is.False);
+            Assert.That(((BoolValue)_w.Get(Disease("pandemic:Blue"), _w.Member("Status", "cured"))).Value, Is.True);
+            Assert.That(CubeCount("pandemic:Atlanta", "pandemic:Blue"), Is.GreaterThanOrEqualTo(1));
+            Assert.That(CubeCount("pandemic:Chicago", "pandemic:Blue"), Is.GreaterThanOrEqualTo(1));
+            Assert.That(CubeCount("pandemic:Washington", "pandemic:Blue"), Is.EqualTo(0));
+            Assert.That(Done(card), Is.True);
+        }
+
+        [Test]
+        public void HiddenPocketDoesNothingWithoutAStrainCardInTheDiscard()
+        {
+            ClearCubes();
+            _w.Set(Disease("pandemic:Blue"), _w.Member("Virulent", "on"), BoolValue.True);
+            Eradicated("pandemic:Blue");
+            EpidemicNext("pandemic:Bogota", "pandemic:Lima", "HiddenPocket");
+            Discarded("pandemic:MexicoCity");
+            Assert.That(Act("alice", "EndTurn", ("player", new EntityValue(_alice))).Succeeded, Is.True);
+            Assert.That(IsEradicated("pandemic:Blue"), Is.True);
+        }
+
         [Test]
         public void UncountedPopulationsAddsACubeWhereThereIsExactlyOne()
         {

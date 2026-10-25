@@ -7,3 +7,4 @@ def-brink-UncountedPopulations = Uncounted Populations
 def-brink-RateEffect = Rate Effect
 def-brink-GovernmentInterference = Government Interference
 brink-treat-first = Treat at least one cube of the virulent strain here before leaving.
+def-brink-HiddenPocket = Hidden Pocket

@@ -7,3 +7,4 @@ def-brink-UncountedPopulations = 집계되지 않은 인구
 def-brink-RateEffect = 확산 속도 효과
 def-brink-GovernmentInterference = 정부 개입
 brink-treat-first = 떠나기 전에 이 도시의 변종 큐브를 하나 이상 치료해야 합니다.
+def-brink-HiddenPocket = 숨은 감염지
