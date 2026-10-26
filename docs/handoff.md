@@ -1,6 +1,6 @@
 # 인계 메모: 현재 상태와 다음 할 일
 
-마지막 갱신: 2026-10-26. 브랜치 `spec-v0.5-scaffold`, 테스트 2560개 통과(커널 2329, CLI 42, 콘솔 호스트 100, 번역 55, 경계 34). 모더용 안내서는 `docs/modding/`(G252, 예시 모드 `samples/guide`). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 슬라이스마다의 자세한 기록(무엇을 어떻게 했고 무엇을 확인했나)은 `docs/history.md`에 날짜순으로 있다. 이 문서는 지금 상태와 다음 할 일만 둔다.
+마지막 갱신: 2026-10-26. 브랜치 `spec-v0.5-scaffold`, 테스트 2560개 통과(커널 2329, CLI 42, 콘솔 호스트 100, 번역 55, 경계 34). 모더용 안내서는 `docs/modding/`(G252, 예시 모드 `samples/guide`). 작업 규칙은 저장소 루트의 `CLAUDE.md`. 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 작업의 기록은 커밋 메시지다(옛 `history.md`는 태그 `pre-gaps-removal`에만 있다).
 
 ## 한 줄 요약
 
@@ -25,7 +25,7 @@
 | X4 번역 파일·포매터(`src/Kesa.Engine.Text`, `check`의 `LOC`, 콘솔 `--lang`) | 끝남 (G254~G275). 커맨드 이름은 엔진이 번역하지 않음(버튼 글은 호스트 UI 파일, G287) |
 | S10 UI의 행동(`@ui_action`·`ui_state`·`submit`, 콘솔의 `[화면]` 메뉴) | 끝남 (G276~G286). 덮어쓰기·패치는 미룸 |
 
-결정은 `docs/spec-gaps.md`의 G1~G328. 기능을 더하거나 바꾸면 `docs/modding/`의 해당 장과 9장 "아직 없는 것"도 고친다(예시는 `samples/`에서 가져오고 `GuideSampleTests`·`SkirmishTests`가 돌린다).
+결정은 `docs/decisions/`의 G1~G328(조회 도구 사용법은 CLAUDE.md의 "결정 기록"). 기능을 더하거나 바꾸면 `docs/modding/`의 해당 장과 9장 "아직 없는 것"도 고친다(예시는 `samples/`에서 가져오고 `GuideSampleTests`·`SkirmishTests`가 돌린다).
 
 ## 핵심 규칙 (자세한 것은 spec-gaps)
 
@@ -41,7 +41,7 @@
 
 **이어 할 곳 (2026-10-26, ③ 뒤):** ④ 콘솔 호스트를 경계로 옮긴다. `src/Kesa.Engine.ConsoleHost/ConsoleGame.cs`가 지금 `World`·`WorldView`를 바로 부른다. 이것을 `IHostOperator`·`IHostSession`(`Bridge.Local`의 `LocalHost`)과 경계 값 번역(`Translator.Value(BridgeValue)` 등)으로 바꾼다. 패널은 `session.Call(키, …)`과 `Changed()`로 다시 그린다. 경계에 없는 것: `ConsoleGame`의 스키마를 뒤지는 엔티티 늘어놓기(`Version`·`All`·`Has`·`Get`·`Member`)는 경계 밖이다. 이것을 디버그 도구로 둘지, 경계에 넣을지, 뺄지 먼저 사용자에게 묻는다(G325에서 미룬 몫). 2026-10-26에 이 기능이 무엇인지 설명은 마쳤다. 모드가 `ui/`를 주지 않으면 세계 전체를 날것으로 찍고, `ViewAs`를 거치지 않아 숨긴 정보도 보인다. 선택지(판 주인 전용 디버그로 남김 / 보기 규칙을 지키는 읽기를 경계에 넣음 / 빼고 "화면 파일 없음"만 알림)와 추천은 아직 내지 않았다. 다음 세션은 이 셋을 장단점·사례와 함께 내고 고르게 한다. `--seat 연결=Def`가 쓰는 `World.All`은 `SeatChoices()`로 바꾸면 되므로 묻지 않는다. 사용자가 "화면을 어떻게 주나"를 직관적이지 않다고 했다. 설명한 내용: 모드는 화면 파일과 화면 함수를 두고, 호스트가 파일을 읽어 함수를 불러 값을 받는다. 커널은 먼저 보내지 않고 `Changed()`로 바뀐 키만 알린다. 사례는 패러독스 `.gui`의 데이터 함수, RimWorld의 매 프레임 그리기, 이전 엔진 `UIInterpreter`. 영수증은 경계 너머라서 둔 최적화다. Unity 쪽 안내서를 쓸 때 이 설명을 짧게 넣을 것. 다 옮기면 `Translator`의 커널 값 오버로드와 `Bridge.Local` 참조를 거둘지도 본다.
 
-(2026-10-26 정리: 끝난 항목의 긴 단락, 콘솔 호스트 구멍 1~6번, S10 논의 메모, 점검한 남은 일은 `docs/history.md` 끝의 "인계 메모에서 옮긴 지난 기록"으로 옮겼다. 판데믹 brink 변종 카드는 모두 끝났고 다음 고를 후보는 아래 "큰 후보"다.)
+(판데믹 brink 변종 카드는 모두 끝났고 다음 고를 후보는 아래 "큰 후보"다.)
 
 큰 후보:
 
@@ -61,5 +61,7 @@
 ## 새 세션에서 시작하는 법
 
 1. `git pull` 후 `dotnet test`로 2560개 통과(커널 2329, CLI 42, 콘솔 호스트 100, 번역 55, 경계 34)를 확인한다. 클라우드 세션에서 .NET 9 SDK를 내려받지 못하면 `apt-get install -y dotnet-sdk-10.0`으로 깔고, 저장소의 `global.json`을 피하려고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다.
-2. `CLAUDE.md`, 이 문서, `docs/spec-gaps.md`(색인, 고를 항목의 영역은 `docs/gaps/`의 그 파일), 고를 항목에 맞는 `docs/spine-spec.md` 절을 읽는다. 실행기 구조는 `Script/Execution/PureEvaluator.cs`(입구)·`Session.cs`(+`.Calls`·`.Preconditions`·`.Stepping`)·`Frame.cs`·`Block.cs`·`PureEvaluator.Nodes.cs`(식 노드)·`PureEvaluator.Statements.cs`(문장 노드)·`FrameLayout.cs`·`LocalTable.cs`다. 고른 영역의 지난 기록이 필요하면 `docs/history.md`에서 그 절만 찾아 읽는다(전부 읽을 필요 없음). 옛 커맨드 첫 슬라이스의 읽을 곳: 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`)·`Frame.cs`(`Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
+2. `CLAUDE.md`, 이 문서, 고를 항목에 맞는 `docs/spine-spec.md` 절을 읽는다. 결정은 `docs/decisions/`를 조회 도구로 필요한 것만 본다(`list --tag …`, `show 번호`, `search 글`). 실행기 구조는 `Script/Execution/PureEvaluator.cs`(입구)·`Session.cs`(+`.Calls`·`.Preconditions`·`.Stepping`)·`Frame.cs`·`Block.cs`·`PureEvaluator.Nodes.cs`(식 노드)·`PureEvaluator.Statements.cs`(문장 노드)·`FrameLayout.cs`·`LocalTable.cs`다. 옛 커맨드 첫 슬라이스의 읽을 곳: 커맨드 코드는 `Runtime/World.Submit.cs`(제출), `Runtime/World.Commands.cs`(인자·사전 검사), `Runtime/World.Undo.cs`(롤백), `Runtime/World.Structure.cs`(구조 변경 내장), `Script/Execution/PureEvaluator.cs`(`RunCommand`)·`Frame.cs`(`Writable`), `Script/Execution/FunctionEffects.cs`, `Loading/CommandSignatures.cs`다.
 3. 위 "다음 할 일 (사용자와 고를 것)"에서 사용자와 다음 항목을 고른다.
+
+**2026-10-26 결정 기록을 옮겼다:** 옛 `spec-gaps.md`·`gaps/`·`history.md`를 지우고 결정을 `docs/decisions/G번호.md`와 조회 도구(`tools/Kesa.Tools.Decisions`)로 바꿨다. 코드·문서의 "spec-gaps G123"은 `show 123`으로 읽는다. 아직 하지 않은 것: 도구의 테스트, 태그 보정(자동으로 붙인 태그라 틀린 것이 섞였을 수 있음).
