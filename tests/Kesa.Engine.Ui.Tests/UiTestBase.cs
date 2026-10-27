@@ -38,6 +38,7 @@ namespace Kesa.Engine.Ui.Tests
             "        choose(target, where=lambda t: True)\n" +
             "        require(target.Hp.v > 1, text(\"arena-too-weak\", hp=target.Hp.v))\n    target.Hp.v -= 1\n" +
             "@ui_action\ndef clear():\n    with preconditions:\n        require(ui.Selection.unit is not None, text(\"arena-none\"))\n    ui.Selection.unit = None\n" +
+            "@command(free=True, acts_for=lambda hero: hero)\ndef Rest(hero: Ref[Hero]):\n    hero.Hp.v += 1\n" +
             "def hp_order():\n    return [u for u in query(Unit) if u.Hp.v < 3] + [u for u in query(Unit) if u.Hp.v >= 3]\n" +
             "def tags():\n    big = [u for u in query(Unit) if u.Hp.v > 3]\n    return [\"x\", \"y\", \"x\"] if len(big) > 0 else [\"x\", \"x\"]\n" +
             "def top():\n    best = None\n    for u in query(Unit):\n        if best is None or u.Hp.v > best.Hp.v:\n            best = u\n    return best\n";

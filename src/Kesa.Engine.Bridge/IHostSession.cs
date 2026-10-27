@@ -68,6 +68,12 @@ namespace Kesa.Engine.Bridge
         /// <summary>세계 변경 도장. 바뀌었으면 보이는 버튼의 <see cref="Check"/>를 다시 한다 (G342).</summary>
         ValueTask<long> Version();
 
+        /// <summary>
+        /// 커맨드를 이름으로 낸다 (G283·G336): 자유 커맨드면 <see cref="Submit"/>, 아니면 이 연결이 답할 수 있고 그 커맨드를 받는 열린 질문
+        /// 하나에 답한다. 화면의 버튼이 응답 커맨드(<c>EndTurn</c> 등)를 가리킬 때 쓴다. 낼 곳이 없으면 거절 이유가 든 결과다.
+        /// </summary>
+        ValueTask<BridgeResult> Deliver(string command, IReadOnlyDictionary<string, BridgeValue> arguments);
+
         ValueTask<BridgeResult> Submit(string command, IReadOnlyDictionary<string, BridgeValue> arguments);
 
         ValueTask<BridgeResult> Respond(long request, string command, IReadOnlyDictionary<string, BridgeValue> arguments);

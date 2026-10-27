@@ -250,10 +250,19 @@ namespace Kesa.Engine.Runtime
             }
             if (decl.Free) return new DeliveryResult(Submit(issuer, submission.Command, submission.Arguments), null, null);
 
+            var accepting = AcceptingRequests(issuer, submission.Command);
+            if (accepting.Count == 1)
+                return new DeliveryResult(null, Respond(issuer, accepting[0].Id, submission.Command, submission.Arguments), null);
+            return new DeliveryResult(null, null, NotDeliverable(issuer, submission.Command, accepting.Count));
+        }
+
+        /// <summary>이 연결이 답할 수 있고 그 응답 커맨드를 받는 열린 질문들.</summary>
+        private List<Request> AcceptingRequests(string issuer, string command)
+        {
             var accepting = new List<Request>();
             foreach (var q in OpenRequests)
             {
-                if (IndexOf(q.Responses, submission.Command) < 0) continue;
+                if (IndexOf(q.Responses, command) < 0) continue;
                 foreach (var who in q.Who)
                 {
                     if (!IsAlive(who) || !MayAnswer(issuer, who)) continue;
@@ -261,12 +270,37 @@ namespace Kesa.Engine.Runtime
                     break;
                 }
             }
-            if (accepting.Count == 1)
-                return new DeliveryResult(null, Respond(issuer, accepting[0].Id, submission.Command, submission.Arguments), null);
-            return new DeliveryResult(null, null, accepting.Count == 0
-                ? submission.Command + " is not a free command, and no open question that " + issuer + " can answer accepts it"
-                : submission.Command + " is accepted by " + accepting.Count + " open questions that " + issuer +
-                  " can answer, so it is not clear which one it answers");
+            return accepting;
+        }
+
+        private static string NotDeliverable(string issuer, string command, int accepting) =>
+            accepting == 0
+                ? command + " is not a free command, and no open question that " + issuer + " can answer accepts it"
+                : command + " is accepted by " + accepting + " open questions that " + issuer +
+                  " can answer, so it is not clear which one it answers";
+
+        /// <summary>
+        /// <see cref="Deliver"/>를 하지 않고 같은 길의 입구만 미리 본다 (회색 버튼, spec-gaps G233·G283): 자유 커맨드는 <c>acts_for</c>로 이 연결이
+        /// 낼 수 있는가, 응답 커맨드는 이 연결이 답할 수 있고 그 커맨드를 받는 열린 질문이 하나이고 그 질문의 대상으로 답할 수 있는가.
+        /// 낼 수 있으면 null, 아니면 이유(개발자용 영어). 인자는 사전 검사를 통과한 것이어야 한다.
+        /// </summary>
+        internal string? WhyNotDeliverable(string issuer, string command, IReadOnlyDictionary<string, Value> args, List<Diagnostic> diagnostics)
+        {
+            var decl = FindCommand(command);
+            if (decl.Free)
+                return MayIssue(issuer, command, args, diagnostics) ? null : "'" + issuer + "' cannot issue " + command + " with these arguments";
+            var accepting = AcceptingRequests(issuer, command);
+            if (accepting.Count != 1) return NotDeliverable(issuer, command, accepting.Count);
+            try
+            {
+                if (!(ActsFor(decl, Sorted(args)) is EntityValue by))
+                    return "computing acts_for of " + decl.Id + ": a response must come from an entity, not None";
+                return Gate(issuer, accepting[0], by.Id)?.Message;
+            }
+            catch (WorldException e)
+            {
+                return e.Message;
+            }
         }
 
         private static int IndexOf(IReadOnlyList<string> items, string item)

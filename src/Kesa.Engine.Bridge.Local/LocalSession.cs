@@ -186,15 +186,30 @@ namespace Kesa.Engine.Bridge.Local
             var view = View;
             try
             {
-                var report = _host.Loaded.UiActions.ContainsKey(name)
-                    ? view.CheckPreconditions(_ui, name, args)
-                    : view.CheckPreconditions(name, args);
+                if (_host.Loaded.UiActions.ContainsKey(name))
+                    return Done(KernelResults.Check(view.CheckPreconditions(_ui, name, args), DefOf(view)));
+
+                var report = view.CheckPreconditions(name, args);
+                // 인자가 맞으면 입구를 본다: 이 연결이 낼 수 있는가가 사전 조건보다 먼저 이유다 (G233·G283)
+                if (report.Arguments.Count == 0)
+                {
+                    string? why = view.WhyNotDeliverable(name, args);
+                    if (why != null) return Done(KernelResults.Denied(why));
+                }
                 return Done(KernelResults.Check(report, DefOf(view)));
             }
             catch (WorldException e)
             {
                 return Done(KernelResults.Failure(e));
             }
+        }
+
+        public ValueTask<BridgeResult> Deliver(string command, IReadOnlyDictionary<string, BridgeValue> arguments)
+        {
+            var args = KernelValues.ToKernel(arguments);
+            var delivered = World.Deliver(Connection, new UiSubmission(command, args));
+            var view = View;
+            return Done(KernelResults.Result(view.Show(delivered), DefOf(view)));
         }
 
         public ValueTask<long> Version() => Done(World.Version());

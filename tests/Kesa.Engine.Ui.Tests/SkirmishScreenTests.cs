@@ -144,6 +144,40 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task EndTurnIsAResponseCommandAndOnlyTheSideWhoseTurnItIsMayPressIt()
+        {
+            var alice = await Open("alice", _red);
+            var bob = await Open("bob", _blue);
+            Assert.That(alice.Renderer.Named("endturn").Enabled, Is.True, "red's turn");
+            Assert.That(bob.Renderer.Named("endturn").Enabled, Is.False, "blue has no open question to answer");
+
+            var results = new List<BridgeResult>();
+            alice.Ui.ActionResult += (_, r) => results.Add(r);
+            await alice.Renderer.Named("endturn").Press();
+            Assert.That(results.Single().Succeeded, Is.True, results.Single().ToString());
+            Assert.That(alice.Renderer.Named("turn").Text, Is.EqualTo("2"));
+            Assert.That(alice.Renderer.Named("endturn").Enabled, Is.False, "now it is blue's turn");
+
+            await bob.Ui.RefreshAsync();
+            Assert.That(bob.Renderer.Named("turn").Text, Is.EqualTo("2"));
+            Assert.That(bob.Renderer.Named("endturn").Enabled, Is.True, "the world version moved, so bob's button woke up");
+        }
+
+        [Test]
+        public async Task DeliverPairsAResponseCommandWithTheQuestionOrRefusesWithAReason()
+        {
+            var bob = await _host.Open("bob");
+            var refused = await bob.Deliver("skirmish.EndTurn", new Dictionary<string, BridgeValue> { ["party"] = new BridgeEntity(_blue, null) });
+            Assert.That((refused.Succeeded, refused.Outcome), Is.EqualTo((false, "Refused")));
+            Assert.That(refused.Reasons.Single().Kind, Is.EqualTo(BridgeReasonKind.Refusal));
+            Assert.That(refused.Reasons.Single().Message, Does.Contain("no open question"));
+
+            var alice = await _host.Open("alice");
+            var answered = await alice.Deliver("skirmish.EndTurn", new Dictionary<string, BridgeValue> { ["party"] = new BridgeEntity(_red, null) });
+            Assert.That(answered.Succeeded, Is.True, answered.ToString());
+        }
+
+        [Test]
         public async Task TheOtherConnectionSeesItsOwnSideAsMine()
         {
             var bob = await Open("bob", _blue);

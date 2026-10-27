@@ -245,6 +245,27 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task CheckSaysWhetherThisConnectionMayIssueTheCommand()
+        {
+            var mine = await Session.Check("arena.Rest", new System.Collections.Generic.Dictionary<string, BridgeValue> { ["hero"] = Entity(Red) });
+            Assert.That(mine.Outcome, Is.EqualTo("Passed"));
+            var theirs = await Session.Check("arena.Rest", new System.Collections.Generic.Dictionary<string, BridgeValue> { ["hero"] = Entity(Blue) });
+            Assert.That((theirs.Succeeded, theirs.Outcome), Is.EqualTo((false, "GateDenied")));
+            Assert.That(theirs.Reasons.Single().Message, Does.Contain("cannot issue arena.Rest"));
+            var wrong = await Session.Check("arena.Rest", new System.Collections.Generic.Dictionary<string, BridgeValue> { ["hero"] = Entity(A) });
+            Assert.That(wrong.Outcome, Is.EqualTo("ArgumentsRejected"), "wrong arguments come first");
+        }
+
+        [Test]
+        public async Task AButtonForAnotherSidesCommandIsGrayFromTheStart()
+        {
+            await Mount("<ui:VisualElement params=\"mine, theirs\"><ui:Button name=\"mine\" on-click=\"arena.Rest(mine)\" />" +
+                        "<ui:Button name=\"theirs\" on-click=\"arena.Rest(theirs)\" /></ui:VisualElement>", ("mine", Entity(Red)), ("theirs", Entity(Blue)));
+            Assert.That(Renderer.Named("mine").Enabled, Is.True);
+            Assert.That(Renderer.Named("theirs").Enabled, Is.False);
+        }
+
+        [Test]
         public async Task StyleSheetsGoToTheTopElementOfTheFileThatNamedThem()
         {
             Files["UI/Row"] = "<ui:UXML xmlns:ui=\"UnityEngine.UIElements\"><ui:Style src=\"row.uss\" /><ui:Label params=\"who\" /></ui:UXML>";

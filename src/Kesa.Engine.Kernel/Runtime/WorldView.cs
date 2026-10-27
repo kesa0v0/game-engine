@@ -87,6 +87,14 @@ namespace Kesa.Engine.Runtime
         public PreconditionReport CheckPreconditions(string command, IReadOnlyDictionary<string, Value> args) =>
             Show(_world.CheckPreconditions(command, args))!;
 
+        /// <summary>
+        /// 이 연결이 그 커맨드를 지금 낼 수 있는가(입구 정책 <c>acts_for</c>, 응답 커맨드는 이 연결이 답할 수 있는 열린 질문, G233·G283).
+        /// 낼 수 있으면 null, 아니면 이유(개발자용 영어). 인자는 <see cref="CheckPreconditions(string, IReadOnlyDictionary{string, Value})"/>를
+        /// 통과한 것이어야 한다.
+        /// </summary>
+        public string? WhyNotDeliverable(string command, IReadOnlyDictionary<string, Value> args) =>
+            _world.WhyNotDeliverable(Issuer, command, args, _diagnostics);
+
         /// <summary>UI 동작 매개변수 하나의 후보 (<see cref="Candidates(string, IReadOnlyDictionary{string, Value}, string)"/>와 같고 못 보는 엔티티는 빠진다).</summary>
         public CandidateList Candidates(UiState ui, string action, IReadOnlyDictionary<string, Value> args, string parameter)
         {
