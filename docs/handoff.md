@@ -26,7 +26,7 @@
 1. (끝) 경계에 `Check`·`Version`(G342)과 커맨드용 `WorldView.CheckPreconditions`.
 2. (끝) `Kesa.Engine.Ui`와 시험. 첫 화면은 `samples/skirmish/core/ui/screen.uxml`(엔진 시험용 데모, 유닛 카드·고르기 → 공격)이고 화면 값 함수 `turn_number`·`mine`·`is_chosen`을 skirmish에 더했다(콘솔 쪽 함수는 그대로).
 3. (끝) 응답 커맨드 버튼은 `Deliver`, 회색 판정에 입구 검사(G346).
-4. (끝) ⑤ UPM 패키지, DLL 복사, Unity 렌더러(G347)와 데모 프로젝트 `hosts/unity/demo`(씬 `Assets/Scenes/Demo.unity`, `KesaDemo`가 skirmish를 돌려 UIDocument에 올리고 프레임마다 `RefreshAsync`, 창 없는 확인 `KesaDemoSetup.Check` 통과). 남은 것: 재생해서 눌림·갱신을 눈으로 확인(사용자), 런타임에 USS 글을 `StyleSheet`로 읽는 법(Unity에 공개 API가 없어 미정, 이전 엔진은 직접 파서), 인라인 `style` 속성, 이미지 파일 읽기 방식의 세부.
+4. (끝) ⑤ UPM 패키지, DLL 복사, Unity 렌더러(G347)와 데모 프로젝트 `hosts/unity/demo`(씬 `Assets/Scenes/Demo.unity`, `KesaDemo`가 skirmish를 돌려 UIDocument에 올리고 프레임마다 `RefreshAsync`, 창 없는 확인 `KesaDemoSetup.Check` 통과). 남은 것: 재생해서 눌림·갱신을 눈으로 확인(사용자), 런타임 USS(아래 "필요해지면", 백로그), 인라인 `style` 속성, 이미지 파일 읽기 방식의 세부.
 5. NUMBER 구현(G334).
 
 **구현하며 제가 정한 것, 사용자 확인 전(G345 잠정):** 어셈블리 이름 `Kesa.Engine.Ui`, 번역을 참조하지 않고 글자 만들기를 주입(G343 일부바뀜), 숫자를 고정소수점 raw로 렌더러에 줌, 영수증 키 모양과 세션당 해석기 하나, 호스트가 직접 낸 동작은 `ActAsync`/`InvalidateButtons`로 알림.
@@ -40,6 +40,8 @@
 **남은 정리:** 조회 도구(`tools/Kesa.Tools.Decisions`)의 테스트, 자동으로 붙인 결정 태그 보정.
 
 ## 필요해지면 (실제 모드 사례가 생기면)
+
+- **런타임 USS (백로그, 사용자가 미룸):** 모드가 모양(스타일)을 바꾸려면 USS 글을 런타임에 읽어야 한다. 지금은 이미지(G335)만 모드가 바꿀 수 있고 데모 화면은 스타일 없이 기본 모양이다. Unity에는 런타임에 USS 글을 `StyleSheet`로 만드는 공개 API가 없다. 이전 엔진은 `RuntimeStyleSheet`(72줄 정규식 파서: `.클래스`·`#id` 선택자와 `--변수`)로 읽고 `StyleApplicator`(377줄, 속성 59가지)가 요소에 인라인 스타일로 직접 적용했다(`SharedPackages/uk.kesa.engine/Scripts/Core/Data/Base/UI/RuntimeStyleSheet.cs`, `.../View/UI/Core/StyleApplicator.cs`). 선택지: A 하이브리드(게임이 기본 스타일시트를 `StyleSheet` 에셋으로 주고 모드 USS는 파서로 나중에 더함, 제 추천) / B 파서를 지금 만든다 / C 게임만 스타일을 준다(모드는 USS 불가). 현재는 `ModFolderAssets`에 스타일시트 읽기를 꽂을 수 있다.
 
 - 호스트 함수 인자 8개 초과(`HostOverloads.cs`를 16개까지), 호스트 창구의 `choices`.
 - 따옴표 없는 Def 참조(`Resource.Wood`), 로직 연산자 확장(`**`·비트 연산, G96), S8 `migrate`.
