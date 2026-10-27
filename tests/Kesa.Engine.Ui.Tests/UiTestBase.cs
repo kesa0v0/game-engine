@@ -36,7 +36,11 @@ namespace Kesa.Engine.Ui.Tests
             "@ui_action\ndef select(u: Ref[Unit]):\n    ui.Selection.unit = u\n" +
             "@command(free=True, acts_for=None)\ndef Hit(target: Ref[Unit]):\n    with preconditions:\n" +
             "        choose(target, where=lambda t: True)\n" +
-            "        require(target.Hp.v > 1, text(\"arena-too-weak\", hp=target.Hp.v))\n    target.Hp.v -= 1\n";
+            "        require(target.Hp.v > 1, text(\"arena-too-weak\", hp=target.Hp.v))\n    target.Hp.v -= 1\n" +
+            "@ui_action\ndef clear():\n    with preconditions:\n        require(ui.Selection.unit is not None, text(\"arena-none\"))\n    ui.Selection.unit = None\n" +
+            "def hp_order():\n    return [u for u in query(Unit) if u.Hp.v < 3] + [u for u in query(Unit) if u.Hp.v >= 3]\n" +
+            "def tags():\n    big = [u for u in query(Unit) if u.Hp.v > 3]\n    return [\"x\", \"y\", \"x\"] if len(big) > 0 else [\"x\", \"x\"]\n" +
+            "def top():\n    best = None\n    for u in query(Unit):\n        if best is None or u.Hp.v > best.Hp.v:\n            best = u\n    return best\n";
 
         private string _root = "";
         protected LocalHost Host = null!;

@@ -24,18 +24,24 @@ namespace Kesa.Engine.Ui
         public static UiReadResult Read(string name, string uxmlText)
         {
             var problems = new List<UiProblem>();
-            XDocument xml;
-            try
+            // 접두사를 선언하지 않은 글은 선언을 씌워 다시 읽는다. 둘 다 안 되면 처음 오류가 줄 번호를 바로 가리킨다
+            var xml = TryParse(uxmlText, out var original);
+            if (xml == null)
             {
-                string text = uxmlText.Contains("xmlns:ui", StringComparison.Ordinal)
-                    ? uxmlText
-                    : "<ui:UXML xmlns:ui=\"UnityEngine.UIElements\">" + uxmlText + "</ui:UXML>";
-                xml = XDocument.Parse(text, LoadOptions.SetLineInfo);
+                xml = TryParse("<ui:UXML xmlns:ui=\"UnityEngine.UIElements\">" + uxmlText + "</ui:UXML>", out _);
+                if (xml == null)
+                {
+                    problems.Add(new UiProblem(name + ":" + original!.LineNumber, "the UXML is not valid XML: " + original.Message));
+                    return new UiReadResult(null, problems);
+                }
             }
-            catch (XmlException e)
+
+            var styles = new List<string>();
+            foreach (var style in xml.Descendants())
             {
-                problems.Add(new UiProblem(name + ":" + e.LineNumber, "the UXML is not valid XML: " + e.Message));
-                return new UiReadResult(null, problems);
+                if (!style.Name.LocalName.Equals("Style", StringComparison.OrdinalIgnoreCase)) continue;
+                string? src = style.Attribute("src")?.Value;
+                if (!string.IsNullOrEmpty(src) && !styles.Contains(src!)) styles.Add(src!);
             }
 
             var top = xml.Root!;
@@ -87,7 +93,21 @@ namespace Kesa.Engine.Ui
             var reader = new ElementReader(name, problems, rootNode == top && top.Name.LocalName.Equals("UXML", StringComparison.OrdinalIgnoreCase));
             var root = reader.Read(rootNode, scope, isRoot: true);
             if (problems.Count > 0) return new UiReadResult(null, problems);
-            return new UiReadResult(new UiDocument(name, declared, seat, root), problems);
+            return new UiReadResult(new UiDocument(name, declared, seat, root, styles), problems);
+        }
+
+        private static XDocument? TryParse(string text, out XmlException? error)
+        {
+            try
+            {
+                error = null;
+                return XDocument.Parse(text, LoadOptions.SetLineInfo);
+            }
+            catch (XmlException e)
+            {
+                error = e;
+                return null;
+            }
         }
 
         private static string Place(string name, XObject node) =>
@@ -130,7 +150,12 @@ namespace Kesa.Engine.Ui
 
                 foreach (var attribute in node.Attributes())
                 {
-                    if (attribute.IsNamespaceDeclaration) continue;
+                    // 이름 공간이 붙은 속성(xsi:…)과 UXML 머리에만 있는 편집기 속성은 요소의 것이 아니다
+                    if (attribute.IsNamespaceDeclaration || attribute.Name.NamespaceName.Length > 0) continue;
+                    if (kind.Equals("UXML", StringComparison.OrdinalIgnoreCase) || (isRoot && _syntheticRoot))
+                    {
+                        if (attribute.Name.LocalName == "editor-extension-mode") continue;
+                    }
                     string n = attribute.Name.LocalName;
                     string v = attribute.Value;
 

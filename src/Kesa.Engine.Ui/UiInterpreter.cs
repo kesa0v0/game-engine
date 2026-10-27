@@ -36,6 +36,7 @@ namespace Kesa.Engine.Ui
     /// <summary>
     /// UXML 해석기 (spec-gaps G330~G345): 읽은 문서를 한 연결의 세션에 맞춰 올리고, 갱신 때 영수증이 바뀐 연결만 다시 부르고, 눌림을
     /// 커맨드나 화면 동작으로 낸다. 화면은 <see cref="IUiRenderer"/>가 그린다. 세션을 부르는 쪽은 한 스레드에서만 쓴다.
+    /// 영수증 키가 해석기마다 <c>p1</c>부터 세므로 세션 하나에는 해석기 하나만 쓴다.
     /// </summary>
     public sealed partial class UiInterpreter
     {
@@ -90,8 +91,36 @@ namespace Kesa.Engine.Ui
             foreach (var name in document.Parameters) scope.Set(name, arguments[name]);
             string panelId = "p" + (++_panels);
             var root = await BuildAsync(document.Root, null, null, 0, scope, panelId);
+            foreach (var sheet in document.StyleSheets) _renderer.AddStyleSheet(root.Handle, sheet);
             await RecheckAsync();
+            _version = await _session.Version();
             return new UiMountResult(new UiPanel(root), problems);
+        }
+
+        /// <summary>
+        /// 호스트가 직접 내는 화면 동작(지도에서 유닛을 눌러 창을 여는 것 등)을 이 해석기로 낸다: 낸 뒤 버튼을 다시 확인하고 화면을 맞춘다.
+        /// 세션에 직접 <c>Act</c>를 불렀다면 <see cref="InvalidateButtons"/>와 <see cref="RefreshAsync"/>를 부른다.
+        /// </summary>
+        public async ValueTask<BridgeResult> ActAsync(string action, IReadOnlyDictionary<string, BridgeValue> arguments)
+        {
+            var result = await _session.Act(action, arguments);
+            ActionResult?.Invoke(action, result);
+            _recheck = true;
+            await RefreshAsync();
+            return result;
+        }
+
+        /// <summary>
+        /// 화면 동작이 UI 기록을 바꿔도 세계 도장은 움직이지 않아서, 호스트가 세션에 직접 동작을 냈다면 이것으로 알려 다음 갱신이 버튼을
+        /// 다시 확인하게 한다.
+        /// </summary>
+        public void InvalidateButtons() => _recheck = true;
+
+        /// <summary>쌓인 <see cref="Errors"/>를 비운다(같은 오류가 다시 나면 다시 담긴다).</summary>
+        public void ClearErrors()
+        {
+            _errors.Clear();
+            _errorTexts.Clear();
         }
 
         /// <summary>패널을 내린다: 요소를 없애고 영수증을 놓는다.</summary>
@@ -115,6 +144,7 @@ namespace Kesa.Engine.Ui
                 foreach (var key in await _session.Changed())
                 {
                     if (!_bindings.TryGetValue(key, out var binding) || !binding.Owner.Alive) continue;
+                    _recheck = true;
                     await ApplyBindingAsync(binding);
                     if (binding.Kind == RuntimeBindingKind.IncludeArgument && binding.Owner.Inner != null)
                         await ReevaluateAsync(binding.Owner.Inner);

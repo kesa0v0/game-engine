@@ -177,6 +177,95 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task AReorderedListMovesTheSameElements()
+        {
+            await Mount("<ui:VisualElement><ui:VisualElement name=\"list\" for=\"u in arena.hp_order()\"><ui:Label bind-text=\"arena.hp(u)\" /></ui:VisualElement></ui:VisualElement>");
+            var list = Renderer.Named("list");
+            var forA = list.Children[0];
+            var forB = list.Children[1];
+            Assert.That(list.Children.Select(c => c.Text), Is.EqualTo(new[] { "3", "3" }));
+
+            SetHp(B, 1);
+            await Ui.RefreshAsync();
+            Assert.That(list.Children[0], Is.SameAs(forB), "the weak unit comes first now, and its element moved with it");
+            Assert.That(list.Children[1], Is.SameAs(forA));
+            Assert.That(list.Children.Select(c => c.Text), Is.EqualTo(new[] { "1", "3" }));
+            Assert.That(Renderer.Log, Does.Contain("move"));
+        }
+
+        [Test]
+        public async Task EqualValuesAreMatchedInOrderAndTheNewOneGoesBetween()
+        {
+            await Mount("<ui:VisualElement><ui:VisualElement name=\"list\" for=\"t in arena.tags()\"><ui:Label bind-text=\"t\" /></ui:VisualElement></ui:VisualElement>");
+            var list = Renderer.Named("list");
+            Assert.That(list.Children.Select(c => c.Text), Is.EqualTo(new[] { "x", "x" }));
+            var first = list.Children[0];
+            var second = list.Children[1];
+
+            SetHp(A, 5);
+            await Ui.RefreshAsync();
+            Assert.That(list.Children.Select(c => c.Text), Is.EqualTo(new[] { "x", "y", "x" }));
+            Assert.That(list.Children[0], Is.SameAs(first));
+            Assert.That(list.Children[2], Is.SameAs(second), "the second 'x' is still the second 'x'");
+        }
+
+        [Test]
+        public async Task AnIncludeArgumentFromACallFollowsItsReceipt()
+        {
+            Files["UI/Row"] = "<ui:Label params=\"who\" name=\"row\" bind-text=\"arena.hp(who)\" />";
+            await Mount("<ui:VisualElement><ui:Include src=\"UI/Row\" who=\"arena.top()\" /></ui:VisualElement>");
+            Assert.That(Renderer.Named("row").Text, Is.EqualTo("3"));
+            SetHp(B, 7);
+            await Ui.RefreshAsync();
+            Assert.That(Renderer.Named("row").Text, Is.EqualTo("7"), "top() is now B, so the inner label reads B");
+        }
+
+        [Test]
+        public async Task AnActionTheHostGivesDirectlyGraysAndWakesTheButtonsThroughTheInterpreter()
+        {
+            await Mount("<ui:VisualElement><ui:Button name=\"clear\" on-click=\"arena.clear()\" /></ui:VisualElement>");
+            var clear = Renderer.Named("clear");
+            Assert.That(clear.Enabled, Is.False, "nothing is chosen");
+
+            await Ui.ActAsync("arena.select", new System.Collections.Generic.Dictionary<string, BridgeValue> { ["u"] = Entity(A) });
+            Assert.That(clear.Enabled, Is.True, "the host's map click changed only the UI record");
+        }
+
+        [Test]
+        public async Task AnActionGivenStraightToTheSessionNeedsInvalidateButtons()
+        {
+            await Mount("<ui:VisualElement><ui:Button name=\"clear\" on-click=\"arena.clear()\" /></ui:VisualElement>");
+            var clear = Renderer.Named("clear");
+            await Session.Act("arena.select", new System.Collections.Generic.Dictionary<string, BridgeValue> { ["u"] = Entity(A) });
+            await Ui.RefreshAsync();
+            Assert.That(clear.Enabled, Is.False, "nothing told the interpreter");
+            Ui.InvalidateButtons();
+            await Ui.RefreshAsync();
+            Assert.That(clear.Enabled, Is.True);
+        }
+
+        [Test]
+        public async Task StyleSheetsGoToTheTopElementOfTheFileThatNamedThem()
+        {
+            Files["UI/Row"] = "<ui:UXML xmlns:ui=\"UnityEngine.UIElements\"><ui:Style src=\"row.uss\" /><ui:Label params=\"who\" /></ui:UXML>";
+            await Mount("<ui:UXML xmlns:ui=\"UnityEngine.UIElements\"><ui:Style src=\"a.uss\" /><ui:Style src=\"b.uss\" /><ui:Style src=\"a.uss\" />" +
+                        "<ui:VisualElement name=\"top\" params=\"u\"><ui:Include src=\"UI/Row\" who=\"u\" /></ui:VisualElement></ui:UXML>", ("u", Entity(A)));
+            Assert.That(Renderer.Named("top").StyleSheets, Is.EqualTo(new[] { "a.uss", "b.uss" }));
+            Assert.That(Renderer.Named("top").Children.Single().StyleSheets, Is.EqualTo(new[] { "row.uss" }));
+        }
+
+        [Test]
+        public async Task ClearedErrorsAreReportedAgainWhenTheyHappenAgain()
+        {
+            await Mount("<ui:VisualElement params=\"u\"><ui:Label bind-display=\"arena.boom(u)\" /></ui:VisualElement>", ("u", Entity(A)));
+            Assert.That(Ui.Errors.Count, Is.EqualTo(1));
+            Ui.ClearErrors();
+            Assert.That(Ui.Errors, Is.Empty);
+            await Ui.RefreshAsync();
+            Assert.That(Ui.Errors.Count, Is.EqualTo(1), "the failing call is tried again on every refresh");
+        }
+
+        [Test]
         public async Task UnmountingRemovesTheElementsAndLetsGoOfTheReceipts()
         {
             var panel = await Mount("<ui:VisualElement params=\"u\"><ui:Label name=\"l\" bind-text=\"arena.hp(u)\" /></ui:VisualElement>", ("u", Entity(A)));

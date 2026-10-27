@@ -39,6 +39,9 @@ namespace Kesa.Engine.Ui
         /// </summary>
         ElementId Create(string kind, ElementId? parent, int index, IReadOnlyList<KeyValuePair<string, string>> attributes);
 
+        /// <summary>파일에 <c>&lt;Style src="…"/&gt;</c>로 적힌 스타일시트를 그 파일의 맨 위 요소에 붙인다. 경로를 찾는 것은 렌더러 몫이다.</summary>
+        void AddStyleSheet(ElementId element, string path);
+
         /// <summary>글자 속성(<c>text</c>)에 글자를 넣는다.</summary>
         void SetText(ElementId element, string property, string value);
 

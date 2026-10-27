@@ -35,6 +35,31 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public void AnEditorHeaderWithADefaultNamespaceIsReadLikeAnyOther()
+        {
+            var doc = Ok(
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<UXML xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"UnityEngine.UIElements\" " +
+                "xsi:noNamespaceSchemaLocation=\"../../UIElementsSchema/UIElements.xsd\" editor-extension-mode=\"False\">\n" +
+                "    <Style src=\"project://database/Assets/UI/a.uss?fileID=7433441132597879392&amp;guid=abc&amp;type=3#a\" />\n" +
+                "    <VisualElement name=\"top\" params=\"u\"><Label bind-text=\"m.f(u)\" /></VisualElement>\n" +
+                "</UXML>");
+            Assert.That(doc.Root.Kind, Is.EqualTo("VisualElement"));
+            Assert.That(doc.Root.Attributes.Select(a => a.Key), Is.EqualTo(new[] { "name" }));
+            Assert.That(doc.Parameters, Is.EqualTo(new[] { "u" }));
+            Assert.That(doc.StyleSheets.Single(), Does.StartWith("project://database/Assets/UI/a.uss"));
+        }
+
+        [Test]
+        public void TheEditorOnlyAttributesDoNotReachASyntheticContainer()
+        {
+            var doc = Ok("<UXML xmlns=\"UnityEngine.UIElements\" editor-extension-mode=\"False\"><Label text=\"a\" /><Label text=\"b\" /></UXML>");
+            Assert.That(doc.Root.Kind, Is.EqualTo("VisualElement"));
+            Assert.That(doc.Root.Attributes, Is.Empty);
+            Assert.That(doc.Root.Children.Count, Is.EqualTo(2));
+        }
+
+        [Test]
         public void SeveralTopElementsAreWrappedInAContainer()
         {
             var doc = Ok("<ui:Label text=\"a\" /><ui:Label text=\"b\" />");

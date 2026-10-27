@@ -19,6 +19,7 @@ namespace Kesa.Engine.Ui.Tests
             public SortedDictionary<string, bool> Flags = new SortedDictionary<string, bool>(StringComparer.Ordinal);
             public SortedDictionary<string, long> Numbers = new SortedDictionary<string, long>(StringComparer.Ordinal);
             public SortedSet<string> Classes = new SortedSet<string>(StringComparer.Ordinal);
+            public List<string> StyleSheets = new List<string>();
             public string? Image;
             public Func<ValueTask>? Click;
             public bool Removed;
@@ -62,6 +63,8 @@ namespace Kesa.Engine.Ui.Tests
             Log.Add("create " + kind);
             return new ElementId(el.Id);
         }
+
+        public void AddStyleSheet(ElementId element, string path) => Get(element).StyleSheets.Add(path);
 
         public void SetText(ElementId element, string property, string value) => Get(element).Texts[property] = value;
 

@@ -5,13 +5,17 @@ namespace Kesa.Engine.Ui
     /// <summary>읽은 UXML 파일 하나 (spec-gaps G340): 받는 이름과 앉은 엔티티를 받을 이름, 그리고 요소 트리.</summary>
     public sealed class UiDocument
     {
-        public UiDocument(string name, IReadOnlyList<string> parameters, string? seatParameter, UiElement root)
+        public UiDocument(string name, IReadOnlyList<string> parameters, string? seatParameter, UiElement root, IReadOnlyList<string> styleSheets)
         {
             Name = name;
             Parameters = parameters;
             SeatParameter = seatParameter;
             Root = root;
+            StyleSheets = styleSheets;
         }
+
+        /// <summary><c>&lt;Style src="…"/&gt;</c>로 적힌 스타일시트 경로들, 적은 순서. 렌더러가 맨 위 요소에 붙인다.</summary>
+        public IReadOnlyList<string> StyleSheets { get; }
 
         /// <summary>오류에 붙일 파일 이름.</summary>
         public string Name { get; }
