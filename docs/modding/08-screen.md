@@ -72,6 +72,26 @@ def board(me):
   . S A S .
 ```
 
+### Unity: UXML
+
+Unity 호스트는 UXML 파일(`samples/skirmish/core/ui/screen.uxml`)로 화면을 정한다. 모양은 UXML, 값은 위의 화면 함수가 만든다. 요소 속성을 함수 값에 묶고, 눌림을 커맨드나 화면 동작에 잇는다.
+
+```xml
+<ui:VisualElement name="screen" params="house" seat="house">          <!-- house에는 호스트가 그 연결이 앉은 진영을 넣는다 -->
+  <ui:Label bind-text="skirmish.turn_number(house)" />                <!-- 속성 text를 함수 값으로 -->
+  <ui:Button on-click="skirmish.EndTurn(house)" />                    <!-- 커맨드면 내고, 응답 커맨드는 열린 질문에 답한다 -->
+  <ui:VisualElement for="row in skirmish.units(house)">               <!-- 리스트의 항목마다 자식 한 벌 -->
+    <ui:VisualElement class="card" bind-class-selected="skirmish.is_chosen(row.unit)" bind-class-acted="row.acted">
+      <ui:Label bind-text="row.hp" />                                 <!-- 사전의 키는 점으로 읽는다 -->
+      <ui:Button on-click="skirmish.select(house, row.unit)" />       <!-- 화면 동작 -->
+```
+
+- 식은 `모드.함수(인자)` 하나나 변수 하나다. 인자는 변수나 고정값(숫자, 작은따옴표 글자, `True`·`False`·`None`)이고 호출 안의 호출과 연산자는 없다. 계산은 함수가 한다.
+- `bind-text`·`bind-display`·`bind-enabled`·`bind-value`·`bind-opacity`·`bind-image`, `bind-class-<이름>`(참이면 클래스를 붙임), `bind-class`(함수가 돌려준 글자나 글자 목록이 클래스).
+- 눌러도 되는지는 호스트가 `require`·`choose`와 입구를 미리 보아 버튼을 회색으로 한다.
+- 다른 파일을 `<Include src="…" 이름="식" />`로 끼우면 그 파일이 `params`로 선언한 이름의 값을 넘겨야 한다.
+- 아직 없는 것: 런타임에 읽는 스타일시트(USS), 인라인 `style`, 창을 끌어 옮기는 속성.
+
 ## 번역
 
 화면에 보일 글은 모드가 키로 적고(`text("harbor-charter", gold=5)`, `TextKey`, 문자열 선택지), 글 자체는 **번역 파일**에 언어마다 둔다.

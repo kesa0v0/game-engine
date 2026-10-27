@@ -31,6 +31,6 @@
 | 한 엔티티에 여러 연결(공동 조종) | 한 연결 이름을 여럿이 나눠 쓴다 |
 | `migrate`(저장 옮기기) | 위의 저장 호환 규칙 안에서 고친다 |
 | 엔진이 만드는 레퍼런스 페이지 | 스텁(`engine stubs`)을 본다 |
-| Unity 화면(UXML) | 규칙(`bind-*`·`on-click`·`for`·`params`)과 해석기는 있고(`samples/skirmish/core/ui/screen.uxml`), 그리는 Unity 렌더러와 패키지는 아직 없다. 지금 화면은 콘솔의 `ui/console.txt`로 본다 |
+| Unity 화면(UXML)의 일부 | 규칙(8장)과 해석기, Unity 패키지(`hosts/unity/uk.kesa.engine.unity`)가 있고 창 없는 확인이 통과했다. 아직 없는 것: 런타임에 읽는 스타일시트(USS), 인라인 `style`, Unity 안에서 눌림과 프레임마다 갱신을 돌려 본 확인 |
 
 이 목록은 엔진이 자라면서 줄어든다. 무엇이 정해졌는지는 `docs/spec-gaps.md`(결정 기록)에 있다.
