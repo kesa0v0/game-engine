@@ -12,7 +12,7 @@
 
 ④ 콘솔 호스트를 경계로 옮기는 일은 끝났다(G329: 세션의 `Entities()`·`Read()`). `ConsoleGame`은 `IHostOperator`·`IHostSession`만 부르고 `Play`가 `LocalHost`를 만든다. 화면 파일이 없을 때는 자리(연결)마다 그 연결이 보는 엔티티를 `[연결]` 머리 아래에 늘어놓는다.
 
-**다음:** ⑤ UPM 패키지와 빌드 복사, UXML 해석기를 사용자와 정한다. 정한 것은 G330(변수는 윗 요소가 이름을 정의하는 이름 범위, 반복은 UXML의 선언형, 커맨드 조립은 스크립트)이다. 남은 질문은 순서대로: 호출식의 문법과 속성 이름(이전 엔진 `UIInterpreter`의 어휘를 이어받을지는 아직 안 정함), 패널 루트 변수를 선언하는 모양, 반복이 리스트가 바뀔 때 항목을 대응시키는 키, 커맨드 버튼이 `@ui_action`을 가리키는 모양, 첫 화면. 한 번에 하나씩 묻는다. 이전 엔진 UI는 `E:\Project\Game\SharedPackages\uk.kesa.engine\Scripts\View\UI\Core`(이 컴퓨터에서는 `Projects\Unity\SharedPackages`). `Translator`의 커널 값 오버로드(`Label(Value, World)` 등)는 이제 번역 테스트만 쓰므로 거둘지 본다(`ConsoleHost`는 `Bridge.Local`을 `LocalHost` 때문에 계속 참조한다). Unity 쪽 안내서에는 "화면 주는 방식"(모드가 화면 함수를 두고 호스트가 읽어 그림, 커널은 `Changed()`로 바뀐 키만 알림, 영수증은 경계 너머라서 둔 최적화)을 짧게 넣는다.
+**다음:** ⑤ UPM 패키지와 빌드 복사, UXML 해석기를 사용자와 정한다. 정한 것은 G330(변수는 윗 요소가 이름을 정의하는 이름 범위, 반복은 UXML의 선언형, 커맨드 조립은 스크립트)과 G331(`bind-<요소 속성>`, 클래스는 `bind-class-<이름>`)이다. 남은 질문은 순서대로: 호출식의 문법 세부(인자로 허용할 것, 중첩 금지 제안은 아직 확인 못 받음), 함수가 클래스 이름을 돌려주는 모양, 이미지, 값을 속성 타입으로 바꾸는 규칙, 패널 루트 변수를 선언하는 모양, 반복이 리스트가 바뀔 때 항목을 대응시키는 키, 커맨드 버튼이 `@ui_action`을 가리키는 모양, 첫 화면. 한 번에 하나씩 묻는다. 이전 엔진 UI는 `E:\Project\Game\SharedPackages\uk.kesa.engine\Scripts\View\UI\Core`(이 컴퓨터에서는 `Projects\Unity\SharedPackages`). `Translator`의 커널 값 오버로드(`Label(Value, World)` 등)는 이제 번역 테스트만 쓰므로 거둘지 본다(`ConsoleHost`는 `Bridge.Local`을 `LocalHost` 때문에 계속 참조한다). Unity 쪽 안내서에는 "화면 주는 방식"(모드가 화면 함수를 두고 호스트가 읽어 그림, 커널은 `Changed()`로 바뀐 키만 알림, 영수증은 경계 너머라서 둔 최적화)을 짧게 넣는다.
 
 **남은 정리:** 조회 도구(`tools/Kesa.Tools.Decisions`)의 테스트, 자동으로 붙인 결정 태그 보정.
 
