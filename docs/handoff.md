@@ -26,7 +26,7 @@
 1. (끝) 경계에 `Check`·`Version`(G342)과 커맨드용 `WorldView.CheckPreconditions`.
 2. (끝) `Kesa.Engine.Ui`와 시험. 첫 화면은 `samples/skirmish/core/ui/screen.uxml`(엔진 시험용 데모, 유닛 카드·고르기 → 공격)이고 화면 값 함수 `turn_number`·`mine`·`is_chosen`을 skirmish에 더했다(콘솔 쪽 함수는 그대로).
 3. (끝) 응답 커맨드 버튼은 `Deliver`, 회색 판정에 입구 검사(G346).
-4. (끝) ⑤ UPM 패키지, DLL 복사, Unity 렌더러(G347). 남은 것: 데모 씬/`MonoBehaviour`(UIDocument에 올리고 프레임마다 `RefreshAsync`, 눌림을 Unity에서 확인), 런타임에 USS 글을 `StyleSheet`로 읽는 법(Unity에 공개 API가 없어 미정, 이전 엔진은 직접 파서), 인라인 `style` 속성, 이미지 파일 읽기 방식의 세부.
+4. (끝) ⑤ UPM 패키지, DLL 복사, Unity 렌더러(G347)와 데모 프로젝트 `hosts/unity/demo`(씬 `Assets/Scenes/Demo.unity`, `KesaDemo`가 skirmish를 돌려 UIDocument에 올리고 프레임마다 `RefreshAsync`, 창 없는 확인 `KesaDemoSetup.Check` 통과). 남은 것: 재생해서 눌림·갱신을 눈으로 확인(사용자), 런타임에 USS 글을 `StyleSheet`로 읽는 법(Unity에 공개 API가 없어 미정, 이전 엔진은 직접 파서), 인라인 `style` 속성, 이미지 파일 읽기 방식의 세부.
 5. NUMBER 구현(G334).
 
 **구현하며 제가 정한 것, 사용자 확인 전(G345 잠정):** 어셈블리 이름 `Kesa.Engine.Ui`, 번역을 참조하지 않고 글자 만들기를 주입(G343 일부바뀜), 숫자를 고정소수점 raw로 렌더러에 줌, 영수증 키 모양과 세션당 해석기 하나, 호스트가 직접 낸 동작은 `ActAsync`/`InvalidateButtons`로 알림.

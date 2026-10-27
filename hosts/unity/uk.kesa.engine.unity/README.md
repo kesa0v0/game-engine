@@ -31,6 +31,10 @@ Unity.exe -batchmode -nographics -projectPath <패키지를 manifest에 적은 �
 
 로그에 `KESA SMOKE TEST: OK`가 나오면 skirmish 화면이 Unity의 요소 트리로 맞게 만들어진 것이다.
 
+## 데모 프로젝트
+
+`hosts/unity/demo`는 이 패키지를 `file:`로 가져다 쓰는 Unity 프로젝트다(`.gitignore`는 Unity 프로젝트용 템플릿). 먼저 저장소 루트에서 `dotnet build`를 한 뒤 Unity 6000.3으로 열고 `Assets/Scenes/Demo.unity`를 재생하면 `samples/skirmish`가 같은 프로세스에서 돌며 UXML 화면이 뜬다(`KesaDemo`). 창 없이 확인: `-executeMethod KesaDemoSetup.Check`.
+
 ## 아직 없는 것
 
 - 스타일시트(`<Style src>`): Unity에 런타임에 USS 글을 읽는 공개 API가 없어 게임이 `ModFolderAssets`에 읽기를 꽂아야 한다.
