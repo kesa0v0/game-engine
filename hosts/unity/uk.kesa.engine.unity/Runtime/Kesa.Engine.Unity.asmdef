@@ -1,0 +1,23 @@
+{
+    "name": "Kesa.Engine.Unity",
+    "rootNamespace": "Kesa.Engine.Unity",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Kesa.Engine.Kernel.dll",
+        "Kesa.Engine.Bridge.dll",
+        "Kesa.Engine.Bridge.Local.dll",
+        "Kesa.Engine.Text.dll",
+        "Kesa.Engine.Ui.dll",
+        "Linguini.Bundle.dll",
+        "Linguini.Shared.dll",
+        "Linguini.Syntax.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

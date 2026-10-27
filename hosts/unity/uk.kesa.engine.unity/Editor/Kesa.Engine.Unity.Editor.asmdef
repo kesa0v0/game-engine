@@ -1,0 +1,24 @@
+{
+    "name": "Kesa.Engine.Unity.Editor",
+    "rootNamespace": "Kesa.Engine.Unity.Editor",
+    "references": [
+        "Kesa.Engine.Unity"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Kesa.Engine.Kernel.dll",
+        "Kesa.Engine.Bridge.dll",
+        "Kesa.Engine.Bridge.Local.dll",
+        "Kesa.Engine.Text.dll",
+        "Kesa.Engine.Ui.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

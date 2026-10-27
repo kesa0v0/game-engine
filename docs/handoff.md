@@ -10,7 +10,7 @@
 
 ## 다음 할 일
 
-**UXML 해석기의 규칙(G330~G345)과 그리지 않는 부분의 코드(`src/Kesa.Engine.Ui`: 식 파서, UXML 읽기, 해석기, 렌더러 인터페이스)와 시험(`tests/Kesa.Engine.Ui.Tests`: 시험용 메모리 렌더러와 진짜 `LocalHost`, skirmish 화면)이 끝났다. Unity 렌더러와 패키지는 아직 없다.** 정한 것:
+**UXML 해석기의 규칙(G330~G345)과 그리지 않는 부분의 코드(`src/Kesa.Engine.Ui`: 식 파서, UXML 읽기, 해석기, 렌더러 인터페이스)와 시험(`tests/Kesa.Engine.Ui.Tests`: 시험용 메모리 렌더러와 진짜 `LocalHost`, skirmish 화면)이 끝났다. Unity 패키지(`hosts/unity/uk.kesa.engine.unity`: `UiToolkitRenderer`, `ModFolderAssets`, `KesaGame`)도 있고, 설치된 Unity 6000.3.8f1에서 컴파일과 창 없는 확인(`KesaSmokeTest`, 패키지 README)이 통과했다: skirmish 화면이 실제 `VisualElement` 트리로 올라와 카드 6장, 번역된 유닛 이름, 회색 버튼까지 맞다. 눌림(클릭)과 프레임마다의 갱신은 Unity에서 아직 돌려 보지 않았다(`dotnet test`에서만).** 정한 것:
 
 - 변수는 윗 요소가 이름을 정의하는 이름 범위, 반복은 UXML의 선언형, 커맨드 조립은 스크립트(G330).
 - 속성: `bind-<요소 속성>`, 클래스 토글은 `bind-class-<이름>`(G331), 함수가 클래스 이름(들)을 돌려주는 `bind-class`(G333), 이미지는 `bind-image`와 모드가 공유하는 가상 경로로 나중에 로드된 모드가 이김(G335), 클릭은 `on-click="모드.이름(인자)"`로 이름이 커맨드면 `Deliver`(자유 커맨드는 `Submit`, 응답 커맨드는 열린 질문에 답함), 화면 동작이면 `Act`(G336·G346).
@@ -26,7 +26,7 @@
 1. (끝) 경계에 `Check`·`Version`(G342)과 커맨드용 `WorldView.CheckPreconditions`.
 2. (끝) `Kesa.Engine.Ui`와 시험. 첫 화면은 `samples/skirmish/core/ui/screen.uxml`(엔진 시험용 데모, 유닛 카드·고르기 → 공격)이고 화면 값 함수 `turn_number`·`mine`·`is_chosen`을 skirmish에 더했다(콘솔 쪽 함수는 그대로).
 3. (끝) 응답 커맨드 버튼은 `Deliver`, 회색 판정에 입구 검사(G346).
-4. ⑤ UPM 패키지와 빌드 복사(G328, 새 DLL이 더해짐)와 Unity 렌더러(`IUiRenderer` 구현: 요소 만들기, 고정 속성·`style`·`<Style src>` 처리, 고정소수점 raw를 실수로, 이미지 경로 찾기).
+4. (끝) ⑤ UPM 패키지, DLL 복사, Unity 렌더러(G347). 남은 것: 데모 씬/`MonoBehaviour`(UIDocument에 올리고 프레임마다 `RefreshAsync`, 눌림을 Unity에서 확인), 런타임에 USS 글을 `StyleSheet`로 읽는 법(Unity에 공개 API가 없어 미정, 이전 엔진은 직접 파서), 인라인 `style` 속성, 이미지 파일 읽기 방식의 세부.
 5. NUMBER 구현(G334).
 
 **구현하며 제가 정한 것, 사용자 확인 전(G345 잠정):** 어셈블리 이름 `Kesa.Engine.Ui`, 번역을 참조하지 않고 글자 만들기를 주입(G343 일부바뀜), 숫자를 고정소수점 raw로 렌더러에 줌, 영수증 키 모양과 세션당 해석기 하나, 호스트가 직접 낸 동작은 `ActAsync`/`InvalidateButtons`로 알림.

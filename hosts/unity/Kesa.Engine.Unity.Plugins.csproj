@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 코드가 없다: Unity 패키지가 쓸 DLL들을 모아 패키지의 Plugins/로 복사한다 (spec-gaps G347) -->
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- 패키지 안의 C# 소스는 Unity가 컴파일한다 -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>$(NoWarn);CS2008</NoWarn>
+    <PluginsFolder>$(MSBuildThisFileDirectory)uk.kesa.engine.unity\Plugins\</PluginsFolder>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Kesa.Engine.Kernel\Kesa.Engine.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\Kesa.Engine.Bridge\Kesa.Engine.Bridge.csproj" />
+    <ProjectReference Include="..\..\src\Kesa.Engine.Bridge.Local\Kesa.Engine.Bridge.Local.csproj" />
+    <ProjectReference Include="..\..\src\Kesa.Engine.Text\Kesa.Engine.Text.csproj" />
+    <ProjectReference Include="..\..\src\Kesa.Engine.Ui\Kesa.Engine.Ui.csproj" />
+  </ItemGroup>
+
+  <Target Name="CopyToUnityPackage" AfterTargets="Build">
+    <ItemGroup>
+      <PluginFile Include="$(OutDir)*.dll;$(OutDir)*.pdb" Exclude="$(OutDir)Kesa.Engine.Unity.Plugins.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PluginFile)" DestinationFolder="$(PluginsFolder)" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Unity package plugins: @(PluginFile->Count()) files -> $(PluginsFolder)" />
+  </Target>
+
+</Project>

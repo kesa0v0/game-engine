@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/hosts/">
+    <Project Path="hosts/unity/Kesa.Engine.Unity.Plugins.csproj" />
+  </Folder>
   <Folder Name="/bench/">
     <Project Path="bench/Kesa.Engine.Bench/Kesa.Engine.Bench.csproj" />
   </Folder>

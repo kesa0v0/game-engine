@@ -1,0 +1,11 @@
+{
+  "name": "uk.kesa.engine.unity",
+  "version": "0.1.0",
+  "displayName": "Kesa Engine - Unity host",
+  "description": "Unity host for the Kesa engine kernel: draws UXML screens (UI Toolkit) from a game's mods through the host boundary. The kernel DLLs are copied here by 'dotnet build' (hosts/unity/Kesa.Engine.Unity.Plugins.csproj).",
+  "unity": "6000.3",
+  "dependencies": {
+    "com.unity.modules.uielements": "1.0.0",
+    "com.unity.modules.imageconversion": "1.0.0"
+  }
+}
