@@ -41,6 +41,12 @@ namespace Kesa.Engine.Bridge
         /// <summary>그 키의 영수증을 놓는다 (패널을 닫음).</summary>
         ValueTask Unbind(string key);
 
+        /// <summary>이 연결에게 보이는 엔티티를 (스키마의 종류 순, id 순)으로, 도장과 함께 (G329).</summary>
+        ValueTask<IReadOnlyList<BridgeListed>> Entities();
+
+        /// <summary>그 엔티티의 보이는 컴포넌트와 멤버 값. 없거나 못 보면 null (G329).</summary>
+        ValueTask<IReadOnlyList<BridgeComponent>?> Read(long entity);
+
         /// <summary>이 연결이 보는 열린 질문들 (G200·G234).</summary>
         ValueTask<IReadOnlyList<BridgeRequest>> OpenRequests();
 

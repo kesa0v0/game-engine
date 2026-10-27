@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Kesa.Engine.Runtime;
+using Kesa.Engine.Schema;
 using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Bridge.Local
@@ -85,6 +86,50 @@ namespace Kesa.Engine.Bridge.Local
         {
             _receipts.Remove(key);
             return default;
+        }
+
+        public ValueTask<IReadOnlyList<BridgeListed>> Entities()
+        {
+            var view = View;
+            var listed = new List<BridgeListed>();
+            foreach (var type in _host.Loaded.Schema.Types)
+            {
+                foreach (var id in view.All(type.Name))
+                    listed.Add(new BridgeListed(new BridgeEntity(id.Value, view.DefOf(id)), World.Version(id), HasDerived(view, id)));
+            }
+            return Done<IReadOnlyList<BridgeListed>>(listed);
+        }
+
+        public ValueTask<IReadOnlyList<BridgeComponent>?> Read(long entity)
+        {
+            var view = View;
+            var id = new EntityId(entity);
+            if (!view.Sees(id)) return Done<IReadOnlyList<BridgeComponent>?>(null);
+            var defOf = DefOf(view);
+            var components = new List<BridgeComponent>();
+            foreach (var component in _host.Loaded.Schema.Components)
+            {
+                if (!view.Has(id, component.Name)) continue;
+                var members = new List<KeyValuePair<string, BridgeValue>>(component.Members.Count);
+                foreach (var m in component.Members)
+                {
+                    var value = KernelValues.ToBridge(view.Get(id, World.Member(component.Name, m.Name)), defOf);
+                    members.Add(new KeyValuePair<string, BridgeValue>(m.Name, value));
+                }
+                components.Add(new BridgeComponent(component.Name, members));
+            }
+            return Done<IReadOnlyList<BridgeComponent>?>(components);
+        }
+
+        private bool HasDerived(WorldView view, EntityId id)
+        {
+            foreach (var component in _host.Loaded.Schema.Components)
+            {
+                if (!view.Has(id, component.Name)) continue;
+                foreach (var m in component.Members)
+                    if (m.Kind == MemberKind.Derived) return true;
+            }
+            return false;
         }
 
         public ValueTask<IReadOnlyList<BridgeRequest>> OpenRequests()

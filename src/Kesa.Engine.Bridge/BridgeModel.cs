@@ -223,6 +223,35 @@ namespace Kesa.Engine.Bridge
         public string? Connection { get; }
     }
 
+    /// <summary>보이는 엔티티 하나와 그 도장 (G329). 도장이 그대로면 <see cref="IHostSession.Read"/>의 결과도 같다. 단 <see cref="Volatile"/>이면 아니다.</summary>
+    public sealed class BridgeListed
+    {
+        public BridgeListed(BridgeEntity entity, long version, bool isVolatile)
+        {
+            Entity = entity;
+            Version = version;
+            Volatile = isVolatile;
+        }
+
+        public BridgeEntity Entity { get; }
+        public long Version { get; }
+        /// <summary>남의 엔티티를 읽는 <c>derived</c> 칸이 있어 도장이 바뀜을 다 담지 못한다 (G251).</summary>
+        public bool Volatile { get; }
+    }
+
+    /// <summary>엔티티에 붙은, 보이는 컴포넌트 하나: 멤버 이름과 값 (스키마의 선언 순) (G329).</summary>
+    public sealed class BridgeComponent
+    {
+        public BridgeComponent(string name, IReadOnlyList<KeyValuePair<string, BridgeValue>> members)
+        {
+            Name = name;
+            Members = members;
+        }
+
+        public string Name { get; }
+        public IReadOnlyList<KeyValuePair<string, BridgeValue>> Members { get; }
+    }
+
     /// <summary>틱 진행 결과. 시간을 막는 질문이 열려 있으면 <see cref="Blocked"/>.</summary>
     public sealed class BridgeAdvance
     {
