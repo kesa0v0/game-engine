@@ -180,6 +180,25 @@ namespace Kesa.Engine.Bridge.Local
             }
         }
 
+        public ValueTask<BridgeResult> Check(string name, IReadOnlyDictionary<string, BridgeValue> arguments)
+        {
+            var args = KernelValues.ToKernel(arguments);
+            var view = View;
+            try
+            {
+                var report = _host.Loaded.UiActions.ContainsKey(name)
+                    ? view.CheckPreconditions(_ui, name, args)
+                    : view.CheckPreconditions(name, args);
+                return Done(KernelResults.Check(report, DefOf(view)));
+            }
+            catch (WorldException e)
+            {
+                return Done(KernelResults.Failure(e));
+            }
+        }
+
+        public ValueTask<long> Version() => Done(World.Version());
+
         public ValueTask<BridgeResult> Submit(string command, IReadOnlyDictionary<string, BridgeValue> arguments)
         {
             var args = KernelValues.ToKernel(arguments);

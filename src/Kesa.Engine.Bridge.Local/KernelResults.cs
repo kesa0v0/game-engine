@@ -59,6 +59,19 @@ namespace Kesa.Engine.Bridge.Local
         public static BridgeMoves NoMoves(WorldException error) =>
             new BridgeMoves(Array.Empty<BridgeMove>(), false, null, new[] { Error(error) });
 
+        /// <summary>사전 조건만 본 결과(G342). 통과하면 <c>Passed</c>.</summary>
+        public static BridgeResult Check(PreconditionReport report, Func<EntityId, string?> defOf)
+        {
+            string outcome = report.Arguments.Count > 0 ? SubmitOutcome.ArgumentsRejected.ToString()
+                : report.Failures.Count > 0 ? SubmitOutcome.PreconditionsFailed.ToString()
+                : "Passed";
+            return new BridgeResult(report.Passed, outcome, Reasons(null, Array.Empty<ArgumentRejection>(), report, defOf));
+        }
+
+        /// <summary>검사하다 난 오류(없는 이름, 스크립트 오류).</summary>
+        public static BridgeResult Failure(WorldException error) =>
+            new BridgeResult(false, SubmitOutcome.ScriptError.ToString(), new[] { Error(error) });
+
         public static IReadOnlyDictionary<string, BridgeValue> Arguments(IReadOnlyDictionary<string, Value> args, Func<EntityId, string?> defOf)
         {
             var result = new SortedDictionary<string, BridgeValue>(StringComparer.Ordinal);

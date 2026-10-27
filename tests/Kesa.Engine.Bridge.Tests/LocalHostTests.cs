@@ -163,6 +163,46 @@ namespace Kesa.Engine.Bridge.Tests
         }
 
         [Test]
+        public async Task CheckSeesThePreconditionsWithoutDoingAnything()
+        {
+            var passes = await _alice.Check("arena.Hit", Target(_a));
+            Assert.That((passes.Succeeded, passes.Outcome, passes.Reasons.Count), Is.EqualTo((true, "Passed", 0)));
+            Assert.That(Hp(_a), Is.EqualTo(3), "checking does not hit");
+
+            _host.World.Set(new EntityId(_a), _host.World.Member("Hp", "v"), new IntValue(1));
+            var fails = await _alice.Check("arena.Hit", Target(_a));
+            Assert.That((fails.Succeeded, fails.Outcome), Is.EqualTo((false, "PreconditionsFailed")));
+            var reason = fails.Reasons.Single();
+            Assert.That(reason.Kind, Is.EqualTo(BridgeReasonKind.Require));
+            Assert.That(reason.Text!.Key, Is.EqualTo("arena-too-weak"));
+            Assert.That(Hp(_a), Is.EqualTo(1));
+        }
+
+        [Test]
+        public async Task CheckTakesAUiActionByNameAndReportsWrongArgumentsAndUnknownNames()
+        {
+            var action = await _alice.Check("arena.click", Args(("u", new BridgeEntity(_a, null))));
+            Assert.That(action.Outcome, Is.EqualTo("Passed"));
+
+            var wrong = await _alice.Check("arena.Hit", Target(_red));
+            Assert.That(wrong.Outcome, Is.EqualTo("ArgumentsRejected"));
+            Assert.That(wrong.Reasons.Single().Parameter, Is.EqualTo("target"));
+
+            var unknown = await _alice.Check("arena.nope", Target(_a));
+            Assert.That(unknown.Succeeded, Is.False);
+            Assert.That(unknown.Reasons.Single().Kind, Is.EqualTo(BridgeReasonKind.Error));
+        }
+
+        [Test]
+        public async Task VersionMovesWhenTheWorldChanges()
+        {
+            long before = await _alice.Version();
+            Assert.That(await _alice.Version(), Is.EqualTo(before), "reading does not move it");
+            await _alice.Submit("arena.Hit", Target(_a));
+            Assert.That(await _alice.Version(), Is.GreaterThan(before));
+        }
+
+        [Test]
         public async Task LegalMovesCrossAsData()
         {
             var moves = await _alice.LegalMoves("arena.Hit", Args(), 10);

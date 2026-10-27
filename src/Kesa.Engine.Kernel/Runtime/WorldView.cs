@@ -83,6 +83,10 @@ namespace Kesa.Engine.Runtime
         public PreconditionReport CheckPreconditions(UiState ui, string action, IReadOnlyDictionary<string, Value> args) =>
             Show(_world.CheckActAs(this, ui, action, args))!;
 
+        /// <summary>커맨드를 내지 않고 사전 조건만 본다(<see cref="World.CheckPreconditions"/>). 이 연결에게 보낼 모양으로 거른다.</summary>
+        public PreconditionReport CheckPreconditions(string command, IReadOnlyDictionary<string, Value> args) =>
+            Show(_world.CheckPreconditions(command, args))!;
+
         /// <summary>UI 동작 매개변수 하나의 후보 (<see cref="Candidates(string, IReadOnlyDictionary{string, Value}, string)"/>와 같고 못 보는 엔티티는 빠진다).</summary>
         public CandidateList Candidates(UiState ui, string action, IReadOnlyDictionary<string, Value> args, string parameter)
         {

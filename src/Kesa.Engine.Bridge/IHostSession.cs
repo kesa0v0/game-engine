@@ -59,6 +59,15 @@ namespace Kesa.Engine.Bridge
         /// <summary>화면 동작의 합법 수 (G280).</summary>
         ValueTask<BridgeMoves> LegalUiMoves(string action, IReadOnlyDictionary<string, BridgeValue> given, int max);
 
+        /// <summary>
+        /// 눌러 보지 않고 사전 조건만 본다(회색 버튼과 그 이유, G342). 이름이 커맨드든 화면 동작이든 된다. 상태를 바꾸지 않는다.
+        /// 결과의 <see cref="BridgeResult.Outcome"/>은 <c>Passed</c>, <c>ArgumentsRejected</c>, <c>PreconditionsFailed</c>나 오류다.
+        /// </summary>
+        ValueTask<BridgeResult> Check(string name, IReadOnlyDictionary<string, BridgeValue> arguments);
+
+        /// <summary>세계 변경 도장. 바뀌었으면 보이는 버튼의 <see cref="Check"/>를 다시 한다 (G342).</summary>
+        ValueTask<long> Version();
+
         ValueTask<BridgeResult> Submit(string command, IReadOnlyDictionary<string, BridgeValue> arguments);
 
         ValueTask<BridgeResult> Respond(long request, string command, IReadOnlyDictionary<string, BridgeValue> arguments);
