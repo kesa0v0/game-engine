@@ -37,4 +37,6 @@
 
 ## Unity
 
-Unity는 `.csproj`를 직접 쓰지 않고 어셈블리 정의(`.asmdef`)로 컴파일한다. 일반 지식으로는 Unity도 Roslyn 분석기 DLL을 `RoslynAnalyzer` 레이블로 받는다. 하지만 이 저장소에서 Unity로 확인한 적은 없다. Unity 패키지 형태가 정해질 때(spec P1a) 같이 확인한다.
+커널·경계·번역·UI 해석은 `dotnet build`로 컴파일되어(그때 이 검사가 돈다) DLL로 Unity 패키지에 들어간다(G328·G347). 그래서 이 부분은 Unity에서 따로 검사할 필요가 없다.
+
+호스트 함수는 게임이 쓰는 코드다. Unity는 `.csproj`를 직접 쓰지 않고 어셈블리 정의(`.asmdef`)로 컴파일한다. 일반 지식으로는 Unity도 Roslyn 분석기 DLL을 `RoslynAnalyzer` 레이블로 받는다. 하지만 게임의 호스트 함수에 이 분석기를 거는 것은 이 저장소에서 Unity로 확인한 적이 없다. 호스트 함수를 Unity에서 쓸 때(spec P1a) 확인한다.
