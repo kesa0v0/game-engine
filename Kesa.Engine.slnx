@@ -10,11 +10,13 @@
     <Project Path="src/Kesa.Engine.ConsoleHost/Kesa.Engine.ConsoleHost.csproj" />
     <Project Path="src/Kesa.Engine.Kernel/Kesa.Engine.Kernel.csproj" />
     <Project Path="src/Kesa.Engine.Text/Kesa.Engine.Text.csproj" />
+    <Project Path="src/Kesa.Engine.Ui/Kesa.Engine.Ui.csproj" />
     <Project Path="tests/Kesa.Engine.Bridge.Tests/Kesa.Engine.Bridge.Tests.csproj" />
     <Project Path="tests/Kesa.Engine.Cli.Tests/Kesa.Engine.Cli.Tests.csproj" />
     <Project Path="tests/Kesa.Engine.ConsoleHost.Tests/Kesa.Engine.ConsoleHost.Tests.csproj" />
     <Project Path="tests/Kesa.Engine.Kernel.Tests/Kesa.Engine.Kernel.Tests.csproj" />
     <Project Path="tests/Kesa.Engine.Text.Tests/Kesa.Engine.Text.Tests.csproj" />
+    <Project Path="tests/Kesa.Engine.Ui.Tests/Kesa.Engine.Ui.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/Kesa.Tools.Decisions/Kesa.Tools.Decisions.csproj" />

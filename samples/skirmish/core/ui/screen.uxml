@@ -1,0 +1,14 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <!-- Unity 호스트의 화면 (spec-gaps G330~G345). house에는 호스트가 그 연결이 앉은 진영을 넣는다 -->
+  <ui:VisualElement name="screen" params="house" seat="house">
+    <ui:Label name="turn" bind-text="skirmish.turn_number(house)" />
+    <ui:VisualElement name="units" class="units" for="row in skirmish.units(house)">
+      <ui:VisualElement class="card" bind-class-mine="skirmish.mine(row.unit, house)" bind-class-selected="skirmish.is_chosen(row.unit)" bind-class-acted="row.acted">
+        <ui:Label name="kind" bind-text="row.unit" />
+        <ui:Label name="hp" bind-text="row.hp" />
+        <ui:Button name="select" text="select" on-click="skirmish.select(house, row.unit)" />
+        <ui:Button name="strike" text="strike" on-click="skirmish.strike(house, row.unit)" />
+      </ui:VisualElement>
+    </ui:VisualElement>
+  </ui:VisualElement>
+</ui:UXML>

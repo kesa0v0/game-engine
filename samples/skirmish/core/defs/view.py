@@ -31,3 +31,11 @@ def selection(me):
 def units(me):
     return [{"unit": u, "x": u.Pos.x, "y": u.Pos.y, "hp": u.Life.hp, "acted": u.Ready.acted, "party": u.Owner.party}
             for u in query(Unit)]
+
+# UXML 화면(ui/screen.uxml)이 부르는 값 함수들: 콘솔 화면이 쓰는 위의 함수들과 따로, 값 하나씩을 돌려준다.
+def turn_number(me):
+    g = game()
+    return 0 if g is None else g.Match.turn
+
+def mine(u, me):
+    return u.Owner.party == me

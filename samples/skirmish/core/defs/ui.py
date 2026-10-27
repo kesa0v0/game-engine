@@ -24,3 +24,7 @@ def strike(me: Ref[Party], target: Ref[Unit]):
     # Attack은 차례 질문의 답이다: 엔진이 이 연결이 답할 질문을 찾아 낸다 (G283)
     submit("Attack", party=me, unit=chosen(), target=target)
     ui.Selection.unit = None
+
+# UXML 화면(ui/screen.uxml)이 부른다: 이 유닛이 고른 유닛인가
+def is_chosen(u):
+    return ui.Selection.unit == u

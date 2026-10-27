@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- UXML 해석의 그리지 않는 부분 (spec-gaps G343·G345). 경계만 알고 Unity를 모른다 -->
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <RootNamespace>Kesa.Engine.Ui</RootNamespace>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+  </PropertyGroup>
+
+  <!-- 숫자는 고정소수점의 원래 정수값으로 렌더러에 간다: 실수는 Unity가 화면에 쓸 때만 (G326·G345) -->
+  <Import Project="..\Kesa.Engine.Analyzers\Determinism.props" />
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kesa.Engine.Ui.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kesa.Engine.Bridge\Kesa.Engine.Bridge.csproj" />
+  </ItemGroup>
+
+</Project>
