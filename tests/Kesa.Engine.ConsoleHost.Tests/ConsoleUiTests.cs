@@ -95,6 +95,28 @@ namespace Kesa.Engine.ConsoleHost.Tests
         }
 
         [Test]
+        public void TheListingShowsEachSeatOnlyWhatItsConnectionSees()
+        {
+            File.WriteAllText(Path.Combine(_root, "banking", "defs", "annex.py"),
+                "Bank(\"Annex\")\n" +
+                "@command(free=True, acts_for=None)\ndef Aaa():\n    spawn(\"Vault\")\n    spawn(\"Annex\")\n" +
+                "@view_rule(Purse)\ndef own_purse(viewer, entity):\n    return viewer == entity\n");
+            var screen = new StringWriter();
+            var errors = new StringWriter();
+            int code = ConsoleHost.Play.Run(new[] { "--lang", "ko", _root, "--seat", "red=banking:Vault", "--seat", "blue=banking:Annex" },
+                new StringReader("1\n:q\n"), screen, errors);
+            Assert.That(code, Is.EqualTo(0), errors.ToString());
+            string text = screen.ToString().Replace("\r\n", "\n");
+            int redAt = text.LastIndexOf("[red]\n", System.StringComparison.Ordinal);
+            int blueAt = text.LastIndexOf("[blue]\n", System.StringComparison.Ordinal);
+            Assert.That(redAt, Is.GreaterThan(-1));
+            string red = text.Substring(redAt, blueAt - redAt);
+            string blue = text.Substring(blueAt);
+            Assert.That(red, Does.Contain("#1 banking:Vault  Seatable() Purse(gold=0)").And.Contain("#2 banking:Annex  Seatable() Worth"));
+            Assert.That(blue, Does.Contain("#2 banking:Annex  Seatable() Purse(gold=0)").And.Contain("#1 banking:Vault  Seatable() Worth"));
+        }
+
+        [Test]
         public void TheListingRereadsADerivedValueThatReadsOtherEntities()
         {
             // 동전을 닦으면 금고의 도장은 그대로지만 Worth.total은 바뀐다 (G251)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using Kesa.Engine.Bridge.Local;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Reporting;
@@ -69,14 +70,16 @@ namespace Kesa.Engine.ConsoleHost
             }
 
             var world = new World(content, seed: seed);
+            var host = new LocalHost(content, world);
             var panels = ConsoleUi.Load(root, content);
-            var wrong = ConsoleUi.Check(world, panels);
+            var opening = host.Open(seats[0].Connection);
+            var wrong = ConsoleUi.Check(opening.IsCompletedSuccessfully ? opening.Result : opening.AsTask().GetAwaiter().GetResult(), panels);
             if (wrong.Count > 0)
             {
                 foreach (var line in wrong) stderr.WriteLine(line);
                 return 1;
             }
-            new ConsoleGame(content, world, seats, panels, Translator(content, languages ?? DefaultLanguages(), stderr), stdin, stdout).Run();
+            new ConsoleGame(host, seats, panels, Translator(content, languages ?? DefaultLanguages(), stderr), stdin, stdout).Run();
             return 0;
         }
 

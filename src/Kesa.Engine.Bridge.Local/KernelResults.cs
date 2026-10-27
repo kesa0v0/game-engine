@@ -69,8 +69,13 @@ namespace Kesa.Engine.Bridge.Local
         public static BridgeResult Result(SubmitResult r, Func<EntityId, string?> defOf) =>
             new BridgeResult(r.Succeeded, r.Outcome.ToString(), Reasons(r.Error, r.ArgumentRejections, r.Preconditions, defOf));
 
-        public static BridgeResult Result(AnswerResult r, Func<EntityId, string?> defOf) =>
-            new BridgeResult(r.Succeeded, r.Outcome.ToString(), Reasons(r.Error, r.ArgumentRejections, r.Preconditions, defOf));
+        public static BridgeResult Result(AnswerResult r, Func<EntityId, string?> defOf)
+        {
+            var reasons = new List<BridgeReason>();
+            if (r.Message != null) reasons.Add(new BridgeReason(BridgeReasonKind.Error, message: r.Message));
+            reasons.AddRange(Reasons(r.Error, r.ArgumentRejections, r.Preconditions, defOf));
+            return new BridgeResult(r.Succeeded, r.Outcome.ToString(), reasons);
+        }
 
         public static BridgeResult Result(ActResult r, Func<EntityId, string?> defOf) =>
             new BridgeResult(r.Succeeded, r.Outcome.ToString(), Reasons(r.Error, r.ArgumentRejections, r.Preconditions, defOf));

@@ -1,6 +1,6 @@
 # 인계 메모
 
-마지막 갱신: 2026-10-26. 브랜치 `spec-v0.5-scaffold`, 테스트 2560개 통과(커널 2329, CLI 42, 콘솔 호스트 100, 번역 55, 경계 34). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
+마지막 갱신: 2026-10-27. 브랜치 `spec-v0.5-scaffold`, 테스트 2566개 통과(커널 2329, CLI 42, 콘솔 호스트 101, 번역 55, 경계 39). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
 
 ## 상태
 
@@ -10,14 +10,9 @@
 
 ## 다음 할 일
 
-**④ 콘솔 호스트를 경계로 옮긴다.** `ConsoleGame.cs`가 지금 `World`·`WorldView`를 바로 부른다. 이것을 `IHostOperator`·`IHostSession`(`LocalHost`)과 경계 값 번역(`Translator.Value(BridgeValue)`)으로 바꾼다. 패널은 `session.Call(키, …)`과 `Changed()`로 다시 그린다. `--seat 연결=Def`가 쓰는 `World.All`은 `SeatChoices()`로 바꾼다(묻지 않음).
+④ 콘솔 호스트를 경계로 옮기는 일은 끝났다(G329: 세션의 `Entities()`·`Read()`). `ConsoleGame`은 `IHostOperator`·`IHostSession`만 부르고 `Play`가 `LocalHost`를 만든다. 화면 파일이 없을 때는 자리(연결)마다 그 연결이 보는 엔티티를 `[연결]` 머리 아래에 늘어놓는다.
 
-먼저 사용자에게 물을 것: 화면 파일이 없을 때 세계를 늘어놓는 기능(`ConsoleGame`의 `All`·`Has`·`Get`)을 어떻게 하나. 선택지는 셋이다.
-- **B′ (추천):** 보기 규칙을 지키는 읽기를 경계에 넣는다. 커널의 `WorldView.All`·`Has`·`Get`·`DefOf`가 이미 거른 읽기라서, 세션에 `Entities()`·`Read(엔티티)` 같은 것을 더해 `LocalHost`가 감싸면 된다. 숨긴 정보가 새지 않고 원격에도 쓴다. 단점은 경계의 값 목록을 넓히는 것(G326).
-- A: 판 주인 전용 디버그로 둔다(숨긴 정보까지 보임, 경계 밖).
-- C: 빼고 "화면 파일 없음"만 알린다.
-
-정하면 `docs/decisions/G329.md`로 적는다. 그 뒤 ⑤ UPM 패키지와 빌드 복사, UXML 해석기의 속성 모양과 첫 화면을 사용자와 정한다. 다 옮기면 `Translator`의 커널 값 오버로드와 `Bridge.Local` 참조를 거둘지 본다. Unity 쪽 안내서에는 "화면 주는 방식"(모드가 화면 함수를 두고 호스트가 읽어 그림, 커널은 `Changed()`로 바뀐 키만 알림, 영수증은 경계 너머라서 둔 최적화)을 짧게 넣는다.
+**다음:** ⑤ UPM 패키지와 빌드 복사, UXML 해석기의 속성 모양과 첫 화면을 사용자와 정한다. `Translator`의 커널 값 오버로드(`Label(Value, World)` 등)는 이제 번역 테스트만 쓰므로 거둘지 본다(`ConsoleHost`는 `Bridge.Local`을 `LocalHost` 때문에 계속 참조한다). Unity 쪽 안내서에는 "화면 주는 방식"(모드가 화면 함수를 두고 호스트가 읽어 그림, 커널은 `Changed()`로 바뀐 키만 알림, 영수증은 경계 너머라서 둔 최적화)을 짧게 넣는다.
 
 **남은 정리:** 조회 도구(`tools/Kesa.Tools.Decisions`)의 테스트, 자동으로 붙인 결정 태그 보정.
 
