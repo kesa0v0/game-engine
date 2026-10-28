@@ -33,7 +33,7 @@
 **남은 일:**
 
 1. 결정 태그 보정(하다 멈춤). 옮길 때 자동으로 붙인 `권한·자리`가 "자리"라는 낱말(함수 자리·인자 자리)만 보고 붙은 것이 많다. G4·G6·G18·G24·G30·G112·G115·G117·G136·G146·G148·G150·G155·G165·G176·G178·G186은 고쳤다. 남은 것(정한 새 태그): G189 `로직언어`, G193 `반응, 로직언어`, G194 `Ref, 로직언어`, G209 `결정론, 스텁`, G216 `호스트`, G227 `로직언어`, G231 `스텁`, G270 `번역, UI`, G299 `derived`, G307 `호스트, 로직언어`, G308 `derived`, G309 `호스트, 로드순서`, G311 `저장, 로드순서, 패치`, G314 `저장`. 영역에서 드러난 빠진 태그: G263 +번역, G84·G78·G79 `진단`(지금 `Flow`·`모드구조`), G85·G76 +진단, G210·G211·G214 +저장, G151·G172 `반응`, G153·G173 +반응, G166 `Flow`, G197 `숨긴정보`, G203·G204·G205 +숨긴정보, G161 `Flow, 시간`, G271·G272 +Flow. G118(권한 3층을 건너뜀)은 맞는 태그라 그대로. 태그 파일은 한글이라 Edit 도구로 고친다.
-2. 런타임 USS(아래 "필요해지면"): 데모에서 모양을 게임만 줄 수 있음이 드러났다. 모드가 USS를 줄지 정하는 계약 결정이다.
+2. **런타임 USS (정함, 구현 중):** 모드도 USS를 준다(G359~G363). `Kesa.Engine.Ui`가 USS를 읽어 규칙·선택자·우선순위(정수)·선언(값은 글자 그대로, 결정론 분석기 때문에 숫자 변환은 호스트)과 진단(`UiProblem`, 모르는 속성 이름, `@import`, `resource()`)을 내고, Unity 패키지가 Unity 내부 `StyleSheetBuilder`를 리플렉션으로 불러 진짜 `StyleSheet`을 만든다(빌더 연결·값 변환은 OneJS `Runtime/Styling/StyleSheetBuilderWrapper.cs`·`UssCompiler.cs`를 MIT 고지와 함께 옮김, `THIRD_PARTY_NOTICES.md`). 경로는 모드 폴더 공유 가상 경로뿐이고 `ModFolderAssets`의 게임 스타일시트 읽기 인자는 없앤다(G362), `url()`도 같은 공간(G363). 속성 이름 목록은 Unity의 `StylePropertyUtil.s_NameToId`에서 한 번 뽑아 엔진에 두고 `SmokeTest`가 비교한다(G361). 시제품(2026-10-29, Unity 6000.3.8f1): 런타임 패널(`UIDocument`)에서 클래스, 자식(`>`)과 손자 구분, `:root`의 `var()`(함수 `Var`·인자 수·`Variable` 값), `pseudoStates`로 켠 `:hover` 뒤의 자손 선택자가 맞게 적용됐다. 남은 질문: 게임 시트(루트)와 모드 시트(파일 맨 위 요소)의 순서, IL2CPP `link.xml`. 에디터가 데모를 열고 있으면 데모를 임시 폴더로 복사하고 `manifest.json`의 패키지 경로를 절대 경로로 바꿔 창 없이 돌린다.
 
 결정 조회 도구에 `check`(머리 규칙 검사: 상태와 `changedBy`, 바뀐 쪽이 뒤의 번호인지, `**바뀜:**` 줄, 참조가 있는지, 파일 이름, 빠진 키, 태그 없음)가 있고, `tests/Kesa.Tools.Decisions.Tests`가 실제 `docs/decisions`에 이것을 돌린다. 결정 파일을 고친 뒤에는 `dotnet test`가 규칙 위반을 잡는다. G61은 처음부터 없던 번호다.
 
@@ -47,7 +47,6 @@
 
 ## 필요해지면 (실제 모드 사례가 생기면)
 
-- **런타임 USS (백로그, 사용자가 미룸):** 모드가 모양(스타일)을 바꾸려면 USS 글을 런타임에 읽어야 한다. 지금은 이미지(G335)만 모드가 바꿀 수 있다. Unity에는 런타임에 USS 글을 `StyleSheet`로 만드는 공개 API가 없다. 이전 엔진은 `RuntimeStyleSheet`(72줄 정규식 파서: `.클래스`·`#id` 선택자와 `--변수`)로 읽고 `StyleApplicator`(377줄, 속성 59가지)가 요소에 인라인 스타일로 직접 적용했다(`SharedPackages/uk.kesa.engine/Scripts/Core/Data/Base/UI/RuntimeStyleSheet.cs`, `.../View/UI/Core/StyleApplicator.cs`). 선택지: A 하이브리드(게임이 기본 스타일시트를 `StyleSheet` 에셋으로 주고 모드 USS는 파서로 나중에 더함, 제 추천) / B 파서를 지금 만든다 / C 게임만 스타일을 준다(모드는 USS 불가). 현재는 `ModFolderAssets`에 스타일시트 읽기를 꽂을 수 있다.
 - 호스트 함수 인자 8개 초과(`HostOverloads.cs`를 16개까지), 호스트 창구의 `choices`.
 - 따옴표 없는 Def 참조(`Resource.Wood`), 로직 연산자 확장(`**`·비트 연산, G96), S8 `migrate`.
 - 속도의 작은 후보(지역 변수 표, 문장 호출 결과 칸, 컴프리헨션 프레임 재사용), 값 구조체화·백본 ECS화(맨 끝).
