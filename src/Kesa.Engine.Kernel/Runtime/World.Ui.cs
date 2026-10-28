@@ -246,6 +246,7 @@ namespace Kesa.Engine.Runtime
         public DeliveryResult Deliver(string issuer, UiSubmission submission)
         {
             NoHostWrites("Deliver");
+            if (submission.Command == PickCommand) return DeliverPick(issuer, submission.Arguments);
             if (!_commands.TryGetValue(submission.Command, out var decl))
             {
                 throw new WorldException(Codes.RunUnknownName, "there is no command '" + submission.Command + "'",
@@ -257,6 +258,46 @@ namespace Kesa.Engine.Runtime
             if (accepting.Count == 1)
                 return new DeliveryResult(null, Respond(issuer, accepting[0].Id, submission.Command, submission.Arguments), null);
             return new DeliveryResult(null, null, NotDeliverable(issuer, submission.Command, accepting.Count));
+        }
+
+        /// <summary>
+        /// 선택지 답 <c>submit("engine.pick", choice=n, by=e)</c> (G379): 이 연결이 답할 수 있는 선택지 질문이 하나면 거기에 답한다.
+        /// <c>by</c>를 빼면 그 질문에서 이 연결이 답할 수 있는 엔티티가 하나여야 한다. 아니면 이유를 붙여 거절한다.
+        /// </summary>
+        private DeliveryResult DeliverPick(string issuer, IReadOnlyDictionary<string, Value> args)
+        {
+            EntityId? by = null;
+            if (args.TryGetValue(PickBy, out var given))
+            {
+                if (!(given is IEntityReference e))
+                    return new DeliveryResult(null, null, PickCommand + " needs by= to be an entity, not " + given.KindName);
+                by = e.EntityId;
+            }
+            if (!args.TryGetValue(PickChoice, out var choice) || !(choice is IntValue index))
+                return new DeliveryResult(null, null, PickCommand + " needs choice= with the index of the choice");
+
+            Request? found = null;
+            var answerers = new List<EntityId>();
+            int questions = 0;
+            foreach (var q in OpenRequests)
+            {
+                if (q.Choices.Count == 0) continue;
+                var mine = new List<EntityId>();
+                foreach (var who in q.Who)
+                    if ((by == null || who == by) && IsAlive(who) && MayAnswer(issuer, who)) mine.Add(who);
+                if (mine.Count == 0) continue;
+                questions++;
+                found = q;
+                answerers = mine;
+            }
+            if (questions != 1)
+                return new DeliveryResult(null, null, questions == 0
+                    ? "no open question with choices that " + issuer + " can answer"
+                    : questions + " open questions with choices can be answered by " + issuer + ", so it is not clear which one this answers");
+            if (answerers.Count != 1)
+                return new DeliveryResult(null, null, answerers.Count + " entities of " + issuer + " can answer request " + found!.Id +
+                                                      "; say which with by=");
+            return new DeliveryResult(null, Answer(issuer, found!.Id, answerers[0], index.Value), null);
         }
 
         /// <summary>이 연결이 답할 수 있고 그 응답 커맨드를 받는 열린 질문들.</summary>
@@ -341,7 +382,7 @@ namespace Kesa.Engine.Runtime
                     "write submit(\"Attack\", target=enemy) (spec-gaps G278)");
             }
             string id = name.Value.IndexOf('.') >= 0 ? name.Value : mod + "." + name.Value;
-            if (!_commands.ContainsKey(id))
+            if (!_commands.ContainsKey(id) && id != PickCommand)
             {
                 throw new ScriptRuntimeException(Codes.RunUnknownName, "submit() names '" + name.Value + "', but there is no command '" + id + "'",
                     _uiActions.ContainsKey(id) ? "a @ui_action runs on the screen; submit a @command" : Suggest.Hint(id, _commands.Keys));

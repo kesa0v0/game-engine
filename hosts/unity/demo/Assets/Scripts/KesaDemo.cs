@@ -36,8 +36,8 @@ public sealed class KesaDemo : MonoBehaviour
     [Tooltip("AI 봇이 앉을 진영의 Def (없으면 비움)")]
     [SerializeField] private string botSeatDef = "skirmish:Blue";
 
-    [Tooltip("봇이 좋아하는 응답 커맨드 순서")]
-    [SerializeField] private string[] botPrefers = { "skirmish.Attack", "skirmish.Move", "skirmish.EndTurn" };
+    [Tooltip("그 진영을 맡을 모드의 @bot")]
+    [SerializeField] private string botName = "skirmish.skirmisher";
 
     [Tooltip("봇이 한 수를 두고 다음 수까지 기다리는 초 (수를 눈으로 따라가게)")]
     [SerializeField] private float botDelay = 0.6f;
@@ -89,7 +89,8 @@ public sealed class KesaDemo : MonoBehaviour
             var botSeat = world.SeatChoices().FirstOrDefault(id => world.DefOf(id) == botSeatDef);
             if (botSeat.Value == 0) throw new InvalidOperationException("no seat with the Def '" + botSeatDef + "' for the bot");
             await game.Host.Seat(botSeat.Value, "bot", ai: true);
-            _bot = new BotSeat(await game.Host.Open("bot"), new PreferredResponses(botPrefers), maxActs: 1);
+            var botSession = await game.Host.Open("bot");
+            _bot = new BotSeat(botSession, await botSession.Bot(botName, botSeat.Value), maxActs: 1);
         }
 
         // 게임이 주는 기본 테마(Assets/Resources/KesaDemo.uss)는 맨 바깥에, 화면의 모양은 모드의 USS가 준다 (G362)

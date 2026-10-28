@@ -190,7 +190,9 @@ namespace Kesa.Engine.Ui.Tests
         {
             await _host.Seat(_blue, "bot", ai: true);
             Assert.That(_world.SeatKindOf(new EntityId(_blue)), Is.EqualTo(SeatKind.Ai));
-            var bot = new BotSeat(await _host.Open("bot"), new PreferredResponses(new[] { "skirmish.Attack", "skirmish.Move", "skirmish.EndTurn" }));
+            var session = await _host.Open("bot");
+            var skirmisher = await session.Bot("skirmish.skirmisher", _blue);
+            var bot = new BotSeat(session, skirmisher);
             Assert.That(await bot.Run(), Is.EqualTo(0), "red's turn, nothing to answer");
 
             var alice = await Open("alice", _red);
@@ -204,6 +206,23 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(alice.Renderer.Named("turn").Text, Is.EqualTo("3"));
             Assert.That(alice.Renderer.Named("endturn").Enabled, Is.True, "red's turn again");
             Assert.That(await bot.Run(), Is.EqualTo(0));
+        }
+
+        [Test]
+        public async Task TwoModBotsPlayAGameToTheEndAnsweringTheHitQuestions()
+        {
+            await _host.Seat(_red, "red-bot", ai: true);
+            await _host.Seat(_blue, "blue-bot", ai: true);
+            var redSession = await _host.Open("red-bot");
+            var blueSession = await _host.Open("blue-bot");
+            var red = new BotSeat(redSession, await redSession.Bot("skirmish.skirmisher", _red));
+            var blue = new BotSeat(blueSession, await blueSession.Bot("skirmish.skirmisher", _blue));
+            var match = _world.Member("Match", "winner");
+            var game = _world.All("Game").Single();
+            for (int round = 0; round < 200 && _world.Get(game, match) is NoneValue; round++)
+                if (await red.Run() + await blue.Run() == 0) break;
+            Assert.That(_world.Get(game, match), Is.Not.SameAs(NoneValue.Instance), "someone won; nobody got stuck on a question");
+            Assert.That(_world.OpenRequests.Any(q => q.Choices.Count > 0), Is.False);
         }
 
         [Test]

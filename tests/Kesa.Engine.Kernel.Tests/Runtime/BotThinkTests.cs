@@ -31,7 +31,9 @@ namespace Kesa.Engine.Tests.Runtime
             "    for i in range(hits):\n        submit(\"Hit\", target=bot.Mind.seen[0])\n" +
             "@bot\ndef dice(me: Ref[Party]):\n    bot.Mind.rolls = bot.Mind.rolls + [random.randint(1, 1000000)]\n" +
             "@bot\ndef spin(me: Ref[Party]):\n    bot.Mind.turns = 9\n    submit(\"Hit\", target=None)\n    while True:\n        pass\n" +
-            "@bot\ndef idle(me: Ref[Party]):\n    pass\n";
+            "@bot\ndef idle(me: Ref[Party]):\n    pass\n" +
+            "@command(free=True, acts_for=None)\ndef Duel(p: Ref[Party]):\n    r = ask(p, \"duel\", choices=[10, 20])\n    p.Hp.v += r.choice\n" +
+            "@bot\ndef chooser(me: Ref[Party]):\n    submit(\"engine.pick\", choice=1)\n";
 
         private World _world = null!;
         private WorldView _view = null!;
@@ -67,6 +69,19 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(_world.Deliver("bot", result.Submissions[0]).Submitted!.Succeeded, Is.True);
             Assert.That(Hp(_a), Is.EqualTo(2));
             Assert.That(_world.BotSettings("core.hunter").Single().Name, Is.EqualTo("hits"));
+        }
+
+        [Test]
+        public void ABotAnswersAQuestionWithChoices()
+        {
+            var bot = _world.NewBot("core.chooser", _blue);
+            var nothing = _world.Deliver("bot", _view.Think(bot).Submissions.Single());
+            Assert.That(nothing.Refusal, Is.EqualTo("no open question with choices that bot can answer"));
+
+            Assert.That(_world.Submit("host", "core.Duel", new Dictionary<string, Value> { ["p"] = new EntityValue(_blue) }).Succeeded, Is.True);
+            var answered = _world.Deliver("bot", _view.Think(bot).Submissions.Single());
+            Assert.That(answered.Answered!.Outcome, Is.EqualTo(AnswerOutcome.Succeeded));
+            Assert.That(Hp(_blue), Is.EqualTo(23));
         }
 
         [Test]
@@ -154,7 +169,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void BotStateIsOnlyForBots()
         {
-            Assert.That(_world.Bots, Is.EqualTo(new[] { "core.dice", "core.hunter", "core.idle", "core.spin" }));
+            Assert.That(_world.Bots, Is.EqualTo(new[] { "core.chooser", "core.dice", "core.hunter", "core.idle", "core.spin" }));
             var e = Assert.Throws<WorldException>(() => _world.Call("core.note", new IntValue(1)))!;
             Assert.That(e.Message, Does.Contain("only a @bot can use it"));
         }

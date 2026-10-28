@@ -88,6 +88,24 @@ namespace Kesa.Engine.Loading
 
         private void CheckSubmit(string mod, SubmitUse use, SortedDictionary<string, CommandDecl> commands)
         {
+            // 선택지 답 (G379): 인자는 choice=와 골라 쓰는 by=뿐이다
+            const string pick = ManifestReader.ReservedId + ".pick";
+            if (use.Command == pick)
+            {
+                bool choice = false;
+                for (int i = 0; i < use.ArgumentNames.Count; i++)
+                {
+                    string name = use.ArgumentNames[i];
+                    if (name == "choice") choice = true;
+                    if (name == "by" || name == "choice") continue;
+                    _stage.Error(mod, Codes.CmdSubmit, pick + " has no argument '" + name + "'", use.ArgumentSpans[i],
+                        "write submit(\"" + pick + "\", choice=1), with by=entity when more than one entity can answer (spec-gaps G379)");
+                }
+                if (!choice)
+                    _stage.Error(mod, Codes.CmdSubmit, pick + " needs choice= with the index of the choice", use.Span,
+                        "choices are numbered from 0 in the order ask(choices=[...]) lists them (spec-gaps G379)");
+                return;
+            }
             string id = use.Command.IndexOf('.') >= 0 ? use.Command : mod + "." + use.Command;
             if (!commands.TryGetValue(id, out var command) || command.IsUiAction || command.Function.IsBot)
             {

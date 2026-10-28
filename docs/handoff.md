@@ -1,6 +1,6 @@
 # 인계 메모
 
-마지막 갱신: 2026-10-29. 브랜치 `spec-v0.5-scaffold`, 테스트 2687개 통과(커널 2329, CLI 42, 콘솔 호스트 101, 번역 65, 경계 43, UI 100, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
+마지막 갱신: 2026-10-29. 브랜치 `spec-v0.5-scaffold`, 테스트 2716개 통과(커널 2354, CLI 42, 콘솔 호스트 101, 번역 65, 경계 46, UI 101, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
 
 ## 상태
 
@@ -33,7 +33,14 @@
 **남은 일:**
 
 1. **런타임 USS (구현함, G359~G365):** `<Style src>`·`Include src`·`url()`에 UI Builder의 `project://…`, 절대 경로, `..`가 오면 찾지 않고 모드 경로로 고치라고 알린다(G365, `UiPaths`). 모드도 USS를 주고 문법은 Unity USS 그대로다. `Kesa.Engine.Ui`의 `UssReader`가 읽고(값은 글자 나무, 숫자 변환은 호스트) 진단하며(`UssProperties` 속성 99개, `@import`·`resource()`·모르는 의사 클래스), 해석기가 `files`로 `<Style src>`를 모드 폴더에서 읽어 `IUiRenderer.AddStyleSheet(요소, UssSheet)`로 넘긴다. Unity 패키지의 `UssStyleSheets`·`UssBuilder`(OneJS MIT, 패키지의 `THIRD_PARTY_NOTICES.md`)가 내부 `StyleSheetBuilder`로 진짜 `StyleSheet`을 만든다. 문제는 화면을 막지 않고 `Errors`로 간다(G364). 게임 시트는 게임 코드가 루트에 붙이고(G362) 명시도가 같으면 가까운 모드 시트가 이긴다(Unity 규칙). `SmokeTest`(`UssCheck`)가 속성 목록, Unity 임포터와 같은 모양(관계는 오른쪽 조각에 붙고 색 이름은 낱말 그대로), 런타임 패널 적용(`:hover` 자손, 자식, `var()`, `url()` 그림)을 확인한다. `ModFolderAssets.LoadUxml`은 `LoadText`로 바뀌었다. 확인하지 못한 것: IL2CPP 빌드(`Runtime/link.xml`을 `Editor/UssLinker`가 링커에 넘기고, `UssCheck`는 그 파일과 적힌 타입이 있는지만 봄). 에디터가 데모를 열고 있으면 데모를 복사하고 `manifest.json`의 패키지 경로를 절대 경로로 바꿔 창 없이 돌린다. 복사본을 `hosts/unity/` 아래 같은 깊이(예: `hosts/unity/demo-check-tmp`, 끝나면 치움)에 두면 데모의 상대 경로 `../../../samples/skirmish`가 맞아 `KesaDemoSetup.Check`도 돈다. 사용자가 에디터에서 데모를 보았고 모양과 카드 `:hover`가 맞다.
-2. **AI 자리 (끼우는 자리만 구현함, G366):** 경계에 `IBotPolicy.Act(세션)`, 돌리는 `BotSeat.Run()`(세계 도장이 그대로면 부르지 않음), 가장 단순한 판단 `PreferredResponses`(좋아하는 응답 커맨드 순서). 데모는 파랑 자리에 `SeatKind.Ai` 봇을 앉혀 2턴에 판이 멈추지 않는다(`KesaDemoSetup.Check`가 3턴까지 봄). 데모 봇은 한 수씩 `botDelay` 간격으로 둔다. skirmish의 턴 숫자는 진영마다 오른다(빨강 1, 파랑 2). Unity 화면에는 이동 버튼이 없어 빨강은 다가갈 수 없고 strike는 적이 사거리에 들어올 때만 켜진다(예시 게임의 몫, 그대로 둠). 모드 스크립트 AI는 정함(구현 안 함, G367~G376): 엔진은 `@bot` 함수(첫 매개변수는 맡은 아무 엔티티, 뒤는 기본값 있는 설정 매개변수이고 값은 호스트가 넘김, 반환 없이 `submit`을 적었으면 한 일 있음, 본문은 `@ui_action`처럼 그 연결의 눈으로 읽기만), 기억 `bot_state`(`ui_state` 표기에 리스트·맵, `bot.기록.칸`, 엔진이 담고 풀고 호스트가 저장에 넣음), 봇 난수(같은 `random.*`, 붙일 때 시드, 없으면 월드 시드·엔티티·함수로), 부름마다 단계 예산(넘으면 그 부름만 버림), 함수 칸 `Score["T"]`·`BotAction["T"]`. 어느 엔티티에 어느 봇은 호스트가 정하고 Def 표기는 없다. 신호는 봇에게 보내지 않는다(필요하면 모드가 판 안에 기록). 후보 행동(Wesnoth RCA식)은 `std.ai` 모드 몫. 다음 할 일: 이것을 구현(커널의 `@bot` 읽기·검사, 봇 실행과 기억·난수·예산, 경계의 스크립트 판단, skirmish 파랑을 `@bot`으로). 사례 조사에서 이전 엔진(WG·QU·TR)은 문법이 달라 참고하지 않기로 했다. 남은 물음: 큰 게임에서 세션으로 판을 읽는 속도(spec 9절), 몇 수 앞을 시험하는 판 복사, 원격 멀티의 전송.
+2. **AI 자리와 모드 봇 (구현함, G366~G379):** 경계의 `IBotPolicy.Act(세션)`과 `BotSeat.Run()`(세계 도장이 그대로면 부르지 않음)에 C# 봇(`PreferredResponses`)과 모드 봇이 같이 끼워진다.
+   - 모드 봇: `@bot def f(me: Ref[X], 설정=기본값)`. 기억은 `bot_state`(칸 규칙은 `ui_state`와 같음, `bot.기록.칸`). 본문은 그 연결의 눈으로 읽고 `bot.…`·`submit`·`random`만 쓰며, "봇을 건드리는 함수" 표시가 퍼져 게임 쪽·화면 쪽은 `bot.…`을 못 쓴다.
+   - 커널: `World.NewBot`/`WorldView.Think`/`BotState.Save`/`World.LoadBot`(`Runtime/World.Bot.cs`). 성공했을 때만 기억과 봇 난수 카운터가 들어가고, 예산을 넘으면 그 부름만 버린다. 봇 난수열은 봇 시드에서(기본은 월드 시드·엔티티·봇 id).
+   - 경계: `session.Bots()`·`Bot(...)`·`LoadBot(바이트)`, `IScriptBot.Act`는 적은 수를 그 연결로 내고 하나라도 받아들여지면 참(G377), 거절 이유는 `LastProblems`(G378).
+   - 선택지 질문에는 `submit("engine.pick", choice=n, by=e)`로 답한다(G379, `@ui_action`도 같음).
+   - skirmish 파랑은 모드 봇 `skirmish.skirmisher`(`samples/skirmish/core/defs/ai.py`)이고 데모도 그것을 쓴다. `KesaDemoSetup.Check` 통과. 봇 둘이 끝까지 두는 시험(`SkirmishScreenTests`)이 맞음 질문 답 경로를 지난다. 에디터에서 눈으로는 아직 안 봄.
+   - 다음 후보: 함수 칸 `Score["T"]`·`BotAction["T"]`(G374)와 `std.ai` 모드(Wesnoth RCA식 후보 행동). 봇이 열린 질문을 스크립트로 읽는 길은 없다(지금 skirmish 봇은 차례가 아닐 때 적은 수가 거절되는 것에 기댐, 필요해지면 정함).
+   - 남은 물음: 큰 게임에서 판을 읽는 속도(spec 9절), 몇 수 앞을 시험하는 판 복사, 원격 멀티의 전송. 이전 엔진(WG·QU·TR)은 문법이 달라 AI 설계에 참고하지 않는다.
 
 결정 조회 도구에 `check`(머리 규칙 검사: 상태와 `changedBy`, 바뀐 쪽이 뒤의 번호인지, `**바뀜:**` 줄, 참조가 있는지, 파일 이름, 빠진 키, 태그 없음)가 있고, `tests/Kesa.Tools.Decisions.Tests`가 실제 `docs/decisions`에 이것을 돌린다. 결정 파일을 고친 뒤에는 `dotnet test`가 규칙 위반을 잡는다. G61은 처음부터 없던 번호다.
 
@@ -53,6 +60,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 루트에서 `dotnet build`(Unity 패키지의 `Plugins/`로 DLL 복사)와 `dotnet test`로 2687개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다(창 없는 확인은 패키지 README).
+1. `git pull` 후 루트에서 `dotnet build`(Unity 패키지의 `Plugins/`로 DLL 복사)와 `dotnet test`로 2716개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다(창 없는 확인은 패키지 README).
 2. `CLAUDE.md`와 이 문서를 읽는다. 필요한 `docs/spine-spec.md` 절과 결정(`list --tag …`·`show 번호`)만 본다. 실행기는 `Script/Execution/PureEvaluator*.cs`·`Session*.cs`·`Frame.cs`·`Block.cs`, 커맨드는 `Runtime/World.Submit.cs`·`World.Commands.cs`·`World.Undo.cs`, UI 해석은 `src/Kesa.Engine.Ui/UiInterpreter*.cs`다.
 3. 위 "다음 할 일"을 사용자와 정한다. 작업 방식(한국어, 허락 질문으로 멈추지 않기, push는 사용자가 말할 때만 등)은 CLAUDE.md에 있다.
