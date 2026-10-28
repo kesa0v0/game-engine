@@ -22,7 +22,8 @@ namespace Kesa.Engine.Bridge.Tests
             "component(\"Hp\", v=field(int, default=3))\n" +
             "deftype(\"Hero\", components=[\"Hp\", \"Seatable\"])\n" +
             "deftype(\"Unit\", components=[\"Hp\"])\n" +
-            "ui_state(\"Selection\", unit=ref(\"Unit\", optional=True))\n";
+            "ui_state(\"Selection\", unit=ref(\"Unit\", optional=True))\n" +
+            "bot_state(\"Tally\", n=field(int, default=0))\n";
 
         private const string Defs =
             "Hero(\"Red\")\nHero(\"Blue\")\nUnit(\"Soldier\")\n" +
@@ -36,7 +37,11 @@ namespace Kesa.Engine.Bridge.Tests
             "    else:\n        submit(\"Hit\", target=u)\n        ui.Selection.unit = None\n" +
             "def hp(u):\n    return u.Hp.v\n" +
             "def selected():\n    return ui.Selection.unit\n" +
-            "def boom():\n    return 1 // 0\n";
+            "def boom():\n    return 1 // 0\n" +
+            // 늘 첫 유닛을 때린다: 체력이 1이 되면 그 수는 거절된다
+            "@bot\ndef striker(me: Ref[Hero], times: int = 1):\n    bot.Tally.n += 1\n" +
+            "    first = [u for u in query(Unit)][0]\n" +
+            "    for i in range(times):\n        submit(\"Hit\", target=first)\n";
 
         private string _root = "";
         private LocalHost _host = null!;
@@ -84,6 +89,40 @@ namespace Kesa.Engine.Bridge.Tests
         private static IReadOnlyDictionary<string, BridgeValue> Target(long id) => Args(("target", new BridgeEntity(id, null)));
 
         private long Hp(long id) => ((IntValue)_host.World.Get(new EntityId(id), _host.World.Member("Hp", "v"))).Value;
+
+        [Test]
+        public async Task TheSessionListsTheModsBots()
+        {
+            var bot = (await _alice.Bots()).Single();
+            Assert.That(bot.Name, Is.EqualTo("arena.striker"));
+            Assert.That(bot.Entity, Is.EqualTo("Ref[\"Hero\"]"));
+            var times = bot.Settings.Single();
+            Assert.That((times.Name, times.Type, ((BridgeInt)times.Default!).Value), Is.EqualTo(("times", "int", 1L)));
+        }
+
+        [Test]
+        public async Task AModBotPlaysUntilEveryMoveItWritesIsRefused()
+        {
+            var striker = await _alice.Bot("arena.striker", _red);
+            var seat = new BotSeat(_alice, striker);
+            // 3 → 2 → 1, 그다음 수는 require가 막아 한 일이 없다 (G377)
+            Assert.That(await seat.Run(), Is.EqualTo(2), string.Join("; ", striker.LastProblems));
+            Assert.That(Hp(_a), Is.EqualTo(1));
+            Assert.That(striker.LastProblems.Single().Kind, Is.EqualTo(BridgeReasonKind.Require));
+            Assert.That(await seat.Run(), Is.EqualTo(0), "the world did not change, so the bot is not asked again");
+        }
+
+        [Test]
+        public async Task TheHostSavesAModBotAndBringsItBack()
+        {
+            var striker = await _alice.Bot("arena.striker", _red, Args(("times", new BridgeInt(2))), seed: 5);
+            await striker.Act(_alice);
+            var back = await _alice.LoadBot(await striker.Save());
+            Assert.That(back.LastProblems, Is.Empty);
+            Assert.That((back.Bot, back.Entity), Is.EqualTo(("arena.striker", _red)));
+            Assert.That(await back.Save(), Is.EqualTo(await striker.Save()));
+            Assert.ThrowsAsync<System.ArgumentException>(async () => await _alice.Bot("arena.strike", _red));
+        }
 
         [Test]
         public async Task TheSameConnectionGetsTheSameSession()

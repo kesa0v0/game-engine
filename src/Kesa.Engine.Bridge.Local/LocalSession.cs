@@ -248,6 +248,52 @@ namespace Kesa.Engine.Bridge.Local
             return Done(new BridgeResult(true, acted.Outcome.ToString(), null, deliveries));
         }
 
+        public ValueTask<IReadOnlyList<BridgeBot>> Bots()
+        {
+            var view = View;
+            var bots = new List<BridgeBot>();
+            foreach (var pair in _host.Loaded.Bots)
+            {
+                var settings = new List<BridgeParameter>();
+                foreach (var p in World.BotSettings(pair.Key))
+                    settings.Add(new BridgeParameter(p.Name, p.Type.Display, p.Default == null ? null : KernelValues.ToBridge(p.Default, DefOf(view))));
+                bots.Add(new BridgeBot(pair.Key, pair.Value.Parameters[0].Type.Display, settings));
+            }
+            return Done<IReadOnlyList<BridgeBot>>(bots);
+        }
+
+        public ValueTask<IScriptBot> Bot(string bot, long entity, IReadOnlyDictionary<string, BridgeValue>? settings = null, long? seed = null,
+            int? stepBudget = null)
+        {
+            BotState state;
+            try
+            {
+                state = World.NewBot(bot, new EntityId(entity), settings == null ? null : KernelValues.ToKernel(settings), seed, stepBudget);
+            }
+            catch (WorldException e)
+            {
+                throw new ArgumentException(e.Hint == null ? e.Message : e.Message + " (" + e.Hint + ")", e);
+            }
+            return Done<IScriptBot>(new LocalScriptBot(_host, Connection, state));
+        }
+
+        public ValueTask<IScriptBot> LoadBot(byte[] saved, int? stepBudget = null)
+        {
+            BotState state;
+            IReadOnlyList<string> warnings;
+            try
+            {
+                state = World.LoadBot(saved, out warnings, stepBudget);
+            }
+            catch (WorldException e)
+            {
+                throw new ArgumentException(e.Message, e);
+            }
+            var problems = new List<BridgeReason>();
+            foreach (var w in warnings) problems.Add(new BridgeReason(BridgeReasonKind.Error, message: w, code: "bot-load"));
+            return Done<IScriptBot>(new LocalScriptBot(_host, Connection, state, problems));
+        }
+
         /// <summary>보는 쪽에서 엔티티의 Def id. 이미 없거나 못 보는 엔티티면 null.</summary>
         private static Func<EntityId, string?> DefOf(WorldView view) => id => view.IsAlive(id) ? view.DefOf(id) : null;
 

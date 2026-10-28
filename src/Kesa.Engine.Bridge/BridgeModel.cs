@@ -199,15 +199,35 @@ namespace Kesa.Engine.Bridge
 
     public sealed class BridgeParameter
     {
-        public BridgeParameter(string name, string type)
+        public BridgeParameter(string name, string type, BridgeValue? @default = null)
         {
             Name = name;
             Type = type;
+            Default = @default;
         }
 
         public string Name { get; }
         /// <summary>스크립트에 적힌 타입(<c>Ref[Player]</c> 등).</summary>
         public string Type { get; }
+        /// <summary>선언한 기본값. 없으면 null.</summary>
+        public BridgeValue? Default { get; }
+    }
+
+    /// <summary>모드의 <c>@bot</c> 하나: 맡을 엔티티의 타입과 호스트가 넘길 수 있는 설정 (G370·G378).</summary>
+    public sealed class BridgeBot
+    {
+        public BridgeBot(string name, string entity, IReadOnlyList<BridgeParameter> settings)
+        {
+            Name = name;
+            Entity = entity;
+            Settings = settings;
+        }
+
+        public string Name { get; }
+        /// <summary>첫 매개변수의 타입(<c>Ref[Party]</c> 등).</summary>
+        public string Entity { get; }
+        /// <summary>첫 매개변수 뒤의 매개변수. 모두 기본값이 있다.</summary>
+        public IReadOnlyList<BridgeParameter> Settings { get; }
     }
 
     /// <summary>앉을 후보 엔티티 하나와 지금 앉은 연결(없으면 null) (G239).</summary>

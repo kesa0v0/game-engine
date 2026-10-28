@@ -83,5 +83,18 @@ namespace Kesa.Engine.Bridge
 
         /// <summary>화면 동작을 하고, 성공하면 적힌 <c>submit</c>을 차례로 낸다(G278·G283). 낸 결과는 <see cref="BridgeResult.Deliveries"/>.</summary>
         ValueTask<BridgeResult> Act(string action, IReadOnlyDictionary<string, BridgeValue> arguments);
+
+        /// <summary>모드의 <c>@bot</c>들 (이름 순, G378).</summary>
+        ValueTask<IReadOnlyList<BridgeBot>> Bots();
+
+        /// <summary>
+        /// 이 연결로 도는 모드 봇을 만든다 (G378). <paramref name="settings"/>에 빠진 설정은 기본값, <paramref name="seed"/>가 없으면 월드 시드·엔티티·
+        /// 봇에서(G373), <paramref name="stepBudget"/>이 없으면 판의 행동 예산(G375). 없는 봇·설정은 <see cref="System.ArgumentException"/>이다.
+        /// </summary>
+        ValueTask<IScriptBot> Bot(string bot, long entity, IReadOnlyDictionary<string, BridgeValue>? settings = null, long? seed = null,
+            int? stepBudget = null);
+
+        /// <summary><see cref="IScriptBot.Save"/>한 봇을 이 연결로 되살린다. 버린 것의 경고는 <see cref="IScriptBot.LastProblems"/>에 있다.</summary>
+        ValueTask<IScriptBot> LoadBot(byte[] saved, int? stepBudget = null);
     }
 }
