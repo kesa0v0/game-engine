@@ -38,15 +38,27 @@ namespace Kesa.Engine.Unity
             _styleSheets = styleSheets;
         }
 
-        /// <summary>가상 경로를 실제 파일로. 나중에 로드된 모드부터 찾는다. 없으면 null.</summary>
+        /// <summary>
+        /// 가상 경로를 실제 파일로. 나중에 로드된 모드부터 찾는다. 없거나 모드 폴더 안의 상대 경로가 아니면(절대 경로, <c>..</c>) null.
+        /// </summary>
         public string? Find(string path)
         {
+            if (!IsInside(path)) return null;
             for (int i = _folders.Count - 1; i >= 0; i--)
             {
                 string full = Path.Combine(_folders[i], path);
                 if (File.Exists(full)) return full;
             }
             return null;
+        }
+
+        // Path.Combine은 절대 경로면 폴더를 버리고 ..는 폴더 밖으로 나가므로 G335의 "모드 폴더 안의 상대 경로"를 여기서 지킨다
+        private static bool IsInside(string path)
+        {
+            if (path.Length == 0 || Path.IsPathRooted(path) || path.IndexOf(':') >= 0) return false;
+            foreach (var segment in path.Split('/', '\\'))
+                if (segment == "..") return false;
+            return true;
         }
 
         public string? LoadUxml(string path)
