@@ -39,10 +39,14 @@ public sealed class KesaDemo : MonoBehaviour
     [Tooltip("봇이 좋아하는 응답 커맨드 순서")]
     [SerializeField] private string[] botPrefers = { "skirmish.Attack", "skirmish.Move", "skirmish.EndTurn" };
 
+    [Tooltip("봇이 한 수를 두고 다음 수까지 기다리는 초 (수를 눈으로 따라가게)")]
+    [SerializeField] private float botDelay = 0.6f;
+
     [SerializeField] private string[] languages = { "ko", "en" };
 
     private UiInterpreter? _ui;
     private BotSeat? _bot;
+    private float _botNext;
     private bool _refreshing;
 
     /// <summary>이 연결의 세션 (확인용).</summary>
@@ -85,7 +89,7 @@ public sealed class KesaDemo : MonoBehaviour
             var botSeat = world.SeatChoices().FirstOrDefault(id => world.DefOf(id) == botSeatDef);
             if (botSeat.Value == 0) throw new InvalidOperationException("no seat with the Def '" + botSeatDef + "' for the bot");
             await game.Host.Seat(botSeat.Value, "bot", ai: true);
-            _bot = new BotSeat(await game.Host.Open("bot"), new PreferredResponses(botPrefers));
+            _bot = new BotSeat(await game.Host.Open("bot"), new PreferredResponses(botPrefers), maxActs: 1);
         }
 
         // 게임이 주는 기본 테마(Assets/Resources/KesaDemo.uss)는 맨 바깥에, 화면의 모양은 모드의 USS가 준다 (G362)
@@ -109,10 +113,11 @@ public sealed class KesaDemo : MonoBehaviour
         _ui = ui;
     }
 
-    /// <summary>봇이 할 일을 하고 화면을 다시 그린다.</summary>
+    /// <summary>봇이 할 일을 기다리지 않고 모두 하고 화면을 다시 그린다 (확인용).</summary>
     public async Task Step()
     {
-        if (_bot != null) await _bot.Run();
+        if (_bot != null)
+            while (await _bot.Run() > 0) { }
         if (_ui != null) await _ui.RefreshAsync();
     }
 
@@ -124,7 +129,8 @@ public sealed class KesaDemo : MonoBehaviour
         {
             // 창이 ESC를 받지 않으면(거짓) 게임이 자기 메뉴를 열 자리다
             if (Input.GetKeyDown(KeyCode.Escape)) await _ui.Windows.Escape();
-            await Step();
+            if (_bot != null && Time.time >= _botNext && await _bot.Run() > 0) _botNext = Time.time + botDelay;
+            await _ui.RefreshAsync();
         }
         catch (Exception e)
         {
