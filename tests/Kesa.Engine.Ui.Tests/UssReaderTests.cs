@@ -119,6 +119,16 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public void UrlTakesOnlyModPaths()
+        {
+            Assert.That(Problems(".a { background-image: url(\"project://database/Assets/Art/x.png?fileID=2800000&guid=ab&type=3#x\"); }").Single(),
+                Does.Contain("url(): 'project://database/Assets/Art/x.png?fileID=2800000&guid=ab&type=3#x' is a Unity project path (the form UI Builder writes); write the path inside the mods instead, like 'ui/x.png'"));
+            Assert.That(Problems(".a { background-image: url(\"../art/x.png\"); }").Single(), Does.Contain("climbs out with '..'"));
+            Assert.That(Problems(".a { background-image: url(\"C:/art/x.png\"); }").Single(), Does.Contain("is a Unity project path"));
+            Assert.That(Problems(".a { background-image: url(\"skirmish/art/x.png\"); }"), Is.Empty);
+        }
+
+        [Test]
         public void ValueMistakesAreReported()
         {
             Assert.That(Problems(".a { color: red !important; }").Single(), Does.Contain("no !important"));

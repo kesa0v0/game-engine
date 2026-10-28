@@ -421,6 +421,8 @@ namespace Kesa.Engine.Ui
                     if (v.Text == "resource") return "resource() points inside the game build; use url(\"<path in the mods>\") in mod USS";
                     if (v.Text == "url" && (v.Arguments.Count != 1 || v.Arguments[0].Kind == UssValueKind.Comma || v.Arguments[0].Kind == UssValueKind.Function))
                         return "url() takes one path";
+                    if (v.Text == "url" && UiPaths.WhyNotModPath(v.Arguments[0].Text) is string notModPath)
+                        return "url(): " + notModPath;
                     if (v.Text == "var" && (v.Arguments.Count == 0 || !v.Arguments[0].Text.StartsWith("--", StringComparison.Ordinal)))
                         return "var() takes a variable name that starts with '--'";
                     string? inner = CheckFunctions(v.Arguments);

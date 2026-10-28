@@ -297,6 +297,12 @@ namespace Kesa.Engine.Ui
                 if (cached == null) problems?.Add(new UiProblem(place, "Include '" + source + "' could not be read"));
                 return cached;
             }
+            string? notModPath = UiPaths.WhyNotModPath(source);
+            if (notModPath != null)
+            {
+                problems?.Add(new UiProblem(place, "Include " + notModPath));
+                return null;
+            }
             string? text = _files?.Invoke(source);
             if (text == null)
             {
@@ -327,6 +333,12 @@ namespace Kesa.Engine.Ui
 
         private UssSheet? LoadStyleSheet(string path, string place)
         {
+            string? notModPath = UiPaths.WhyNotModPath(path);
+            if (notModPath != null)
+            {
+                Report(place, "Style " + notModPath);
+                return null;
+            }
             if (!_styleSheets.TryGetValue(path, out var read))
             {
                 string? text = _files?.Invoke(path);

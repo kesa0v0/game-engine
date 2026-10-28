@@ -47,6 +47,7 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
 
 - 모드의 `<Style src>`는 해석기가 `files`(`mods.Assets.LoadText`)로 모드 폴더에서 읽고 해석해 렌더러에 넘긴다. 렌더러는 Unity 내부 `StyleSheetBuilder`를 리플렉션으로 불러 진짜 `StyleSheet`을 만들어 붙인다(G359, `Runtime/UssBuilder.cs`·`UssStyleSheets.cs`, OneJS에서 고쳐 옮김, `THIRD_PARTY_NOTICES.md`). 캐스케이드·`:hover`·선택자·`var()`·`transition`은 Unity가 한다.
 - 게임 빌드 안의 모양(Unity 에셋 `StyleSheet`)은 경로로 찾지 않는다. 게임 코드가 화면 맨 바깥(`UIDocument.rootVisualElement`)에 붙인다(G362). 명시도가 같으면 모드 시트가 이긴다.
+- UI Builder가 쓰는 `project://…`·`/Assets/…`·`..` 경로는 모드 경로가 아니라서 찾지 않고 진단만 낸다(G365). 모드 UXML·USS는 모드 폴더 안의 경로로 쓴다.
 - USS의 잘못은 화면을 막지 않고 `UiInterpreter.Errors`에 담긴다(G364).
 - 공개되지 않은 API라 Unity를 올리면 깨질 수 있다. `SmokeTest`가 엔진의 속성 목록과 Unity의 표, 같은 글을 Unity 임포터가 만든 시트와 우리 시트, 런타임 패널의 실제 적용을 비교하므로 Unity를 올리면 먼저 이것을 돌린다.
 - IL2CPP: 리플렉션으로 부르는 타입은 `Runtime/link.xml`에 있고 `Editor/UssLinker`가 빌드 때 링커에 넘긴다(Unity는 패키지의 link.xml을 읽지 않는다). IL2CPP 빌드로는 아직 돌려 보지 않았다.

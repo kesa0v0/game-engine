@@ -195,6 +195,27 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task UnityProjectPathsAreNamedInsteadOfLookedUp()
+        {
+            Files["Assets/UI/screen.uss"] = ".a { color: red; }";
+            var panel = await Mount("<ui:UXML xmlns:ui=\"UnityEngine.UIElements\">" +
+                                    "<ui:Style src=\"project://database/Assets/UI/screen.uss?fileID=7433441132597879392&amp;guid=0a1b&amp;type=3#screen\" />" +
+                                    "<ui:Style src=\"../shared/card.uss\" />" +
+                                    "<ui:VisualElement name=\"top\" params=\"u\" /></ui:UXML>", ("u", Entity(A)));
+            Assert.That(panel, Is.Not.Null);
+            Assert.That(Renderer.Named("top").StyleSheets, Is.Empty);
+            Assert.That(Ui.Errors.Select(e => e.Message), Is.EqualTo(new[]
+            {
+                "Style 'project://database/Assets/UI/screen.uss?fileID=7433441132597879392&guid=0a1b&type=3#screen' is a Unity project path (the form UI Builder writes); write the path inside the mods instead, like 'ui/screen.uss'",
+                "Style '../shared/card.uss' climbs out with '..'; paths start at the mods' root, not at this file, like 'ui/card.uss'",
+            }));
+
+            var included = await Ui.MountAsync(Doc("<ui:VisualElement><ui:Include src=\"/Assets/UI/Row.uxml\" /></ui:VisualElement>"),
+                new System.Collections.Generic.Dictionary<string, BridgeValue>());
+            Assert.That(string.Join("\n", included.Problems), Does.Contain("Include '/Assets/UI/Row.uxml' is a Unity project path"));
+        }
+
+        [Test]
         public async Task AReorderedListMovesTheSameElements()
         {
             await Mount("<ui:VisualElement><ui:VisualElement name=\"list\" for=\"u in arena.hp_order()\"><ui:Label bind-text=\"arena.hp(u)\" /></ui:VisualElement></ui:VisualElement>");
