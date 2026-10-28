@@ -17,7 +17,9 @@
 
 **먼저:** 루트에서 `dotnet build`(DLL 복사) 후 Unity 6000.3으로 `hosts/unity/demo`를 열고 `Assets/Scenes/Demo.unity`를 재생해 눌림(선택·공격·턴 끝내기)과 프레임마다 갱신을 눈으로 확인한다. 이것은 Unity에서 아직 돌려 보지 않았다(`dotnet test`에서만 시험함). 데모 화면은 스타일이 없어 기본 모양이다.
 
-**사용자 확인을 기다리는 잠정 결정:** G337(창은 UI 기록에 묶은 패널), G345(렌더러 인터페이스: 어셈블리 이름 `Kesa.Engine.Ui`, 번역을 참조하지 않고 글자 만들기를 주입, 숫자를 고정소수점 raw로 렌더러에 줌, 영수증 키 모양과 세션당 해석기 하나, 호스트가 직접 낸 동작은 `ActAsync`/`InvalidateButtons`로 알림), G347(패키지의 `.meta`를 올림, `KesaGame`·`ModFolderAssets`의 API 모양). 조회: `dotnet run --project tools/Kesa.Tools.Decisions -- show 345`.
+**정한 것, 구현할 것:** 창은 제어되는 패널(G348, G337 일부바뀜): 열림은 UI 기록, 패널이 층·ESC·끌기를 선언, 호스트의 얇은 창 층이 처리하고 닫을 때 패널의 닫기 동작을 부름. 표기는 `window="층"`·`on-close`·`close-on-escape`·`window-drag`(G349), 종류는 `normal`·`modal`뿐이고 층은 없다(G350), 누르면 맨 위로 올리고 `window-raise="false"`로 끔(G351), 위치는 게임을 켜 둔 동안만 남음(G352). 구현은 아직이다(UXML 읽기·해석기의 창 속성, 렌더러에 창 알림, Unity 렌더러의 창 층).
+
+**사용자 확인을 기다리는 잠정 결정:** G345(렌더러 인터페이스: 어셈블리 이름 `Kesa.Engine.Ui`, 번역을 참조하지 않고 글자 만들기를 주입, 숫자를 고정소수점 raw로 렌더러에 줌, 세션당 해석기 하나, 호스트가 직접 낸 동작은 `ActAsync`/`InvalidateButtons`로 알림), G347(`KesaGame`·`ModFolderAssets`의 API 모양). 조회: `dotnet run --project tools/Kesa.Tools.Decisions -- show 345`. 영수증 키 모양과 `.meta`를 올리는 것은 내부 구현이라 묻지 않는다(CLAUDE.md의 묻는 기준). 잠정 G2~G30(로딩·로직 언어 규칙)은 그 영역을 다시 건드리거나 실제 모드가 부딪힐 때 확인한다.
 
 **정한 UXML 규칙 요약**(전문은 결정 기록):
 
@@ -36,7 +38,7 @@
 
 **작은 것:** 화면 동작이 낸 `submit`이 거절돼도 `BridgeResult.Succeeded`는 참이고 실패는 `Deliveries`에만 있다(G283, 호스트가 `ActionResult`에서 봐야 함). `UiInterpreter.Errors`는 `ClearErrors`로만 비운다.
 
-**정하지 않은 세부(필요해지면):** 창 끌기·맨 위로 올리기 속성, 닫았다 열 때 위치 기억, ESC·모달·레이어(G337) · 회색 버튼의 표시와 이유 보이기(툴팁과 함께), 화면 동작이 읽는 UI 기록 변화로도 다시 확인할지 · `Include`의 `src`를 찾는 법과 `params` 기본값·타입 · 한 연결이 여러 곳에 앉았을 때 패널을 곳마다 만들지 · 숨김 값을 참거짓으로 볼지, 오류를 화면에 보일지 · 리스트 번호 읽기, 호출 결과 공유 · 반복이 빌 때의 보임과 이전 엔진의 `filter-path` · 이미지가 없을 때의 보임, 스프라이트 시트, 이미지 읽기 방식의 세부 · 인라인 `style` 속성 · 고정소수점·`None`·숨김·선택지 값의 반복 키.
+**정하지 않은 세부(필요해지면):** 껐다 켜도 창 위치 남기기(G352) · 회색 버튼의 표시와 이유 보이기(툴팁과 함께), 화면 동작이 읽는 UI 기록 변화로도 다시 확인할지 · `Include`의 `src`를 찾는 법과 `params` 기본값·타입 · 한 연결이 여러 곳에 앉았을 때 패널을 곳마다 만들지 · 숨김 값을 참거짓으로 볼지, 오류를 화면에 보일지 · 리스트 번호 읽기, 호출 결과 공유 · 반복이 빌 때의 보임과 이전 엔진의 `filter-path` · 이미지가 없을 때의 보임, 스프라이트 시트, 이미지 읽기 방식의 세부 · 인라인 `style` 속성 · 고정소수점·`None`·숨김·선택지 값의 반복 키.
 
 이전 엔진 UI는 `E:\Project\Game\SharedPackages\uk.kesa.engine\Scripts\View\UI\Core`(이 컴퓨터에서는 `Projects\Unity\SharedPackages`)에 있고, 이전 게임 UXML 75개는 `Quarantined`·`TurbulentRepublic`·`wargame`의 `*.uxml`이다.
 
