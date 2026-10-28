@@ -72,6 +72,7 @@ namespace Kesa.Engine.Runtime
         {
             SetViewRules(loaded.ViewRules);
             _uiActions = loaded.UiActions;
+            _bots = loaded.Bots;
             _mods = loaded.Mods;
             _contents = loaded.Contents;
             _hostFunctions = loaded.HostFunctions;

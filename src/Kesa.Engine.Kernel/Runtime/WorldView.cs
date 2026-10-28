@@ -77,6 +77,12 @@ namespace Kesa.Engine.Runtime
         public ActResult Act(UiState ui, string action, IReadOnlyDictionary<string, Value> args) => _world.ActAs(this, ui, action, args);
 
         /// <summary>
+        /// 봇이 이 연결의 눈으로 한 번 생각한다 (G369·G374·G375). 성공했을 때만 기억과 봇 난수 카운터가 들어간다. 게임은 바뀌지 않는다:
+        /// 적어 둔 <c>submit</c>은 호스트가 <see cref="World.Deliver"/>로 낸다.
+        /// </summary>
+        public ThinkResult Think(BotState bot) => _world.ThinkAs(this, bot);
+
+        /// <summary>
         /// UI 동작을 누르지 않고 사전 조건만 본다 (회색 버튼과 그 이유, G280): 인자 검사 → <c>require</c>. <paramref name="ui"/>는 읽기만 하고
         /// 바꾸지 않는다. 커맨드의 <see cref="World.CheckPreconditions"/>와 같은 보고서다.
         /// </summary>

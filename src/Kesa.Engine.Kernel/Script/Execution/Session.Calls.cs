@@ -44,7 +44,7 @@ namespace Kesa.Engine.Script
                             "function that changes the world called on its own line from it (spec-gaps G117, G135)");
                     }
                     // 본문 프레임이 스택에 있어야 한다: derived·조건·입구는 따로 도는 실행이고, 사전 조건은 본문이 열리기 전이다 (G178)
-                    if (b.Random && !_stack.Exists(f => f.Writable))
+                    if (b.Random && !AllowsRandom && !_stack.Exists(f => f.Writable))
                     {
                         throw Fail(Codes.RunNotWritable, b.Name + "() draws a random number, so it cannot be called here",
                             "random numbers can only be drawn in a @command, @on or @when body and the functions it calls; " +
@@ -123,7 +123,7 @@ namespace Kesa.Engine.Script
             var newFrame = Enter(fn, captured, positional, keywords);
             newFrame.CallSite = site;
             newFrame.Writable = writable && (fn.Writes || entry);
-            newFrame.UiWritable = uiWritable && fn.WritesUi;
+            newFrame.UiWritable = uiWritable && (fn.WritesUi || fn.WritesBot);
             if (fn.Definition != null) newFrame.Blocks.Add(BodyBlock(fn.Definition, newFrame.Layout));
             _stack.Add(newFrame);
             return newFrame;

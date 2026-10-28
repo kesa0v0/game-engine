@@ -22,6 +22,9 @@ namespace Kesa.Engine.Script
             _meter = meter!;
         }
 
+        /// <summary>본문 프레임 없이도 난수를 뽑을 수 있나: 봇의 난수열은 게임 난수와 따로라 된다 (G373).</summary>
+        public bool AllowsRandom { get; set; }
+
         /// <summary>맨 위 프레임의 함수가 속한 모드 id. 프레임이 없으면 빈 문자열.</summary>
         public string TopMod => _stack.Count == 0 ? "" : _stack[_stack.Count - 1].Function.Mod;
 

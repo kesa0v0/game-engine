@@ -222,7 +222,9 @@ namespace Kesa.Engine.Runtime
         private T OutsideAct<T>(Func<T> run)
         {
             var saved = _act;
+            var savedBot = _botRun;
             _act = null;
+            _botRun = null;
             try
             {
                 return run();
@@ -230,6 +232,7 @@ namespace Kesa.Engine.Runtime
             finally
             {
                 _act = saved;
+                _botRun = savedBot;
             }
         }
 
@@ -315,6 +318,7 @@ namespace Kesa.Engine.Runtime
         private void AddUiBuiltins(SortedDictionary<string, Value> table)
         {
             table.Add(PureBuiltins.UiName, new UiRoot(this));
+            table.Add(PureBuiltins.BotName, new UiRoot(this, bot: true));
             table.Add(PureBuiltins.SubmitName,
                 new PureBuiltin(PureBuiltins.SubmitName, (p, k) => SubmitBuiltin(_evaluator?.ScriptMod ?? "", p, k))
                 {
@@ -329,7 +333,7 @@ namespace Kesa.Engine.Runtime
 
         private Value SubmitBuiltin(string mod, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
-            if (_act == null) throw OutsideUi("submit()");
+            var submissions = _act?.Submissions ?? _botRun?.Submissions ?? throw OutsideUi("submit()");
             if (positional.Count != 1 || !(positional[0] is StrValue name))
             {
                 throw new ScriptRuntimeException(Codes.RunType,
@@ -344,7 +348,7 @@ namespace Kesa.Engine.Runtime
             }
             var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
             foreach (var pair in keywords) args[pair.Key] = ToPlain("argument '" + pair.Key + "' of submit()", pair.Value);
-            _act.Submissions.Add(new UiSubmission(id, args));
+            submissions.Add(new UiSubmission(id, args));
             return NoneValue.Instance;
         }
 
@@ -383,26 +387,35 @@ namespace Kesa.Engine.Runtime
             return !IsAlive(e.Id) || HiddenFromViewer(e.Id.Value);
         }
 
-        /// <summary>스크립트의 <c>ui</c>: 기록 이름으로 <see cref="UiRecord"/>를 준다.</summary>
+        /// <summary>스크립트의 <c>ui</c>(봇이면 <c>bot</c>, G371): 기록 이름으로 <see cref="UiRecord"/>를 준다.</summary>
         private sealed class UiRoot : Value, IRuntimeAttributes
         {
             private readonly World _world;
+            private readonly bool _bot;
 
-            public UiRoot(World world) => _world = world;
+            public UiRoot(World world, bool bot = false)
+            {
+                _world = world;
+                _bot = bot;
+            }
 
-            public override string KindName => "ui";
+            public override string KindName => _bot ? "bot" : "ui";
 
             public Value GetAttribute(string name)
             {
-                if (_world._act == null) throw OutsideUi("ui");
-                if (_world._schema.TryGetUiState(name, out var state)) return new UiRecord(_world, state);
+                if (_bot ? _world._botRun == null : _world._act == null) throw _bot ? OutsideBot("bot") : OutsideUi("ui");
+                if (_bot ? _world._schema.TryGetBotState(name, out var state) : _world._schema.TryGetUiState(name, out state))
+                    return new UiRecord(_world, state);
                 var names = new List<string>();
-                foreach (var s in _world._schema.UiStates) names.Add(s.Name);
-                throw new ScriptRuntimeException(Codes.RunUnknownName, "there is no UI state '" + name + "'", Suggest.Hint(name, names));
+                foreach (var s in _bot ? _world._schema.BotStates : _world._schema.UiStates) names.Add(s.Name);
+                throw new ScriptRuntimeException(Codes.RunUnknownName, "there is no " + (_bot ? "bot" : "UI") + " state '" + name + "'",
+                    Suggest.Hint(name, names));
             }
         }
 
-        /// <summary><c>ui.Selection</c>: 칸을 읽고 쓴다. 쓰기는 UI 동작의 사본에 들어가고 동작이 성공하면 저장소에 들어간다.</summary>
+        /// <summary>
+        /// <c>ui.Selection</c>(<c>bot.Mind</c>): 칸을 읽고 쓴다. 쓰기는 동작(생각하기)의 사본에 들어가고 성공하면 저장소에 들어간다.
+        /// </summary>
         private sealed class UiRecord : Value, IRuntimeAttributes, IUiRecord
         {
             private readonly World _world;
@@ -414,19 +427,26 @@ namespace Kesa.Engine.Runtime
                 _state = state;
             }
 
-            public override string KindName => "UI state " + _state.Name;
+            private string Noun => _state.IsBot ? "bot state" : "UI state";
+
+            public override string KindName => (_state.IsBot ? "bot state " : "UI state ") + _state.Name;
 
             private MemberDecl Member(string name)
             {
                 if (_state.TryGetMember(name, out var member)) return member;
                 var names = new List<string>();
                 foreach (var m in _state.Members) names.Add(m.Name);
-                throw new ScriptRuntimeException(Codes.RunUnknownName, "UI state '" + _state.Name + "' has no field '" + name + "'",
-                    Suggest.Hint(name, names));
+                throw new ScriptRuntimeException(Codes.RunUnknownName,
+                    (_state.IsBot ? "Bot state '" : "UI state '") + _state.Name + "' has no field '" + name + "'", Suggest.Hint(name, names));
             }
 
             private SortedDictionary<string, Value> Fields()
             {
+                if (_state.IsBot)
+                {
+                    if (_world._botRun == null) throw OutsideBot("bot");
+                    return _world._botRun.Draft[_state.Name];
+                }
                 if (_world._act == null) throw OutsideUi("ui");
                 return _world._act.Draft[_state.Name];
             }
@@ -435,7 +455,7 @@ namespace Kesa.Engine.Runtime
             {
                 Member(name);
                 var fields = Fields();
-                _world._act!.ReadUi = true;
+                if (!_state.IsBot) _world._act!.ReadUi = true;
                 return _world.UiRead(fields[name]);
             }
 
@@ -452,7 +472,7 @@ namespace Kesa.Engine.Runtime
                 var rejections = new List<ArgumentRejection>();
                 var fitted = _world.Fit(name, member.Display, member.Spec.Type, plain, rejections);
                 if (fitted == null)
-                    throw new ScriptRuntimeException(Codes.RunType, rejections[0].Message, "spec-gaps G279");
+                    throw new ScriptRuntimeException(Codes.RunType, rejections[0].Message, _state.IsBot ? "spec-gaps G371" : "spec-gaps G279");
                 fields[name] = fitted;
             }
         }

@@ -18,13 +18,13 @@ namespace Kesa.Engine.Runtime
         internal UiState(SchemaSet schema)
         {
             _schema = schema;
-            _records = Defaults(schema);
+            _records = Defaults(schema.UiStates);
         }
 
-        private static SortedDictionary<string, SortedDictionary<string, Value>> Defaults(SchemaSet schema)
+        internal static SortedDictionary<string, SortedDictionary<string, Value>> Defaults(IReadOnlyList<UiStateType> states)
         {
             var records = new SortedDictionary<string, SortedDictionary<string, Value>>(StringComparer.Ordinal);
-            foreach (var state in schema.UiStates)
+            foreach (var state in states)
             {
                 var fields = new SortedDictionary<string, Value>(StringComparer.Ordinal);
                 foreach (var m in state.Members) fields[m.Name] = m.Kind == MemberKind.Ref ? NoneValue.Instance : m.Spec.Default!;
@@ -36,7 +36,7 @@ namespace Kesa.Engine.Runtime
         /// <summary>모든 기록을 선언한 기본값으로 되돌린다 (판이 바뀌었을 때 등, G279).</summary>
         public void Reset()
         {
-            _records = Defaults(_schema);
+            _records = Defaults(_schema.UiStates);
             Version++;
         }
 
