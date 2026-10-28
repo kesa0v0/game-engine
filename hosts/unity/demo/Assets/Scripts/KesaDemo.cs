@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Kesa.Engine.Bridge;
+using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Runtime;
 using Kesa.Engine.Script;
 using Kesa.Engine.Ui;
@@ -53,8 +54,11 @@ public sealed class KesaDemo : MonoBehaviour
     /// <summary>판을 열고 화면을 <paramref name="root"/>에 올린다.</summary>
     public async Task Begin(VisualElement root)
     {
-        string mods = Path.GetFullPath(Path.Combine(Application.dataPath, "..", modsFolder));
-        var game = KesaGame.Load(mods, 1, languages);
+        var mods = LoadedMods.Load(Path.GetFullPath(Path.Combine(Application.dataPath, "..", modsFolder)), languages);
+        foreach (var d in mods.Diagnostics)
+            if (d.Severity != Severity.Info) Debug.LogWarning("Kesa mods: " + d);
+        if (mods.Disabled.Count > 0) Debug.LogWarning("Kesa mods disabled by errors: " + string.Join(", ", mods.Disabled));
+        var game = mods.NewMatch(1);
         var world = game.Host.World;
         if (startCommand.Length > 0 && !world.Submit("host", startCommand, new Dictionary<string, Value>()).Succeeded)
             throw new InvalidOperationException("the start command '" + startCommand + "' was refused");
@@ -64,9 +68,9 @@ public sealed class KesaDemo : MonoBehaviour
         await game.Host.Seat(seat.Value, connection);
         var session = await game.Host.Open(connection);
 
-        var renderer = new UiToolkitRenderer(root, game.Assets);
-        var ui = new UiInterpreter(session, renderer, game.Format, game.Assets.LoadUxml);
-        string? uxml = game.Assets.LoadUxml(screen);
+        var renderer = new UiToolkitRenderer(root, mods.Assets);
+        var ui = new UiInterpreter(session, renderer, mods.Format, mods.Assets.LoadUxml);
+        string? uxml = mods.Assets.LoadUxml(screen);
         if (uxml == null) throw new FileNotFoundException("the screen '" + screen + "' was not found in the mods");
         var read = UxmlReader.Read(screen, uxml);
         if (!read.Succeeded) throw new InvalidOperationException(string.Join("\n", read.Problems));

@@ -11,10 +11,12 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
    ```
 3. 코드에서:
    ```csharp
-   var game = KesaGame.Load(modsRoot, seed: 1, languages: new[] { "ko", "en" });
-   var session = await game.Host.Open("me");
-   var renderer = new UiToolkitRenderer(uiDocument.rootVisualElement, game.Assets);
-   var ui = new UiInterpreter(session, renderer, game.Format, game.Assets.LoadUxml);
+   var mods = LoadedMods.Load(modsRoot, languages: new[] { "ko", "en" });
+   // mods.Diagnostics·mods.Disabled: 오류가 난 모드는 빠진 채로 온다. 보일지, 멈출지는 게임이 정한다
+   var match = mods.NewMatch(seed: 1);   // 새 게임마다 이것만 다시
+   var session = await match.Host.Open("me");
+   var renderer = new UiToolkitRenderer(uiDocument.rootVisualElement, mods.Assets);
+   var ui = new UiInterpreter(session, renderer, mods.Format, mods.Assets.LoadUxml);
    var read = UxmlReader.Read("screen.uxml", File.ReadAllText(path));
    await ui.MountAsync(read.Document!, new Dictionary<string, BridgeValue> { [read.Document!.SeatParameter!] = seatEntity });
    // 프레임마다: await ui.RefreshAsync();
@@ -26,7 +28,7 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
 
 ```
 Unity.exe -batchmode -nographics -projectPath <패키지를 manifest에 적은 프로젝트> \
-  -executeMethod Kesa.Engine.Unity.Editor.KesaSmokeTest.Run -kesaMods <저장소>/samples/skirmish -logFile -
+  -executeMethod Kesa.Engine.Unity.Editor.SmokeTest.Run -kesaMods <저장소>/samples/skirmish -logFile -
 ```
 
 로그에 `KESA SMOKE TEST: OK`가 나오면 skirmish 화면이 Unity의 요소 트리로 맞게 만들어진 것이다.

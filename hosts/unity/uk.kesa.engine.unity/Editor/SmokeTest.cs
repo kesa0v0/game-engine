@@ -16,10 +16,10 @@ using UnityEngine.UIElements;
 namespace Kesa.Engine.Unity.Editor
 {
     /// <summary>
-    /// 창 없이 돌리는 확인 (batch 모드): <c>-executeMethod Kesa.Engine.Unity.Editor.KesaSmokeTest.Run -kesaMods &lt;skirmish 폴더&gt;</c>.
+    /// 창 없이 돌리는 확인 (batch 모드): <c>-executeMethod Kesa.Engine.Unity.Editor.SmokeTest.Run -kesaMods &lt;skirmish 폴더&gt;</c>.
     /// 진짜 커널 위에서 skirmish 화면(UXML)을 올려 Unity의 <c>VisualElement</c> 트리가 맞게 만들어지는지 본다. 틀리면 종료 코드 1.
     /// </summary>
-    public static class KesaSmokeTest
+    public static class SmokeTest
     {
         public static void Run()
         {
@@ -53,7 +53,9 @@ namespace Kesa.Engine.Unity.Editor
         private static async Task Check()
         {
             string root = Arg("-kesaMods");
-            var game = KesaGame.Load(root, 1, new[] { "ko", "en" });
+            var mods = LoadedMods.Load(root, new[] { "ko", "en" });
+            Require(!mods.HasErrors, "mods load without errors: " + string.Join("; ", mods.Diagnostics));
+            var game = mods.NewMatch(1);
             var world = game.Host.World;
             Require(world.Submit("host", "skirmish.Start", new Dictionary<string, Value>()).Succeeded, "skirmish.Start");
             var red = world.All("Party").Single(p => world.DefOf(p) == "skirmish:Red");
@@ -61,8 +63,8 @@ namespace Kesa.Engine.Unity.Editor
             var session = await game.Host.Open("alice");
 
             var host = new VisualElement();
-            var renderer = new UiToolkitRenderer(host, game.Assets);
-            var ui = new UiInterpreter(session, renderer, game.Format, game.Assets.LoadUxml);
+            var renderer = new UiToolkitRenderer(host, mods.Assets);
+            var ui = new UiInterpreter(session, renderer, mods.Format, mods.Assets.LoadUxml);
             var read = UxmlReader.Read("screen.uxml", File.ReadAllText(Path.Combine(root, "core", "ui", "screen.uxml")));
             Require(read.Succeeded, "screen.uxml reads: " + string.Join("; ", read.Problems));
             var document = read.Document!;
