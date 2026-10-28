@@ -55,6 +55,7 @@ namespace Kesa.Engine.Ui
         private readonly SortedDictionary<string, BridgeCommand> _uiActions = new SortedDictionary<string, BridgeCommand>(StringComparer.Ordinal);
         private readonly SortedDictionary<string, RuntimeBinding> _bindings = new SortedDictionary<string, RuntimeBinding>(StringComparer.Ordinal);
         private readonly List<UiNode> _eventNodes = new List<UiNode>();
+        private readonly List<UiNode> _windowNodes = new List<UiNode>();
         private readonly List<UiProblem> _errors = new List<UiProblem>();
         private readonly SortedSet<string> _errorTexts = new SortedSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<string, UiDocument?> _includes = new Dictionary<string, UiDocument?>(StringComparer.Ordinal);
@@ -68,8 +69,12 @@ namespace Kesa.Engine.Ui
 
         /// <param name="text">값을 글자로 바꾸는 것(번역기를 꽂는다, G345).</param>
         /// <param name="files"><c>Include</c>의 <c>src</c>로 UXML 글을 찾는다. 못 찾으면 null. 없으면 <c>Include</c>를 쓸 수 없다.</param>
-        public UiInterpreter(IHostSession session, IUiRenderer renderer, UiTextFormatter text, Func<string, string?>? files = null)
+        /// <param name="windows">창 목록. 해석기 여럿의 창이 함께 겹치고 ESC를 나누려면 같은 것을 넘긴다. 없으면 이 해석기만의 것을 만든다.</param>
+        public UiInterpreter(IHostSession session, IUiRenderer renderer, UiTextFormatter text, Func<string, string?>? files = null,
+            UiWindows? windows = null)
         {
+            Windows = windows ?? new UiWindows();
+            Windows.Attach(renderer);
             _session = session;
             var count = InterpretersPerSession.GetValue(session, _ => new StrongBox<int>());
             int index;
@@ -79,6 +84,9 @@ namespace Kesa.Engine.Ui
             _text = text;
             _files = files;
         }
+
+        /// <summary>이 해석기의 창이 들어가는 창 목록. ESC는 호스트가 여기의 <see cref="UiWindows.Escape"/>로 보낸다.</summary>
+        public UiWindows Windows { get; }
 
         /// <summary>바인딩을 계산하다 난 오류. 같은 오류는 한 번만 담는다. 그 바인딩은 직전 값을 유지한다 (G341).</summary>
         public IReadOnlyList<UiProblem> Errors => _errors;
@@ -106,6 +114,7 @@ namespace Kesa.Engine.Ui
             await RecheckAsync();
             _version = await _session.Version();
             _uiVersion = await _session.UiVersion();
+            SyncWindows();
             return new UiMountResult(new UiPanel(root), problems);
         }
 
@@ -135,6 +144,7 @@ namespace Kesa.Engine.Ui
             var handle = panel.Root.Handle;
             await DestroyAsync(panel.Root);
             _renderer.Remove(handle);
+            Windows.Flush();
         }
 
         /// <summary>
@@ -163,6 +173,7 @@ namespace Kesa.Engine.Ui
                     _uiVersion = uiVersion;
                     await RecheckAsync();
                 }
+                SyncWindows();
             }
             finally
             {
@@ -201,7 +212,7 @@ namespace Kesa.Engine.Ui
 
         private async ValueTask ValidateAsync(UiDocument document, List<UiProblem> problems, List<string> stack)
         {
-            await ValidateElementAsync(document.Root, problems, stack);
+            await ValidateElementAsync(document.Root, problems, stack, insideWindow: false);
         }
 
         private readonly SortedDictionary<string, string?> _callChecks = new SortedDictionary<string, string?>(StringComparer.Ordinal);
@@ -218,15 +229,18 @@ namespace Kesa.Engine.Ui
             if (why != null) problems.Add(new UiProblem(place, attribute + ": " + why));
         }
 
-        private async ValueTask ValidateElementAsync(UiElement element, List<UiProblem> problems, List<string> stack)
+        private async ValueTask ValidateElementAsync(UiElement element, List<UiProblem> problems, List<string> stack, bool insideWindow)
         {
             foreach (var b in element.Bindings)
                 await CheckCallAsync(element.Place, b.Kind == UiBindKind.Property ? "bind-" + b.Name : "bind-class", b.Expression, problems);
             if (element.Repeat != null) await CheckCallAsync(element.Place, "for", element.Repeat.Source, problems);
             foreach (var e in element.Events) ValidateEvent(element.Place, e, problems);
+            // Include를 건너면 읽기만으로는 창 안인지 모르므로 올리기 전에 본다
+            bool inside = insideWindow || element.Window != null;
+            if (element.DragHandle && !inside) problems.Add(new UiProblem(element.Place, "window-drag is only inside a window (an element with window=\"…\" above it)"));
 
-            if (element.Include != null) await ValidateIncludeAsync(element, problems, stack);
-            foreach (var child in element.Children) await ValidateElementAsync(child, problems, stack);
+            if (element.Include != null) await ValidateIncludeAsync(element, problems, stack, inside);
+            foreach (var child in element.Children) await ValidateElementAsync(child, problems, stack, inside);
         }
 
         private void ValidateEvent(string place, UiEvent e, List<UiProblem> problems)
@@ -245,7 +259,7 @@ namespace Kesa.Engine.Ui
                 problems.Add(new UiProblem(place, "on-" + e.Name + ": '" + name + "' takes " + target.Parameters.Count + " argument(s), got " + e.Call.Arguments.Count));
         }
 
-        private async ValueTask ValidateIncludeAsync(UiElement element, List<UiProblem> problems, List<string> stack)
+        private async ValueTask ValidateIncludeAsync(UiElement element, List<UiProblem> problems, List<string> stack, bool insideWindow)
         {
             var include = element.Include!;
             var included = LoadInclude(include.Source, element.Place, problems);
@@ -267,7 +281,7 @@ namespace Kesa.Engine.Ui
                 if (!given.Contains(name)) problems.Add(new UiProblem(element.Place, "Include '" + include.Source + "' needs the value '" + name + "'"));
 
             stack.Add(include.Source);
-            await ValidateElementAsync(included.Root, problems, stack);
+            await ValidateElementAsync(included.Root, problems, stack, insideWindow);
             stack.RemoveAt(stack.Count - 1);
         }
 

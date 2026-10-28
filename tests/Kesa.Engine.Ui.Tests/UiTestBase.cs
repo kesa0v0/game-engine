@@ -19,7 +19,8 @@ namespace Kesa.Engine.Ui.Tests
             "component(\"Hp\", v=field(int, default=3))\n" +
             "deftype(\"Hero\", components=[\"Hp\", \"Seatable\"])\n" +
             "deftype(\"Unit\", components=[\"Hp\"])\n" +
-            "ui_state(\"Selection\", unit=ref(\"Unit\", optional=True))\n";
+            "ui_state(\"Selection\", unit=ref(\"Unit\", optional=True))\n" +
+            "ui_state(\"Confirm\", open=field(bool, default=False))\n";
 
         private const string Defs =
             "Hero(\"Red\")\nHero(\"Blue\")\nUnit(\"Soldier\")\n" +
@@ -41,6 +42,9 @@ namespace Kesa.Engine.Ui.Tests
             "@command(free=True, acts_for=lambda hero: hero)\ndef Rest(hero: Ref[Hero]):\n    hero.Hp.v += 1\n" +
             "def hp_order():\n    return [u for u in query(Unit) if u.Hp.v < 3] + [u for u in query(Unit) if u.Hp.v >= 3]\n" +
             "def tags():\n    big = [u for u in query(Unit) if u.Hp.v > 3]\n    return [\"x\", \"y\", \"x\"] if len(big) > 0 else [\"x\", \"x\"]\n" +
+            "@ui_action\ndef ask():\n    ui.Confirm.open = True\n" +
+            "@ui_action\ndef answer():\n    ui.Confirm.open = False\n" +
+            "def asking():\n    return ui.Confirm.open\n" +
             "def top():\n    best = None\n    for u in query(Unit):\n        if best is None or u.Hp.v > best.Hp.v:\n            best = u\n    return best\n";
 
         private string _root = "";

@@ -90,6 +90,9 @@ namespace Kesa.Engine.Ui
 
         public bool Alive { get; set; } = true;
 
+        /// <summary>마지막으로 넣은 <c>display</c>(창이 보이는지는 이것과 모든 윗 노드의 것으로 본다, G354).</summary>
+        public bool Displayed { get; set; } = true;
+
         public List<RuntimeBinding> Bindings { get; } = new List<RuntimeBinding>();
 
         public List<UiNode> Children { get; } = new List<UiNode>();

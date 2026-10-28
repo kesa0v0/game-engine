@@ -88,6 +88,45 @@ namespace Kesa.Engine.Unity.Editor
             var kind = cards[0].Q<Label>("kind");
             Require(kind != null && (kind.text.Contains("병사") || kind.text.Contains("궁수")), "the unit kind is translated, got " + kind?.text);
             Require(ui.Errors.Count == 0, "no binding errors: " + string.Join("; ", ui.Errors));
+            CheckWindows(mods.Assets);
+        }
+
+        /// <summary>창 배치 (G354): 창은 겹침 층으로 가고 원래 자리에는 자리표가 남아 형제 순서가 그대로이며, 모달 막이는 정한 자리에 선다.</summary>
+        private static void CheckWindows(IUiAssets assets)
+        {
+            var host = new VisualElement();
+            var renderer = new UiToolkitRenderer(host, assets);
+            var root = renderer.Create("VisualElement", null, 0, new KeyValuePair<string, string>[0]);
+            var first = renderer.Create("Label", root, 0, new[] { new KeyValuePair<string, string>("name", "first") });
+            var info = renderer.Create("VisualElement", root, 1, new[] { new KeyValuePair<string, string>("name", "info") });
+            var confirm = renderer.Create("VisualElement", root, 2, new[] { new KeyValuePair<string, string>("name", "confirm") });
+            var inner = renderer.Create("Label", info, 0, new[] { new KeyValuePair<string, string>("name", "inner") });
+            renderer.MakeWindow(info);
+            renderer.MakeWindow(confirm);
+            var last = renderer.Create("Label", root, 3, new[] { new KeyValuePair<string, string>("name", "last") });
+
+            var rootElement = renderer.Element(root);
+            Require(rootElement.childCount == 4 && rootElement[0].name == "first" && rootElement[3].name == "last",
+                "the windows left place holders so sibling order holds");
+            var layer = host.Q("kesa-windows");
+            Require(renderer.Element(info).parent == layer && renderer.Element(inner).parent == renderer.Element(info), "the window moved to the window layer with its children");
+            Require(renderer.Element(info).resolvedStyle.display == DisplayStyle.None || renderer.Element(info).style.display == DisplayStyle.None,
+                "a window is hidden until arranged");
+
+            renderer.ArrangeWindows(new[] { info, confirm }, 1);
+            var order = layer.Children().Select(e => e.name).ToList();
+            Require(string.Join(",", order) == "info,kesa-modal-blocker,confirm", "arranged with the blocker under the modal, got " + string.Join(",", order));
+            Require(renderer.Element(info).style.display == DisplayStyle.Flex, "a shown window is displayed");
+
+            renderer.ArrangeWindows(new[] { info }, -1);
+            order = layer.Children().Select(e => e.name).ToList();
+            Require(string.Join(",", order) == "confirm,info", "hidden windows go below and there is no blocker, got " + string.Join(",", order));
+            Require(renderer.Element(confirm).style.display == DisplayStyle.None, "a window not in the list is hidden");
+
+            renderer.Move(info, root, 3);
+            Require(rootElement.childCount == 4 && rootElement[3].name == "kesa-window-place", "moving a window moves its place holder");
+            renderer.Remove(root);
+            Require(layer.childCount == 0, "removing the panel removes its windows from the layer, left " + layer.childCount);
         }
 
         private static void Dump(VisualElement element, int depth, StringBuilder text)

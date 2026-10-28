@@ -16,7 +16,8 @@ namespace Kesa.Engine.Ui
     {
         private static readonly Regex ForPattern = new Regex(@"^\s*([A-Za-z_][A-Za-z0-9_]*)\s+in\s+(.+?)\s*$", RegexOptions.CultureInvariant);
 
-        private static readonly string[] Events = { "click" };
+        private static readonly string[] Events = { "click", "close" };
+        private static readonly string[] WindowKinds = { "normal", "modal" };
 
         /// <summary>
         /// <paramref name="name"/>은 오류에 붙일 파일 이름. <c>ui:</c> 접두사를 선언하지 않은 파일은 선언을 씌워 읽는다.
@@ -147,6 +148,9 @@ namespace Kesa.Engine.Ui
                 UiRepeat? repeat = null;
                 string? includeSource = null;
                 bool isInclude = kind.Equals("Include", StringComparison.OrdinalIgnoreCase);
+                UiWindowKind? windowKind = null;
+                bool? closeOnEscape = null, closeOnOutside = null, raise = null;
+                bool dragHandle = false;
 
                 foreach (var attribute in node.Attributes())
                 {
@@ -168,6 +172,17 @@ namespace Kesa.Engine.Ui
                     {
                         if (!isRoot) Problem(place, n + " can only be on the top element of a file");
                     }
+                    else if (n == "window")
+                    {
+                        if (isInclude) Problem(place, "window cannot be on an Include (put it on the top element of the included file)");
+                        else if (v == "normal") windowKind = UiWindowKind.Normal;
+                        else if (v == "modal") windowKind = UiWindowKind.Modal;
+                        else Problem(place, "window=\"" + v + "\": a window is " + string.Join(" or ", WindowKinds) + UiSuggest.Hint(v, WindowKinds));
+                    }
+                    else if (n == "close-on-escape") closeOnEscape = ReadFlag(place, n, v);
+                    else if (n == "close-on-outside") closeOnOutside = ReadFlag(place, n, v);
+                    else if (n == "window-raise") raise = ReadFlag(place, n, v);
+                    else if (n == "window-drag") dragHandle = ReadFlag(place, n, v) == true;
                     else if (isInclude)
                     {
                         if (n == "src") includeSource = v;
@@ -220,6 +235,22 @@ namespace Kesa.Engine.Ui
                     }
                 }
 
+                bool hasClose = events.Exists(e => e.Name == "close");
+                UiWindow? window = null;
+                if (windowKind == null)
+                {
+                    if (hasClose) Problem(place, "on-close is only for a window (add window=\"normal\" or window=\"modal\")");
+                    if (closeOnEscape != null) Problem(place, "close-on-escape is only for a window");
+                    if (closeOnOutside != null) Problem(place, "close-on-outside is only for a window");
+                    if (raise != null) Problem(place, "window-raise is only for a window");
+                }
+                else
+                {
+                    if (!hasClose && closeOnEscape == true) Problem(place, "close-on-escape=\"true\" needs an on-close to call");
+                    if (!hasClose && closeOnOutside == true) Problem(place, "close-on-outside=\"true\" needs an on-close to call");
+                    window = new UiWindow(windowKind.Value, closeOnEscape ?? hasClose, closeOnOutside ?? false, raise ?? true);
+                }
+
                 UiInclude? include = null;
                 if (isInclude)
                 {
@@ -240,7 +271,15 @@ namespace Kesa.Engine.Ui
                 }
                 if (isInclude && children.Count > 0) Problem(place, "an Include has no children");
 
-                return new UiElement(kind, place, attributes, bindings, events, repeat, include, children);
+                return new UiElement(kind, place, attributes, bindings, events, repeat, include, children, window, dragHandle);
+            }
+
+            private bool? ReadFlag(string place, string attribute, string value)
+            {
+                if (value == "true") return true;
+                if (value == "false") return false;
+                Problem(place, attribute + "=\"" + value + "\": must be true or false");
+                return null;
             }
 
             private UiRepeat? ReadRepeat(string place, string text, SortedSet<string> scope)

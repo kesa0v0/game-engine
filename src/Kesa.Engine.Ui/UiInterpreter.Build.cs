@@ -27,12 +27,27 @@ namespace Kesa.Engine.Ui
                 await ApplyBindingAsync(Register(node, scope, kind, attribute, b.Name, b.Expression, attribute + "=\"" + b.Source + "\""));
             }
 
+            bool clickable = false;
+            UiEvent? close = null;
             foreach (var e in definition.Events)
             {
                 var captured = e;
-                _renderer.OnClick(id, () => ClickAsync(node, captured));
+                if (e.Name == "close")
+                {
+                    close = e;
+                    continue;
+                }
+                _renderer.OnClick(id, () => EventAsync(node, captured));
+                clickable = true;
             }
-            if (definition.Events.Count > 0) _eventNodes.Add(node);
+            if (clickable) _eventNodes.Add(node);
+            if (definition.Window != null)
+            {
+                var closeEvent = close;
+                Windows.Add(_renderer, id, definition.Window, closeEvent == null ? (Func<ValueTask>?)null : () => EventAsync(node, closeEvent));
+                _windowNodes.Add(node);
+            }
+            if (definition.DragHandle) _renderer.MakeDragHandle(id);
 
             if (definition.Repeat != null)
             {
@@ -112,7 +127,11 @@ namespace Kesa.Engine.Ui
                     _renderer.SetText(handle, binding.Name, _text(value));
                     break;
                 case UiPropertyType.Flag:
-                    if (UiValues.TryTruthy(value, out bool flag, out string flagError)) _renderer.SetFlag(handle, binding.Name, flag);
+                    if (UiValues.TryTruthy(value, out bool flag, out string flagError))
+                    {
+                        _renderer.SetFlag(handle, binding.Name, flag);
+                        if (binding.Name == "display") binding.Owner.Displayed = flag;
+                    }
                     else Report(place, binding.Label + ": " + flagError);
                     break;
                 case UiPropertyType.Number:
@@ -320,6 +339,19 @@ namespace Kesa.Engine.Ui
                     foreach (var root in group.Roots)
                         await DestroyAsync(root);
             _eventNodes.Remove(node);
+            if (node.Definition.Window != null && _windowNodes.Remove(node)) Windows.Remove(_renderer, node.Id!.Value);
+        }
+
+        /// <summary>창 노드마다 보이는지(자기와 모든 윗 노드의 <c>display</c>)를 창 목록에 넣고 바뀐 것을 그리게 한다 (G354).</summary>
+        private void SyncWindows()
+        {
+            foreach (var node in _windowNodes)
+            {
+                bool visible = true;
+                for (var n = node; n != null && visible; n = n.Parent) visible = n.Displayed;
+                Windows.SetVisible(_renderer, node.Id!.Value, visible);
+            }
+            Windows.Flush();
         }
 
         // ---- 눌림과 버튼 확인 (G336·G342) ----
@@ -338,7 +370,7 @@ namespace Kesa.Engine.Ui
             return true;
         }
 
-        private async ValueTask ClickAsync(UiNode node, UiEvent e)
+        private async ValueTask EventAsync(UiNode node, UiEvent e)
         {
             if (!node.Alive) return;
             if (!TryEventCall(node, e, out string name, out var arguments)) return;
@@ -356,6 +388,8 @@ namespace Kesa.Engine.Ui
                 if (!node.Alive) continue;
                 foreach (var e in node.Definition.Events)
                 {
+                    // 닫힘 요청은 누르는 것이 아니라 창을 회색으로 만들지 않는다
+                    if (e.Name != "click") continue;
                     if (!TryEventCall(node, e, out string name, out var arguments))
                     {
                         _renderer.SetFlag(node.Handle, "enabled", false);

@@ -112,11 +112,41 @@ namespace Kesa.Engine.Ui
         public IReadOnlyList<KeyValuePair<string, UiExpr>> Arguments { get; }
     }
 
+    /// <summary>창의 종류 (G350): 모달은 보통 창보다 늘 위이고 그 아래 입력을 막는다.</summary>
+    public enum UiWindowKind
+    {
+        Normal,
+        Modal,
+    }
+
+    /// <summary><c>window="…"</c>가 붙은 요소의 창 성질 (G348~G351·G354).</summary>
+    public sealed class UiWindow
+    {
+        public UiWindow(UiWindowKind kind, bool closeOnEscape, bool closeOnOutside, bool raise)
+        {
+            Kind = kind;
+            CloseOnEscape = closeOnEscape;
+            CloseOnOutside = closeOnOutside;
+            Raise = raise;
+        }
+
+        public UiWindowKind Kind { get; }
+
+        /// <summary>ESC가 <c>on-close</c>를 부르나(<c>on-close</c>가 있으면 기본 참).</summary>
+        public bool CloseOnEscape { get; }
+
+        /// <summary>바깥 클릭이 <c>on-close</c>를 부르나(기본 거짓).</summary>
+        public bool CloseOnOutside { get; }
+
+        /// <summary>누르면 보통 창들 중 맨 위로 오나(기본 참).</summary>
+        public bool Raise { get; }
+    }
+
     public sealed class UiElement
     {
         public UiElement(string kind, string place, IReadOnlyList<KeyValuePair<string, string>> attributes,
             IReadOnlyList<UiBinding> bindings, IReadOnlyList<UiEvent> events, UiRepeat? repeat, UiInclude? include,
-            IReadOnlyList<UiElement> children)
+            IReadOnlyList<UiElement> children, UiWindow? window = null, bool dragHandle = false)
         {
             Kind = kind;
             Place = place;
@@ -126,7 +156,15 @@ namespace Kesa.Engine.Ui
             Repeat = repeat;
             Include = include;
             Children = children;
+            Window = window;
+            DragHandle = dragHandle;
         }
+
+        /// <summary><c>window="…"</c>가 있으면 이 요소는 창이다.</summary>
+        public UiWindow? Window { get; }
+
+        /// <summary><c>window-drag="true"</c>: 이 요소를 끌면 이 요소를 담은 창이 움직인다.</summary>
+        public bool DragHandle { get; }
 
         /// <summary>요소 이름(<c>Label</c>·<c>Button</c> …). 접두사는 뗀다.</summary>
         public string Kind { get; }

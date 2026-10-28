@@ -92,6 +92,8 @@ public sealed class KesaDemo : MonoBehaviour
         _refreshing = true;
         try
         {
+            // 창이 ESC를 받지 않으면(거짓) 게임이 자기 메뉴를 열 자리다
+            if (Input.GetKeyDown(KeyCode.Escape)) await _ui.Windows.Escape();
             await _ui.RefreshAsync();
         }
         catch (Exception e)

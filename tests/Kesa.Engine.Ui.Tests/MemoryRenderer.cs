@@ -101,6 +101,33 @@ namespace Kesa.Engine.Ui.Tests
 
         public void OnClick(ElementId element, Func<ValueTask> handler) => Get(element).Click = handler;
 
+        public SortedSet<long> Windows { get; } = new SortedSet<long>();
+
+        public SortedSet<long> DragHandles { get; } = new SortedSet<long>();
+
+        /// <summary>마지막으로 받은 보일 창(아래에서 위)과 막이 자리.</summary>
+        public List<El> Shown { get; } = new List<El>();
+
+        public int BlockerAt { get; private set; } = -1;
+
+        private Func<ElementId?, ValueTask>? _press;
+
+        public void MakeWindow(ElementId element) => Windows.Add(element.Value);
+
+        public void MakeDragHandle(ElementId element) => DragHandles.Add(element.Value);
+
+        public void ArrangeWindows(IReadOnlyList<ElementId> windows, int blockerAt)
+        {
+            Shown.Clear();
+            foreach (var id in windows) Shown.Add(Get(id));
+            BlockerAt = blockerAt;
+        }
+
+        public void OnPress(Func<ElementId?, ValueTask> handler) => _press = handler;
+
+        /// <summary>화면을 누른다: 창 안이면 그 창, 창 밖이나 막이면 null.</summary>
+        public ValueTask PressAt(El? window) => _press!(window == null ? (ElementId?)null : new ElementId(window.Id));
+
         private static void Mark(El el)
         {
             el.Removed = true;

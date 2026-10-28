@@ -90,7 +90,31 @@ Unity 호스트는 UXML 파일(`samples/skirmish/core/ui/screen.uxml`)로 화면
 - `bind-text`·`bind-display`·`bind-enabled`·`bind-value`·`bind-opacity`·`bind-image`, `bind-class-<이름>`(참이면 클래스를 붙임), `bind-class`(함수가 돌려준 글자나 글자 목록이 클래스).
 - 눌러도 되는지는 호스트가 `require`·`choose`와 입구를 미리 보아 버튼을 회색으로 한다.
 - 다른 파일을 `<Include src="…" 이름="식" />`로 끼우면 그 파일이 `params`로 선언한 이름의 값을 넘겨야 한다.
-- 아직 없는 것: 런타임에 읽는 스타일시트(USS), 인라인 `style`, 창을 끌어 옮기는 속성.
+- 아직 없는 것: 런타임에 읽는 스타일시트(USS), 인라인 `style`.
+
+#### 창
+
+창은 평범한 요소에 `window`를 붙인 것이다. 열렸는지는 UI 기록에 두고 `bind-display`로 묶는다. 닫는 것도 화면 동작이 UI 기록을 바꿔서 한다. 아래의 함수 이름은 예이고 skirmish에는 없다.
+
+```xml
+<ui:VisualElement name="info" window="normal"
+    bind-display="skirmish.inspected()" on-close="skirmish.close_info()">      <!-- 고른 유닛이 있으면 열림 -->
+  <ui:VisualElement class="title" window-drag="true">                          <!-- 이것을 끌면 창이 움직인다 -->
+    <ui:Label text="유닛 정보" />
+  </ui:VisualElement>
+</ui:VisualElement>
+<ui:VisualElement name="confirm" window="modal"
+    bind-display="skirmish.asking()" on-close="skirmish.cancel()" />           <!-- 대답할 때까지 다른 것을 못 누른다 -->
+```
+
+- `window="normal"`이나 `window="modal"`이다. 모달은 나중에 열린 보통 창보다도 늘 위에 있고 그 아래 입력을 막는다. 같은 종류끼리는 나중에 연 창이 위다.
+- 보통 창은 누르면 맨 위로 온다. 막으려면 `window-raise="false"`.
+- `on-close`는 닫힘 요청(ESC, 켰으면 바깥 클릭)에 부를 커맨드나 화면 동작이다. 엔진은 창을 직접 숨기지 않는다: 그 동작이 UI 기록을 바꿔 `bind-display`가 거짓이 되면 닫힌다.
+- `on-close`가 있으면 ESC가 맨 위 창부터 닫는다. 막으려면 `close-on-escape="false"`. ESC로 닫히지 않는 모달이 맨 위면 ESC는 그 아래로 가지 않는다.
+- 바깥 클릭은 기본으로 닫지 않는다. `close-on-outside="true"`면 모달은 뒤의 막이를, 보통 창은 그 창 밖을 누를 때 `on-close`를 부른다.
+- `window-drag="true"`는 창 안의 요소에만 붙는다(끼운 파일이어도 된다). 끌어 놓은 자리는 게임을 켜 둔 동안 남는다.
+- 창은 화면 맨 위의 겹침 층에 그려지므로 자리는 USS의 `left`·`top` 등으로 정한다. 모달 뒤의 막이는 USS 클래스 `modal-blocker`로 모양을 정한다(기본은 투명).
+- 창 안에 화면을 여는 버튼과 닫는 버튼을 두는 것은 평범한 `on-click`이다.
 
 ## 번역
 

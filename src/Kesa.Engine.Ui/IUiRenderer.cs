@@ -65,5 +65,27 @@ namespace Kesa.Engine.Ui
 
         /// <summary>눌렀을 때 부를 것을 단다. 렌더러는 입력이 오면 이것을 부르고 기다린다.</summary>
         void OnClick(ElementId element, Func<ValueTask> handler);
+
+        /// <summary>
+        /// 요소를 창으로 삼는다 (G348·G354). 그 뒤로 이 요소의 보임과 겹침은 <see cref="ArrangeWindows"/>만 정하고, 그때까지는 숨긴다.
+        /// 창을 다른 창과 겹치게 하려고 어디로 옮기든 핸들과 부모 안의 순서(<see cref="Create"/>·<see cref="Move"/>의 자리)는 그대로여야 한다.
+        /// </summary>
+        void MakeWindow(ElementId element);
+
+        /// <summary>이 요소를 끌면 이 요소를 담은 가장 가까운 창이 움직인다 (G349).</summary>
+        void MakeDragHandle(ElementId element);
+
+        /// <summary>
+        /// 보이는 창과 겹침을 정한다 (G350·G351·G354). <paramref name="windows"/>는 이 렌더러의 보일 창, 아래에서 위 순서이고 여기 없는
+        /// 창은 숨긴다. 모달 막이는 <paramref name="blockerAt"/>번째 창 바로 아래에 둔다: -1이면 막이가 없고, <c>windows.Count</c>면
+        /// 이 렌더러의 모든 것 위(다른 렌더러의 모달이 맨 위). 막이는 그 아래 전부의 입력을 막는다.
+        /// </summary>
+        void ArrangeWindows(IReadOnlyList<ElementId> windows, int blockerAt);
+
+        /// <summary>
+        /// 화면이 눌렸을 때 부를 것을 단다 (G351·G354). 렌더러는 누름이 다른 처리보다 먼저 이것을 부른다: 눌린 곳을 담은 맨 위 창, 창 밖이나
+        /// 막이면 null.
+        /// </summary>
+        void OnPress(Func<ElementId?, ValueTask> handler);
     }
 }
