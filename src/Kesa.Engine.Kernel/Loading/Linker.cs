@@ -89,15 +89,17 @@ namespace Kesa.Engine.Loading
         private void CheckSubmit(string mod, SubmitUse use, SortedDictionary<string, CommandDecl> commands)
         {
             string id = use.Command.IndexOf('.') >= 0 ? use.Command : mod + "." + use.Command;
-            if (!commands.TryGetValue(id, out var command) || command.IsUiAction)
+            if (!commands.TryGetValue(id, out var command) || command.IsUiAction || command.Function.IsBot)
             {
                 var names = new List<string>();
                 foreach (var c in commands.Values)
-                    if (!c.IsUiAction) names.Add(c.Mod == mod ? c.Function.Name : c.Id);
+                    if (!c.IsUiAction && !c.Function.IsBot) names.Add(c.Mod == mod ? c.Function.Name : c.Id);
+                string kind = command == null ? "" : command.Function.EntryKind;
                 _stage.Error(mod, Codes.CmdSubmit,
-                    command != null ? "'" + use.Command + "' is a @ui_action, so it cannot be submitted"
+                    command != null ? "'" + use.Command + "' is a " + kind + ", so it cannot be submitted"
                         : "submit() names '" + use.Command + "', but there is no command '" + id + "'",
-                    use.Span, command != null ? "a @ui_action runs on the screen; submit a @command (spec-gaps G278)"
+                    use.Span, command != null ? "a " + kind + (command.IsUiAction ? " runs on the screen" : " runs in a bot's seat") +
+                                                "; submit a @command (spec-gaps G278)"
                         : Suggest.Hint(use.Command, names));
                 return;
             }

@@ -242,10 +242,12 @@ namespace Kesa.Engine.Runtime
         private static string? Refusal(FunctionValue fn, bool withUi)
         {
             if (fn.IsUiAction) return "it is a @ui_action, which the host runs as an action, not as a value to show";
+            if (fn.IsBot) return "it is a @bot, which the host runs in a bot's seat, not as a value to show";
             if (fn.IsEntry) return "it is a " + fn.EntryKind + ", which runs only when submitted or triggered";
             if (fn.Writes) return "it changes the world (at " + fn.WriteWitness!.Value + ")";
             if (fn.Random) return "it uses random numbers (at " + fn.RandomWitness!.Value + ")";
             if (fn.WritesUi) return "it changes UI state (at " + fn.UiWriteWitness!.Value + "); run it from a @ui_action";
+            if (fn.TouchesBot) return "it uses bot state (at " + fn.BotTouchWitness!.Value + "); only a @bot can use it";
             // ui를 읽는 화면 함수는 연결의 UI 기록과 함께 부른다 (G279)
             if (fn.TouchesUi && !withUi)
                 return "it reads UI state (at " + fn.UiTouchWitness!.Value + "); call it with ViewAs(issuer).Call(ui, ...)";

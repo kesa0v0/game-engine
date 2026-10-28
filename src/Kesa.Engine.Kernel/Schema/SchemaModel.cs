@@ -385,13 +385,17 @@ namespace Kesa.Engine.Schema
     /// </summary>
     public sealed class UiStateDecl
     {
-        internal UiStateDecl(string name, SourceSpan span, string mod, IReadOnlyList<MemberDecl> members)
+        internal UiStateDecl(string name, SourceSpan span, string mod, IReadOnlyList<MemberDecl> members, bool bot = false)
         {
             Name = name;
             Span = span;
             Mod = mod;
             Members = members;
+            IsBot = bot;
         }
+
+        /// <summary><c>bot_state</c>(봇의 기억, G371)인가. 칸 규칙은 같고 <c>bot.이름.칸</c>으로 읽는다.</summary>
+        public bool IsBot { get; }
 
         public string Name { get; }
         public SourceSpan Span { get; }
@@ -413,6 +417,7 @@ namespace Kesa.Engine.Schema
         public List<SignalDecl> Signals { get; } = new List<SignalDecl>();
         public List<StageDecl> Stages { get; } = new List<StageDecl>();
         public List<UiStateDecl> UiStates { get; } = new List<UiStateDecl>();
+        public List<UiStateDecl> BotStates { get; } = new List<UiStateDecl>();
     }
 
     /// <summary>완성된 UI 로컬 기록 (G277·G279).</summary>
@@ -431,6 +436,7 @@ namespace Kesa.Engine.Schema
         }
 
         public UiStateDecl Decl { get; }
+        public bool IsBot => Decl.IsBot;
         public string Name => Decl.Name;
         public string Mod => Decl.Mod;
         public IReadOnlyList<MemberDecl> Members => Decl.Members;
@@ -614,10 +620,18 @@ namespace Kesa.Engine.Schema
 
         public bool TryGetUiState(string name, out UiStateType state) => _uiStates.TryGetValue(name, out state!);
 
+        private readonly Dictionary<string, UiStateType> _botStates = new Dictionary<string, UiStateType>(StringComparer.Ordinal);
+        private readonly List<UiStateType> _botStateList = new List<UiStateType>();
+
+        /// <summary>봇의 기억 (G371). 순서는 <see cref="UiStates"/>와 같다.</summary>
+        public IReadOnlyList<UiStateType> BotStates => _botStateList;
+
+        public bool TryGetBotState(string name, out UiStateType state) => _botStates.TryGetValue(name, out state!);
+
         internal void Add(UiStateType state)
         {
-            _uiStates.Add(state.Name, state);
-            _uiStateList.Add(state);
+            (state.IsBot ? _botStates : _uiStates).Add(state.Name, state);
+            (state.IsBot ? _botStateList : _uiStateList).Add(state);
         }
 
         private readonly Dictionary<string, StageDecl> _stages = new Dictionary<string, StageDecl>(StringComparer.Ordinal);

@@ -25,6 +25,9 @@ namespace Kesa.Engine.Script
         /// <summary><c>@ui_action</c>으로 선언한 UI 동작, 정의된 순서대로 (G280). 커맨드와 다른 목록이다.</summary>
         public List<CommandDecl> UiActions { get; } = new List<CommandDecl>();
 
+        /// <summary><c>@bot</c>으로 선언한 봇 함수, 정의된 순서대로 (G369). 첫 매개변수는 맡은 엔티티다(G368).</summary>
+        public List<CommandDecl> Bots { get; } = new List<CommandDecl>();
+
         /// <summary>
         /// <c>@view_rule(대상)</c>(G315)으로 선언한 보기 규칙, 정의된 순서대로. 한 모드가 한 대상에 둘을 걸면 로드 오류다.
         /// </summary>

@@ -216,6 +216,7 @@ namespace Kesa.Engine.Schema
                     foreach (var s in m.Signals) if (!Reserved(s.Name, s.Mod, s.Span)) Note(s.Name, s.Mod, s.Span);
                     // UI 로컬 기록도 같은 이름 공간이다: 스텁에서 같은 class가 된다 (G281)
                     foreach (var u in m.UiStates) if (!Reserved(u.Name, u.Mod, u.Span)) Note(u.Name, u.Mod, u.Span);
+                    foreach (var u in m.BotStates) if (!Reserved(u.Name, u.Mod, u.Span)) Note(u.Name, u.Mod, u.Span);
                 }
 
                 bool Unique(string name, string mod, SourceSpan span)
@@ -250,6 +251,8 @@ namespace Kesa.Engine.Schema
                     foreach (var s in m.Signals)
                         if (!Engine(s.Name) && Unique(s.Name, s.Mod, s.Span)) _set.Add(new SignalType(s));
                     foreach (var u in m.UiStates)
+                        if (!Engine(u.Name) && Unique(u.Name, u.Mod, u.Span)) _set.Add(new UiStateType(u));
+                    foreach (var u in m.BotStates)
                         if (!Engine(u.Name) && Unique(u.Name, u.Mod, u.Span)) _set.Add(new UiStateType(u));
                 }
             }
@@ -453,7 +456,7 @@ namespace Kesa.Engine.Schema
                 {
                     foreach (var f in s.Fields) CheckTypeNames(f.Type, s.Mod);
                 }
-                foreach (var u in _set.UiStates)
+                foreach (var u in System.Linq.Enumerable.Concat(_set.UiStates, _set.BotStates))
                 {
                     foreach (var member in u.Members) CheckTypeNames(member.Spec.Type, member.Mod);
                 }
@@ -634,6 +637,11 @@ namespace Kesa.Engine.Schema
                     Error(from, Codes.SchUnknownName, "'" + r.Name + "' is a UI state, not a Def type", r.Span);
                     return null;
                 }
+                if (_set.TryGetBotState(r.Name, out _))
+                {
+                    Error(from, Codes.SchUnknownName, "'" + r.Name + "' is a bot state, not a Def type", r.Span);
+                    return null;
+                }
                 if (_ambiguous.Contains(r.Name)) return null;
 
                 var visible = new List<string>();
@@ -666,6 +674,12 @@ namespace Kesa.Engine.Schema
                 {
                     Error(from, Codes.SchUnknownName, "'" + r.Name + "' is a UI state, not a component", r.Span,
                         hint: "a UI state belongs to a screen, not to entities; read it as ui." + r.Name + " (spec-gaps G277)");
+                    return null;
+                }
+                if (_set.TryGetBotState(r.Name, out _))
+                {
+                    Error(from, Codes.SchUnknownName, "'" + r.Name + "' is a bot state, not a component", r.Span,
+                        hint: "a bot state belongs to a bot, not to entities; read it as bot." + r.Name + " in a @bot (spec-gaps G371)");
                     return null;
                 }
                 if (_ambiguous.Contains(r.Name)) return null;

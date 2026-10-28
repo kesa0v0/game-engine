@@ -54,6 +54,7 @@ namespace Kesa.Engine.Loading
                 var scopes = new SortedDictionary<string, ModScope>(StringComparer.Ordinal);
                 var commands = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var uiActions = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
+                var bots = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var handlers = new List<HandlerDecl>();
                 var whens = new List<WhenDecl>();
                 var wraps = new List<WrapDecl>();
@@ -79,6 +80,7 @@ namespace Kesa.Engine.Loading
                     // 같은 모드 안의 같은 이름은 EVL004로 막히고 모드 id는 유일하므로 id는 겹치지 않는다
                     foreach (var command in u.Functions.Commands) commands.Add(command.Id, command);
                     foreach (var action in u.Functions.UiActions) uiActions.Add(action.Id, action);
+                    foreach (var bot in u.Functions.Bots) bots.Add(bot.Id, bot);
                     handlers.AddRange(u.Functions.Handlers);
                     whens.AddRange(u.Functions.Whens);
                     viewRules.AddRange(u.Functions.ViewRules);
@@ -91,6 +93,7 @@ namespace Kesa.Engine.Loading
                 {
                     ViewRules = viewRules,
                     UiActions = uiActions,
+                    Bots = bots,
                     Order = order,
                     ModsRoot = modsRoot,
                     TextUses = textUses,
@@ -195,6 +198,7 @@ namespace Kesa.Engine.Loading
                     new CallContext(u.Manifest.Id, u.Bag));
                 CommandSignatures.Resolve(u.Functions.UiActions, schema, visibility, u.Scope,
                     new CallContext(u.Manifest.Id, u.Bag));
+                CommandSignatures.Resolve(u.Functions.Bots, schema, visibility, u.Scope, new CallContext(u.Manifest.Id, u.Bag));
                 HandlerStages.Check(u.Functions.Handlers, schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
                 CommandSignatures.ResolveWhens(u.Functions.Whens, schema, visibility, u.Scope, new CallContext(u.Manifest.Id, u.Bag));
                 HandlerStages.Check(u.Functions.Whens, schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
@@ -253,6 +257,7 @@ namespace Kesa.Engine.Loading
                 if (u.Failed) continue;
                 commands.AddRange(u.Functions.Commands);
                 commands.AddRange(u.Functions.UiActions); // 기본값·choose 리터럴 검사는 같다
+                commands.AddRange(u.Functions.Bots);
                 functions.Add(new KeyValuePair<string, ModFunctions>(u.Manifest.Id, u.Functions));
             }
             Linker.Check(run.Expanded, run.Defs, run.Schema, run.Visibility, id => units.Find(u => u.Manifest.Id == id)?.Manifest, stage,

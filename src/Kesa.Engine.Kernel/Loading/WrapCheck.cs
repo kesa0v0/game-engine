@@ -39,6 +39,9 @@ namespace Kesa.Engine.Loading
                 fn.RandomWitness = target.RandomWitness;
                 fn.UiTouchWitness = target.UiTouchWitness;
                 fn.UiWriteWitness = target.UiWriteWitness;
+                fn.UiStateWitness = target.UiStateWitness;
+                fn.BotTouchWitness = target.BotTouchWitness;
+                fn.BotWriteWitness = target.BotWriteWitness;
                 w.Target = target;
             }
         }
@@ -111,6 +114,14 @@ namespace Kesa.Engine.Loading
                     fn.Definition!.Span, "a command wrapper runs like the command's body (spec-gaps G320)", new[] { fn.UiTouchWitness!.Value });
                 ok = false;
             }
+            else if (fn.TouchesBot)
+            {
+                context.Error(Codes.CmdUiEffect, "the @wrap '" + fn.Name + "' of the command '" + target.Name +
+                                                 "' uses bot state (bot.…), so it cannot run as game code",
+                    fn.Definition!.Span, "a command wrapper runs like the command's body (spec-gaps G320, G374)",
+                    new[] { fn.BotTouchWitness!.Value });
+                ok = false;
+            }
             var walker = new InnerWalker(fn.Parameters[0].Name);
             walker.Block(fn.Definition!.Body);
             foreach (var span in walker.Misused)
@@ -174,10 +185,13 @@ namespace Kesa.Engine.Loading
             string? wider = fn.Writes && !target.Writes ? "changes the world" :
                 fn.Random && !target.Random ? "draws random numbers" :
                 fn.WritesUi && !target.WritesUi ? "changes UI state" :
-                fn.TouchesUi && !target.TouchesUi ? "uses ui.…" : null;
+                fn.TouchesUi && !target.TouchesUi ? "uses ui.…" :
+                fn.WritesBot && !target.WritesBot ? "changes bot state" :
+                fn.TouchesBot && !target.TouchesBot ? "uses bot.…" : null;
             if (wider == null) return true;
             var witness = fn.Writes && !target.Writes ? fn.WriteWitness : fn.Random && !target.Random ? fn.RandomWitness :
-                fn.WritesUi && !target.WritesUi ? fn.UiWriteWitness : fn.UiTouchWitness;
+                fn.WritesUi && !target.WritesUi ? fn.UiWriteWitness : fn.TouchesUi && !target.TouchesUi ? fn.UiTouchWitness :
+                fn.WritesBot && !target.WritesBot ? fn.BotWriteWitness : fn.BotTouchWitness;
             context.Error(Codes.CmdWriteEffect,
                 "'" + fn.Name + "' " + wider + " but '" + target.Name + "' does not, so it cannot wrap it", w.Span,
                 "a wrapper can do no more than the function it wraps, because it runs everywhere that function is called (spec-gaps G311)",

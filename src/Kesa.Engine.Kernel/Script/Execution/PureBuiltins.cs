@@ -82,6 +82,9 @@ namespace Kesa.Engine.Script
         /// </summary>
         public const string UiName = "ui";
 
+        /// <summary>봇의 기억 <c>bot.Mind.plan</c> (G371). <c>@bot</c>과 봇 함수만 쓴다 (G374).</summary>
+        public const string BotName = "bot";
+
         /// <summary>
         /// <c>@ui_action</c>에서 커맨드를 내 달라고 적어 두는 내장 (spec-gaps G278). UI 로컬 쓰기와 자리 규칙이 같다 (G282).
         /// </summary>
@@ -117,7 +120,7 @@ namespace Kesa.Engine.Script
 
         private static SortedSet<string> NameSet()
         {
-            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, DefDataName, DefsName, UiName, SubmitName };
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, DefDataName, DefsName, UiName, BotName, SubmitName };
             set.UnionWith(WritingNameArray);
             return set;
         }

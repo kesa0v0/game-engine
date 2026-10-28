@@ -153,6 +153,26 @@ namespace Kesa.Engine.Script
 
         public bool WritesUi => UiWriteWitness != null;
 
+        /// <summary>
+        /// <c>ui.…</c> 자체를 읽거나 쓰는 곳 (<see cref="UiTouchWitness"/>와 달리 <c>submit</c>은 세지 않는다). <c>@bot</c>은 <c>submit</c>은
+        /// 하지만 화면 기록은 못 쓴다(G374). 아니면 null.
+        /// </summary>
+        public SourceSpan? UiStateWitness { get; internal set; }
+
+        public bool UsesUiState => UiStateWitness != null;
+
+        /// <summary>
+        /// <c>bot.…</c>을 읽거나 쓰는 곳 (G371·G374). 그런 함수는 <c>@bot</c>과 다른 봇 함수 안에서만 부른다. 아니면 null.
+        /// </summary>
+        public SourceSpan? BotTouchWitness { get; internal set; }
+
+        public bool TouchesBot => BotTouchWitness != null;
+
+        /// <summary><c>bot.X.y</c>에 쓰는 곳 (G374). 그런 함수는 문장으로만 부른다(<see cref="WritesUi"/>와 같은 규칙). 아니면 null.</summary>
+        public SourceSpan? BotWriteWitness { get; internal set; }
+
+        public bool WritesBot => BotWriteWitness != null;
+
         /// <summary><c>@command</c> 함수인가 (G109). 로직에서 쓸 수 없다 (G118).</summary>
         public bool IsCommand => Definition != null && Definition.IsCommand;
 
@@ -163,7 +183,7 @@ namespace Kesa.Engine.Script
         /// 제출이나 신호로만 실행되는 입구(커맨드·핸들러·반응, 호스트가 부르는 UI 동작)인가. 로직에서 부르거나 값으로 쓸 수 없다
         /// (G118, 핸들러는 G145, UI 동작은 G280).
         /// </summary>
-        public bool IsEntry => IsCommand || IsHandler || IsWhen || IsUiAction || IsWrap;
+        public bool IsEntry => IsCommand || IsHandler || IsWhen || IsUiAction || IsBot || IsWrap;
 
         /// <summary><c>@wrap</c>으로 다른 함수를 감싸는 함수인가 (G311·G312). 대상을 부르는 자리에서만 불린다.</summary>
         public bool IsWrap => Definition != null && Definition.IsWrap;
@@ -180,8 +200,11 @@ namespace Kesa.Engine.Script
         /// <summary><c>@ui_action</c>인가 (G276·G280).</summary>
         public bool IsUiAction => Definition != null && Definition.IsUiAction;
 
+        /// <summary><c>@bot</c>인가 (G369).</summary>
+        public bool IsBot => Definition != null && Definition.IsBot;
+
         /// <summary>메시지에 쓰는 입구 종류: <c>@command</c>, <c>@on handler</c>, <c>@when reaction</c> 또는 <c>@ui_action</c>.</summary>
-        public string EntryKind => IsHandler ? "@on handler" : IsWhen ? "@when reaction" : IsUiAction ? "@ui_action" :
+        public string EntryKind => IsHandler ? "@on handler" : IsWhen ? "@when reaction" : IsUiAction ? "@ui_action" : IsBot ? "@bot" :
             IsWrap ? "@wrap function" : "@command";
 
         /// <summary><c>@view_rule</c> 함수인가 (G315). 순수 자리다.</summary>

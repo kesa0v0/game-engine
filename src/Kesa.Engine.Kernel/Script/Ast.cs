@@ -418,7 +418,7 @@ namespace Kesa.Engine.Script
         /// </summary>
         public bool IsCommand => Decorators.Count > 0 && DecoratorName != Interpreter.SubmitPolicyName &&
                                  DecoratorName != Interpreter.ViewPolicyName && DecoratorName != Interpreter.ViewRuleName &&
-                                 !IsHandler && !IsWhen && !IsUiAction && !IsWrap;
+                                 !IsHandler && !IsWhen && !IsUiAction && !IsBot && !IsWrap;
 
         /// <summary><c>@wrap(대상)</c>인가 (spec-gaps G311·G312). 대상 함수를 부르는 자리마다 대신 불린다.</summary>
         public bool IsWrap => Decorators.Count > 0 && DecoratorName == Interpreter.WrapName;
@@ -428,6 +428,9 @@ namespace Kesa.Engine.Script
         /// 호스트가 연결마다 부르고 UI 로컬 기록만 쓴다.
         /// </summary>
         public bool IsUiAction => Decorators.Count > 0 && DecoratorName == Interpreter.UiActionName;
+
+        /// <summary><c>@bot</c>인가 (G369). 호스트가 봇 자리에서 부르고 <c>submit</c>으로 수를 낸다.</summary>
+        public bool IsBot => Decorators.Count > 0 && DecoratorName == Interpreter.BotName;
 
         /// <summary><c>@on(신호)</c> 핸들러인가 (spec S5, spec-gaps G145). 본문은 커맨드처럼 Flow지만 사전 조건이 없다.</summary>
         public bool IsHandler => Decorators.Count > 0 && DecoratorName == Interpreter.OnName;

@@ -112,6 +112,12 @@ namespace Kesa.Engine.Tests.Loading
                 "\n" +
                 "ui: _ui\n" +
                 "\n" +
+                // @bot 데코레이터도 같은 bot이다 (G369·G371)
+                "class _bot:\n" +
+                "    def __call__[F: Callable[..., Any]](self, f: F, /) -> F: ...\n" +
+                "\n" +
+                "bot: _bot\n" +
+                "\n" +
                 "class patch:\n" +
                 "    @staticmethod\n" +
                 "    def set(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any) -> None: ...\n" +

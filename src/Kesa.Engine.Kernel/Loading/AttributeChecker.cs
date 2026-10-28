@@ -128,7 +128,8 @@ namespace Kesa.Engine.Loading
 
         private static void CollectEntries(ModFunctions functions, Contexts contexts, SchemaSet schema)
         {
-            foreach (var command in System.Linq.Enumerable.Concat(functions.Commands, functions.UiActions))
+            foreach (var command in System.Linq.Enumerable.Concat(System.Linq.Enumerable.Concat(functions.Commands, functions.UiActions),
+                         functions.Bots))
             {
                 var types = new Dictionary<string, StaticType?>(StringComparer.Ordinal);
                 foreach (var p in command.Parameters) types[p.Name] = FromType(p.Type, schema);

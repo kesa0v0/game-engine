@@ -18,6 +18,7 @@ namespace Kesa.Engine.Schema
         public const string Signal = "signal";
         public const string Stage = "stage";
         public const string UiState = "ui_state";
+        public const string BotState = "bot_state";
 
         /// <summary>Def 생성자 키워드 중 필드 이름으로 쓸 수 없는 것 (spec S1 상속·중복 ID).</summary>
         public static readonly IReadOnlyList<string> ReservedDefKeywords = new[] { "abstract", "override", "parent" };
@@ -46,7 +47,8 @@ namespace Kesa.Engine.Schema
             Add(new BuiltinFunction(Extend, DeclareExtension));
             Add(new BuiltinFunction(Signal, DeclareSignal));
             Add(new BuiltinFunction(Stage, DeclareStage));
-            Add(new BuiltinFunction(UiState, DeclareUiState));
+            Add(new BuiltinFunction(UiState, (c, s, a) => DeclareUiState(c, s, a, false)));
+            Add(new BuiltinFunction(BotState, (c, s, a) => DeclareUiState(c, s, a, true)));
             Add(new BuiltinFunction("const", MakeConst));
             Add(new BuiltinFunction("field", MakeField));
             Add(new BuiltinFunction("derived", MakeDerived));
@@ -66,6 +68,7 @@ namespace Kesa.Engine.Schema
                 yield return Signal;
                 yield return Stage;
                 yield return UiState;
+                yield return BotState;
                 yield return "const";
                 yield return "field";
                 yield return "derived";
@@ -216,14 +219,17 @@ namespace Kesa.Engine.Schema
         /// <summary>
         /// <c>ui_state("Selection", unit=ref("Unit", optional=True), panel=field(bool, default=False))</c> (spec-gaps G277·G279).
         /// 칸은 <c>field</c>(리스트·사전, 엔티티 키도 됨)와 <c>optional=True</c>인 <c>ref</c>뿐이고 모두 기본값이 있어야 한다:
-        /// 엔티티의 <c>spawn</c>처럼 처음 값을 줄 때가 없다.
+        /// 엔티티의 <c>spawn</c>처럼 처음 값을 줄 때가 없다. <c>bot_state</c>(봇의 기억, G371)도 칸 규칙이 같다.
         /// </summary>
-        private Value DeclareUiState(CallContext ctx, SourceSpan span, IReadOnlyList<ArgValue> args)
+        private Value DeclareUiState(CallContext ctx, SourceSpan span, IReadOnlyList<ArgValue> args, bool bot)
         {
-            const string hint = "a UI state is never created like an entity, so every value starts from its default (spec-gaps G279)";
-            var r = new ArgReader(ctx, UiState, span, args);
-            r.ExpectPositional(1, "ui_state(\"Name\", value=field(int, default=0), unit=ref(\"Unit\", optional=True))");
-            var name = ReadTypeName(ctx, r, "UI state name");
+            string noun = bot ? "bot state" : "UI state";
+            string builtin = bot ? BotState : UiState;
+            string hint = "a " + noun + " is never created like an entity, so every value starts from its default (spec-gaps G279" +
+                          (bot ? ", G371)" : ")");
+            var r = new ArgReader(ctx, builtin, span, args);
+            r.ExpectPositional(1, builtin + "(\"Name\", value=field(int, default=0), unit=ref(\"Unit\", optional=True))");
+            var name = ReadTypeName(ctx, r, noun + " name");
             var members = new List<MemberDecl>();
             foreach (var arg in r.Rest())
             {
@@ -234,31 +240,31 @@ namespace Kesa.Engine.Schema
                 {
                     case MemberKind.Field:
                         if (spec.DefaultFrom != null)
-                            throw ctx.Fail(Codes.SchBadDeclaration, "'" + arg.Name + "' cannot use default_from in a UI state", arg.Span,
+                            throw ctx.Fail(Codes.SchBadDeclaration, "'" + arg.Name + "' cannot use default_from in a " + noun, arg.Span,
                                 hint: "there is no Def to read it from; write default=... (spec-gaps G279)");
                         if (spec.Default is FunctionValue)
-                            throw ctx.Fail(Codes.SchBadDeclaration, "'" + arg.Name + "' cannot have a function default in a UI state",
+                            throw ctx.Fail(Codes.SchBadDeclaration, "'" + arg.Name + "' cannot have a function default in a " + noun,
                                 arg.Span, hint: "write a value: default=0, default=[] (spec-gaps G279)");
                         if (spec.Default == null)
                             throw ctx.Fail(Codes.SchBadDeclaration, "'" + arg.Name + "' needs a default", arg.Span, hint: hint);
                         break;
                     case MemberKind.Ref:
                         if (spec.Inverse != null)
-                            throw ctx.Fail(Codes.SchBadDeclaration, "a UI state's ref cannot have inverse=: the entity does not see " +
-                                                                    "who points at it from a screen", arg.Span);
+                            throw ctx.Fail(Codes.SchBadDeclaration, "a " + noun + "'s ref cannot have inverse=: the entity does not see " +
+                                                                    "who points at it from " + (bot ? "a bot" : "a screen"), arg.Span);
                         if (!spec.Optional)
                             throw ctx.Fail(Codes.SchBadDeclaration, "'" + arg.Name + "' must be ref(..., optional=True)", arg.Span,
                                 hint: "it starts as None, and it reads as None again when its entity is gone (spec-gaps G279)");
                         break;
                     default:
                         throw ctx.Fail(Codes.SchBadDeclaration,
-                            "'" + arg.Name + "': a UI state holds field(...) and ref(...) only, not " +
+                            "'" + arg.Name + "': a " + noun + " holds field(...) and ref(...) only, not " +
                             spec.Kind.ToString().ToLowerInvariant() + " values", arg.Span,
                             hint: "read Def values and derived values from the game where you need them (spec-gaps G277)");
                 }
                 members.Add(new MemberDecl(arg.Name!, arg.Span, ctx.Mod, spec));
             }
-            _target.UiStates.Add(new UiStateDecl(name.Name, name.Span, ctx.Mod, members));
+            (bot ? _target.BotStates : _target.UiStates).Add(new UiStateDecl(name.Name, name.Span, ctx.Mod, members, bot));
             return NoneValue.Instance;
         }
 
@@ -270,7 +276,7 @@ namespace Kesa.Engine.Schema
                 case DictTypeRef d:
                     if (d.Key is EntityRefTypeRef)
                         throw ctx.Fail(Codes.SchBadDeclaration, "map keys must be str, int or DefId[...], not " + d.Key.Display, span,
-                            hint: "entity keys are only for ui_state fields (spec-gaps G277)");
+                            hint: "entity keys are only for ui_state and bot_state fields (spec-gaps G277)");
                     RejectEntityKeys(ctx, d.Value, span);
                     break;
                 case ListTypeRef l:

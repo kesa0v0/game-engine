@@ -75,6 +75,10 @@ namespace Kesa.Engine.Loading
         public IReadOnlyDictionary<string, CommandDecl> UiActions { get; internal set; } =
             new SortedDictionary<string, CommandDecl>(System.StringComparer.Ordinal);
 
+        /// <summary>살아남은 모드가 선언한 <c>@bot</c> (id → 선언, id 서수 순, G369). 커맨드와 따로라 제출할 수 없다.</summary>
+        public IReadOnlyDictionary<string, CommandDecl> Bots { get; internal set; } =
+            new SortedDictionary<string, CommandDecl>(System.StringComparer.Ordinal);
+
         /// <summary>
         /// 보기 규칙 <c>@view_rule(대상) def f(viewer, entity)</c> (spec-gaps G196·G197·G203·G238·G315), 로드 순서대로(모드 안에서는 정의
         /// 순서). 같은 대상의 규칙은 뒤의 것부터 묻는다. 비었으면 거른 읽기는 모두 보인다.

@@ -25,7 +25,8 @@ namespace Kesa.Engine.Script
             foreach (var function in functions.Functions)
             {
                 var body = new Body(function);
-                var walker = new Walker(scope, body, hosts ?? HostNames.None, new UiNames(schema, sees ?? (_ => true), context))
+                var walker = new Walker(scope, body, hosts ?? HostNames.None, new UiNames(schema, sees ?? (_ => true), context, false),
+                    new UiNames(schema, sees ?? (_ => true), context, true))
                 {
                     Mods = mods ?? ModNames.None,
                 };
@@ -109,6 +110,10 @@ namespace Kesa.Engine.Script
                     changed = true;
                 }
             }
+            // ui.… 자체(submit 빼고), bot.… 읽기·쓰기, bot.… 쓰기 (G374: 봇은 submit은 하지만 화면 기록은 못 쓴다)
+            Propagate(bodies, f => f.UsesUiState, b => b.FirstUiState, true, (f, w) => f.UiStateWitness = w);
+            Propagate(bodies, f => f.TouchesBot, b => b.FirstBotTouch, true, (f, w) => f.BotTouchWitness = w);
+            Propagate(bodies, f => f.WritesBot, b => b.FirstBotWrite, false, (f, w) => f.BotWriteWitness = w);
 
             // 사전 조건은 UI가 거듭 확인하므로 같은 답을 내야 한다 (G178)
             const string randomHint = "draw random numbers in the body instead; derived values, conditions and preconditions must give " +
@@ -194,6 +199,28 @@ namespace Kesa.Engine.Script
         private static bool Before(SourceSpan a, SourceSpan b) =>
             a.Line < b.Line || (a.Line == b.Line && a.Col < b.Col);
 
+        /// <summary>본문에 직접 있거나 그런 함수를 부르면(<paramref name="expressions"/>면 식 안의 호출도) 표시한다, 고정점까지.</summary>
+        private static void Propagate(List<Body> bodies, Func<FunctionValue, bool> has, Func<Body, SourceSpan?> first,
+            bool expressions, Action<FunctionValue, SourceSpan> set)
+        {
+            bool changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (var body in bodies)
+                {
+                    if (has(body.Function)) continue;
+                    SourceSpan? witness = first(body);
+                    foreach (var calls in expressions ? new[] { body.StatementCalls, body.ExpressionCalls } : new[] { body.StatementCalls })
+                    foreach (var call in calls)
+                        if (has(call.Callee) && (witness == null || Before(call.Span, witness.Value))) witness = call.Span;
+                    if (witness == null) continue;
+                    set(body.Function, witness.Value);
+                    changed = true;
+                }
+            }
+        }
+
         /// <summary>
         /// UI 로컬 효과의 자리 (G278·G282). UI 기록은 연결마다 다르고 저장되지 않으므로 게임 쪽 코드가 건드리면 컴퓨터마다 판이 갈라진다.
         /// 거꾸로 <c>@ui_action</c>은 게임을 바꾸지 않는다: 바꾸려면 커맨드를 <c>submit</c>한다.
@@ -202,12 +229,18 @@ namespace Kesa.Engine.Script
         {
             const string gameHint = "UI state is different on every screen and is not saved; pass what the game needs as a command " +
                                     "argument with submit(...) (spec-gaps G278, G282)";
+            const string botHint = "a bot's memory belongs to that bot and is not game state; read and write it only in a @bot and the " +
+                                   "functions it calls (spec-gaps G374)";
 
             void Game(FunctionValue? fn, string what, SourceSpan span)
             {
-                if (fn == null || !fn.TouchesUi) return;
-                context.Error(Codes.CmdUiEffect, what + " uses UI state (ui.… or submit), so it cannot run as game code", span, gameHint,
-                    new[] { fn.UiTouchWitness!.Value });
+                if (fn == null) return;
+                if (fn.TouchesUi)
+                    context.Error(Codes.CmdUiEffect, what + " uses UI state (ui.… or submit), so it cannot run as game code", span, gameHint,
+                        new[] { fn.UiTouchWitness!.Value });
+                else if (fn.TouchesBot)
+                    context.Error(Codes.CmdUiEffect, what + " uses bot state (bot.…), so it cannot run as game code", span, botHint,
+                        new[] { fn.BotTouchWitness!.Value });
             }
 
             const string statementHint = "call it on its own line in a @ui_action or in another function that changes UI state (spec-gaps G282)";
@@ -219,6 +252,14 @@ namespace Kesa.Engine.Script
                     context.Error(Codes.CmdUiEffect,
                         "'" + call.Callee.Name + "' changes UI state, so it can only be called as a statement", call.Span,
                         statementHint, new[] { call.Callee.UiWriteWitness!.Value });
+                }
+                foreach (var call in body.ExpressionCalls)
+                {
+                    if (!call.Callee.WritesBot || call.Callee.IsEntry || call.Callee.WritesUi) continue;
+                    context.Error(Codes.CmdUiEffect,
+                        "'" + call.Callee.Name + "' changes bot state, so it can only be called as a statement", call.Span,
+                        "call it on its own line in a @bot or in another function that changes bot state (spec-gaps G374)",
+                        new[] { call.Callee.BotWriteWitness!.Value });
                 }
                 foreach (var span in body.SubmitExpressions)
                     context.Error(Codes.CmdUiEffect, "submit() asks the host to submit a command, so it can only be called as a statement",
@@ -236,6 +277,24 @@ namespace Kesa.Engine.Script
                         context.Error(Codes.CmdUiEffect,
                             "the @ui_action '" + fn.Name + "' draws random numbers; that would use up the game's random numbers",
                             fn.Definition!.Span, "draw them in the command it submits (spec-gaps G278)", new[] { fn.RandomWitness!.Value });
+                    if (fn.TouchesBot)
+                        context.Error(Codes.CmdUiEffect,
+                            "the @ui_action '" + fn.Name + "' uses bot state (bot.…); only a @bot has a bot's memory",
+                            fn.Definition!.Span, botHint, new[] { fn.BotTouchWitness!.Value });
+                }
+                else if (fn.IsBot)
+                {
+                    // 봇은 판을 읽고 submit으로만 바꾼다. 난수는 봇의 난수열이라 쓸 수 있다 (G373·G374)
+                    if (fn.Writes)
+                        context.Error(Codes.CmdUiEffect,
+                            "the @bot '" + fn.Name + "' changes the game; it can only change bot.… and submit commands",
+                            fn.Definition!.Span, "to change the game, submit(\"Command\", ...) a command that does it (spec-gaps G374)",
+                            new[] { fn.WriteWitness!.Value });
+                    if (fn.UsesUiState)
+                        context.Error(Codes.CmdUiEffect,
+                            "the @bot '" + fn.Name + "' uses UI state (ui.…); a bot has no screen",
+                            fn.Definition!.Span, "keep what the bot remembers in a bot_state and read it as bot.State.field (spec-gaps G374)",
+                            new[] { fn.UiStateWitness!.Value });
                 }
                 else if (fn.IsCommand || fn.IsHandler || fn.IsWhen)
                     Game(fn, "the " + fn.EntryKind + " '" + fn.Name + "'", fn.Definition!.Span);
@@ -272,6 +331,13 @@ namespace Kesa.Engine.Script
                     context.Error(Codes.CmdUiEffect,
                         what + " uses '" + fn.Name + "', which uses UI state (ui.… or submit); game values cannot depend on a screen",
                         span, "UI state is different on every screen and is not saved (spec-gaps G282)", new[] { fn.UiTouchWitness!.Value });
+                    return;
+                }
+                if (fn.TouchesBot)
+                {
+                    context.Error(Codes.CmdUiEffect,
+                        what + " uses '" + fn.Name + "', which uses bot state (bot.…); game values cannot depend on a bot",
+                        span, "a bot's memory belongs to that bot and is not game state (spec-gaps G374)", new[] { fn.BotTouchWitness!.Value });
                     return;
                 }
                 if (!fn.Writes) return;
@@ -357,47 +423,84 @@ namespace Kesa.Engine.Script
                 TouchUi(span);
                 if (FirstUiWrite == null) FirstUiWrite = span;
             }
+
+            /// <summary>본문의 첫 <c>ui.…</c> 자체 (submit 빼고, G374).</summary>
+            public SourceSpan? FirstUiState { get; set; }
+
+            /// <summary>본문의 첫 <c>bot.…</c> 읽기·쓰기 (G374).</summary>
+            public SourceSpan? FirstBotTouch { get; set; }
+
+            /// <summary>본문의 첫 <c>bot.X.y</c> 대입 (G374).</summary>
+            public SourceSpan? FirstBotWrite { get; set; }
+
+            /// <summary><c>ui.…</c>(<paramref name="bot"/>면 <c>bot.…</c>) 기록을 건드린다.</summary>
+            public void Touch(bool bot, SourceSpan span)
+            {
+                if (bot)
+                {
+                    if (FirstBotTouch == null) FirstBotTouch = span;
+                    return;
+                }
+                TouchUi(span);
+                if (FirstUiState == null) FirstUiState = span;
+            }
+
+            public void Write(bool bot, SourceSpan span)
+            {
+                Touch(bot, span);
+                if (bot)
+                {
+                    if (FirstBotWrite == null) FirstBotWrite = span;
+                }
+                else WriteUi(span);
+            }
         }
 
         /// <summary>
         /// <c>ui.기록.칸</c> 경로의 이름 검사 (G279). 경로는 늘 이 모양으로 적는다: <c>s = ui.Selection</c>처럼 기록을 값으로 들면
-        /// 그 뒤의 <c>s.unit = …</c>가 UI 쓰기인지 엔티티 쓰기인지 알 수 없다.
+        /// 그 뒤의 <c>s.unit = …</c>가 UI 쓰기인지 엔티티 쓰기인지 알 수 없다. 봇의 <c>bot.기록.칸</c>도 같다 (G371).
         /// </summary>
         private sealed class UiNames
         {
             private readonly SchemaSet _schema;
             private readonly Func<string, bool> _sees;
             private readonly CallContext _context;
+            private readonly bool _bot;
 
-            public UiNames(SchemaSet schema, Func<string, bool> sees, CallContext context)
+            public UiNames(SchemaSet schema, Func<string, bool> sees, CallContext context, bool bot)
             {
                 _schema = schema;
                 _sees = sees;
                 _context = context;
+                _bot = bot;
             }
+
+            private string Noun => _bot ? "bot state" : "UI state";
 
             public void Check(string state, string member, SourceSpan span)
             {
-                if (!_schema.TryGetUiState(state, out var type))
+                if (!(_bot ? _schema.TryGetBotState(state, out var type) : _schema.TryGetUiState(state, out type)))
                 {
                     var names = new List<string>();
-                    foreach (var s in _schema.UiStates) names.Add(s.Name);
-                    _context.Error(Codes.EvlUnknownName, "there is no UI state '" + state + "'", span,
-                        Suggest.Hint(state, names) ?? "declare it in a schema file with ui_state(\"" + state + "\", ...) (spec-gaps G277)");
+                    foreach (var s in _bot ? _schema.BotStates : _schema.UiStates) names.Add(s.Name);
+                    _context.Error(Codes.EvlUnknownName, "there is no " + Noun + " '" + state + "'", span,
+                        Suggest.Hint(state, names) ?? "declare it in a schema file with " + (_bot ? "bot_state" : "ui_state") + "(\"" +
+                        state + "\", ...) (spec-gaps " + (_bot ? "G371" : "G277") + ")");
                     return;
                 }
                 if (!_sees(type.Mod))
                 {
                     _context.Error(Codes.SchNotVisible,
-                        "UI state '" + state + "' belongs to mod '" + type.Mod + "', which mod '" + _context.Mod + "' does not depend on",
+                        (_bot ? "Bot state '" : "UI state '") + state + "' belongs to mod '" + type.Mod + "', which mod '" + _context.Mod +
+                        "' does not depend on",
                         span, "add \"" + type.Mod + "\" to dependencies in mod.py");
                     return;
                 }
                 if (type.TryGetMember(member, out _)) return;
                 var members = new List<string>();
                 foreach (var m in type.Members) members.Add(m.Name);
-                _context.Error(Codes.EvlUnknownName, "UI state '" + state + "' has no field '" + member + "'", span,
-                    Suggest.Hint(member, members));
+                _context.Error(Codes.EvlUnknownName, (_bot ? "Bot state '" : "UI state '") + state + "' has no field '" + member + "'",
+                    span, Suggest.Hint(member, members));
             }
 
             public void Positional(SourceSpan span) =>
@@ -409,8 +512,12 @@ namespace Kesa.Engine.Script
                     "call submit(\"Command\", ...) on its own line (spec-gaps G282)");
 
             public void Bare(SourceSpan span) =>
-                _context.Error(Codes.CmdUiEffect, "write the UI state as ui.State.field; ui and ui.State cannot be used as values",
-                    span, "a held ui.State would hide which assignments change UI state (spec-gaps G282)");
+                _context.Error(Codes.CmdUiEffect, _bot
+                        ? "write the bot state as bot.State.field; bot and bot.State cannot be used as values"
+                        : "write the UI state as ui.State.field; ui and ui.State cannot be used as values",
+                    span, _bot
+                        ? "a held bot.State would hide which assignments change bot state (spec-gaps G374)"
+                        : "a held ui.State would hide which assignments change UI state (spec-gaps G282)");
         }
 
         private sealed class Walker
@@ -423,30 +530,37 @@ namespace Kesa.Engine.Script
             private bool _inPreconditions;
 
             private readonly UiNames _ui;
+            private readonly UiNames _bot;
 
             /// <summary><c>모드id.이름</c>으로 쓸 수 있는 모드들 (G309).</summary>
             public ModNames Mods { get; set; } = ModNames.None;
 
-            public Walker(ModScope scope, Body body, HostNames hosts, UiNames ui)
+            public Walker(ModScope scope, Body body, HostNames hosts, UiNames ui, UiNames bot)
             {
                 _scope = scope;
                 _body = body;
                 _hosts = hosts;
                 _ui = ui;
+                _bot = bot;
             }
+
+            /// <summary>덮어쓰지 않은 <c>ui</c>(거짓)나 <c>bot</c>(참)이면 그 뜻.</summary>
+            private bool? StateRoot(Expr expr, SortedSet<string> locals) =>
+                IsRuntime(expr, PureBuiltins.UiName, locals) ? false :
+                IsRuntime(expr, PureBuiltins.BotName, locals) ? true : (bool?)null;
 
             /// <summary>지역 변수도 모드 이름도 아닌 실행 이름인가 (덮어쓰지 않은 <c>ui</c>·<c>submit</c>).</summary>
             private bool IsRuntime(Expr expr, string name, SortedSet<string> locals) =>
                 expr is NameExpr n && n.Name == name && !locals.Contains(name) && !_scope.TryLookup(name, out _);
 
-            /// <summary><c>ui.기록.칸</c>이면 이름을 검사하고 true (G279).</summary>
-            private bool UiField(Expr expr, SortedSet<string> locals)
+            /// <summary><c>ui.기록.칸</c>(G279)이면 거짓, <c>bot.기록.칸</c>(G371)이면 참. 이름을 검사한다. 아니면 null.</summary>
+            private bool? StateField(Expr expr, SortedSet<string> locals)
             {
-                if (!(expr is AttributeExpr member) || !(member.Target is AttributeExpr state) ||
-                    !IsRuntime(state.Target, PureBuiltins.UiName, locals))
-                    return false;
-                _ui.Check(state.Name, member.Name, member.Span);
-                return true;
+                if (!(expr is AttributeExpr member) || !(member.Target is AttributeExpr state)) return null;
+                var bot = StateRoot(state.Target, locals);
+                if (bot == null) return null;
+                (bot.Value ? _bot : _ui).Check(state.Name, member.Name, member.Span);
+                return bot;
             }
 
             /// <summary>문장 <c>submit("커맨드", 이름=값)</c>: 커맨드 인자는 이름으로만 넘긴다 (G278).</summary>
@@ -536,7 +650,7 @@ namespace Kesa.Engine.Script
                             break;
                         case AssignStmt assign:
                             // ui.기록.칸 = …는 UI 로컬 쓰기다. ui.기록.칸.x = …는 칸이 가리키는 엔티티 쓰기다 (G282)
-                            if (UiField(assign.Target, locals)) _body.WriteUi(assign.Span);
+                            if (StateField(assign.Target, locals) is bool written) _body.Write(written, assign.Span);
                             else if (assign.Target is AttributeExpr target)
                             {
                                 if (_body.FirstWrite == null) _body.FirstWrite = assign.Span;
@@ -602,9 +716,9 @@ namespace Kesa.Engine.Script
                         else if (!IsNamed(call.Callee, locals)) Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
                         break;
-                    case NameExpr name when IsRuntime(name, PureBuiltins.UiName, locals):
-                        _body.TouchUi(name.Span);
-                        _ui.Bare(name.Span);
+                    case NameExpr name when StateRoot(name, locals) is bool bare:
+                        _body.Touch(bare, name.Span);
+                        (bare ? _bot : _ui).Bare(name.Span);
                         break;
                     case NameExpr name when IsRuntime(name, PureBuiltins.SubmitName, locals):
                         _body.TouchUi(name.Span);
@@ -627,11 +741,11 @@ namespace Kesa.Engine.Script
                         Expr(unary.Operand, locals);
                         break;
                     case AttributeExpr attr:
-                        if (UiField(attr, locals)) _body.TouchUi(attr.Span);
-                        else if (IsRuntime(attr.Target, PureBuiltins.UiName, locals))
+                        if (StateField(attr, locals) is bool read) _body.Touch(read, attr.Span);
+                        else if (StateRoot(attr.Target, locals) is bool held)
                         {
-                            _body.TouchUi(attr.Span);
-                            _ui.Bare(attr.Span);
+                            _body.Touch(held, attr.Span);
+                            (held ? _bot : _ui).Bare(attr.Span);
                         }
                         // 값으로 쓴 다른 모드의 커맨드 이름을 기록한다 (G118·G309)
                         else if (attr.Target is NameExpr root && IsModRoot(root.Name, locals)) Resolve(attr, locals);

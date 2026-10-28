@@ -188,6 +188,7 @@ namespace Kesa.Engine.Stubs
             "def extend(type_name: str, /, *, components: list[str] = ..., **consts: MemberDecl) -> None: ...\n" +
             "def signal(name: str, /, **values: Any) -> None: ...\n" +
             "def ui_state(name: str, /, **members: MemberDecl) -> None: ...\n" +
+            "def bot_state(name: str, /, **members: MemberDecl) -> None: ...\n" +
             "def stage(id: str, /, *, after: list[str] = ..., before: list[str] = ..., optional_after: list[str] = ..., " +
             "optional_before: list[str] = ...) -> None: ...\n" +
             "def const(type: Any, /, *, default: Any = ..., min: int | float = ..., max: int | float = ..., " +
@@ -543,7 +544,10 @@ namespace Kesa.Engine.Stubs
                 var visible = new List<UiStateType>();
                 foreach (var u in _schema.UiStates)
                     if (Sees(u.Mod)) visible.Add(u);
-                foreach (var state in visible)
+                var bots = new List<UiStateType>();
+                foreach (var u in _schema.BotStates)
+                    if (Sees(u.Mod)) bots.Add(u);
+                foreach (var state in System.Linq.Enumerable.Concat(visible, bots))
                 {
                     Line("class " + state.Name + ":");
                     foreach (var member in state.Members)
@@ -557,6 +561,13 @@ namespace Kesa.Engine.Stubs
                 if (visible.Count == 0) Line("    ...");
                 Line();
                 Line("ui: _ui");
+                Line();
+                // @bot 데코레이터와 bot.Mind.plan이 같은 이름이다 (G369·G371)
+                Line("class _bot:");
+                foreach (var state in bots) Line("    " + state.Name + ": " + state.Name);
+                Line("    def __call__[F: Callable[..., Any]](self, f: F, /) -> F: ...");
+                Line();
+                Line("bot: _bot");
                 Line();
             }
 

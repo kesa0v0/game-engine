@@ -246,6 +246,9 @@ namespace Kesa.Engine.Loading
             if (fn.TouchesUi)
                 return "'" + fn.Name + "' uses UI state (ui.… or submit) (at " + fn.UiTouchWitness + "), but " + slot +
                        " holds functions that run as game code, and a game value cannot depend on a screen";
+            if (fn.TouchesBot)
+                return "'" + fn.Name + "' uses bot state (bot.…) (at " + fn.BotTouchWitness + "), but " + slot +
+                       " holds functions that run as game code, and a game value cannot depend on a bot";
             // 확인용 자리에는 쓰기 함수를 둘 수 없다 (G117). 판정은 ②b 끝에 끝나 있다
             if (reads && fn.Writes)
                 return "'" + fn.Name + "' changes the world (at " + fn.WriteWitness + "), but " + slot + " only holds functions that read";

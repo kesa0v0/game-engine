@@ -46,7 +46,7 @@ namespace Kesa.Engine.Loading
                     if (decl.Kind == MemberKind.Const || decl.Kind == MemberKind.Field) yield return decl;
                 }
             // UI 로컬 칸의 기본값도 같은 검사를 받는다 (G279: 모두 기본값이 있고 함수가 아니다)
-            foreach (var state in schema.UiStates)
+            foreach (var state in System.Linq.Enumerable.Concat(schema.UiStates, schema.BotStates))
                 foreach (var decl in state.Members)
                     if (decl.Kind == MemberKind.Field && decl.Spec.Default != null) yield return decl;
         }

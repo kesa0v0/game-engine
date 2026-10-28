@@ -28,7 +28,8 @@ namespace Kesa.Engine.Loading
                     if (p.Annotation == null)
                     {
                         context.Error(Codes.CmdParameterType,
-                            "parameter '" + p.Name + "' of " + (command.IsUiAction ? "UI action '" : "command '") + command.Id +
+                            "parameter '" + p.Name + "' of " +
+                            (command.IsUiAction ? "UI action '" : command.Function.IsBot ? "bot '" : "command '") + command.Id +
                             "' needs a type annotation", p.Span,
                             hint: "write " + p.Name + ": Ref[Unit], " + p.Name + ": int, ... (spec-gaps G114)");
                         ok = false;
@@ -55,8 +56,33 @@ namespace Kesa.Engine.Loading
                     parameters.Add(new CommandParameter(p.Name, type, p.Span, @default));
                 }
                 if (ok) command.Parameters = parameters;
+                if (ok && command.Function.IsBot) CheckBot(command, parameters, context);
                 CheckActsFor(command, context);
                 CheckWhereTypes(command, parameters, context);
+            }
+        }
+
+        /// <summary>
+        /// <c>@bot</c>의 모양 (G368·G370): 첫 매개변수는 맡은 엔티티(<c>Ref[X]</c>, 기본값 없음)이고 나머지는 호스트가 안 넘기면 쓰는
+        /// 기본값이 있는 설정이다.
+        /// </summary>
+        private static void CheckBot(CommandDecl bot, List<CommandParameter> parameters, CallContext context)
+        {
+            const string usage = "write @bot def think(me: Ref[Party], caution: int = 2): ... (spec-gaps G368, G370)";
+            if (parameters.Count == 0 || !(parameters[0].Type is EntityRefTypeRef) || parameters[0].Default != null)
+            {
+                context.Error(Codes.CmdParameterType,
+                    "the @bot '" + bot.Id + "' takes the entity it plays as its first parameter, typed Ref[...] with no default",
+                    parameters.Count == 0 ? bot.Function.Definition!.Span : parameters[0].Span, hint: usage);
+                return;
+            }
+            for (int i = 1; i < parameters.Count; i++)
+            {
+                if (parameters[i].Default != null) continue;
+                context.Error(Codes.CmdParameterType,
+                    "parameter '" + parameters[i].Name + "' of the @bot '" + bot.Id + "' needs a default", parameters[i].Span,
+                    hint: "after the entity, a bot's parameters are settings the host may pass; the default is used otherwise " +
+                          "(spec-gaps G370)");
             }
         }
 

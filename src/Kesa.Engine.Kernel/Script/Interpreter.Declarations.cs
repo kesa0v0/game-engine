@@ -12,6 +12,7 @@ namespace Kesa.Engine.Script
         public const string ViewRuleName = "view_rule";
         public const string ActsForName = "acts_for";
         public const string UiActionName = "ui_action";
+        public const string BotName = "bot";
 
         /// <summary>S5의 <c>on_stale=</c>. 이름만 예약했다: 지금은 기본 취소만 있다 (spec-gaps G166).</summary>
         public const string OnStaleName = "on_stale";
@@ -358,7 +359,7 @@ namespace Kesa.Engine.Script
 
             string? name = def.DecoratorName;
             if ((name == CommandName || name == SubmitPolicyName || name == ViewPolicyName || name == ViewRuleName || name == OnName || name == WhenName ||
-                 name == UiActionName || name == WrapName) && !IsBuiltin(name))
+                 name == UiActionName || name == BotName || name == WrapName) && !IsBuiltin(name))
             {
                 bool schema = _scope.IsSchemaName(name);
                 _context.Error(Codes.CmdBadDecorator,
@@ -405,6 +406,11 @@ namespace Kesa.Engine.Script
                 DeclareUiAction(function, decorator);
                 return;
             }
+            if (name == BotName)
+            {
+                DeclareBot(function, decorator);
+                return;
+            }
             if (name == WrapName)
             {
                 DeclareWrap(def, function, decorator);
@@ -413,7 +419,7 @@ namespace Kesa.Engine.Script
             if (name != CommandName)
             {
                 _context.Error(Codes.CmdBadDecorator,
-                    "unknown decorator; only @command, @on, @when, @ui_action, @wrap and @view_rule are supported",
+                    "unknown decorator; only @command, @on, @when, @ui_action, @bot, @wrap and @view_rule are supported",
                     decorator.Span, hint: "write @command or @command(free=True, acts_for=...)");
                 return;
             }
@@ -504,6 +510,22 @@ namespace Kesa.Engine.Script
                 return;
             }
             _context.Functions.UiActions.Add(new CommandDecl(_context.Mod, function, false, decorator.Span));
+        }
+
+        /// <summary>
+        /// <c>@bot</c> (G369): 인자 없는 데코레이터. 첫 매개변수는 맡은 엔티티(G368)이고 나머지는 기본값 있는 설정이다(G370).
+        /// 매개변수 타입은 <c>CommandSignatures</c>가 본다.
+        /// </summary>
+        private void DeclareBot(FunctionValue function, Expr decorator)
+        {
+            if (decorator is CallExpr call)
+            {
+                _context.Error(Codes.CmdBadDecorator, "@bot takes no arguments",
+                    call.Arguments.Count > 0 ? call.Arguments[0].Span : call.Span,
+                    hint: "write @bot; the host picks which entity it plays and passes its settings (spec-gaps G369, G370)");
+                return;
+            }
+            _context.Functions.Bots.Add(new CommandDecl(_context.Mod, function, false, decorator.Span));
         }
 
         /// <summary>
