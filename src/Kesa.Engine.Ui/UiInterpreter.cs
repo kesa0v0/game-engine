@@ -69,12 +69,14 @@ namespace Kesa.Engine.Ui
 
         /// <param name="text">값을 글자로 바꾸는 것(번역기를 꽂는다, G345).</param>
         /// <param name="files"><c>Include</c>의 <c>src</c>로 UXML 글을 찾는다. 못 찾으면 null. 없으면 <c>Include</c>를 쓸 수 없다.</param>
-        /// <param name="windows">창 목록. 해석기 여럿의 창이 함께 겹치고 ESC를 나누려면 같은 것을 넘긴다. 없으면 이 해석기만의 것을 만든다.</param>
+        /// <param name="windows">
+        /// 창 목록. 렌더러가 서로 다른 해석기들의 창도 함께 겹치고 ESC를 나누려면 같은 것을 넘긴다. 없으면 이 렌더러에 붙은 것을 쓰고, 그것도
+        /// 없으면 새로 만든다.
+        /// </param>
         public UiInterpreter(IHostSession session, IUiRenderer renderer, UiTextFormatter text, Func<string, string?>? files = null,
             UiWindows? windows = null)
         {
-            Windows = windows ?? new UiWindows();
-            Windows.Attach(renderer);
+            Windows = UiWindows.For(renderer, windows);
             _session = session;
             var count = InterpretersPerSession.GetValue(session, _ => new StrongBox<int>());
             int index;

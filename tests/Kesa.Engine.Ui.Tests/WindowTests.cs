@@ -183,6 +183,19 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task InterpretersOnOneRendererGetOneWindowListEvenWhenNoneIsGiven()
+        {
+            await Mount("<ui:VisualElement><ui:VisualElement name=\"one\" window=\"normal\" bind-display=\"arena.title()\" /></ui:VisualElement>");
+            var second = new UiInterpreter(Session, Renderer, Format);
+            await second.MountAsync(Doc("<ui:VisualElement><ui:VisualElement name=\"two\" window=\"normal\" bind-display=\"arena.title()\" /></ui:VisualElement>"), Args());
+            Assert.That(second.Windows, Is.SameAs(Ui.Windows));
+            Assert.That(ShownNames(), Is.EqualTo(new[] { "one", "two" }), "neither list hides the other's windows");
+
+            var other = new UiWindows();
+            Assert.That(() => new UiInterpreter(Session, Renderer, Format, null, other), Throws.InvalidOperationException);
+        }
+
+        [Test]
         public async Task UnmountingAPanelTakesItsWindowsOffTheList()
         {
             var panel = await Mount("<ui:VisualElement>" + Info + "</ui:VisualElement>");

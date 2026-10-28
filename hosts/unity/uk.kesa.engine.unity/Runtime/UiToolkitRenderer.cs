@@ -188,23 +188,29 @@ namespace Kesa.Engine.Unity
 
         public void ArrangeWindows(IReadOnlyList<ElementId> windows, int blockerAt)
         {
-            var shown = new List<long>();
-            foreach (var id in windows) shown.Add(id.Value);
-            _windowLayer.Clear();
+            var shown = new List<VisualElement>();
+            foreach (var id in windows) shown.Add(_elements[id.Value]);
             foreach (long id in _windowOrder)
+                if (!shown.Contains(_elements[id])) _elements[id].style.display = DisplayStyle.None;
+
+            var want = new List<VisualElement>(shown);
+            if (blockerAt >= 0)
             {
-                if (shown.Contains(id)) continue;
-                _elements[id].style.display = DisplayStyle.None;
-                _windowLayer.Add(_elements[id]);
+                want.Insert(blockerAt, _blocker);
+                if (_blocker.parent != _windowLayer) _windowLayer.Add(_blocker);
             }
-            for (int i = 0; i <= shown.Count; i++)
+            else
             {
-                if (i == blockerAt) _windowLayer.Add(_blocker);
-                if (i == shown.Count) break;
-                var window = _elements[shown[i]];
-                window.style.display = DisplayStyle.Flex;
-                _windowLayer.Add(window);
+                _blocker.RemoveFromHierarchy();
             }
+            // 떼었다 붙이면 포커스와 눌린 포인터가 끊길 수 있으므로 순서가 다를 때만 앞으로 옮긴다
+            var current = new List<VisualElement>();
+            foreach (var child in _windowLayer.Children())
+                if (want.Contains(child)) current.Add(child);
+            bool same = current.Count == want.Count;
+            for (int i = 0; same && i < want.Count; i++) same = current[i] == want[i];
+            if (!same) foreach (var element in want) element.BringToFront();
+            foreach (var window in shown) window.style.display = DisplayStyle.Flex;
         }
 
         public void OnPress(Func<ElementId?, ValueTask> handler)

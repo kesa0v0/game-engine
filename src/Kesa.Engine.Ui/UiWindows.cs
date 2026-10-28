@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace Kesa.Engine.Ui
@@ -59,11 +60,29 @@ namespace Kesa.Engine.Ui
             return false;
         }
 
-        internal void Attach(IUiRenderer renderer)
+        // 렌더러는 자기 창만 받은 목록대로 나머지를 숨기므로 렌더러 하나에는 늘 목록 하나다
+        private static readonly ConditionalWeakTable<IUiRenderer, UiWindows> ByRenderer = new ConditionalWeakTable<IUiRenderer, UiWindows>();
+
+        /// <summary>
+        /// 해석기가 쓸 목록: 받은 것이 있으면 그것, 없으면 렌더러에 이미 붙은 것, 그것도 없으면 새것. 렌더러가 이미 다른 목록에 붙어 있으면
+        /// <see cref="InvalidOperationException"/>이다.
+        /// </summary>
+        internal static UiWindows For(IUiRenderer renderer, UiWindows? given)
         {
-            if (_renderers.Contains(renderer)) return;
-            _renderers.Add(renderer);
-            renderer.OnPress(window => PressAsync(renderer, window));
+            lock (ByRenderer)
+            {
+                if (ByRenderer.TryGetValue(renderer, out var attached))
+                {
+                    if (given != null && !ReferenceEquals(given, attached))
+                        throw new InvalidOperationException("this renderer already belongs to another window list; give every interpreter on it the same UiWindows");
+                    return attached;
+                }
+                var windows = given ?? new UiWindows();
+                ByRenderer.Add(renderer, windows);
+                windows._renderers.Add(renderer);
+                renderer.OnPress(window => windows.PressAsync(renderer, window));
+                return windows;
+            }
         }
 
         internal void Add(IUiRenderer renderer, ElementId id, UiWindow window, Func<ValueTask>? close)

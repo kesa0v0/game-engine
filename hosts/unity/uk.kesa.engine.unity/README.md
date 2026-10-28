@@ -20,6 +20,8 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
    var read = UxmlReader.Read("screen.uxml", File.ReadAllText(path));
    await ui.MountAsync(read.Document!, new Dictionary<string, BridgeValue> { [read.Document!.SeatParameter!] = seatEntity });
    // 프레임마다: await ui.RefreshAsync();
+   // ESC: if (!await ui.Windows.Escape()) 게임의 메뉴를 연다
+   // 화면을 여러 해석기로 나눠도 창을 함께 겹칠 것은 렌더러 하나에 올린다(그 렌더러의 해석기들은 창 목록 하나를 쓴다, G354)
    ```
 
 ## 확인

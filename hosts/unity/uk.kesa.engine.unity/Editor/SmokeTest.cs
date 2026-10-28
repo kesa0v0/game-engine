@@ -118,9 +118,12 @@ namespace Kesa.Engine.Unity.Editor
             Require(string.Join(",", order) == "info,kesa-modal-blocker,confirm", "arranged with the blocker under the modal, got " + string.Join(",", order));
             Require(renderer.Element(info).style.display == DisplayStyle.Flex, "a shown window is displayed");
 
+            renderer.ArrangeWindows(new[] { confirm, info }, -1);
+            order = layer.Children().Select(e => e.name).ToList();
+            Require(string.Join(",", order) == "confirm,info", "reordered without a blocker, got " + string.Join(",", order));
             renderer.ArrangeWindows(new[] { info }, -1);
             order = layer.Children().Select(e => e.name).ToList();
-            Require(string.Join(",", order) == "confirm,info", "hidden windows go below and there is no blocker, got " + string.Join(",", order));
+            Require(string.Join(",", order) == "confirm,info", "already in order, so nothing moved, got " + string.Join(",", order));
             Require(renderer.Element(confirm).style.display == DisplayStyle.None, "a window not in the list is hidden");
 
             renderer.Move(info, root, 3);
