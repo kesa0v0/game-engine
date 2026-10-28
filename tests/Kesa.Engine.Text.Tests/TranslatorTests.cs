@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
+using Kesa.Engine.Bridge;
+using Kesa.Engine.Bridge.Local;
 using Kesa.Engine.Numerics;
 using Kesa.Engine.Runtime;
 using Kesa.Engine.Script;
@@ -49,15 +51,27 @@ namespace Kesa.Engine.Text.Tests
         private static TextValue T(string key, Dictionary<string, Value> args, Dictionary<string, string>? defs = null) =>
             new TextValue(key, args, defs);
 
+        // 번역기는 경계 값만 받는다: 호스트 세션(LocalSession)처럼 커널 값을 바꿔 넘긴다
+        private static BridgeValue B(Value value, World? world = null) =>
+            KernelValues.ToBridge(value, id => world != null && world.IsAlive(id) ? world.DefOf(id) : null);
+
+        private string Format(TextValue text) => _tr.Format((BridgeText)B(text));
+
+        private string Label(Value value, World? world = null) => _tr.Label(B(value, world));
+
+        private string Attr(Value value, string attribute, World? world = null) => _tr.Attr(B(value, world), attribute);
+
+        private string Shown(Value value) => _tr.Value(B(value));
+
         [Test]
         public void NumbersStringsAndDefIdsFillTheirPlaces()
         {
-            string s = _tr.Format(T("harbor-bought", new Dictionary<string, Value>
+            string s = Format(T("harbor-bought", new Dictionary<string, Value>
             {
                 ["ship"] = new StrValue("harbor:Sloop"), ["n"] = new IntValue(5), ["f"] = new FixedValue(Fixed.FromRaw(1_500_000)),
             }));
             Assert.That(s, Is.EqualTo("bought sloop for 5 gold (1.5)"));
-            string literal = _tr.Format(T("harbor-said", new Dictionary<string, Value>
+            string literal = Format(T("harbor-said", new Dictionary<string, Value>
             {
                 ["who"] = new StrValue("Sloop"), ["what"] = new StrValue("harbor:Nothing"),
             }));
@@ -68,7 +82,7 @@ namespace Kesa.Engine.Text.Tests
         [Test]
         public void NumbersKeepTheirDecimalText()
         {
-            string Of(Value n) => _tr.Format(T("harbor-bought", new Dictionary<string, Value>
+            string Of(Value n) => Format(T("harbor-bought", new Dictionary<string, Value>
                 { ["ship"] = new StrValue("x"), ["n"] = n, ["f"] = new FixedValue(Fixed.FromRaw(1)) }));
             Assert.That(Of(new IntValue(1234567)), Is.EqualTo("bought x for 1234567 gold (0.000001)"));
             Assert.That(Of(new IntValue(1234567890123456789)), Does.Contain(" 1234567890123456789 "), "past 2^53 a double would round");
@@ -77,9 +91,9 @@ namespace Kesa.Engine.Text.Tests
         [Test]
         public void IntsPickPluralBranchesAndBoolsAndNonePickStrings()
         {
-            string Count(long n) => _tr.Format(T("harbor-count", new Dictionary<string, Value> { ["n"] = new IntValue(n) }));
+            string Count(long n) => Format(T("harbor-count", new Dictionary<string, Value> { ["n"] = new IntValue(n) }));
             Assert.That((Count(1), Count(3)), Is.EqualTo(("one ship", "3 ships")));
-            string flag = _tr.Format(T("harbor-flag", new Dictionary<string, Value> { ["b"] = BoolValue.True, ["z"] = NoneValue.Instance }));
+            string flag = Format(T("harbor-flag", new Dictionary<string, Value> { ["b"] = BoolValue.True, ["z"] = NoneValue.Instance }));
             Assert.That(flag, Is.EqualTo("yes none"));
         }
 
@@ -92,21 +106,21 @@ namespace Kesa.Engine.Text.Tests
                 ["what"] = T("harbor-bought", new Dictionary<string, Value>
                     { ["ship"] = HiddenValue.Instance, ["n"] = new IntValue(2), ["f"] = new IntValue(0) }),
             }, new Dictionary<string, string> { ["who"] = "harbor:Brig" });
-            Assert.That(_tr.Format(said), Is.EqualTo("brig said: bought unknown for 2 gold (0)"));
+            Assert.That(Format(said), Is.EqualTo("brig said: bought unknown for 2 gold (0)"));
         }
 
         [Test]
         public void LabelTreatsStringsAsKeysOrDefsAndValueShowsThemAsWritten()
         {
             var sloop = _world.Create("harbor:Sloop");
-            Assert.That(_tr.Label(new StrValue("harbor-accept")), Is.EqualTo("Accept"));
-            Assert.That(_tr.Label(new StrValue("harbor:Brig")), Is.EqualTo("brig"));
-            Assert.That(_tr.Label(new EntityValue(sloop), _world), Is.EqualTo("sloop"));
-            Assert.That(_tr.Label(HiddenValue.Instance), Is.EqualTo("unknown"));
-            Assert.That(_tr.Value(new StrValue("harbor-accept")), Is.EqualTo("harbor-accept"), "a screen value is shown as written");
-            Assert.That(_tr.Value(new StrValue("harbor:Brig")), Is.EqualTo("brig"));
-            Assert.That(_tr.Value(new IntValue(-3)), Is.EqualTo("-3"));
-            Assert.That(_tr.Value(new EntityValue(sloop)), Is.EqualTo("unknown"), "without a world the entity cannot be named");
+            Assert.That(Label(new StrValue("harbor-accept")), Is.EqualTo("Accept"));
+            Assert.That(Label(new StrValue("harbor:Brig")), Is.EqualTo("brig"));
+            Assert.That(Label(new EntityValue(sloop), _world), Is.EqualTo("sloop"));
+            Assert.That(Label(HiddenValue.Instance), Is.EqualTo("unknown"));
+            Assert.That(Shown(new StrValue("harbor-accept")), Is.EqualTo("harbor-accept"), "a screen value is shown as written");
+            Assert.That(Shown(new StrValue("harbor:Brig")), Is.EqualTo("brig"));
+            Assert.That(Shown(new IntValue(-3)), Is.EqualTo("-3"));
+            Assert.That(Shown(new EntityValue(sloop)), Is.EqualTo("unknown"), "without a world the entity cannot be named");
             Assert.That(_errors, Is.Empty);
         }
 
@@ -114,24 +128,24 @@ namespace Kesa.Engine.Text.Tests
         public void AttrReadsTheFluentAttributeOfKeysDefsEntitiesTextsAndOptions()
         {
             var sloop = _world.Create("harbor:Sloop");
-            Assert.That(_tr.Attr(new StrValue("harbor-accept"), "desc"), Is.EqualTo("take the deal"));
-            Assert.That(_tr.Attr(new StrValue("harbor:Sloop"), "desc"), Is.EqualTo("a small boat"));
-            Assert.That(_tr.Attr(new EntityValue(sloop), "desc", _world), Is.EqualTo("a small boat"));
+            Assert.That(Attr(new StrValue("harbor-accept"), "desc"), Is.EqualTo("take the deal"));
+            Assert.That(Attr(new StrValue("harbor:Sloop"), "desc"), Is.EqualTo("a small boat"));
+            Assert.That(Attr(new EntityValue(sloop), "desc", _world), Is.EqualTo("a small boat"));
             var offer = T("harbor-offer", new Dictionary<string, Value> { ["who"] = new StrValue("harbor:Brig") });
-            Assert.That(_tr.Attr(offer, "desc"), Is.EqualTo("brig offers a deal"));
+            Assert.That(Attr(offer, "desc"), Is.EqualTo("brig offers a deal"));
 
             var plain = new OptionValue(new StrValue("harbor-accept"), null, null, null, null);
             var dressed = new OptionValue(new StrValue("x"), new StrValue("harbor:Brig"), offer, null, null);
-            Assert.That((_tr.Label(plain), _tr.Attr(plain, "desc")), Is.EqualTo(("Accept", "take the deal")));
-            Assert.That((_tr.Label(dressed), _tr.Attr(dressed, "desc")), Is.EqualTo(("brig", "Offer from brig")));
+            Assert.That((Label(plain), Attr(plain, "desc")), Is.EqualTo(("Accept", "take the deal")));
+            Assert.That((Label(dressed), Attr(dressed, "desc")), Is.EqualTo(("brig", "Offer from brig")));
         }
 
         [Test]
         public void MissingKeysAndArgumentsFallBackAndReportButNeverThrow()
         {
-            Assert.That(_tr.Label(new StrValue("harbor-nope")), Is.EqualTo("harbor-nope"));
-            Assert.That(_tr.Attr(new StrValue("harbor:Brig"), "desc"), Is.EqualTo("def-harbor-Brig.desc"));
-            string s = _tr.Format(T("harbor-count", new Dictionary<string, Value>()));
+            Assert.That(Label(new StrValue("harbor-nope")), Is.EqualTo("harbor-nope"));
+            Assert.That(Attr(new StrValue("harbor:Brig"), "desc"), Is.EqualTo("def-harbor-Brig.desc"));
+            string s = Format(T("harbor-count", new Dictionary<string, Value>()));
             Assert.That(s, Does.Contain("ships"));
             Assert.That(_errors, Has.Count.EqualTo(3));
             Assert.That(_errors[0], Is.EqualTo("no translation for 'harbor-nope'"));
@@ -142,19 +156,19 @@ namespace Kesa.Engine.Text.Tests
         public void AnUntranslatedDefShowsItsId()
         {
             var raft = _world.Create("harbor:Raft");
-            Assert.That(_tr.Label(new StrValue("harbor:Raft")), Is.EqualTo("harbor:Raft"));
-            Assert.That(_tr.Label(new EntityValue(raft), _world), Is.EqualTo("harbor:Raft"));
-            string said = _tr.Format(T("harbor-said", new Dictionary<string, Value>
+            Assert.That(Label(new StrValue("harbor:Raft")), Is.EqualTo("harbor:Raft"));
+            Assert.That(Label(new EntityValue(raft), _world), Is.EqualTo("harbor:Raft"));
+            string said = Format(T("harbor-said", new Dictionary<string, Value>
                 { ["who"] = new StrValue("harbor:Raft"), ["what"] = new StrValue("hi") }));
             Assert.That(said, Is.EqualTo("harbor:Raft said: hi"));
             Assert.That(_errors.Distinct(), Is.EqualTo(new[] { "no translation for 'def-harbor-Raft'" }), "still reported");
-            Assert.That(_tr.Attr(new StrValue("harbor:Raft"), "desc"), Is.EqualTo("def-harbor-Raft.desc"), "attributes keep the key");
+            Assert.That(Attr(new StrValue("harbor:Raft"), "desc"), Is.EqualTo("def-harbor-Raft.desc"), "attributes keep the key");
         }
 
         [Test]
         public void TheHostCanFormatItsOwnKeys()
         {
-            Assert.That(_tr.Text("harbor-count", ("n", new IntValue(1))), Is.EqualTo("one ship"));
+            Assert.That(_tr.Text("harbor-count", ("n", new BridgeInt(1))), Is.EqualTo("one ship"));
             Assert.That(Translator.DefKey("harbor:rigs/Brig"), Is.EqualTo("def-harbor-rigs-Brig"));
         }
     }

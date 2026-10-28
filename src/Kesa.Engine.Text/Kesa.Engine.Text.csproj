@@ -20,8 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Kesa.Engine.Kernel\Kesa.Engine.Kernel.csproj" />
-    <!-- 호스트 경계 값(G326)을 번역한다. 커널 값은 경계 값으로 바꿔 같은 규칙을 쓴다 -->
-    <ProjectReference Include="..\Kesa.Engine.Bridge.Local\Kesa.Engine.Bridge.Local.csproj" />
+    <!-- 번역기는 호스트 경계 값(G326)만 받는다. 커널은 번역 파일 읽기와 검사가 쓴다 -->
+    <ProjectReference Include="..\Kesa.Engine.Bridge\Kesa.Engine.Bridge.csproj" />
   </ItemGroup>
 
 </Project>

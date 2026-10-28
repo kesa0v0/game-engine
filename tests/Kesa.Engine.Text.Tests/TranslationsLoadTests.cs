@@ -13,7 +13,7 @@ namespace Kesa.Engine.Text.Tests
     public class TranslationsLoadTests : TextTestBase
     {
         private static string Say(Translations texts, string key, params string[] languages) =>
-            texts.For(languages).Format(new TextValue(key, new Dictionary<string, Value>()));
+            texts.For(languages).Format(Bridged(new TextValue(key, new Dictionary<string, Value>())));
 
         [Test]
         public void AModsFilesAreFoundUnderLocaleAndFormatted()
@@ -24,8 +24,8 @@ namespace Kesa.Engine.Text.Tests
             var texts = LoadTextsClean();
             Assert.That(texts.Languages, Is.EqualTo(new[] { "en", "ko" }));
             Assert.That(Say(texts, "harbor-charter", "ko"), Is.EqualTo("헌장에 서명할까요?"));
-            var gold = texts.For(new[] { "en" }).Format(new TextValue("harbor-gold",
-                new Dictionary<string, Value> { ["n"] = new IntValue(5) }));
+            var gold = texts.For(new[] { "en" }).Format(Bridged(new TextValue("harbor-gold",
+                new Dictionary<string, Value> { ["n"] = new IntValue(5) })));
             Assert.That(gold, Is.EqualTo("5 gold"), "no U+2068/U+2069 isolation marks around placeables");
         }
 
@@ -89,7 +89,7 @@ namespace Kesa.Engine.Text.Tests
             var texts = LoadTextsClean();
             var errors = new List<string>();
             var tr = texts.For(new[] { "pt-BR", "en" }, errors.Add);
-            string Of(string key) => tr.Format(new TextValue(key, new Dictionary<string, Value>()));
+            string Of(string key) => tr.Format(Bridged(new TextValue(key, new Dictionary<string, Value>())));
             Assert.That(Of("harbor-c"), Is.EqualTo("português"), "pt-BR → pt");
             Assert.That(Of("harbor-b"), Is.EqualTo("english b"), "the second language of the list");
             Assert.That(Of("harbor-a"), Is.EqualTo("中文"), "the owner's defaultLanguage");

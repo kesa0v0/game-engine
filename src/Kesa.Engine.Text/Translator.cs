@@ -2,9 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Kesa.Engine.Bridge;
-using Kesa.Engine.Bridge.Local;
-using Kesa.Engine.Runtime;
-using Kesa.Engine.Script;
 using Linguini.Bundle;
 using Linguini.Shared.Types.Bundle;
 
@@ -33,24 +30,11 @@ namespace Kesa.Engine.Text
         /// <summary>스크립트가 만든 쪽지 (<c>require</c> 메시지·<c>text(...)</c>).</summary>
         public string Format(BridgeText text) => Lookup(text.Key, Arguments(text));
 
-        public string Format(TextValue text) => Value(text, NoEntities);
-
         /// <summary>호스트가 키로 직접 (<c>tr.Text("harbor-gold", ("n", new BridgeInt(5)))</c>).</summary>
         public string Text(string key, params (string Name, BridgeValue Value)[] args)
         {
             var map = new Dictionary<string, IFluentType>(StringComparer.Ordinal);
             foreach (var (name, value) in args) map[name] = Argument(value);
-            return Lookup(key, map);
-        }
-
-        public string Text(string key, params (string Name, Value Value)[] args)
-        {
-            var map = new Dictionary<string, IFluentType>(StringComparer.Ordinal);
-            foreach (var (name, value) in args)
-            {
-                var bridged = ToBridge(value, NoEntities);
-                map[name] = bridged == null ? new FluentString(CannotShow(value.KindName)) : Argument(bridged);
-            }
             return Lookup(key, map);
         }
 
@@ -71,10 +55,6 @@ namespace Kesa.Engine.Text
                     return Value(value);
             }
         }
-
-        public string Label(Value value, WorldView? view = null) => Label(value, DefOf(view));
-
-        public string Label(Value value, World world) => Label(value, DefOf(world));
 
         /// <summary>
         /// 그 값의 Fluent 속성 (G263·G270): 키면 <c>키.속성</c>, Def id·엔티티면 <c>def-….속성</c>, 쪽지면 그 키의 속성을 같은 인자로.
@@ -100,10 +80,6 @@ namespace Kesa.Engine.Text
             }
         }
 
-        public string Attr(Value value, string attribute, WorldView? view = null) => Attr(value, attribute, DefOf(view));
-
-        public string Attr(Value value, string attribute, World world) => Attr(value, attribute, DefOf(world));
-
         /// <summary>화면 값 안의 맨 값 하나 (G267·G269): 문자열은 Def의 전체 이름이 아니면 글자 그대로.</summary>
         public string Value(BridgeValue value)
         {
@@ -123,48 +99,6 @@ namespace Kesa.Engine.Text
                     return Plain(value) ?? CannotShow(KindName(value));
             }
         }
-
-        public string Value(Value value, WorldView? view = null) => Value(value, DefOf(view));
-
-        public string Value(Value value, World world) => Value(value, DefOf(world));
-
-        // ---- 커널 값: 경계 값으로 바꿔 같은 규칙 ----
-
-        private string Label(Value value, Func<EntityId, string?> defOf)
-        {
-            var bridged = ToBridge(value, defOf);
-            return bridged == null ? CannotShow(value.KindName) : Label(bridged);
-        }
-
-        private string Attr(Value value, string attribute, Func<EntityId, string?> defOf)
-        {
-            var bridged = ToBridge(value, defOf);
-            if (bridged != null) return Attr(bridged, attribute);
-            Error("cannot look up ." + attribute + " of " + value.KindName);
-            return "";
-        }
-
-        private string Value(Value value, Func<EntityId, string?> defOf)
-        {
-            var bridged = ToBridge(value, defOf);
-            return bridged == null ? CannotShow(value.KindName) : Value(bridged);
-        }
-
-        /// <summary>경계를 넘을 수 없는 값(함수 등)이면 null.</summary>
-        private static BridgeValue? ToBridge(Value value, Func<EntityId, string?> defOf)
-        {
-            try
-            {
-                return KernelValues.ToBridge(value, defOf);
-            }
-            catch (BridgeValueException)
-            {
-                return null;
-            }
-        }
-
-        /// <summary>쪽지만 바꿀 때: 엔티티 인자는 <c>text()</c> 때 적어 둔 Def를 쓴다(G267).</summary>
-        private static readonly Func<EntityId, string?> NoEntities = _ => null;
 
         // ---- 번역 인자 (G267) ----
 
@@ -278,11 +212,5 @@ namespace Kesa.Engine.Text
         }
 
         private void Error(string message) => _onError?.Invoke(message);
-
-        private static Func<EntityId, string?> DefOf(WorldView? view) =>
-            id => view != null && view.Sees(id) ? view.DefOf(id) : null;
-
-        private static Func<EntityId, string?> DefOf(World world) =>
-            id => world.IsAlive(id) ? world.DefOf(id) : null;
     }
 }

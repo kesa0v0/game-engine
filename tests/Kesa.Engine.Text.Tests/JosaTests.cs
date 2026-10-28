@@ -53,7 +53,7 @@ namespace Kesa.Engine.Text.Tests
             var errors = new List<string>();
             var tr = LoadTextsClean().For(new[] { "ko" }, errors.Add);
             string Say(string key, string name, Value v, Dictionary<string, string>? defs = null) =>
-                tr.Format(new TextValue(key, new Dictionary<string, Value> { [name] = v }, defs));
+                tr.Format(Bridged(new TextValue(key, new Dictionary<string, Value> { [name] = v }, defs)));
 
             Assert.That(Say("harbor-bought", "ship", new StrValue("harbor:Sloop")), Is.EqualTo("슬루프를 샀다"));
             Assert.That(Say("harbor-bought", "ship", new StrValue("harbor:Galleon")), Is.EqualTo("갈레온을 샀다"));

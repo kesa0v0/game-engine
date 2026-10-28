@@ -31,10 +31,9 @@
 
 **남은 일:**
 
-1. `Translator`의 커널 값 오버로드(`Label(Value, World)` 등)는 이제 번역 테스트만 쓰므로 거둘지 본다(`ConsoleHost`는 `Bridge.Local`을 `LocalHost` 때문에 계속 참조한다).
-2. 조회 도구(`tools/Kesa.Tools.Decisions`)의 테스트, 자동으로 붙인 결정 태그 보정.
+1. 조회 도구(`tools/Kesa.Tools.Decisions`)의 테스트, 자동으로 붙인 결정 태그 보정.
 
-번역문의 `NUMBER`는 구현했다(G334·G356~G358, `NumberFunction`, 검사 `LOC012`). 옵션을 더할 때는 `Intl.NumberFormat` 이름을 따른다. 호스트 개발자용 "화면이 갱신되는 방식"은 Unity 패키지 README에 있다.
+번역문의 `NUMBER`는 구현했다(G334·G356~G358, `NumberFunction`, 검사 `LOC012`). 옵션을 더할 때는 `Intl.NumberFormat` 이름을 따른다. 호스트 개발자용 "화면이 갱신되는 방식"은 Unity 패키지 README에 있다. `Translator`는 경계 값만 받는다(커널 값 오버로드를 거둠, 번역 어셈블리는 `Bridge.Local`이 아니라 `Bridge`를 참조하고 커널은 번역 파일 읽기와 검사에만 씀).
 
 **작은 것:** 화면 동작이 낸 `submit`이 거절돼도 `BridgeResult.Succeeded`는 참이고 실패는 `Deliveries`에만 있다(G283, 호스트가 `ActionResult`에서 봐야 함). `UiInterpreter.Errors`는 `ClearErrors`로만 비운다.
 

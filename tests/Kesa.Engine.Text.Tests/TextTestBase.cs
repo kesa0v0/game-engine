@@ -56,6 +56,10 @@ namespace Kesa.Engine.Text.Tests
         protected void Ftl(string mod, string language, string text, string file = "main.ftl") =>
             Write("mods/" + mod + "/locale/" + language + "/" + file, text);
 
+        /// <summary>번역기는 경계 값만 받는다: 커널의 쪽지를 호스트 세션처럼 바꿔 넘긴다(엔티티 인자는 적어 둔 Def).</summary>
+        protected static Kesa.Engine.Bridge.BridgeText Bridged(Kesa.Engine.Script.TextValue text) =>
+            (Kesa.Engine.Bridge.BridgeText)Kesa.Engine.Bridge.Local.KernelValues.ToBridge(text, _ => null);
+
         protected ContentLoadResult LoadContent()
         {
             var bag = new DiagnosticBag();
