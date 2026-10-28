@@ -162,6 +162,19 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task AWindowCannotBeInsideAnotherWindowEvenAcrossAnInclude()
+        {
+            Files["popup.uxml"] = "<ui:VisualElement name=\"popup\" window=\"normal\" />";
+            var nested = await Ui.MountAsync(Doc("<ui:VisualElement window=\"modal\"><Include src=\"popup.uxml\" /></ui:VisualElement>"), Args());
+            Assert.That(nested.Panel, Is.Null);
+            Assert.That(nested.Problems.Single().Message, Does.StartWith("a window cannot be inside another window"));
+            Assert.That(Renderer.Windows, Is.Empty, "nothing was built");
+
+            await Mount("<ui:VisualElement><ui:VisualElement window=\"normal\" /><Include src=\"popup.uxml\" /></ui:VisualElement>");
+            Assert.That(Renderer.Windows.Count, Is.EqualTo(2), "side by side is fine");
+        }
+
+        [Test]
         public async Task InterpretersSharingTheWindowListShareTheModalAndEscape()
         {
             await Mount("<ui:VisualElement>" + Info + "</ui:VisualElement>");

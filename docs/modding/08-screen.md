@@ -112,6 +112,7 @@ Unity 호스트는 UXML 파일(`samples/skirmish/core/ui/screen.uxml`)로 화면
 - `on-close`는 닫힘 요청(ESC, 켰으면 바깥 클릭)에 부를 커맨드나 화면 동작이다. 엔진은 창을 직접 숨기지 않는다: 그 동작이 UI 기록을 바꿔 `bind-display`가 거짓이 되면 닫힌다.
 - `on-close`가 있으면 ESC가 맨 위 창부터 닫는다. 막으려면 `close-on-escape="false"`. ESC로 닫히지 않는 모달이 맨 위면 ESC는 그 아래로 가지 않는다.
 - 바깥 클릭은 기본으로 닫지 않는다. `close-on-outside="true"`면 모달은 뒤의 막이를, 보통 창은 그 창 밖을 누를 때 `on-close`를 부른다.
+- 창 안에 창은 둘 수 없다(끼운 파일이어도 오류다). 창끼리는 나란히 둔다.
 - `window-drag="true"`는 창 안의 요소에만 붙는다(끼운 파일이어도 된다). 끌어 놓은 자리는 게임을 켜 둔 동안 남는다.
 - 창은 화면 맨 위의 겹침 층에 그려지므로 자리는 USS의 `left`·`top` 등으로 정한다. 모달 뒤의 막이는 USS 클래스 `modal-blocker`로 모양을 정한다(기본은 투명).
 - 창 안에 화면을 여는 버튼과 닫는 버튼을 두는 것은 평범한 `on-click`이다.

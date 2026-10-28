@@ -238,6 +238,8 @@ namespace Kesa.Engine.Ui
             if (element.Repeat != null) await CheckCallAsync(element.Place, "for", element.Repeat.Source, problems);
             foreach (var e in element.Events) ValidateEvent(element.Place, e, problems);
             // Include를 건너면 읽기만으로는 창 안인지 모르므로 올리기 전에 본다
+            if (element.Window != null && insideWindow)
+                problems.Add(new UiProblem(element.Place, "a window cannot be inside another window (move it out of the window element above it)"));
             bool inside = insideWindow || element.Window != null;
             if (element.DragHandle && !inside) problems.Add(new UiProblem(element.Place, "window-drag is only inside a window (an element with window=\"…\" above it)"));
 
