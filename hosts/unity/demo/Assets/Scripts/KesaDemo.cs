@@ -68,6 +68,9 @@ public sealed class KesaDemo : MonoBehaviour
         await game.Host.Seat(seat.Value, connection);
         var session = await game.Host.Open(connection);
 
+        // 데모 게임이 주는 모양(Assets/Resources/KesaDemo.uss). 모드의 USS는 아직 읽지 않는다
+        var style = Resources.Load<StyleSheet>("KesaDemo");
+        if (style != null) root.styleSheets.Add(style);
         var renderer = new UiToolkitRenderer(root, mods.Assets);
         var ui = new UiInterpreter(session, renderer, mods.Format, mods.Assets.LoadUxml);
         string? uxml = mods.Assets.LoadUxml(screen);

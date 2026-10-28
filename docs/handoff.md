@@ -12,12 +12,13 @@
 - UXML 해석 `src/Kesa.Engine.Ui`: 식 파서, UXML 읽기, 해석기, `IUiRenderer`. 경계만 참조한다(G330~G345). 시험은 `tests/Kesa.Engine.Ui.Tests`(시험용 메모리 렌더러, 진짜 `LocalHost`, skirmish 화면).
 - Unity 패키지 `hosts/unity/uk.kesa.engine.unity`(`UiToolkitRenderer`, `ModFolderAssets`, 입구 `LoadedMods.Load`와 `mods.NewMatch`, G353)와 데모 프로젝트 `hosts/unity/demo`(씬 `Assets/Scenes/Demo.unity`, `KesaDemo`). 루트 `dotnet build`가 DLL을 패키지의 `Plugins/`로 복사한다(G347, 복사본은 git에 없음). 모드 오류는 판을 막지 않고 `Diagnostics`·`Disabled`로 온다. API 타입 이름에 `Kesa` 접두사를 붙이지 않는다.
 - 설치된 Unity 6000.3.8f1(이 컴퓨터: `C:\Program Files\Unity\Hub\Editor\6000.3.8f1`)에서 컴파일과 창 없는 확인이 통과했다(`SmokeTest`, `KesaDemoSetup.Check`, 패키지 README). skirmish 화면이 실제 `VisualElement` 트리로 올라와 카드 6장, 번역된 유닛 이름, 회색 버튼까지 맞다.
+- 사용자가 에디터에서 데모를 재생해 눈으로 확인했다(2026-10-29): 카드 배치, 선택 표시, 정보창 끌기·ESC, 확인 모달(뒤를 막음, 턴이 넘어가면 닫힘). 모양은 데모 게임이 주는 `Assets/Resources/KesaDemo.uss`다(모드 USS가 아님). 기본 런타임 테마는 글자가 짙어 스타일 없이는 어두운 배경에서 안 보인다.
 
 ## 다음 할 일
 
-**먼저:** 루트에서 `dotnet build`(DLL 복사) 후 Unity 6000.3으로 `hosts/unity/demo`를 열고 `Assets/Scenes/Demo.unity`를 재생해 눈으로 확인한다: 눌림(선택·공격), 프레임마다 갱신, 카드의 `info`로 여는 정보창(제목 끌기·누르면 위로·ESC), `end turn`으로 여는 확인 모달(뒤를 못 누름, ESC는 모달부터, 턴이 넘어가면 저절로 닫힘). 이것은 Unity에서 아직 돌려 보지 않았다(`dotnet test`와 창 없는 확인만). 데모 화면은 스타일이 없어 기본 모양이고 창은 왼쪽 위에 겹쳐 뜬다.
+데모를 돌리는 법: 루트에서 `dotnet build`(DLL 복사) 후 Unity 6000.3으로 `hosts/unity/demo`를 열고 `Assets/Scenes/Demo.unity`를 재생한다. 에디터가 프로젝트를 열고 있으면 창 없는 확인(`-batchmode`)은 잠금 때문에 바로 끝난다.
 
-**창(구현함):** 창은 제어되는 패널(G348, G337 일부바뀜): 열림은 UI 기록, 패널이 층·ESC·끌기를 선언, 호스트의 얇은 창 층이 처리하고 닫을 때 패널의 닫기 동작을 부름. 표기는 `window="층"`·`on-close`·`close-on-escape`·`window-drag`(G349), 종류는 `normal`·`modal`뿐이고 층은 없다(G350), 누르면 맨 위로 올리고 `window-raise="false"`로 끔(G351), 위치는 게임을 켜 둔 동안만 남음(G352), 판단은 해석기들이 함께 쓰는 `UiWindows`가 하고 ESC는 호스트가 `Windows.Escape()`로 보내며 바깥 클릭은 `close-on-outside="true"`일 때만(G354), 창 안에 창은 오류(G355). Unity 렌더러는 창을 겹침 층으로 옮기고 원래 자리에 자리표를 둔다. 시험은 `WindowTests`와 `SmokeTest`의 창 배치이고, Unity에서 눈으로 본 확인(끌기·누름·ESC)은 아직이다.
+**창(구현함):** 창은 제어되는 패널(G348, G337 일부바뀜): 열림은 UI 기록, 패널이 층·ESC·끌기를 선언, 호스트의 얇은 창 층이 처리하고 닫을 때 패널의 닫기 동작을 부름. 표기는 `window="층"`·`on-close`·`close-on-escape`·`window-drag`(G349), 종류는 `normal`·`modal`뿐이고 층은 없다(G350), 누르면 맨 위로 올리고 `window-raise="false"`로 끔(G351), 위치는 게임을 켜 둔 동안만 남음(G352), 판단은 해석기들이 함께 쓰는 `UiWindows`가 하고 ESC는 호스트가 `Windows.Escape()`로 보내며 바깥 클릭은 `close-on-outside="true"`일 때만(G354), 창 안에 창은 오류(G355). Unity 렌더러는 창을 겹침 층으로 옮기고 원래 자리에 자리표를 둔다. 시험은 `WindowTests`와 `SmokeTest`의 창 배치이고, Unity 데모에서 눈으로도 확인했다.
 
 **잠정 결정:** handoff가 기다리던 G337·G345·G347은 모두 정리했다. 잠정 G2~G30(로딩·로직 언어 규칙)은 그 영역을 다시 건드리거나 실제 모드가 부딪힐 때 확인한다.
 

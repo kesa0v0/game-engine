@@ -94,6 +94,7 @@ public static class KesaDemoSetup
         if (turn == null || turn.text != "1") throw new InvalidOperationException("the turn label should show 1, got " + turn?.text);
         int cards = root.Q("units").childCount;
         if (cards != 6) throw new InvalidOperationException("six unit cards expected, got " + cards);
+        if (root.styleSheets.count == 0) throw new InvalidOperationException("the demo style sheet (Resources/KesaDemo.uss) was not loaded");
         if (scene.rootCount < 2) throw new InvalidOperationException("the scene lost its objects");
     }
 
