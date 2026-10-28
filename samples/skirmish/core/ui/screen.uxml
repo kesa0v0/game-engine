@@ -1,5 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
   <!-- Unity 호스트의 화면 (spec-gaps G330~G355). house에는 호스트가 그 연결이 앉은 진영을 넣는다 -->
+  <ui:Style src="ui/screen.uss" />
   <ui:VisualElement name="screen" params="house" seat="house">
     <ui:Label name="turn" bind-text="skirmish.turn_number(house)" />
     <ui:Button name="ask-end" text="end turn" on-click="skirmish.ask_end_turn()" />

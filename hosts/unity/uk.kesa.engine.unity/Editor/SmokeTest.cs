@@ -87,7 +87,8 @@ namespace Kesa.Engine.Unity.Editor
             Require(firstHp != null && (firstHp.text == "10" || firstHp.text == "6"), "a card shows hp, got " + firstHp?.text);
             var kind = cards[0].Q<Label>("kind");
             Require(kind != null && (kind.text.Contains("병사") || kind.text.Contains("궁수")), "the unit kind is translated, got " + kind?.text);
-            Require(ui.Errors.Count == 0, "no binding errors: " + string.Join("; ", ui.Errors));
+            Require(ui.Errors.Count == 0, "no binding or style sheet errors: " + string.Join("; ", ui.Errors));
+            Require(host.Q("screen").styleSheets.count == 1, "the mod's ui/screen.uss is on the screen element");
             CheckWindows(mods.Assets);
             UssCheck.Run();
         }

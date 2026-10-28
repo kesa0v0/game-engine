@@ -94,7 +94,7 @@ Unity 호스트는 UXML 파일(`samples/skirmish/core/ui/screen.uxml`)로 화면
 
 #### 모양 (USS)
 
-모양은 모드 폴더의 USS 파일로 준다. UXML에 `<Style src="…" />`로 붙이면 그 파일의 맨 위 요소에 붙는다.
+모양은 모드 폴더의 USS 파일로 준다. UXML에 `<Style src="…" />`로 붙이면 그 파일의 맨 위 요소에 붙는다. skirmish는 `ui/screen.uss`를 붙인다.
 
 ```xml
 <ui:UXML xmlns:ui="UnityEngine.UIElements">

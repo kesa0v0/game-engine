@@ -32,6 +32,7 @@ namespace Kesa.Engine.Ui.Tests
         private World _world = null!;
         private long _red, _blue;
         private UiDocument _screen = null!;
+        private string _modFolder = null!;
 
         private sealed class Seat
         {
@@ -58,6 +59,7 @@ namespace Kesa.Engine.Ui.Tests
             await _host.Seat(_red, "alice");
             await _host.Seat(_blue, "bob");
 
+            _modFolder = Path.Combine(root, "core");
             var read = UxmlReader.Read("screen.uxml", File.ReadAllText(Path.Combine(root, "core", "ui", "screen.uxml")));
             Assert.That(read.Problems, Is.Empty, string.Join("\n", read.Problems));
             _screen = read.Document!;
@@ -67,10 +69,27 @@ namespace Kesa.Engine.Ui.Tests
         {
             var session = await _host.Open(connection);
             var renderer = new MemoryRenderer();
-            var seat = new Seat { Session = session, Renderer = renderer, Ui = new UiInterpreter(session, renderer, Format), Party = new BridgeEntity(party, null) };
+            var ui = new UiInterpreter(session, renderer, Format, ModFile);
+            var seat = new Seat { Session = session, Renderer = renderer, Ui = ui, Party = new BridgeEntity(party, null) };
             var result = await seat.Ui.MountAsync(_screen, new Dictionary<string, BridgeValue> { [_screen.SeatParameter!] = seat.Party });
             Assert.That(result.Problems, Is.Empty, string.Join("\n", result.Problems));
+            Assert.That(ui.Errors, Is.Empty, "the screen's USS reads cleanly: " + string.Join("\n", ui.Errors));
             return seat;
+        }
+
+        private string? ModFile(string path)
+        {
+            string file = Path.Combine(_modFolder, path);
+            return File.Exists(file) ? File.ReadAllText(file) : null;
+        }
+
+        [Test]
+        public async Task TheScreenCarriesTheModsStyleSheet()
+        {
+            var seat = await Open("alice", _red);
+            Assert.That(seat.Renderer.Named("screen").StyleSheets, Is.EqualTo(new[] { "ui/screen.uss" }));
+            var selectors = seat.Renderer.Sheets.Single().Rules.SelectMany(r => r.Selectors).Select(s => string.Concat(s.Compounds.SelectMany(c => c.Parts))).ToList();
+            Assert.That(selectors, Does.Contain(".card.selected").And.Contain(".modal-blocker"));
         }
 
         private static List<MemoryRenderer.El> Cards(Seat seat) => seat.Renderer.Named("units").Children;
