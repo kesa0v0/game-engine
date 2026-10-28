@@ -94,18 +94,33 @@ Unity 호스트는 UXML 파일(`samples/skirmish/core/ui/screen.uxml`)로 화면
 
 #### 창
 
-창은 평범한 요소에 `window`를 붙인 것이다. 열렸는지는 UI 기록에 두고 `bind-display`로 묶는다. 닫는 것도 화면 동작이 UI 기록을 바꿔서 한다. 아래의 함수 이름은 예이고 skirmish에는 없다.
+창은 평범한 요소에 `window`를 붙인 것이다. 열렸는지는 UI 기록에 두고 `bind-display`로 묶는다. 닫는 것도 화면 동작이 UI 기록을 바꿔서 한다. skirmish 화면(`screen.uxml`, 동작은 `defs/ui.py`)에서:
 
 ```xml
-<ui:VisualElement name="info" window="normal"
-    bind-display="skirmish.inspected()" on-close="skirmish.close_info()">      <!-- 고른 유닛이 있으면 열림 -->
-  <ui:VisualElement class="title" window-drag="true">                          <!-- 이것을 끌면 창이 움직인다 -->
-    <ui:Label text="유닛 정보" />
-  </ui:VisualElement>
+<ui:VisualElement name="unit-info" window="normal"
+    bind-display="skirmish.inspected()" on-close="skirmish.close_inspect()">   <!-- 연 유닛이 있으면 열림 -->
+  <ui:Label class="title" text="unit" window-drag="true" />                    <!-- 이것을 끌면 창이 움직인다 -->
+  <ui:Label bind-text="skirmish.inspected_hp()" />
 </ui:VisualElement>
 <ui:VisualElement name="confirm" window="modal"
-    bind-display="skirmish.asking()" on-close="skirmish.cancel()" />           <!-- 대답할 때까지 다른 것을 못 누른다 -->
+    bind-display="skirmish.asking_end_turn()" on-close="skirmish.cancel_end_turn()">  <!-- 대답할 때까지 다른 것을 못 누른다 -->
+  <ui:Button text="end turn" on-click="skirmish.EndTurn(house)" />
+</ui:VisualElement>
 ```
+
+```python
+@ui_action
+def ask_end_turn():
+    with preconditions:
+        require(playing(), text("skirmish-over"))
+        require(not asking_end_turn(), text("skirmish-already-open"))
+    ui.Confirm.turn = turn_now()      # 물은 턴을 적는다
+
+def asking_end_turn():                # 턴이 넘어가면 저절로 거짓이 되어 모달이 닫힌다
+    return ui.Confirm.turn != 0 and ui.Confirm.turn == turn_now()
+```
+
+창을 여닫는 동작에도 사전 조건을 붙여 두면 좋다. 버튼이 뜻이 없을 때 회색이 되고, 화면 동작을 모두 늘어놓는 호스트(콘솔)에서 판이 끝난 뒤 남는 선택지가 생기지 않는다.
 
 - `window="normal"`이나 `window="modal"`이다. 모달은 나중에 열린 보통 창보다도 늘 위에 있고 그 아래 입력을 막는다. 같은 종류끼리는 나중에 연 창이 위다.
 - 보통 창은 누르면 맨 위로 온다. 막으려면 `window-raise="false"`.

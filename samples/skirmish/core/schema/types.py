@@ -13,3 +13,6 @@ deftype("Unit", components=["Pos", "Life", "Owner", "Ready"],
 deftype("Game", components=["Match"])
 # 화면에만 있는 기록: 연결마다 하나, 저장되지 않는다 (spec-gaps G277·G279). 고른 유닛
 ui_state("Selection", unit=ref("Unit", optional=True))
+# UXML 화면의 창 (G348~G355): 정보창이 보이는 유닛, 턴 끝내기 확인을 물은 턴(0이면 묻지 않음)
+ui_state("Inspect", unit=ref("Unit", optional=True))
+ui_state("Confirm", turn=field(int, default=0))

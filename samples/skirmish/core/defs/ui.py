@@ -28,3 +28,50 @@ def strike(me: Ref[Party], target: Ref[Unit]):
 # UXML 화면(ui/screen.uxml)이 부른다: 이 유닛이 고른 유닛인가
 def is_chosen(u):
     return ui.Selection.unit == u
+
+# 유닛 정보창 (UXML의 보통 창, G348~G355): 연 유닛을 UI 기록에 두고 창은 그 값에 보임을 묶는다.
+# 사전 조건은 뜻이 있을 때만 합법이게 한다: 판이 끝나면 화면 동작도 남지 않는다
+def playing():
+    g = game()
+    return g is not None and g.Match.winner is None
+
+@ui_action
+def inspect(unit: Ref[Unit]):
+    with preconditions:
+        require(playing(), text("skirmish-over"))
+        choose(unit, where=lambda u: u != ui.Inspect.unit)
+    ui.Inspect.unit = unit
+
+@ui_action
+def close_inspect():
+    with preconditions:
+        require(ui.Inspect.unit is not None, text("skirmish-not-open"))
+    ui.Inspect.unit = None
+
+def inspected():
+    return ui.Inspect.unit
+
+def inspected_hp():
+    u = ui.Inspect.unit
+    return 0 if u is None else u.Life.hp
+
+# 턴 끝내기 확인 (UXML의 모달): 물은 턴을 적어 두므로 턴이 넘어가면 저절로 닫힌다
+def turn_now():
+    g = game()
+    return 0 if g is None else g.Match.turn
+
+@ui_action
+def ask_end_turn():
+    with preconditions:
+        require(playing(), text("skirmish-over"))
+        require(not asking_end_turn(), text("skirmish-already-open"))
+    ui.Confirm.turn = turn_now()
+
+@ui_action
+def cancel_end_turn():
+    with preconditions:
+        require(asking_end_turn(), text("skirmish-not-open"))
+    ui.Confirm.turn = 0
+
+def asking_end_turn():
+    return ui.Confirm.turn != 0 and ui.Confirm.turn == turn_now()

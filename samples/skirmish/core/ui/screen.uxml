@@ -1,15 +1,31 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
-  <!-- Unity 호스트의 화면 (spec-gaps G330~G345). house에는 호스트가 그 연결이 앉은 진영을 넣는다 -->
+  <!-- Unity 호스트의 화면 (spec-gaps G330~G355). house에는 호스트가 그 연결이 앉은 진영을 넣는다 -->
   <ui:VisualElement name="screen" params="house" seat="house">
     <ui:Label name="turn" bind-text="skirmish.turn_number(house)" />
-    <ui:Button name="endturn" text="end turn" on-click="skirmish.EndTurn(house)" />
+    <ui:Button name="ask-end" text="end turn" on-click="skirmish.ask_end_turn()" />
     <ui:VisualElement name="units" class="units" for="row in skirmish.units(house)">
       <ui:VisualElement class="card" bind-class-mine="skirmish.mine(row.unit, house)" bind-class-selected="skirmish.is_chosen(row.unit)" bind-class-acted="row.acted">
         <ui:Label name="kind" bind-text="row.unit" />
         <ui:Label name="hp" bind-text="row.hp" />
         <ui:Button name="select" text="select" on-click="skirmish.select(house, row.unit)" />
         <ui:Button name="strike" text="strike" on-click="skirmish.strike(house, row.unit)" />
+        <ui:Button name="info" text="info" on-click="skirmish.inspect(row.unit)" />
       </ui:VisualElement>
+    </ui:VisualElement>
+
+    <!-- 보통 창: 제목줄로 끌고, ESC나 close로 닫는다 -->
+    <ui:VisualElement name="unit-info" class="window" window="normal" bind-display="skirmish.inspected()" on-close="skirmish.close_inspect()">
+      <ui:Label name="info-title" class="title" text="unit" window-drag="true" />
+      <ui:Label name="info-kind" bind-text="skirmish.inspected()" />
+      <ui:Label name="info-hp" bind-text="skirmish.inspected_hp()" />
+      <ui:Button name="info-close" text="close" on-click="skirmish.close_inspect()" />
+    </ui:VisualElement>
+
+    <!-- 모달: 대답할 때까지 뒤를 누를 수 없다. endturn은 차례인 쪽만 누를 수 있다 -->
+    <ui:VisualElement name="confirm" class="window" window="modal" bind-display="skirmish.asking_end_turn()" on-close="skirmish.cancel_end_turn()">
+      <ui:Label text="end the turn?" />
+      <ui:Button name="endturn" text="end turn" on-click="skirmish.EndTurn(house)" />
+      <ui:Button name="cancel" text="cancel" on-click="skirmish.cancel_end_turn()" />
     </ui:VisualElement>
   </ui:VisualElement>
 </ui:UXML>

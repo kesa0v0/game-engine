@@ -151,16 +151,45 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(alice.Renderer.Named("endturn").Enabled, Is.True, "red's turn");
             Assert.That(bob.Renderer.Named("endturn").Enabled, Is.False, "blue has no open question to answer");
 
+            await alice.Renderer.Named("ask-end").Press();
+            Assert.That(alice.Renderer.Shown.Select(e => e.Attributes["name"]), Is.EqualTo(new[] { "confirm" }));
             var results = new List<BridgeResult>();
             alice.Ui.ActionResult += (_, r) => results.Add(r);
             await alice.Renderer.Named("endturn").Press();
             Assert.That(results.Single().Succeeded, Is.True, results.Single().ToString());
             Assert.That(alice.Renderer.Named("turn").Text, Is.EqualTo("2"));
             Assert.That(alice.Renderer.Named("endturn").Enabled, Is.False, "now it is blue's turn");
+            Assert.That(alice.Renderer.Shown, Is.Empty, "the question was asked on turn 1, so the modal closed by itself");
 
             await bob.Ui.RefreshAsync();
             Assert.That(bob.Renderer.Named("turn").Text, Is.EqualTo("2"));
             Assert.That(bob.Renderer.Named("endturn").Enabled, Is.True, "the world version moved, so bob's button woke up");
+        }
+
+        [Test]
+        public async Task TheInfoWindowShowsTheUnitAndClosesWithEscapeAndTheModalSitsAboveIt()
+        {
+            var alice = await Open("alice", _red);
+            var order = _world.All("Unit").Select(u => u.Value).ToList();
+            var enemy = UnitsOf(_blue)[0];
+            var info = Cards(alice)[order.IndexOf(enemy)].Children.Single(e => e.Attributes.GetValueOrDefault("name") == "info");
+            List<string> Shown() => alice.Renderer.Shown.Select(e => e.Attributes["name"]).ToList();
+
+            Assert.That(Shown(), Is.Empty);
+            await info.Press();
+            Assert.That(Shown(), Is.EqualTo(new[] { "unit-info" }));
+            Assert.That(alice.Renderer.Named("info-hp").Text, Is.EqualTo(((IntValue)_world.Get(new EntityId(enemy), _world.Member("Life", "hp"))).Value.ToString()));
+            Assert.That(info.Enabled, Is.False, "already showing that unit");
+            Assert.That(alice.Renderer.DragHandles, Does.Contain(alice.Renderer.Named("info-title").Id));
+
+            await alice.Renderer.Named("ask-end").Press();
+            Assert.That(Shown(), Is.EqualTo(new[] { "unit-info", "confirm" }));
+            Assert.That(alice.Renderer.BlockerAt, Is.EqualTo(1));
+            Assert.That(await alice.Ui.Windows.Escape(), Is.True);
+            Assert.That(Shown(), Is.EqualTo(new[] { "unit-info" }), "ESC closes the modal first through cancel_end_turn");
+            Assert.That(await alice.Ui.Windows.Escape(), Is.True);
+            Assert.That(Shown(), Is.Empty);
+            Assert.That(await alice.Ui.Windows.Escape(), Is.False, "nothing left to close");
         }
 
         [Test]
