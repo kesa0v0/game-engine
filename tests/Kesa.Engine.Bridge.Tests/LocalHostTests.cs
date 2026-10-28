@@ -203,6 +203,19 @@ namespace Kesa.Engine.Bridge.Tests
         }
 
         [Test]
+        public async Task UiVersionMovesWhenThisConnectionsUiRecordChanges()
+        {
+            var bob = await _host.Open("bob");
+            long world = await _alice.Version();
+            long mine = await _alice.UiVersion();
+            long theirs = await bob.UiVersion();
+            await _alice.Act("arena.click", Args(("u", new BridgeEntity(_a, null))));
+            Assert.That(await _alice.UiVersion(), Is.GreaterThan(mine));
+            Assert.That(await _alice.Version(), Is.EqualTo(world), "a screen action does not move the world stamp");
+            Assert.That(await bob.UiVersion(), Is.EqualTo(theirs), "each connection has its own UI record");
+        }
+
+        [Test]
         public async Task LegalMovesCrossAsData()
         {
             var moves = await _alice.LegalMoves("arena.Hit", Args(), 10);

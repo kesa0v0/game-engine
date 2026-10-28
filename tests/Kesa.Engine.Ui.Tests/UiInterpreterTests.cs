@@ -250,16 +250,14 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
-        public async Task AnActionGivenStraightToTheSessionNeedsInvalidateButtons()
+        public async Task AnActionGivenStraightToTheSessionIsNoticedByTheUiRecordStamp()
         {
             await Mount("<ui:VisualElement><ui:Button name=\"clear\" on-click=\"arena.clear()\" /></ui:VisualElement>");
             var clear = Renderer.Named("clear");
+            Assert.That(clear.Enabled, Is.False);
             await Session.Act("arena.select", new System.Collections.Generic.Dictionary<string, BridgeValue> { ["u"] = Entity(A) });
             await Ui.RefreshAsync();
-            Assert.That(clear.Enabled, Is.False, "nothing told the interpreter");
-            Ui.InvalidateButtons();
-            await Ui.RefreshAsync();
-            Assert.That(clear.Enabled, Is.True);
+            Assert.That(clear.Enabled, Is.True, "the UI record stamp moved though the world stamp did not");
         }
 
         [Test]

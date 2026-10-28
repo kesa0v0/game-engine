@@ -214,6 +214,8 @@ namespace Kesa.Engine.Bridge.Local
 
         public ValueTask<long> Version() => Done(World.Version());
 
+        public ValueTask<long> UiVersion() => Done(_ui.Version);
+
         public ValueTask<BridgeResult> Submit(string command, IReadOnlyDictionary<string, BridgeValue> arguments)
         {
             var args = KernelValues.ToKernel(arguments);

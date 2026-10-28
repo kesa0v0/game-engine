@@ -41,7 +41,7 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>기록이 바뀐 횟수: 화면 함수의 영수증이 이것으로 다시 읽을지 본다 (G279, 엔티티 도장 G235와 같은 방식).</summary>
-        internal long Version { get; private set; }
+        public long Version { get; private set; }
 
         /// <summary>
         /// 적힌 그대로의 값 (없어진 엔티티도 그대로, 호스트의 디버그용). 화면에 쓸 값은 모드의 화면 함수가 읽는다.

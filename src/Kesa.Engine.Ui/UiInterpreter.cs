@@ -63,6 +63,7 @@ namespace Kesa.Engine.Ui
         private bool _refreshing;
         private bool _recheck = true;
         private long _version = -1;
+        private long _uiVersion = -1;
         private int _panels;
 
         /// <param name="text">값을 글자로 바꾸는 것(번역기를 꽂는다, G345).</param>
@@ -104,12 +105,13 @@ namespace Kesa.Engine.Ui
             foreach (var sheet in document.StyleSheets) _renderer.AddStyleSheet(root.Handle, sheet);
             await RecheckAsync();
             _version = await _session.Version();
+            _uiVersion = await _session.UiVersion();
             return new UiMountResult(new UiPanel(root), problems);
         }
 
         /// <summary>
-        /// 호스트가 직접 내는 화면 동작(지도에서 유닛을 눌러 창을 여는 것 등)을 이 해석기로 낸다: 낸 뒤 버튼을 다시 확인하고 화면을 맞춘다.
-        /// 세션에 직접 <c>Act</c>를 불렀다면 <see cref="InvalidateButtons"/>와 <see cref="RefreshAsync"/>를 부른다.
+        /// 호스트가 직접 내는 화면 동작(지도에서 유닛을 눌러 창을 여는 것 등)을 이 해석기로 내고 바로 화면을 맞춘다. 세션에 직접 <c>Act</c>를
+        /// 불러도 다음 <see cref="RefreshAsync"/>가 UI 기록 도장으로 알아챈다.
         /// </summary>
         public async ValueTask<BridgeResult> ActAsync(string action, IReadOnlyDictionary<string, BridgeValue> arguments)
         {
@@ -119,12 +121,6 @@ namespace Kesa.Engine.Ui
             await RefreshAsync();
             return result;
         }
-
-        /// <summary>
-        /// 화면 동작이 UI 기록을 바꿔도 세계 도장은 움직이지 않아서, 호스트가 세션에 직접 동작을 냈다면 이것으로 알려 다음 갱신이 버튼을
-        /// 다시 확인하게 한다.
-        /// </summary>
-        public void InvalidateButtons() => _recheck = true;
 
         /// <summary>쌓인 <see cref="Errors"/>를 비운다(같은 오류가 다시 나면 다시 담긴다).</summary>
         public void ClearErrors()
@@ -142,8 +138,8 @@ namespace Kesa.Engine.Ui
         }
 
         /// <summary>
-        /// 세계가 바뀐 뒤 화면을 맞춘다: 영수증이 바뀌었거나 실패했던 연결만 다시 부르고, 세계 도장이 움직였거나 낸 것이 있으면 버튼을
-        /// 다시 확인한다 (G342·G345).
+        /// 세계가 바뀐 뒤 화면을 맞춘다: 영수증이 바뀌었거나 실패했던 연결만 다시 부르고, 세계 도장이나 UI 기록 도장이 움직였거나 낸 것이
+        /// 있으면 버튼을 다시 확인한다 (G342·G345).
         /// </summary>
         public async ValueTask RefreshAsync()
         {
@@ -160,9 +156,11 @@ namespace Kesa.Engine.Ui
                         await ReevaluateAsync(binding.Owner.Inner);
                 }
                 long version = await _session.Version();
-                if (version != _version || _recheck)
+                long uiVersion = await _session.UiVersion();
+                if (version != _version || uiVersion != _uiVersion || _recheck)
                 {
                     _version = version;
+                    _uiVersion = uiVersion;
                     await RecheckAsync();
                 }
             }
