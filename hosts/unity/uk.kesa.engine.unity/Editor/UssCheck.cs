@@ -30,6 +30,7 @@ namespace Kesa.Engine.Unity.Editor
 
         public static void Run()
         {
+            CheckLinkXml();
             CheckPropertyNames();
             CheckSameAsImporter();
             CheckApplied();
@@ -38,6 +39,19 @@ namespace Kesa.Engine.Unity.Editor
         private static void Require(bool condition, string what)
         {
             if (!condition) throw new InvalidOperationException("expected (USS): " + what);
+        }
+
+        // IL2CPP 빌드는 여기서 돌리지 못하므로 링커에 넘길 파일이 있고 적힌 타입이 이 Unity에 있는지만 본다
+        private static void CheckLinkXml()
+        {
+            string path = new UssLinker().GenerateAdditionalLinkXmlFile(null!, null!);
+            Require(File.Exists(path), "the package's link.xml is found at " + path);
+            var assembly = typeof(VisualElement).Assembly;
+            foreach (var type in System.Xml.Linq.XDocument.Load(path).Descendants("type"))
+            {
+                string name = type.Attribute("fullname")!.Value.Replace('/', '+');
+                Require(assembly.GetType(name) != null, "link.xml names a type this Unity has: " + name);
+            }
         }
 
         private static void CheckPropertyNames()

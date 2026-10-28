@@ -323,6 +323,18 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task StyleSheetProblemsComeBackAfterClearingWhenTheSheetIsUsedAgain()
+        {
+            Files["card.uss"] = ".card { colr: red; }";
+            const string uxml = "<ui:UXML xmlns:ui=\"UnityEngine.UIElements\"><ui:Style src=\"card.uss\" /><ui:VisualElement params=\"u\" /></ui:UXML>";
+            await Mount(uxml, ("u", Entity(A)));
+            Assert.That(Ui.Errors.Count, Is.EqualTo(1));
+            Ui.ClearErrors();
+            await Mount(uxml, ("u", Entity(A)));
+            Assert.That(Ui.Errors.Count, Is.EqualTo(1));
+        }
+
+        [Test]
         public async Task ClearedErrorsAreReportedAgainWhenTheyHappenAgain()
         {
             await Mount("<ui:VisualElement params=\"u\"><ui:Label bind-display=\"arena.boom(u)\" /></ui:VisualElement>", ("u", Entity(A)));

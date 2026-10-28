@@ -59,7 +59,7 @@ namespace Kesa.Engine.Ui
         private readonly List<UiProblem> _errors = new List<UiProblem>();
         private readonly SortedSet<string> _errorTexts = new SortedSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<string, UiDocument?> _includes = new Dictionary<string, UiDocument?>(StringComparer.Ordinal);
-        private readonly Dictionary<string, UssSheet?> _styleSheets = new Dictionary<string, UssSheet?>(StringComparer.Ordinal);
+        private readonly Dictionary<string, UssReadResult?> _styleSheets = new Dictionary<string, UssReadResult?>(StringComparer.Ordinal);
 
         private bool _loaded;
         private bool _refreshing;
@@ -327,19 +327,19 @@ namespace Kesa.Engine.Ui
 
         private UssSheet? LoadStyleSheet(string path, string place)
         {
-            if (!_styleSheets.TryGetValue(path, out var sheet))
+            if (!_styleSheets.TryGetValue(path, out var read))
             {
                 string? text = _files?.Invoke(path);
-                if (text != null)
-                {
-                    var read = UssReader.Read(path, text);
-                    foreach (var problem in read.Problems) Report(problem.Place, problem.Message);
-                    sheet = read.Sheet;
-                }
-                _styleSheets[path] = sheet;
+                read = text == null ? null : UssReader.Read(path, text);
+                _styleSheets[path] = read;
             }
-            if (sheet == null) Report(place, "Style '" + path + "' was not found" + (_files == null ? " (no way to find files was given)" : ""));
-            return sheet;
+            if (read == null)
+            {
+                Report(place, "Style '" + path + "' was not found" + (_files == null ? " (no way to find files was given)" : ""));
+                return null;
+            }
+            foreach (var problem in read.Problems) Report(problem.Place, problem.Message);
+            return read.Sheet;
         }
 
         private void Report(string place, string message)
