@@ -27,7 +27,7 @@
 결정은 `docs/decisions/G번호.md` 한 건씩이다(327건은 옛 `spec-gaps.md`에서 옮겼고, 옛 문서는 태그 `pre-gaps-removal`에서만 본다). 파일은 머리(`id`·`area`·`title`·`status`·`changedBy`·`tags`·`refs`·`summary`)와 본문(무엇이 비어 있었나·어떻게 정했나·이유)이다. 읽기는 통째로 하지 않고 조회 도구로 한다.
 
 - `dotnet run --project tools/Kesa.Tools.Decisions -- list --tag 영수증` (유효한 결정만, `--all`은 바뀐 것까지, `--area`·`--tag` 여러 번)
-- `... -- show 325` (전문과 바뀐 관계), `... -- search ViewAs`, `... -- tags`
+- `... -- show 325` (전문과 바뀐 관계), `... -- search ViewAs`, `... -- tags`, `... -- check` (머리 규칙 검사, `dotnet test`도 돌림)
 - 코드·문서의 "spec-gaps G123" 같은 참조는 `show 123`으로 읽는다.
 - 새 결정은 다음 번호(`ls docs/decisions`의 마지막 + 1)로 파일 하나를 만든다. 머리의 `status`는 `확인`(사용자가 동의) 또는 `잠정`, `tags`는 `tags` 명령에 있는 것을 쓴다. 뒤의 결정이 앞의 것을 바꾸면 앞 파일을 지우지 않고 `status`를 `바뀜`(통째로) 또는 `일부바뀜`으로, `changedBy`에 새 번호를 적는다. 본문 끝에 `**바뀜:**` 한 줄을 붙인다.
 - 머리는 `키: 값` 한 줄씩이고 값 안에 줄바꿈은 없다. 목록은 쉼표로 나눈다.

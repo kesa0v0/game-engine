@@ -1,6 +1,6 @@
 # 인계 메모
 
-마지막 갱신: 2026-10-28. 브랜치 `spec-v0.5-scaffold`, 테스트 2658개 통과(커널 2329, CLI 42, 콘솔 호스트 101, 번역 65, 경계 43, UI 78). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
+마지막 갱신: 2026-10-29. 브랜치 `spec-v0.5-scaffold`, 테스트 2665개 통과(커널 2329, CLI 42, 콘솔 호스트 101, 번역 65, 경계 43, UI 78, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
 
 ## 상태
 
@@ -32,7 +32,10 @@
 
 **남은 일:**
 
-1. 조회 도구(`tools/Kesa.Tools.Decisions`)의 테스트, 자동으로 붙인 결정 태그 보정.
+1. 결정 태그 보정(하다 멈춤). 옮길 때 자동으로 붙인 `권한·자리`가 "자리"라는 낱말(함수 자리·인자 자리)만 보고 붙은 것이 많다. G4·G6·G18·G24·G30·G112·G115·G117·G136·G146·G148·G150·G155·G165·G176·G178은 고쳤다. 남은 것(정한 새 태그): G186 `결정론, 커맨드`, G189 `로직언어`, G193 `반응, 로직언어`, G194 `Ref, 로직언어`, G209 `결정론, 스텁`, G216 `호스트`, G227 `로직언어`, G231 `스텁`, G270 `번역, UI`, G299 `derived`, G307 `호스트, 로직언어`, G308 `derived`, G309 `호스트, 로드순서`, G311 `저장, 로드순서, 패치`, G314 `저장`. 영역에서 드러난 빠진 태그: G263 +번역, G84·G78·G79 `진단`(지금 `Flow`·`모드구조`), G85·G76 +진단, G210·G211·G214 +저장, G151·G172 `반응`, G153·G173 +반응, G166 `Flow`, G197 `숨긴정보`, G203·G204·G205 +숨긴정보, G161 `Flow, 시간`, G271·G272 +Flow. G118(권한 3층을 건너뜀)은 맞는 태그라 그대로. 태그 파일은 한글이라 Edit 도구로 고친다.
+2. 런타임 USS(아래 "필요해지면"): 데모에서 모양을 게임만 줄 수 있음이 드러났다. 모드가 USS를 줄지 정하는 계약 결정이다.
+
+결정 조회 도구에 `check`(머리 규칙 검사: 상태와 `changedBy`, 바뀐 쪽이 뒤의 번호인지, `**바뀜:**` 줄, 참조가 있는지, 파일 이름, 빠진 키, 태그 없음)가 있고, `tests/Kesa.Tools.Decisions.Tests`가 실제 `docs/decisions`에 이것을 돌린다. 결정 파일을 고친 뒤에는 `dotnet test`가 규칙 위반을 잡는다. G61은 처음부터 없던 번호다.
 
 번역문의 `NUMBER`는 구현했다(G334·G356~G358, `NumberFunction`, 검사 `LOC012`). 옵션을 더할 때는 `Intl.NumberFormat` 이름을 따른다. 호스트 개발자용 "화면이 갱신되는 방식"은 Unity 패키지 README에 있다. `Translator`는 경계 값만 받는다(커널 값 오버로드를 거둠, 번역 어셈블리는 `Bridge.Local`이 아니라 `Bridge`를 참조하고 커널은 번역 파일 읽기와 검사에만 씀).
 
@@ -51,6 +54,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 루트에서 `dotnet build`(Unity 패키지의 `Plugins/`로 DLL 복사)와 `dotnet test`로 2658개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다(창 없는 확인은 패키지 README).
+1. `git pull` 후 루트에서 `dotnet build`(Unity 패키지의 `Plugins/`로 DLL 복사)와 `dotnet test`로 2665개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다(창 없는 확인은 패키지 README).
 2. `CLAUDE.md`와 이 문서를 읽는다. 필요한 `docs/spine-spec.md` 절과 결정(`list --tag …`·`show 번호`)만 본다. 실행기는 `Script/Execution/PureEvaluator*.cs`·`Session*.cs`·`Frame.cs`·`Block.cs`, 커맨드는 `Runtime/World.Submit.cs`·`World.Commands.cs`·`World.Undo.cs`, UI 해석은 `src/Kesa.Engine.Ui/UiInterpreter*.cs`다.
 3. 위 "다음 할 일"을 사용자와 정한다. 작업 방식(한국어, 허락 질문으로 멈추지 않기, push는 사용자가 말할 때만 등)은 CLAUDE.md에 있다.

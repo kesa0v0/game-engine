@@ -18,7 +18,14 @@ namespace Kesa.Tools.Decisions
         public string Summary = "";
         public string Body = "";
 
-        public int Number => int.Parse(Id.Substring(1));
+        /// <summary>머리에 적힌 키 (빠진 키를 검사가 찾는다).</summary>
+        public HashSet<string> Keys = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>읽은 파일 이름(확장자 없이). 파일에서 읽지 않았으면 빈 글.</summary>
+        public string FileName = "";
+
+        /// <summary>id가 <c>G숫자</c> 꼴이 아니면 -1.</summary>
+        public int Number => Id.Length > 1 && Id[0] == 'G' && int.TryParse(Id.Substring(1), out int n) ? n : -1;
 
         /// <summary>뒤의 결정이 통째로 갈아 치운 것만 유효하지 않다. 일부 바뀜은 아직 유효하다.</summary>
         public bool Active => Status != "바뀜";
@@ -35,6 +42,7 @@ namespace Kesa.Tools.Decisions
                 if (colon < 0) continue;
                 string key = lines[i].Substring(0, colon).Trim();
                 string value = lines[i].Substring(colon + 1).Trim();
+                d.Keys.Add(key);
                 switch (key)
                 {
                     case "id": d.Id = value; break;
@@ -53,7 +61,12 @@ namespace Kesa.Tools.Decisions
 
         public static List<Decision> LoadAll(string dir) =>
             Directory.GetFiles(dir, "G*.md")
-                .Select(f => Parse(File.ReadAllText(f)))
+                .Select(f =>
+                {
+                    var d = Parse(File.ReadAllText(f));
+                    d.FileName = Path.GetFileNameWithoutExtension(f);
+                    return d;
+                })
                 .OrderBy(d => d.Number)
                 .ToList();
 

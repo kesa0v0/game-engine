@@ -13,6 +13,7 @@ namespace Kesa.Tools.Decisions
             "  list [--area 영역] [--tag 태그]... [--all]   유효한 결정의 번호·제목·요약 (--all은 바뀐 것까지)\n" +
             "  search <글> [--all]           제목·요약·전문에서 글자 검색, 번호와 요약만\n" +
             "  tags                          쓰인 태그와 개수\n" +
+            "  check                         머리 규칙(상태·바뀐 관계·참조·태그) 검사, 문제가 있으면 종료 코드 1\n" +
             "옵션: --dir <결정 폴더> (기본: 위로 올라가며 docs/decisions를 찾음)";
 
         private static int Main(string[] args)
@@ -39,6 +40,7 @@ namespace Kesa.Tools.Decisions
                 case "list": return List(all, rest);
                 case "search": return Search(all, rest);
                 case "tags": return Tags(all);
+                case "check": return Check(all);
                 default: Console.Error.WriteLine(Usage); return 2;
             }
         }
@@ -94,6 +96,14 @@ namespace Kesa.Tools.Decisions
             foreach (var g in all.SelectMany(d => d.Tags).GroupBy(t => t).OrderByDescending(g => g.Count()))
                 Console.WriteLine(g.Key + "\t" + g.Count());
             return 0;
+        }
+
+        private static int Check(List<Decision> all)
+        {
+            var problems = DecisionCheck.Run(all);
+            foreach (var p in problems) Console.WriteLine(p);
+            Console.Error.WriteLine(all.Count + "건 중 문제 " + problems.Count + "개");
+            return problems.Count == 0 ? 0 : 1;
         }
 
         private static void Print(Decision d) =>
