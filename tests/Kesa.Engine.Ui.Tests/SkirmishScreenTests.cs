@@ -186,6 +186,27 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task ABotInBluesSeatPlaysItsTurnSoRedGetsTheNextOne()
+        {
+            await _host.Seat(_blue, "bot", ai: true);
+            Assert.That(_world.SeatKindOf(new EntityId(_blue)), Is.EqualTo(SeatKind.Ai));
+            var bot = new BotSeat(await _host.Open("bot"), new PreferredResponses(new[] { "skirmish.Attack", "skirmish.Move", "skirmish.EndTurn" }));
+            Assert.That(await bot.Run(), Is.EqualTo(0), "red's turn, nothing to answer");
+
+            var alice = await Open("alice", _red);
+            await alice.Renderer.Named("ask-end").Press();
+            await alice.Renderer.Named("endturn").Press();
+            Assert.That(alice.Renderer.Named("turn").Text, Is.EqualTo("2"));
+
+            int acts = await bot.Run();
+            Assert.That(acts, Is.GreaterThan(1), "blue moved or attacked before ending the turn");
+            await alice.Ui.RefreshAsync();
+            Assert.That(alice.Renderer.Named("turn").Text, Is.EqualTo("3"));
+            Assert.That(alice.Renderer.Named("endturn").Enabled, Is.True, "red's turn again");
+            Assert.That(await bot.Run(), Is.EqualTo(0));
+        }
+
+        [Test]
         public async Task TheInfoWindowShowsTheUnitAndClosesWithEscapeAndTheModalSitsAboveIt()
         {
             var alice = await Open("alice", _red);

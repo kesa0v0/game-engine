@@ -33,10 +33,20 @@ public sealed class KesaDemo : MonoBehaviour
 
     [SerializeField] private string connection = "me";
 
+    [Tooltip("AI 봇이 앉을 진영의 Def (없으면 비움)")]
+    [SerializeField] private string botSeatDef = "skirmish:Blue";
+
+    [Tooltip("봇이 좋아하는 응답 커맨드 순서")]
+    [SerializeField] private string[] botPrefers = { "skirmish.Attack", "skirmish.Move", "skirmish.EndTurn" };
+
     [SerializeField] private string[] languages = { "ko", "en" };
 
     private UiInterpreter? _ui;
+    private BotSeat? _bot;
     private bool _refreshing;
+
+    /// <summary>이 연결의 세션 (확인용).</summary>
+    public IHostSession? Session { get; private set; }
 
     private async void Start()
     {
@@ -67,6 +77,16 @@ public sealed class KesaDemo : MonoBehaviour
         if (seat.Value == 0) throw new InvalidOperationException("no seat with the Def '" + seatDef + "'");
         await game.Host.Seat(seat.Value, connection);
         var session = await game.Host.Open(connection);
+        Session = session;
+
+        // 빈자리는 질문에 아무도 답하지 않아 판이 멈추므로 봇을 앉힌다 (G366)
+        if (botSeatDef.Length > 0)
+        {
+            var botSeat = world.SeatChoices().FirstOrDefault(id => world.DefOf(id) == botSeatDef);
+            if (botSeat.Value == 0) throw new InvalidOperationException("no seat with the Def '" + botSeatDef + "' for the bot");
+            await game.Host.Seat(botSeat.Value, "bot", ai: true);
+            _bot = new BotSeat(await game.Host.Open("bot"), new PreferredResponses(botPrefers));
+        }
 
         // 게임이 주는 기본 테마(Assets/Resources/KesaDemo.uss)는 맨 바깥에, 화면의 모양은 모드의 USS가 준다 (G362)
         var style = Resources.Load<StyleSheet>("KesaDemo");
@@ -89,6 +109,13 @@ public sealed class KesaDemo : MonoBehaviour
         _ui = ui;
     }
 
+    /// <summary>봇이 할 일을 하고 화면을 다시 그린다.</summary>
+    public async Task Step()
+    {
+        if (_bot != null) await _bot.Run();
+        if (_ui != null) await _ui.RefreshAsync();
+    }
+
     private async void Update()
     {
         if (_ui == null || _refreshing) return;
@@ -97,7 +124,7 @@ public sealed class KesaDemo : MonoBehaviour
         {
             // 창이 ESC를 받지 않으면(거짓) 게임이 자기 메뉴를 열 자리다
             if (Input.GetKeyDown(KeyCode.Escape)) await _ui.Windows.Escape();
-            await _ui.RefreshAsync();
+            await Step();
         }
         catch (Exception e)
         {

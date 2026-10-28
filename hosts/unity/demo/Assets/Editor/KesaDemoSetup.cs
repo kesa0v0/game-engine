@@ -1,9 +1,11 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Kesa.Engine.Bridge;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -96,6 +98,13 @@ public static class KesaDemoSetup
         if (cards != 6) throw new InvalidOperationException("six unit cards expected, got " + cards);
         if (root.styleSheets.count == 0) throw new InvalidOperationException("the demo style sheet (Resources/KesaDemo.uss) was not loaded");
         if (scene.rootCount < 2) throw new InvalidOperationException("the scene lost its objects");
+
+        var me = (await demo.Session!.Seats()).Single();
+        var ended = await demo.Session.Deliver("skirmish.EndTurn", new Dictionary<string, BridgeValue> { ["party"] = me });
+        if (!ended.Succeeded) throw new InvalidOperationException("red could not end the turn: " + ended);
+        await demo.Step();
+        turn = root.Q<Label>("turn");
+        if (turn == null || turn.text != "3") throw new InvalidOperationException("the bot should play blue's turn so it is turn 3, got " + turn?.text);
     }
 
     private static void Dump(VisualElement element, int depth, StringBuilder text)
