@@ -16,6 +16,7 @@ namespace Kesa.Engine.Text
         {
             bundle.AddFunctionOverriding(JosaName, JosaFunction);
             bundle.AddFunctionOverriding(DefAttrName, DefAttrFunction);
+            NumberFunction.AddTo(bundle);
         }
 
         /// <summary><c>JOSA($x, "을")</c> → 이름에 맞는 조사를 붙인 글.</summary>

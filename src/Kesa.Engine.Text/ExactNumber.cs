@@ -12,11 +12,23 @@ namespace Kesa.Engine.Text
         private readonly string _text;
 
         public ExactNumber(string text)
-            : base(FromString(text)) =>
+            : this(text, text)
+        {
+        }
+
+        /// <summary><c>NUMBER</c>의 결과: 보이는 글과 따로 그 수의 십진 표기(<see cref="Exact"/>)를 든다 (G356).</summary>
+        public ExactNumber(string text, string exact)
+            : base(FromString(exact))
+        {
             _text = text;
+            Exact = exact;
+        }
+
+        /// <summary><c>.</c>를 쓰는 십진 표기. <c>NUMBER</c>를 겹쳐 불러도 이것을 읽는다.</summary>
+        public string Exact { get; }
 
         public new string AsString() => _text;
 
-        public new IFluentType Copy() => new ExactNumber(_text);
+        public new IFluentType Copy() => new ExactNumber(_text, Exact);
     }
 }

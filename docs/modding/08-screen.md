@@ -22,7 +22,7 @@ def ships(me):
 - 돌려줄 수 있는 것: 수, 문자열, 참거짓, 엔티티, 그리고 이들의 리스트·사전.
 - 함수는 **그 연결이 보는 세계**에서 돈다(7장). 그래서 숨긴 정보를 따로 거를 필요가 없다. 대신 "안 보임"(`x.C is None`)을 다룬다.
 - 호스트는 함수가 읽은 곳을 기록해 두고 그곳이 바뀌었을 때만 다시 부른다. 모더가 신경 쓸 것은 없다.
-- 숫자를 글에 넣는 `str()`이 아직 없다. 지금은 사전으로 돌려주면 호스트가 `{gold: 20, fleet: 7}`처럼 보인다(9장).
+- 숫자를 글에 넣는 `str()`은 없다. 글로 보이려면 `text("키", gold=20)`을 돌려주고 번역문의 `NUMBER`로 서식을 정한다(아래 "번역"). 사전으로 돌려주면 호스트가 `{gold: 20, fleet: 7}`처럼 보인다.
 
 ## 호스트의 UI 파일
 
@@ -153,7 +153,7 @@ def-harbor-Sloop = 슬루프
 - 자리: 모드 폴더의 `locale/<언어 태그>/` 아래 아무 이름의 `.ftl`. 언어 태그는 `en`, `ko`, `pt-BR` 꼴이다.
   `locale/`이 있으면 `mod.py`에 `defaultLanguage`(1장)가 있어야 한다.
 - 키는 하이픈으로 잇는다(`harbor-charter`). `.desc`처럼 들여 쓴 줄은 그 키의 속성이다.
-- `text()`의 인자는 `{ $gold }`로 들어간다. 수는 적은 그대로(`1.5`), 엔티티와 Def id는 그 Def의 번역된 이름으로 보인다.
+- `text()`의 인자는 `{ $gold }`로 들어간다. 수는 적은 그대로(`1.5`, 서식은 아래 `NUMBER`), 엔티티와 Def id는 그 Def의 번역된 이름으로 보인다.
 - **Def 이름**은 `def-모드id-경로` 키에 둔다(`skirmish:Red` → `def-skirmish-Red`, `harbor:rigs/Brig` → `def-harbor-rigs-Brig`). 설명 같은 덧붙임은 속성(`.desc`)으로 둔다.
   번역이 없는 Def는 Def id(`harbor:Gull`)로 보인다.
 - `engine-`로 시작하는 키는 엔진과 호스트의 글이다(`engine-hidden` = 보이지 않는 엔티티). 모드가 같은 키를 두면 그 글로 바뀐다.
@@ -190,9 +190,46 @@ harbor-arrived = { DEFATTR($ship, "size") ->
   없으면(영문 등) `을(를)`처럼 둘 다 적는다. 모르는 조사는 `check`가 오류로 보고, 게임 중에는 적힌 그대로 붙인다.
 - `DEFATTR(Def나 엔티티, "속성")`: `def-` 키의 그 속성 글. 없으면 빈 글이라 기본 가지로 간다.
 
+### 숫자 서식: `NUMBER`
+
+`{ $n }`은 수를 가진 자릿수 그대로 보인다(`12.345678`, `1234567`). 자릿수·천 단위·퍼센트는 번역문의 `NUMBER`로 정한다.
+화면에 숫자를 넣으려면 모드 함수가 `text("키", n=값)`을 돌려주고 번역문이 서식을 정한다.
+
+```
+hp-line = 체력 { NUMBER($hp, maximumFractionDigits: 0) }          # 9.6 → 체력 10
+gold-line = 금화 { NUMBER($gold) }                                 # 1234567 → 금화 1,234,567
+tax-line = 세금 { NUMBER($rate, style: "percent", signDisplay: "always") }   # 0.1 → 세금 +10%
+```
+
+(설명용이고 예시 모드에는 없다.)
+
+- 옵션은 `Intl.NumberFormat`의 이름 중 다섯만 받는다. 그 밖의 옵션이나 값은 `check`의 오류(`LOC012`)다.
+
+  | 옵션 | 값 | 기본 |
+  |---|---|---|
+  | `minimumFractionDigits` | 0~20 | 0 (모자라면 0을 채움) |
+  | `maximumFractionDigits` | 0~20 | 3, 퍼센트는 0 |
+  | `useGrouping` | `"true"`·`"false"` | `"true"` (천 단위 구분) |
+  | `style` | `"decimal"`·`"percent"` (100을 곱해 `%`) | `"decimal"` |
+  | `signDisplay` | `"auto"`·`"always"` (`+3`, `+0`)·`"exceptZero"` (`+3`, `0`) | `"auto"` (음수만 `-`) |
+
+- 자를 때는 0에서 먼 쪽으로 반올림한다(`2.5` → `3`, `-2.5` → `-3`). 로직 언어의 `round`와 같다. 반올림해 0이 된 음수는 `0`이다.
+- 결과도 수라 복수형 가지(`{ NUMBER($n, maximumFractionDigits: 0) -> [one] … *[other] … }`)는 반올림한 값으로 고른다.
+- 기호는 언어마다 엔진 글 `engine-number-decimal`(`.`)·`engine-number-group`(`,`)·`engine-number-percent`(`{ $n }%`)이다.
+  언어를 더하는 모드가 그 언어 파일에서 덮어쓴다. 공백은 앞뒤가 잘리므로 따옴표로 적는다.
+
+  ```
+  # locale/de/…  →  1.234,5   12,5 %
+  engine-number-decimal = ,
+  engine-number-group = .
+  engine-number-percent = { $n } %
+  # locale/fr/…  →  1 234,5
+  engine-number-group = {" "}
+  ```
+
 ### 검사
 
-`engine check`가 번역도 본다(`LOC`, 1장): 구문 오류, 한 모드에서 겹친 키, 모르는 조사, 쓸 수 없는 `def-`·`engine-` 키는 오류,
+`engine check`가 번역도 본다(`LOC`, 1장): 구문 오류, 한 모드에서 겹친 키, 모르는 조사, `NUMBER`의 모르는 옵션, 쓸 수 없는 `def-`·`engine-` 키는 오류,
 `text("키")`의 키가 어느 언어에도 없거나 번역문이 쓰는 변수를 넘기지 않으면 경고, 언어마다 빠진 글의 수는 정보다.
 게임 중에 번역이 틀린 글은 판을 멈추지 않고 할 수 있는 만큼 보인다(콘솔은 stderr에 한 번 알린다).
 

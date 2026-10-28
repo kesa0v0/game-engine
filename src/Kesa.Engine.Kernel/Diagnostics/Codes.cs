@@ -190,6 +190,8 @@ namespace Kesa.Engine.Diagnostics
         public const string LocExtraVariable = "LOC010";
         // 모드·언어마다 빠진 글의 수 (정보)
         public const string LocUntranslated = "LOC011";
+        // 번역문의 NUMBER에 모르는 옵션이나 맞지 않는 값 (G356)
+        public const string LocNumberOption = "LOC012";
 
         // 커맨드 선언 (spec S6, spec-gaps G109)
         public const string CmdBadDecorator = "CMD001";

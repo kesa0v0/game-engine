@@ -18,11 +18,17 @@ namespace Kesa.Engine.Text
         /// <summary>못 보는 값 (G198·G267).</summary>
         public const string Hidden = "engine-hidden";
 
+        /// <summary><c>NUMBER</c>의 기호 (G358). 다른 언어는 그 언어 파일에서 덮어쓴다.</summary>
+        private const string Number =
+            NumberFunction.DecimalKey + " = .\n" +
+            NumberFunction.GroupKey + " = ,\n" +
+            NumberFunction.PercentKey + " = { $" + NumberFunction.PercentArgument + " }%\n";
+
         /// <summary>언어 태그 → 파일 내용.</summary>
         public static readonly IReadOnlyDictionary<string, string> Files = new SortedDictionary<string, string>(System.StringComparer.Ordinal)
         {
-            ["en"] = Hidden + " = unknown\n",
-            ["ko"] = Hidden + " = 알 수 없음\n",
+            ["en"] = Hidden + " = unknown\n" + Number,
+            ["ko"] = Hidden + " = 알 수 없음\n" + Number,
         };
     }
 }

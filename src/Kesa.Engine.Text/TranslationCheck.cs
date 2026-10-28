@@ -34,6 +34,10 @@ namespace Kesa.Engine.Text
                             diagnostics.Error(Codes.LocUnknownParticle, "JOSA in '" + pair.Key + "' (" + language.Key + ") has no particle '" +
                                 particle + "'", entry.Span, entry.Mod,
                                 hint: "known particles: " + string.Join(" ", Josa.Known()));
+                foreach (var pattern in Patterns(entry.Item))
+                    foreach (var problem in NumberProblems(pattern.Value))
+                        diagnostics.Error(Codes.LocNumberOption, "NUMBER in '" + pair.Key + "' (" + language.Key + "): " + problem,
+                            entry.Span, entry.Mod, hint: "NUMBER takes one number and the options " + NumberFunction.Known);
             }
 
             ScriptUses(texts, content, diagnostics);
@@ -190,6 +194,36 @@ namespace Kesa.Engine.Text
                 if (e is FunctionReference f && f.Id.Name.ToString() == TextFunctions.JosaName &&
                     f.Arguments.PositionalArgs.Count == 2 && f.Arguments.PositionalArgs[1] is TextLiteral literal)
                     found.Add(literal.Value.ToString());
+            });
+            return found;
+        }
+
+        /// <summary>글 안의 <c>NUMBER(…)</c>에 리터럴로 적은 옵션 중 맞지 않는 것 (G356). 변수로 준 값은 실행 때 본다.</summary>
+        private static IEnumerable<string> NumberProblems(Pattern pattern)
+        {
+            var found = new List<string>();
+            Walk(pattern, e =>
+            {
+                if (!(e is FunctionReference f) || f.Id.Name.ToString() != NumberFunction.Name) return;
+                if (f.Arguments.PositionalArgs.Count != 1)
+                    found.Add("takes one number, got " + f.Arguments.PositionalArgs.Count);
+                int? min = null, max = null;
+                foreach (var a in f.Arguments.NamedArgs)
+                {
+                    string name = a.Name.Name.ToString();
+                    string? value = a.Value switch
+                    {
+                        TextLiteral t => t.Value.ToString(),
+                        NumberLiteral n => n.Value.ToString(),
+                        _ => null,
+                    };
+                    var problem = value == null ? null : NumberFunction.Problem(name, value);
+                    if (problem != null) found.Add(problem);
+                    else if (value != null && name == "minimumFractionDigits") min = int.Parse(value);
+                    else if (value != null && name == "maximumFractionDigits") max = int.Parse(value);
+                }
+                var range = min != null && max != null ? NumberFunction.RangeProblem(min.Value, max.Value) : null;
+                if (range != null) found.Add(range);
             });
             return found;
         }
