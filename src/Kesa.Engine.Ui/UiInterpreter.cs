@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Kesa.Engine.Bridge;
 
@@ -36,11 +37,16 @@ namespace Kesa.Engine.Ui
     /// <summary>
     /// UXML 해석기 (spec-gaps G330~G345): 읽은 문서를 한 연결의 세션에 맞춰 올리고, 갱신 때 영수증이 바뀐 연결만 다시 부르고, 눌림을
     /// 커맨드나 화면 동작으로 낸다. 화면은 <see cref="IUiRenderer"/>가 그린다. 세션을 부르는 쪽은 한 스레드에서만 쓴다.
-    /// 영수증 키가 해석기마다 <c>p1</c>부터 세므로 세션 하나에는 해석기 하나만 쓴다.
+    /// 한 세션에 해석기를 여럿 둘 수 있다(영수증 키에 세션 안 해석기 번호가 붙는다).
     /// </summary>
     public sealed partial class UiInterpreter
     {
+        // 영수증 키는 세션 하나에 모이므로 해석기마다 세션 안에서 다른 앞머리를 받는다
+        private static readonly ConditionalWeakTable<IHostSession, StrongBox<int>> InterpretersPerSession =
+            new ConditionalWeakTable<IHostSession, StrongBox<int>>();
+
         private readonly IHostSession _session;
+        private readonly string _keyPrefix;
         private readonly IUiRenderer _renderer;
         private readonly UiTextFormatter _text;
         private readonly Func<string, string?>? _files;
@@ -64,6 +70,10 @@ namespace Kesa.Engine.Ui
         public UiInterpreter(IHostSession session, IUiRenderer renderer, UiTextFormatter text, Func<string, string?>? files = null)
         {
             _session = session;
+            var count = InterpretersPerSession.GetValue(session, _ => new StrongBox<int>());
+            int index;
+            lock (count) index = ++count.Value;
+            _keyPrefix = index == 1 ? "p" : "ui" + index + ".p";
             _renderer = renderer;
             _text = text;
             _files = files;
@@ -89,7 +99,7 @@ namespace Kesa.Engine.Ui
 
             var scope = new UiScope(null);
             foreach (var name in document.Parameters) scope.Set(name, arguments[name]);
-            string panelId = "p" + (++_panels);
+            string panelId = _keyPrefix + (++_panels);
             var root = await BuildAsync(document.Root, null, null, 0, scope, panelId);
             foreach (var sheet in document.StyleSheets) _renderer.AddStyleSheet(root.Handle, sheet);
             await RecheckAsync();

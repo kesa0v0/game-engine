@@ -35,6 +35,24 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task TwoInterpretersOnOneSessionKeepTheirOwnReceipts()
+        {
+            const string uxml = "<ui:VisualElement params=\"u\"><ui:Label name=\"x\" bind-text=\"arena.hp(u)\" /></ui:VisualElement>";
+            await Mount(uxml, ("u", Entity(A)));
+            var otherRenderer = new MemoryRenderer();
+            var other = new UiInterpreter(Session, otherRenderer, Format);
+            var mounted = await other.MountAsync(Doc(uxml), new System.Collections.Generic.Dictionary<string, BridgeValue> { ["u"] = Entity(B) });
+            Assert.That(mounted.Problems, Is.Empty);
+
+            SetHp(A, 1);
+            SetHp(B, 2);
+            await Ui.RefreshAsync();
+            await other.RefreshAsync();
+            Assert.That(Renderer.Named("x").Text, Is.EqualTo("1"), "the second interpreter's panel did not take over the first one's receipt");
+            Assert.That(otherRenderer.Named("x").Text, Is.EqualTo("2"));
+        }
+
+        [Test]
         public async Task ARepeatMakesOneGroupPerItemAndReadsDictionaryKeys()
         {
             await Mount("<ui:VisualElement><ui:VisualElement name=\"list\" for=\"row in arena.units()\"><ui:Label bind-text=\"row.hp\" /></ui:VisualElement></ui:VisualElement>");

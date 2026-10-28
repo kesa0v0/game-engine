@@ -19,7 +19,7 @@
 
 **정한 것, 구현할 것:** 창은 제어되는 패널(G348, G337 일부바뀜): 열림은 UI 기록, 패널이 층·ESC·끌기를 선언, 호스트의 얇은 창 층이 처리하고 닫을 때 패널의 닫기 동작을 부름. 표기는 `window="층"`·`on-close`·`close-on-escape`·`window-drag`(G349), 종류는 `normal`·`modal`뿐이고 층은 없다(G350), 누르면 맨 위로 올리고 `window-raise="false"`로 끔(G351), 위치는 게임을 켜 둔 동안만 남음(G352). 구현은 아직이다(UXML 읽기·해석기의 창 속성, 렌더러에 창 알림, Unity 렌더러의 창 층).
 
-**사용자 확인을 기다리는 잠정 결정:** G345(렌더러 인터페이스: 어셈블리 이름 `Kesa.Engine.Ui`, 번역을 참조하지 않고 글자 만들기를 주입, 숫자를 고정소수점 raw로 렌더러에 줌, 세션당 해석기 하나, 호스트가 직접 낸 동작은 `ActAsync`/`InvalidateButtons`로 알림), G347(`KesaGame`·`ModFolderAssets`의 API 모양). 조회: `dotnet run --project tools/Kesa.Tools.Decisions -- show 345`. 영수증 키 모양과 `.meta`를 올리는 것은 내부 구현이라 묻지 않는다(CLAUDE.md의 묻는 기준). 잠정 G2~G30(로딩·로직 언어 규칙)은 그 영역을 다시 건드리거나 실제 모드가 부딪힐 때 확인한다.
+**사용자 확인을 기다리는 잠정 결정:** G345(렌더러 인터페이스: 번역을 참조하지 않고 글자 만들기를 주입하는 것과 숫자를 고정소수점 raw로 주는 것, 한 세션에 해석기 여럿은 확인함, 남은 것은 호스트가 직접 낸 동작은 `ActAsync`/`InvalidateButtons`로 알림), G347(`KesaGame`·`ModFolderAssets`의 API 모양). 조회: `dotnet run --project tools/Kesa.Tools.Decisions -- show 345`. 영수증 키 모양과 `.meta`를 올리는 것은 내부 구현이라 묻지 않는다(CLAUDE.md의 묻는 기준). 잠정 G2~G30(로딩·로직 언어 규칙)은 그 영역을 다시 건드리거나 실제 모드가 부딪힐 때 확인한다.
 
 **정한 UXML 규칙 요약**(전문은 결정 기록):
 

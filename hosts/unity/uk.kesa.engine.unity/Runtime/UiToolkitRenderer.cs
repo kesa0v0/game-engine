@@ -79,8 +79,8 @@ namespace Kesa.Engine.Unity
 
         public void SetNumber(ElementId element, string property, long raw)
         {
-            // 고정소수점의 원래 정수값(백만 분의 일)을 화면에 쓸 때만 실수로 바꾼다 (G326)
-            float number = raw / 1000000f;
+            // 고정소수점의 원래 정수값을 화면에 쓸 때만 실수로 바꾼다 (G326)
+            float number = raw / (float)Kesa.Engine.Bridge.BridgeFixed.Scale;
             var target = _elements[element.Value];
             if (property == "opacity")
             {
