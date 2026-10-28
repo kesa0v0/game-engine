@@ -22,6 +22,8 @@ namespace Kesa.Engine.Unity
         private readonly IUiAssets _assets;
         private readonly Dictionary<long, VisualElement> _elements = new Dictionary<long, VisualElement>();
         private readonly Dictionary<VisualElement, long> _ids = new Dictionary<VisualElement, long>();
+        private readonly Dictionary<UssSheet, (StyleSheet? Sheet, List<UiProblem> Problems)> _styleSheets =
+            new Dictionary<UssSheet, (StyleSheet?, List<UiProblem>)>();
         private long _next;
 
         // UI Toolkit은 트리 순서로 그리므로 창은 겹침 층으로 옮기고 원래 자리에는 자리표를 남겨 부모 안의 순서를 지킨다 (G354)
@@ -74,17 +76,29 @@ namespace Kesa.Engine.Unity
             return new ElementId(id);
         }
 
-        public void AddStyleSheet(ElementId element, string path)
+        public IReadOnlyList<UiProblem> AddStyleSheet(ElementId element, UssSheet uss)
         {
-            var sheet = _assets.LoadStyleSheet(path);
-            if (sheet == null)
+            if (!_styleSheets.TryGetValue(uss, out var built))
             {
-                Debug.LogWarning("Kesa UI: the style sheet '" + path + "' could not be found");
-                return;
+                var problems = new List<UiProblem>();
+                StyleSheet? made = null;
+                try
+                {
+                    made = UssStyleSheets.Build(uss, _assets.LoadImage, problems);
+                }
+                catch (Exception e) when (e is TypeInitializationException || e is System.Reflection.TargetInvocationException || e is MissingMemberException || e is TypeLoadException)
+                {
+                    problems.Add(new UiProblem(uss.Name + ":0", "the style sheet could not be built in this Unity version: " + (e.InnerException ?? e).Message));
+                }
+                built = (made, problems);
+                _styleSheets[uss] = built;
             }
+            var sheet = built.Sheet;
+            if (sheet == null) return built.Problems;
             _elements[element.Value].styleSheets.Add(sheet);
             // 겹침 층으로 옮긴 창은 파일 맨 위 요소 밖에 있으므로 같은 스타일시트를 층에도 붙인다
             if (!_windowLayer.styleSheets.Contains(sheet)) _windowLayer.styleSheets.Add(sheet);
+            return built.Problems;
         }
 
         public void SetText(ElementId element, string property, string value)

@@ -1,0 +1,15 @@
+<!-- 런타임 USS가 리플렉션으로 부르는 Unity 내부 타입 (G359). Unity는 패키지의 link.xml을 읽지 않으므로 Editor/UssLinker가 링커에 넘긴다. -->
+<linker>
+  <assembly fullname="UnityEngine.UIElementsModule">
+    <type fullname="UnityEngine.UIElements.StyleSheets.StyleSheetBuilder" preserve="all" />
+    <type fullname="UnityEngine.UIElements.StyleSheets.StyleSheetBuilder/ComplexSelectorScope" preserve="all" />
+    <type fullname="UnityEngine.UIElements.StyleSheets.Dimension" preserve="all" />
+    <type fullname="UnityEngine.UIElements.StyleSheets.Dimension/Unit" preserve="all" />
+    <type fullname="UnityEngine.UIElements.StyleSelectorPart" preserve="all" />
+    <type fullname="UnityEngine.UIElements.StyleSelectorRelationship" preserve="all" />
+    <type fullname="UnityEngine.UIElements.StyleValueKeyword" preserve="all" />
+    <type fullname="UnityEngine.UIElements.StyleValueType" preserve="all" />
+    <type fullname="UnityEngine.UIElements.StyleValueFunction" preserve="all" />
+    <type fullname="UnityEngine.UIElements.StyleValueFunctionExtension" preserve="all" />
+  </assembly>
+</linker>

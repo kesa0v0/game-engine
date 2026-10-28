@@ -90,7 +90,34 @@ Unity 호스트는 UXML 파일(`samples/skirmish/core/ui/screen.uxml`)로 화면
 - `bind-text`·`bind-display`·`bind-enabled`·`bind-value`·`bind-opacity`·`bind-image`, `bind-class-<이름>`(참이면 클래스를 붙임), `bind-class`(함수가 돌려준 글자나 글자 목록이 클래스).
 - 눌러도 되는지는 호스트가 `require`·`choose`와 입구를 미리 보아 버튼을 회색으로 한다.
 - 다른 파일을 `<Include src="…" 이름="식" />`로 끼우면 그 파일이 `params`로 선언한 이름의 값을 넘겨야 한다.
-- 아직 없는 것: 런타임에 읽는 스타일시트(USS), 인라인 `style`.
+- 아직 없는 것: 인라인 `style`.
+
+#### 모양 (USS)
+
+모양은 모드 폴더의 USS 파일로 준다. UXML에 `<Style src="…" />`로 붙이면 그 파일의 맨 위 요소에 붙는다.
+
+```xml
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:Style src="skirmish/ui/card.uss" />
+  <ui:VisualElement name="screen" params="house" seat="house"> … </ui:VisualElement>
+</ui:UXML>
+```
+
+```css
+/* skirmish/ui/card.uss */
+:root { --accent: #ffb000; }
+.card { flex-direction: row; background-color: rgb(30, 34, 40); }
+.card:hover .name { color: var(--accent); }
+.card.selected { border-color: var(--accent); border-width: 2px; }
+.icon { background-image: url("skirmish/art/icon.png"); }
+```
+
+- 문법은 Unity USS 그대로다(Unity 문서를 보면 된다): 타입·`.클래스`·`#이름`·`*`, 이어 붙이기, 쉼표 목록, 자손(띄어쓰기)·자식(`>`), `:hover`·`:active`·`:inactive`·`:focus`·`:disabled`·`:enabled`·`:checked`·`:root`, Unity가 아는 속성 전부, `--변수`와 `var()`.
+- 경로(`<Style src>`와 `url()`)는 이미지·`Include`와 같은 공간이다: 모든 모드 폴더를 겹친 경로이고 같은 경로는 나중에 로드된 모드가 이긴다. 시트 파일 기준의 상대 경로가 아니다. 이름이 우연히 겹치지 않게 자기 모드 id 폴더 아래에 둔다.
+- 의존하는 모드의 시트도 그 경로로 붙인다. 조금 고치려면 자기 시트를 뒤에 하나 더 붙이고, 같은 경로에 파일을 두면 통째로 바뀐다(스킨 모드).
+- 우선순위는 Unity 규칙이다: 명시도가 높은 규칙이 이기고, 같으면 요소에 더 가까이 붙은 시트, 같은 요소면 나중에 붙은 시트가 이긴다. 게임이 화면 맨 바깥에 붙인 기본 모양과 명시도가 같으면 모드 시트가 이긴다.
+- 없는 것: `@import`(시트마다 `<Style src>`를 쓴다), `resource()`(게임 빌드 안을 가리키므로 `url()`을 쓴다), `url()`로 그림이 아닌 파일(폰트 등) 읽기.
+- 잘못은 화면을 막지 않는다. 모르는 속성(`colr` → "혹시 'color'?"), 깨진 문법, 못 찾은 파일·그림, 바꿀 수 없는 값은 그 줄이나 규칙만 빠지고 오류 목록(`Errors`)에 `파일:줄`과 함께 담긴다.
 
 #### 창
 

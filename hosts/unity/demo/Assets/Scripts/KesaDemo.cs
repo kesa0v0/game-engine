@@ -72,8 +72,8 @@ public sealed class KesaDemo : MonoBehaviour
         var style = Resources.Load<StyleSheet>("KesaDemo");
         if (style != null) root.styleSheets.Add(style);
         var renderer = new UiToolkitRenderer(root, mods.Assets);
-        var ui = new UiInterpreter(session, renderer, mods.Format, mods.Assets.LoadUxml);
-        string? uxml = mods.Assets.LoadUxml(screen);
+        var ui = new UiInterpreter(session, renderer, mods.Format, mods.Assets.LoadText);
+        string? uxml = mods.Assets.LoadText(screen);
         if (uxml == null) throw new FileNotFoundException("the screen '" + screen + "' was not found in the mods");
         var read = UxmlReader.Read(screen, uxml);
         if (!read.Succeeded) throw new InvalidOperationException(string.Join("\n", read.Problems));

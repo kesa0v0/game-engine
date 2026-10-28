@@ -74,7 +74,7 @@ namespace Kesa.Engine.Ui
                 await ApplyBindingAsync(Register(wrapper, scope, RuntimeBindingKind.IncludeArgument, arg.Key, arg.Key, arg.Value,
                     arg.Key + "=\"" + arg.Value + "\""));
             wrapper.Inner = await BuildAsync(document.Root, wrapper, parentId, index, innerScope, path + "/inc");
-            foreach (var sheet in document.StyleSheets) _renderer.AddStyleSheet(wrapper.Inner.Handle, sheet);
+            AddStyleSheets(document, wrapper.Inner.Handle);
             return wrapper;
         }
 

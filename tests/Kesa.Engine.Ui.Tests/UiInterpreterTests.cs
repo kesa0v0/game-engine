@@ -285,10 +285,41 @@ namespace Kesa.Engine.Ui.Tests
         public async Task StyleSheetsGoToTheTopElementOfTheFileThatNamedThem()
         {
             Files["UI/Row"] = "<ui:UXML xmlns:ui=\"UnityEngine.UIElements\"><ui:Style src=\"row.uss\" /><ui:Label params=\"who\" /></ui:UXML>";
+            foreach (var name in new[] { "a.uss", "b.uss", "row.uss" }) Files[name] = ".x { color: red; }";
             await Mount("<ui:UXML xmlns:ui=\"UnityEngine.UIElements\"><ui:Style src=\"a.uss\" /><ui:Style src=\"b.uss\" /><ui:Style src=\"a.uss\" />" +
                         "<ui:VisualElement name=\"top\" params=\"u\"><ui:Include src=\"UI/Row\" who=\"u\" /></ui:VisualElement></ui:UXML>", ("u", Entity(A)));
             Assert.That(Renderer.Named("top").StyleSheets, Is.EqualTo(new[] { "a.uss", "b.uss" }));
             Assert.That(Renderer.Named("top").Children.Single().StyleSheets, Is.EqualTo(new[] { "row.uss" }));
+            Assert.That(Ui.Errors, Is.Empty);
+        }
+
+        [Test]
+        public async Task StyleSheetProblemsDoNotStopTheScreen()
+        {
+            Files["card.uss"] = ".card {\n  colr: red;\n  margin: 2px;\n  padding: 1px;\n}";
+            Renderer.RejectedProperties.Add("padding");
+            var panel = await Mount("<ui:UXML xmlns:ui=\"UnityEngine.UIElements\"><ui:Style src=\"card.uss\" /><ui:Style src=\"gone.uss\" />" +
+                                    "<ui:VisualElement name=\"top\" params=\"u\" /></ui:UXML>", ("u", Entity(A)));
+            Assert.That(panel, Is.Not.Null);
+            Assert.That(Renderer.Named("top").StyleSheets, Is.EqualTo(new[] { "card.uss" }));
+            Assert.That(Renderer.Sheets.Single().Rules.Single().Declarations.Select(d => d.Name), Is.EqualTo(new[] { "margin", "padding" }));
+            Assert.That(Ui.Errors.Select(e => e.ToString()), Is.EqualTo(new[]
+            {
+                "card.uss:2: 'colr' is not a USS property (did you mean 'color'?)",
+                "card.uss:4: padding: cannot be converted",
+                "test.uxml:1: Style 'gone.uss' was not found",
+            }));
+        }
+
+        [Test]
+        public async Task ASheetIsReadOnceAndHandedOverAsTheSameObject()
+        {
+            Files["UI/Row"] = "<ui:UXML xmlns:ui=\"UnityEngine.UIElements\"><ui:Style src=\"row.uss\" /><ui:Label params=\"who\" /></ui:UXML>";
+            Files["row.uss"] = ".row { color: red; }";
+            await Mount("<ui:VisualElement params=\"u\"><ui:Include src=\"UI/Row\" who=\"u\" /><ui:Include src=\"UI/Row\" who=\"u\" /></ui:VisualElement>",
+                ("u", Entity(A)));
+            Assert.That(Renderer.Sheets.Count, Is.EqualTo(2));
+            Assert.That(Renderer.Sheets[0], Is.SameAs(Renderer.Sheets[1]));
         }
 
         [Test]

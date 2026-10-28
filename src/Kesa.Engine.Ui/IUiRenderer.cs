@@ -39,8 +39,11 @@ namespace Kesa.Engine.Ui
         /// </summary>
         ElementId Create(string kind, ElementId? parent, int index, IReadOnlyList<KeyValuePair<string, string>> attributes);
 
-        /// <summary>파일에 <c>&lt;Style src="…"/&gt;</c>로 적힌 스타일시트를 그 파일의 맨 위 요소에 붙인다. 경로를 찾는 것은 렌더러 몫이다.</summary>
-        void AddStyleSheet(ElementId element, string path);
+        /// <summary>
+        /// 파일에 <c>&lt;Style src="…"/&gt;</c>로 적힌 스타일시트(해석기가 읽은 것)를 그 파일의 맨 위 요소에 붙인다 (G359). 같은 시트는 같은
+        /// 객체로 다시 온다. 값을 렌더러의 값으로 바꾸지 못한 선언은 빼고 그 문제를 돌려준다(G361, 화면은 막지 않음 G364).
+        /// </summary>
+        IReadOnlyList<UiProblem> AddStyleSheet(ElementId element, UssSheet sheet);
 
         /// <summary>글자 속성(<c>text</c>)에 글자를 넣는다.</summary>
         void SetText(ElementId element, string property, string value);

@@ -64,7 +64,7 @@ namespace Kesa.Engine.Unity.Editor
 
             var host = new VisualElement();
             var renderer = new UiToolkitRenderer(host, mods.Assets);
-            var ui = new UiInterpreter(session, renderer, mods.Format, mods.Assets.LoadUxml);
+            var ui = new UiInterpreter(session, renderer, mods.Format, mods.Assets.LoadText);
             var read = UxmlReader.Read("screen.uxml", File.ReadAllText(Path.Combine(root, "core", "ui", "screen.uxml")));
             Require(read.Succeeded, "screen.uxml reads: " + string.Join("; ", read.Problems));
             var document = read.Document!;
@@ -89,6 +89,7 @@ namespace Kesa.Engine.Unity.Editor
             Require(kind != null && (kind.text.Contains("병사") || kind.text.Contains("궁수")), "the unit kind is translated, got " + kind?.text);
             Require(ui.Errors.Count == 0, "no binding errors: " + string.Join("; ", ui.Errors));
             CheckWindows(mods.Assets);
+            UssCheck.Run();
         }
 
         /// <summary>창 배치 (G354): 창은 겹침 층으로 가고 원래 자리에는 자리표가 남아 형제 순서가 그대로이며, 모달 막이는 정한 자리에 선다.</summary>

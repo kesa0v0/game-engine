@@ -59,6 +59,7 @@ namespace Kesa.Engine.Ui
         private readonly List<UiProblem> _errors = new List<UiProblem>();
         private readonly SortedSet<string> _errorTexts = new SortedSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<string, UiDocument?> _includes = new Dictionary<string, UiDocument?>(StringComparer.Ordinal);
+        private readonly Dictionary<string, UssSheet?> _styleSheets = new Dictionary<string, UssSheet?>(StringComparer.Ordinal);
 
         private bool _loaded;
         private bool _refreshing;
@@ -68,7 +69,7 @@ namespace Kesa.Engine.Ui
         private int _panels;
 
         /// <param name="text">값을 글자로 바꾸는 것(번역기를 꽂는다, G345).</param>
-        /// <param name="files"><c>Include</c>의 <c>src</c>로 UXML 글을 찾는다. 못 찾으면 null. 없으면 <c>Include</c>를 쓸 수 없다.</param>
+        /// <param name="files"><c>Include</c>와 <c>Style</c>의 <c>src</c>로 UXML·USS 글을 찾는다(G362). 못 찾으면 null. 없으면 둘 다 쓸 수 없다.</param>
         /// <param name="windows">
         /// 창 목록. 렌더러가 서로 다른 해석기들의 창도 함께 겹치고 ESC를 나누려면 같은 것을 넘긴다. 없으면 이 렌더러에 붙은 것을 쓰고, 그것도
         /// 없으면 새로 만든다.
@@ -112,7 +113,7 @@ namespace Kesa.Engine.Ui
             foreach (var name in document.Parameters) scope.Set(name, arguments[name]);
             string panelId = _keyPrefix + (++_panels);
             var root = await BuildAsync(document.Root, null, null, 0, scope, panelId);
-            foreach (var sheet in document.StyleSheets) _renderer.AddStyleSheet(root.Handle, sheet);
+            AddStyleSheets(document, root.Handle);
             await RecheckAsync();
             _version = await _session.Version();
             _uiVersion = await _session.UiVersion();
@@ -311,6 +312,34 @@ namespace Kesa.Engine.Ui
             }
             _includes[source] = read.Document;
             return read.Document;
+        }
+
+        // USS의 문제는 화면을 막지 않고 Errors에만 간다 (G364)
+        private void AddStyleSheets(UiDocument document, ElementId element)
+        {
+            foreach (var path in document.StyleSheets)
+            {
+                var sheet = LoadStyleSheet(path, document.Root.Place);
+                if (sheet == null) continue;
+                foreach (var problem in _renderer.AddStyleSheet(element, sheet)) Report(problem.Place, problem.Message);
+            }
+        }
+
+        private UssSheet? LoadStyleSheet(string path, string place)
+        {
+            if (!_styleSheets.TryGetValue(path, out var sheet))
+            {
+                string? text = _files?.Invoke(path);
+                if (text != null)
+                {
+                    var read = UssReader.Read(path, text);
+                    foreach (var problem in read.Problems) Report(problem.Place, problem.Message);
+                    sheet = read.Sheet;
+                }
+                _styleSheets[path] = sheet;
+            }
+            if (sheet == null) Report(place, "Style '" + path + "' was not found" + (_files == null ? " (no way to find files was given)" : ""));
+            return sheet;
         }
 
         private void Report(string place, string message)

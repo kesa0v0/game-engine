@@ -64,7 +64,19 @@ namespace Kesa.Engine.Ui.Tests
             return new ElementId(el.Id);
         }
 
-        public void AddStyleSheet(ElementId element, string path) => Get(element).StyleSheets.Add(path);
+        /// <summary>붙은 시트 객체들(같은 경로는 같은 객체여야 한다).</summary>
+        public List<UssSheet> Sheets { get; } = new List<UssSheet>();
+
+        /// <summary>값을 바꾸지 못한 척할 선언 이름: 렌더러가 문제로 돌려준다.</summary>
+        public SortedSet<string> RejectedProperties { get; } = new SortedSet<string>(StringComparer.Ordinal);
+
+        public IReadOnlyList<UiProblem> AddStyleSheet(ElementId element, UssSheet sheet)
+        {
+            Get(element).StyleSheets.Add(sheet.Name);
+            Sheets.Add(sheet);
+            return sheet.Rules.SelectMany(r => r.Declarations).Where(d => RejectedProperties.Contains(d.Name))
+                .Select(d => new UiProblem(sheet.Name + ":" + d.Line, d.Name + ": cannot be converted")).ToList();
+        }
 
         public void SetText(ElementId element, string property, string value) => Get(element).Texts[property] = value;
 

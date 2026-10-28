@@ -16,7 +16,7 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
    var match = mods.NewMatch(seed: 1);   // 새 게임마다 이것만 다시
    var session = await match.Host.Open("me");
    var renderer = new UiToolkitRenderer(uiDocument.rootVisualElement, mods.Assets);
-   var ui = new UiInterpreter(session, renderer, mods.Format, mods.Assets.LoadUxml);
+   var ui = new UiInterpreter(session, renderer, mods.Format, mods.Assets.LoadText);
    var read = UxmlReader.Read("screen.uxml", File.ReadAllText(path));
    await ui.MountAsync(read.Document!, new Dictionary<string, BridgeValue> { [read.Document!.SeatParameter!] = seatEntity });
    // 프레임마다: await ui.RefreshAsync();
@@ -43,6 +43,14 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
 - 화면 동작이 낸 `submit`이 거절돼도 `BridgeResult.Succeeded`는 참이다. 실패는 `Deliveries`에만 있으니 `ActionResult`에서 본다(G283).
 - 부르다 실패한 바인딩은 직전 값을 유지하고 `UiInterpreter.Errors`에 쌓인다(G341). 비우는 것은 `ClearErrors`뿐이다.
 
+## 스타일시트 (USS)
+
+- 모드의 `<Style src>`는 해석기가 `files`(`mods.Assets.LoadText`)로 모드 폴더에서 읽고 해석해 렌더러에 넘긴다. 렌더러는 Unity 내부 `StyleSheetBuilder`를 리플렉션으로 불러 진짜 `StyleSheet`을 만들어 붙인다(G359, `Runtime/UssBuilder.cs`·`UssStyleSheets.cs`, OneJS에서 고쳐 옮김, `THIRD_PARTY_NOTICES.md`). 캐스케이드·`:hover`·선택자·`var()`·`transition`은 Unity가 한다.
+- 게임 빌드 안의 모양(Unity 에셋 `StyleSheet`)은 경로로 찾지 않는다. 게임 코드가 화면 맨 바깥(`UIDocument.rootVisualElement`)에 붙인다(G362). 명시도가 같으면 모드 시트가 이긴다.
+- USS의 잘못은 화면을 막지 않고 `UiInterpreter.Errors`에 담긴다(G364).
+- 공개되지 않은 API라 Unity를 올리면 깨질 수 있다. `SmokeTest`가 엔진의 속성 목록과 Unity의 표, 같은 글을 Unity 임포터가 만든 시트와 우리 시트, 런타임 패널의 실제 적용을 비교하므로 Unity를 올리면 먼저 이것을 돌린다.
+- IL2CPP: 리플렉션으로 부르는 타입은 `Runtime/link.xml`에 있고 `Editor/UssLinker`가 빌드 때 링커에 넘긴다(Unity는 패키지의 link.xml을 읽지 않는다). IL2CPP 빌드로는 아직 돌려 보지 않았다.
+
 ## 확인
 
 창 없이 돌려 보는 방법 (Unity 6000.3):
@@ -52,7 +60,7 @@ Unity.exe -batchmode -nographics -projectPath <패키지를 manifest에 적은 �
   -executeMethod Kesa.Engine.Unity.Editor.SmokeTest.Run -kesaMods <저장소>/samples/skirmish -logFile -
 ```
 
-로그에 `KESA SMOKE TEST: OK`가 나오면 skirmish 화면이 Unity의 요소 트리로 맞게 만들어진 것이다.
+로그에 `KESA SMOKE TEST: OK`가 나오면 skirmish 화면이 Unity의 요소 트리로 맞게 만들어졌고, 창 배치와 런타임 USS(`UssCheck`)도 맞는 것이다. 에디터가 그 프로젝트를 열고 있으면 잠금 때문에 바로 끝나므로, 프로젝트를 다른 폴더로 복사하고 `manifest.json`의 패키지 경로를 절대 경로로 바꿔 돌린다(USS 확인은 그 프로젝트의 `Assets/KesaUssCheck`에 시트를 잠시 만들었다 지운다).
 
 ## 데모 프로젝트
 
@@ -60,5 +68,5 @@ Unity.exe -batchmode -nographics -projectPath <패키지를 manifest에 적은 �
 
 ## 아직 없는 것
 
-- 스타일시트(`<Style src>`): Unity에 런타임에 USS 글을 읽는 공개 API가 없어 게임이 `ModFolderAssets`에 읽기를 꽂아야 한다.
+- USS의 `@import`, `url()`로 그림이 아닌 파일(폰트 등) 읽기.
 - 인라인 `style` 속성, `Include` 밖의 여러 이벤트, 키보드 입력.
