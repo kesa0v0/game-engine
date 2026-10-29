@@ -68,6 +68,9 @@ namespace Kesa.Engine.Bridge.Local
             return new BridgeResult(report.Passed, outcome, Reasons(null, Array.Empty<ArgumentRejection>(), report, defOf));
         }
 
+        /// <summary>검사할 사전 조건이 없고 낼 수 있다.</summary>
+        public static BridgeResult Passed() => new BridgeResult(true, "Passed", Array.Empty<BridgeReason>());
+
         /// <summary>이 연결이 낼 수 없다(입구 정책, 낼 질문 없음 등)는 검사 결과 (G233·G283).</summary>
         public static BridgeResult Denied(string why) =>
             new BridgeResult(false, SubmitOutcome.GateDenied.ToString(), new[] { new BridgeReason(BridgeReasonKind.Error, message: why) });

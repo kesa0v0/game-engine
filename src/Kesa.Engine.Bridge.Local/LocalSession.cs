@@ -188,6 +188,12 @@ namespace Kesa.Engine.Bridge.Local
             {
                 if (_host.Loaded.UiActions.ContainsKey(name))
                     return Done(KernelResults.Check(view.CheckPreconditions(_ui, name, args), DefOf(view)));
+                // 선택지 답은 커맨드가 아니라 사전 조건이 없다: 낼 수 있는 질문이 있는가만 본다 (G379)
+                if (name == World.PickCommand)
+                {
+                    string? whyNot = view.WhyNotDeliverable(name, args);
+                    return Done(whyNot == null ? KernelResults.Passed() : KernelResults.Denied(whyNot));
+                }
 
                 var report = view.CheckPreconditions(name, args);
                 // 인자가 맞으면 입구를 본다: 이 연결이 낼 수 있는가가 사전 조건보다 먼저 이유다 (G233·G283)

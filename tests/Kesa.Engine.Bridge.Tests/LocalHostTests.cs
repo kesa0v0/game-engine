@@ -295,6 +295,22 @@ namespace Kesa.Engine.Bridge.Tests
         }
 
         [Test]
+        public async Task CheckPreviewsAPickTheWayDeliverSendsIt()
+        {
+            var first = Args((BridgeNames.PickChoice, new BridgeInt(0)));
+            var none = await _alice.Check(BridgeNames.Pick, first);
+            Assert.That(none.Outcome, Is.EqualTo("GateDenied"));
+            Assert.That(none.Reasons.Single().Message, Is.EqualTo("no open question with choices that alice can answer"));
+
+            Assert.That((await _alice.Submit("arena.Duel", Args(("h", new BridgeEntity(_red, null))))).Succeeded, Is.True);
+            Assert.That((await _alice.Check(BridgeNames.Pick, first)).Outcome, Is.EqualTo("Passed"));
+            var far = await _alice.Check(BridgeNames.Pick, Args((BridgeNames.PickChoice, new BridgeInt(5))));
+            Assert.That(far.Reasons.Single().Message, Does.EndWith("has 2 choices, so 5 is out of range"));
+            Assert.That((await _alice.Deliver(BridgeNames.Pick, first)).Succeeded, Is.True);
+            Assert.That(Hp(_red), Is.EqualTo(4));
+        }
+
+        [Test]
         public async Task ARequestIsAnsweredWithAPick()
         {
             Assert.That((await _alice.Submit("arena.Duel", Args(("h", new BridgeEntity(_red, null))))).Succeeded, Is.True);

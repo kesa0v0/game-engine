@@ -267,17 +267,28 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         private DeliveryResult DeliverPick(string issuer, IReadOnlyDictionary<string, Value> args, Request? only)
         {
+            string? why = FindPick(issuer, args, only, out var found, out var answerer, out long index);
+            return why != null ? new DeliveryResult(null, null, why) : new DeliveryResult(null, Answer(issuer, found!.Id, answerer, index), null);
+        }
+
+        /// <summary><see cref="DeliverPick"/>이 답할 질문·엔티티·번호를 찾는다 (회색 버튼도 같은 규칙, G346). 못 찾으면 이유.</summary>
+        private string? FindPick(string issuer, IReadOnlyDictionary<string, Value> args, Request? only, out Request? found,
+            out EntityId answerer, out long index)
+        {
+            found = null;
+            answerer = default;
+            index = 0;
             EntityId? by = null;
             if (args.TryGetValue(PickBy, out var given))
             {
                 if (!(given is IEntityReference e))
-                    return new DeliveryResult(null, null, PickCommand + " needs by= to be an entity, not " + given.KindName);
+                    return PickCommand + " needs by= to be an entity, not " + given.KindName;
                 by = e.EntityId;
             }
-            if (!args.TryGetValue(PickChoice, out var choice) || !(choice is IntValue index))
-                return new DeliveryResult(null, null, PickCommand + " needs choice= with the index of the choice");
+            if (!args.TryGetValue(PickChoice, out var choice) || !(choice is IntValue picked))
+                return PickCommand + " needs choice= with the index of the choice";
+            index = picked.Value;
 
-            Request? found = null;
             var answerers = new List<EntityId>();
             int questions = 0;
             foreach (var q in OpenRequests)
@@ -292,17 +303,19 @@ namespace Kesa.Engine.Runtime
                 answerers = mine;
             }
             if (only != null && questions == 0)
-                return new DeliveryResult(null, null, only.Choices.Count == 0
+                return only.Choices.Count == 0
                     ? "request " + only.Id + " has no choices; answer it with one of its responses"
-                    : "request " + only.Id + " cannot be answered by " + issuer + (by == null ? "" : " with that by="));
+                    : "request " + only.Id + " cannot be answered by " + issuer + (by == null ? "" : " with that by=");
             if (questions != 1)
-                return new DeliveryResult(null, null, questions == 0
+                return questions == 0
                     ? "no open question with choices that " + issuer + " can answer"
-                    : questions + " open questions with choices can be answered by " + issuer + ", so it is not clear which one this answers");
+                    : questions + " open questions with choices can be answered by " + issuer + ", so it is not clear which one this answers";
             if (answerers.Count != 1)
-                return new DeliveryResult(null, null, answerers.Count + " entities of " + issuer + " can answer request " + found!.Id +
-                                                      "; say which with by=");
-            return new DeliveryResult(null, Answer(issuer, found!.Id, answerers[0], index.Value), null);
+                return answerers.Count + " entities of " + issuer + " can answer request " + found!.Id + "; say which with by=";
+            if (index < 0 || index >= found!.Choices.Count)
+                return "request " + found!.Id + " has " + found.Choices.Count + " choices, so " + index + " is out of range";
+            answerer = answerers[0];
+            return null;
         }
 
         /// <summary>이 연결이 답할 수 있고 그 응답 커맨드를 받는 열린 질문들.</summary>
@@ -335,6 +348,7 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         internal string? WhyNotDeliverable(string issuer, string command, IReadOnlyDictionary<string, Value> args, List<Diagnostic> diagnostics)
         {
+            if (command == PickCommand) return FindPick(issuer, args, null, out _, out _, out _);
             var decl = FindCommand(command);
             if (decl.Free)
                 return MayIssue(issuer, command, args, diagnostics) ? null : "'" + issuer + "' cannot issue " + command + " with these arguments";
