@@ -1,6 +1,6 @@
 # 인계 메모
 
-마지막 갱신: 2026-10-29. 브랜치 `spec-v0.5-scaffold`, 테스트 2716개 통과(커널 2354, CLI 42, 콘솔 호스트 101, 번역 65, 경계 46, UI 101, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
+마지막 갱신: 2026-10-30. 브랜치 `spec-v0.5-scaffold`, 테스트 2740개 통과(커널 2377, CLI 42, 콘솔 호스트 101, 번역 65, 경계 46, UI 102, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
 
 ## 상태
 
@@ -16,11 +16,21 @@
 
 ## 다음 할 일
 
+**질문을 화면에 보이고 답받기(G380~G385, 구현함):** 데모에서 사람 빨강이 맞음 질문에 답할 길이 없어 판이 멈췄다. 층을 나눴다: 게임 규칙(`ask`) → 판단(모드 스크립트) → 그림(UXML·나중의 월드 표시는 판단 함수에 묶이기만) → 엔진 기본(아무도 안 그린 질문만, 아직 없음).
+- `ask(..., name="종류")`는 필수(G382). 경계에서는 `BridgeRequest.Name`.
+- `questions()`/`questions("이름")`은 이 연결이 답할 열린 질문 목록(G383). 화면 함수·`@ui_action`·`@bot`에서만 쓰고 게임 쪽 코드는 로드 오류(`ReadsQuestions` 표시가 퍼짐). 화면 함수 영수증이 질문 변화(`RequestsVersion`)를 본다.
+- `respond(q, 커맨드, 인자…)`는 고른 질문 하나에 답한다(G384, `UiSubmission.Request`). `submit`은 그대로 엔진이 짝을 찾는다.
+- 질문이 열리고 닫히면 전역 시계가 오른다(G385).
+- skirmish: 카드가 `is_hit`에 `hit` 클래스와 hold·retreat 버튼 보임을 묶고 버튼이 `respond`한다. 봇은 `questions()`로 판단해 차례가 아닐 때 아무것도 적지 않는다. 시험 `SkirmishScreenTests.AHitUnitsCard…`, `QuestionsTests`.
+
 **바로 다음(순서대로):**
 
-1. 사용자가 에디터에서 데모를 재생해 파랑 모드 봇이 두는 것을 눈으로 본다(이동·공격·차례 넘김, 맞음 질문 답). 빨강 차례에도 봇이 수를 적어 거절되므로 `LastProblems`가 시끄러운 것은 알려진 일이다.
-2. 봇 점수 도우미: 함수 칸 `Score["T"]`·`BotAction["T"]`(G374)와 `std.ai` 모드(후보 행동마다 점수를 매기고 가장 높은 것을 하는 Wesnoth RCA식). 먼저 skirmish 봇을 이 꼴로 다시 써 보며 모양을 정한다.
-3. 봇이 열린 질문·합법 수를 스크립트로 읽는 길(필요해지면). 지금은 거절에 기댄다. 정하면 모딩 안내서 9장과 10장의 표를 고친다.
+1. 사용자가 에디터에서 데모를 재생해 본다: 빨강 유닛이 맞으면 카드가 붉어지고 hold·retreat가 뜨는지, 파랑 봇이 두는지.
+2. 재현해 둔 어긋남: 경계 `Check("engine.pick")`이 RUN001로 실패하고, `LegalMoves`와 `Check`가 질문 입구에서 다르게 판단한다. 고치기 전에 G184를 다시 읽는다.
+3. 엔진 기본 안내 칸(G380의 4층): 아무도 그리지 않은 질문 때문에 판이 멈추지 않게 하는 몫. 모드가 그린 질문과 겹쳐 보이는 문제를 함께 정한다.
+4. 월드 표시(GameObject) 설계: G381 스케치(전역 레이캐스트 → 종류마다 `@ui_action`, 늘 있는 그림은 판단 함수에, 그때그때 생기는 표시는 모드 함수가 돌려준 목록으로).
+5. 그 밖: UXML 컴포넌트 재사용, `hint`·선택지 `style`을 모양에 잇기, 데모 로그(봇 거절·열린 질문).
+6. 봇 점수 도우미: 함수 칸 `Score["T"]`·`BotAction["T"]`(G374)와 `std.ai` 모드(Wesnoth RCA식). 먼저 skirmish 봇을 이 꼴로 다시 써 보며 모양을 정한다.
 
 데모를 돌리는 법: 루트에서 `dotnet build`(DLL 복사) 후 Unity 6000.3으로 `hosts/unity/demo`를 열고 `Assets/Scenes/Demo.unity`를 재생한다. 에디터가 프로젝트를 열고 있으면 창 없는 확인(`-batchmode`)은 잠금 때문에 바로 끝난다.
 
@@ -45,7 +55,7 @@
    - 경계: `session.Bots()`·`Bot(...)`·`LoadBot(바이트)`, `IScriptBot.Act`는 적은 수를 그 연결로 내고 하나라도 받아들여지면 참(G377), 거절 이유는 `LastProblems`(G378).
    - 선택지 질문에는 `submit("engine.pick", choice=n, by=e)`로 답한다(G379, `@ui_action`도 같음).
    - skirmish 파랑은 모드 봇 `skirmish.skirmisher`(`samples/skirmish/core/defs/ai.py`)이고 데모도 그것을 쓴다. `KesaDemoSetup.Check` 통과. 봇 둘이 끝까지 두는 시험(`SkirmishScreenTests`)이 맞음 질문 답 경로를 지난다. 에디터에서 눈으로는 아직 안 봄.
-   - 다음 후보: 함수 칸 `Score["T"]`·`BotAction["T"]`(G374)와 `std.ai` 모드(Wesnoth RCA식 후보 행동). 봇이 열린 질문을 스크립트로 읽는 길은 없다(지금 skirmish 봇은 차례가 아닐 때 적은 수가 거절되는 것에 기댐, 필요해지면 정함).
+   - 다음 후보: 함수 칸 `Score["T"]`·`BotAction["T"]`(G374)와 `std.ai` 모드(Wesnoth RCA식 후보 행동). 봇은 `questions()`로 열린 질문을 읽는다(G383). 합법 수를 스크립트로 읽는 길은 아직 없다.
    - 남은 물음: 큰 게임에서 판을 읽는 속도(spec 9절), 몇 수 앞을 시험하는 판 복사, 원격 멀티의 전송. 이전 엔진(WG·QU·TR)은 문법이 달라 AI 설계에 참고하지 않는다.
 
 결정 조회 도구에 `check`(머리 규칙 검사: 상태와 `changedBy`, 바뀐 쪽이 뒤의 번호인지, `**바뀜:**` 줄, 참조가 있는지, 파일 이름, 빠진 키, 태그 없음)가 있고, `tests/Kesa.Tools.Decisions.Tests`가 실제 `docs/decisions`에 이것을 돌린다. 결정 파일을 고친 뒤에는 `dotnet test`가 규칙 위반을 잡는다. G61은 처음부터 없던 번호다.
@@ -66,6 +76,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 루트에서 `dotnet build`(Unity 패키지의 `Plugins/`로 DLL 복사)와 `dotnet test`로 2716개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다(창 없는 확인은 패키지 README).
+1. `git pull` 후 루트에서 `dotnet build`(Unity 패키지의 `Plugins/`로 DLL 복사)와 `dotnet test`로 2740개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다(창 없는 확인은 패키지 README).
 2. `CLAUDE.md`와 이 문서를 읽는다. 필요한 `docs/spine-spec.md` 절과 결정(`list --tag …`·`show 번호`)만 본다. 실행기는 `Script/Execution/PureEvaluator*.cs`·`Session*.cs`·`Frame.cs`·`Block.cs`, 커맨드는 `Runtime/World.Submit.cs`·`World.Commands.cs`·`World.Undo.cs`, UI 해석은 `src/Kesa.Engine.Ui/UiInterpreter*.cs`다.
 3. 위 "다음 할 일"을 사용자와 정한다. 작업 방식(한국어, 허락 질문으로 멈추지 않기, push는 사용자가 말할 때만 등)은 CLAUDE.md에 있다.
