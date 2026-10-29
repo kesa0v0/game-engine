@@ -21,6 +21,7 @@ namespace Kesa.Engine.Runtime
 
         private Value LookBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
+            ScreenOnly("look()");
             if (positional.Count != 1)
                 throw LookError("look() takes the name of a look, got " + positional.Count + " arguments",
                     "write look(\"infantry\", hurt=True) (spec-gaps G389)");
@@ -33,6 +34,7 @@ namespace Kesa.Engine.Runtime
 
         private Value AtBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
+            ScreenOnly("at()");
             NoPlaceKeywords("at()", keywords);
             const string usage = "write at(\"hex\", (3, 4)), or at((3, 4)) for the game's default space (spec-gaps G394)";
             if (positional.Count == 1) return WhereValue.At(null, Savable("the value of at()", positional[0], usage, hidden: true));
@@ -43,6 +45,7 @@ namespace Kesa.Engine.Runtime
 
         private Value OntoBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
+            ScreenOnly("onto()");
             NoPlaceKeywords("onto()", keywords);
             const string usage = "write onto(ship, \"deck\") (spec-gaps G406)";
             if (positional.Count < 1 || positional.Count > 2)
@@ -59,11 +62,19 @@ namespace Kesa.Engine.Runtime
 
         private Value BetweenBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
+            ScreenOnly("between()");
             NoPlaceKeywords("between()", keywords);
             if (positional.Count != 2 || !(positional[0] is WhereValue first) || !(positional[1] is WhereValue second))
                 throw LookError("between() takes two places made by at(), onto() or between()",
                     "write between(at(\"hex\", a), onto(ship)) (spec-gaps G394)");
             return WhereValue.Between(first, second);
+        }
+
+        /// <summary>이름으로 보이지 않는 길(칸 값을 변수에 담아 부름)로 게임 코드가 만들면 실행 중에 막는다: 멈춘 흐름에 남으면 저장할 수 없다.</summary>
+        private void ScreenOnly(string function)
+        {
+            if (_viewer == null)
+                throw new ScriptRuntimeException(Codes.RunNotWritable, function + " can only be used on a screen", FunctionEffects.LookHint);
         }
 
         private static string Name(string function, string what, Value value)
@@ -114,8 +125,10 @@ namespace Kesa.Engine.Runtime
         /// 그 엔티티의 <c>[그림, 자리]</c>를 연결의 UI 기록과 함께 계산한다. 없거나 못 보거나 올릴 타입이 아니거나 칸 하나가 <c>None</c>이면
         /// <c>None</c>이다 (G405). 영수증은 엔티티가 죽거나 보기 정책이 바뀌는 것도 본다.
         /// </summary>
-        internal CallResult WorldObjectAs(WorldView viewer, UiState ui, EntityId id) =>
-            ViewingWithUi(viewer, ui, () => Traced("#" + id.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), reads =>
+        internal CallResult WorldObjectAs(WorldView viewer, UiState ui, EntityId id)
+        {
+            NoHostWrites("WorldObject");
+            return ViewingWithUi(viewer, ui, () => Traced("#" + id.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), reads =>
             {
                 reads.Add(new CallRead(id.Value, ""));
                 if (!_entities.TryGetValue(id.Value, out var entity) || !viewer.Sees(id) || !IsWorldType(entity.Def.Type))
@@ -126,6 +139,7 @@ namespace Kesa.Engine.Runtime
                 if (where is NoneValue) return where;
                 return new ListValue(new[] { look, where });
             }));
+        }
 
         private Value SlotValue(EntityRecord entity, EntityId id, string slot)
         {
@@ -143,7 +157,8 @@ namespace Kesa.Engine.Runtime
             {
                 StrValue name when slot == LookSlot => name,
                 FunctionValue fn => RunGateFunction(fn, new Value[] { new EntityView(this, id) }, label),
-                _ => throw new WorldException(Codes.RunType, "'" + label + "' holds a " + raw.KindName + ", which cannot be called here yet"),
+                // 로드 검사가 함수와 (Look의) 글자만 들인다
+                _ => throw new InvalidOperationException("'" + label + "' holds a " + raw.KindName),
             };
             switch (value)
             {

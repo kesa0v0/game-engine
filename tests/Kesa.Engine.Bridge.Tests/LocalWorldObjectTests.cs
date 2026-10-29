@@ -115,7 +115,8 @@ namespace Kesa.Engine.Bridge.Tests
 
             _world.Destroy(_foot);
             Assert.That(await_(_alice.WorldObjects(back.Stamp)).Gone, Is.EqualTo(new[] { _foot.Value }));
-            Assert.That(await_(_alice.WorldObjects(0)).Changed, Is.Empty, "from the start: nothing left to draw");
+            var fresh = await_(_alice.WorldObjects(0));
+            Assert.That((fresh.Changed.Count, fresh.Gone.Count), Is.EqualTo((0, 0)), "from the start: nothing to draw and nothing to take away");
         }
 
         [Test]

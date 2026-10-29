@@ -309,7 +309,11 @@ namespace Kesa.Engine.Loading
         {
             string name = "'" + host.Name + "'";
             bool cond = slot.Kind == FunctionSlotKind.Cond;
-            if ((cond || slot.IsScreen) && host.Writes)
+            // 호스트 함수의 서명에는 그림·자리 타입이 없다
+            if (slot.IsScreen)
+                return name + " is a host function, which cannot give a look or a place; " + slot.Display + " holds a mod function" +
+                       (slot.Kind == FunctionSlotKind.Look ? " or the name of a look" : "");
+            if (cond && host.Writes)
                 return name + " is a host function that changes the world, but " + slot.Display + " only holds functions that read";
             var signature = host.Signature;
             var parameters = signature.Parameters;

@@ -128,7 +128,7 @@ namespace Kesa.Engine.Bridge.Local
                 if (pair.Value.Shown != null && pair.Value.Stamp > since) changed.Add(pair.Value.Shown);
             var gone = new List<long>();
             foreach (var pair in _gone)
-                if (pair.Value > since) gone.Add(pair.Key);
+                if (since > 0 && pair.Value > since) gone.Add(pair.Key);
             return Done(new BridgeWorldObjects(_objectStamp, changed, gone));
         }
 

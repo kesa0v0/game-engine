@@ -149,6 +149,16 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
+        public void AHostFunctionCannotGiveALook()
+        {
+            Mod("core", schema: Schema.Replace("effect=const(Action[\"Goal\"])", "effect=const(Action[\"Goal\"]), look=const(Look[\"Goal\"])"),
+                defs: Fns + "Goal(\"A\", check=done, effect=reward, look=core.goals.reached)\n");
+            LoadWithHost(out var diags);
+            Assert.That(diags.Single().Message, Does.Contain(
+                "'core.goals.reached' is a host function, which cannot give a look or a place; Look[\"Goal\"] holds a mod function or the name of a look"));
+        }
+
+        [Test]
         public void ContentCannotCallAHostFunctionWhileLoading()
         {
             Mod("core", schema: Schema, defs: Fns + "x = core.goals.count(None)\n");

@@ -98,6 +98,23 @@ namespace Kesa.Engine.Tests.Runtime
         }
 
         [Test]
+        public void GameCodeThatReachesASlotThroughAVariableIsStoppedWhileRunning()
+        {
+            // 이름으로는 보이지 않는 길: 멈춘 흐름에 자리 값이 남으면 저장할 수 없다
+            Mod("scouts", schema: "component(\"Life\", v=field(int, default=3))\ndeftype(\"Scout\", components=[\"Life\"], look=const(Look[\"Scout\"]), where=const(Where[\"Scout\"]))\n",
+                defs: "Scout(\"Foot2\", look=\"pine\", where=lambda u: at(\"hex\", 1))\n" +
+                      "@command(free=True, acts_for=None)\ndef Go(u: Ref[Scout]):\n    t = u.Scout\n    p = t.where(u)\n" +
+                      "    ask(u, \"t\", name=\"q\", choices=[\"a\"])\n");
+            var world = new World(LoadClean());
+            var u = world.Create("scouts:Foot2");
+            world.Seat(u, "alice");
+            var result = world.Submit("alice", "scouts.Go", new Dictionary<string, Value> { ["u"] = new EntityValue(u) });
+            Assert.That(result.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(result.Error!.Message, Does.Contain("at() can only be used on a screen"));
+            Assert.That(world.Save(), Is.Not.Empty);
+        }
+
+        [Test]
         public void ASlotThatGivesSomethingElseIsAnError()
         {
             var odd = _world.Create("core:Odd");
