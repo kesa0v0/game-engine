@@ -246,7 +246,8 @@ namespace Kesa.Engine.Runtime
         public DeliveryResult Deliver(string issuer, UiSubmission submission)
         {
             NoHostWrites("Deliver");
-            if (submission.Command == PickCommand) return DeliverPick(issuer, submission.Arguments);
+            if (submission.Request is long target) return DeliverTo(issuer, target, submission);
+            if (submission.Command == PickCommand) return DeliverPick(issuer, submission.Arguments, null);
             if (!_commands.TryGetValue(submission.Command, out var decl))
             {
                 throw new WorldException(Codes.RunUnknownName, "there is no command '" + submission.Command + "'",
@@ -264,7 +265,7 @@ namespace Kesa.Engine.Runtime
         /// 선택지 답 <c>submit("engine.pick", choice=n, by=e)</c> (G379): 이 연결이 답할 수 있는 선택지 질문이 하나면 거기에 답한다.
         /// <c>by</c>를 빼면 그 질문에서 이 연결이 답할 수 있는 엔티티가 하나여야 한다. 아니면 이유를 붙여 거절한다.
         /// </summary>
-        private DeliveryResult DeliverPick(string issuer, IReadOnlyDictionary<string, Value> args)
+        private DeliveryResult DeliverPick(string issuer, IReadOnlyDictionary<string, Value> args, Request? only)
         {
             EntityId? by = null;
             if (args.TryGetValue(PickBy, out var given))
@@ -281,7 +282,7 @@ namespace Kesa.Engine.Runtime
             int questions = 0;
             foreach (var q in OpenRequests)
             {
-                if (q.Choices.Count == 0) continue;
+                if (q.Choices.Count == 0 || only != null && q.Id != only.Id) continue;
                 var mine = new List<EntityId>();
                 foreach (var who in q.Who)
                     if ((by == null || who == by) && IsAlive(who) && MayAnswer(issuer, who)) mine.Add(who);
@@ -290,6 +291,10 @@ namespace Kesa.Engine.Runtime
                 found = q;
                 answerers = mine;
             }
+            if (only != null && questions == 0)
+                return new DeliveryResult(null, null, only.Choices.Count == 0
+                    ? "request " + only.Id + " has no choices; answer it with one of its responses"
+                    : "request " + only.Id + " cannot be answered by " + issuer + (by == null ? "" : " with that by="));
             if (questions != 1)
                 return new DeliveryResult(null, null, questions == 0
                     ? "no open question with choices that " + issuer + " can answer"
@@ -361,6 +366,12 @@ namespace Kesa.Engine.Runtime
             table.Add(PureBuiltins.UiName, new UiRoot(this));
             table.Add(PureBuiltins.BotName, new UiRoot(this, bot: true));
             table.Add(PureBuiltins.QuestionsName, new PureBuiltin(PureBuiltins.QuestionsName, QuestionsBuiltin));
+            table.Add(PureBuiltins.RespondName,
+                new PureBuiltin(PureBuiltins.RespondName, (p, k) => RespondBuiltin(_evaluator?.ScriptMod ?? "", p, k))
+                {
+                    WritesUi = true,
+                    CallerBody = RespondBuiltin,
+                });
             table.Add(PureBuiltins.SubmitName,
                 new PureBuiltin(PureBuiltins.SubmitName, (p, k) => SubmitBuiltin(_evaluator?.ScriptMod ?? "", p, k))
                 {

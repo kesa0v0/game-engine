@@ -115,7 +115,7 @@ namespace Kesa.Engine.Loading
                 string kind = command == null ? "" : command.Function.EntryKind;
                 _stage.Error(mod, Codes.CmdSubmit,
                     command != null ? "'" + use.Command + "' is a " + kind + ", so it cannot be submitted"
-                        : "submit() names '" + use.Command + "', but there is no command '" + id + "'",
+                        : use.Builtin + "() names '" + use.Command + "', but there is no command '" + id + "'",
                     use.Span, command != null ? "a " + kind + (command.IsUiAction ? " runs on the screen" : " runs in a bot's seat") +
                                                 "; submit a @command (spec-gaps G278)"
                         : Suggest.Hint(use.Command, names));

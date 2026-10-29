@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Script;
@@ -7,6 +8,7 @@ namespace Kesa.Engine.Runtime
     /// <summary>
     /// 스크립트가 이 연결이 답할 열린 질문을 읽는다 (G381·G383): <c>questions()</c>와 <c>questions("이름")</c>. "내게"는 보는 쪽(<see cref="_viewer"/>)이라
     /// 화면 함수·<c>@ui_action</c>·<c>@bot</c>에서만 돈다. 보이는 범위는 <see cref="WorldView.OpenRequests"/>와 같다(G200·G234).
+    /// 읽은 질문 하나에 답하는 길은 <c>respond(q, 커맨드, …)</c>다(G384).
     /// </summary>
     public sealed partial class World
     {
@@ -38,6 +40,49 @@ namespace Kesa.Engine.Runtime
             foreach (var q in _viewer.OpenRequests)
                 if (name == null || q.Name == name) result.Add(new QuestionValue(this, q));
             return new ListValue(result);
+        }
+
+        /// <summary>
+        /// <c>respond(q, "커맨드", 이름=…)</c> (G384): <c>submit</c>처럼 적어 두고 동작이 끝나면 호스트가 그 질문에 낸다. 커맨드는 그 질문의 응답
+        /// 커맨드이거나 선택지 질문의 <c>engine.pick</c>이다.
+        /// </summary>
+        private Value RespondBuiltin(string mod, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
+            var submissions = _act?.Submissions ?? _botRun?.Submissions ?? throw OutsideUi("respond()");
+            if (positional.Count != 2 || !(positional[0] is QuestionValue q) || !(positional[1] is StrValue name))
+            {
+                throw new ScriptRuntimeException(Codes.RunType,
+                    "respond() takes a question from questions(), the command name and then its arguments by name",
+                    "write respond(q, \"engine.pick\", choice=0) or respond(q, \"Move\", to=cell) (spec-gaps G384)");
+            }
+            string id = name.Value.IndexOf('.') >= 0 ? name.Value : mod + "." + name.Value;
+            if (!_commands.ContainsKey(id) && id != PickCommand)
+            {
+                throw new ScriptRuntimeException(Codes.RunUnknownName, "respond() names '" + name.Value + "', but there is no command '" + id + "'",
+                    Suggest.Hint(id, _commands.Keys));
+            }
+            var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+            foreach (var pair in keywords) args[pair.Key] = ToPlain("argument '" + pair.Key + "' of respond()", pair.Value);
+            submissions.Add(new UiSubmission(id, args, q.Request.Id));
+            return NoneValue.Instance;
+        }
+
+        /// <summary><c>respond</c>가 적은 답을 그 질문에 낸다 (G384). 질문이 이미 닫혔거나 그 커맨드를 받지 않으면 이유를 붙여 거절한다.</summary>
+        private DeliveryResult DeliverTo(string issuer, long request, UiSubmission submission)
+        {
+            Request? q = null;
+            foreach (var open in OpenRequests)
+                if (open.Id == request) q = open;
+            if (q == null) return new DeliveryResult(null, null, "request " + request + " is no longer open");
+            if (submission.Command == PickCommand) return DeliverPick(issuer, submission.Arguments, q);
+            if (!_commands.ContainsKey(submission.Command))
+            {
+                throw new WorldException(Codes.RunUnknownName, "there is no command '" + submission.Command + "'",
+                    Suggest.Hint(submission.Command, _commands.Keys));
+            }
+            if (IndexOf(q.Responses, submission.Command) < 0)
+                return new DeliveryResult(null, null, "request " + request + " does not accept " + submission.Command);
+            return new DeliveryResult(null, Respond(issuer, request, submission.Command, submission.Arguments), null);
         }
 
         /// <summary>

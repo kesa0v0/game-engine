@@ -110,7 +110,7 @@ namespace Kesa.Engine.Loading
             if (fn.TouchesUi)
             {
                 context.Error(Codes.CmdUiEffect, "the @wrap '" + fn.Name + "' of the command '" + target.Name +
-                                                 "' uses UI state (ui.… or submit), so it cannot run as game code",
+                                                 "' uses UI state (ui.…, submit or respond), so it cannot run as game code",
                     fn.Definition!.Span, "a command wrapper runs like the command's body (spec-gaps G320)", new[] { fn.UiTouchWitness!.Value });
                 ok = false;
             }

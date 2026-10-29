@@ -309,10 +309,12 @@ namespace Kesa.Engine.Script
                                 if (arg.Name != null) names.Add(arg.Name);
                             _texts.Add(new TextUse(key.Value, names, key.Span));
                         }
-                        // submit("커맨드", ...)의 리터럴 이름과 넘긴 이름은 로더가 커맨드와 대조한다 (G278)
-                        if (call.Callee is NameExpr submit && submit.Name == PureBuiltins.SubmitName &&
-                            !IsShadowed(submit.Name, locals) && call.Arguments.Count > 0 &&
-                            call.Arguments[0].Name == null && call.Arguments[0].Value is StringLiteral command)
+                        // submit("커맨드", ...)·respond(q, "커맨드", ...)의 리터럴 이름과 넘긴 이름은 로더가 커맨드와 대조한다 (G278·G384)
+                        int at = call.Callee is NameExpr submit && !IsShadowed(submit.Name, locals)
+                            ? submit.Name == PureBuiltins.SubmitName ? 0 : submit.Name == PureBuiltins.RespondName ? 1 : -1
+                            : -1;
+                        if (at >= 0 && call.Arguments.Count > at && call.Arguments[at].Name == null &&
+                            call.Arguments[at].Value is StringLiteral command)
                         {
                             var names = new List<string>();
                             var spans = new List<SourceSpan>();
@@ -322,7 +324,8 @@ namespace Kesa.Engine.Script
                                 names.Add(arg.Name);
                                 spans.Add(arg.Span);
                             }
-                            Submits.Add(new SubmitUse(command.Value, names, spans, command.Span));
+                            Submits.Add(new SubmitUse(command.Value, names, spans, command.Span,
+                                at == 0 ? PureBuiltins.SubmitName : PureBuiltins.RespondName));
                         }
                         // ask는 질문 종류의 이름 name=을 꼭 받는다 (G382)
                         if (call.Callee is NameExpr ask && ask.Name == PureBuiltins.AskName && !IsShadowed(ask.Name, locals) &&

@@ -244,7 +244,7 @@ namespace Kesa.Engine.Loading
                 return "'" + fn.Name + "' is a " + fn.EntryKind + ", so it cannot be a value of " + slot + "; use a plain function";
             // 함수 자리는 모두 게임 쪽에서 돈다: 화면마다 다른 UI 기록에 기댈 수 없다 (G282)
             if (fn.TouchesUi)
-                return "'" + fn.Name + "' uses UI state (ui.… or submit) (at " + fn.UiTouchWitness + "), but " + slot +
+                return "'" + fn.Name + "' uses UI state (ui.…, submit or respond) (at " + fn.UiTouchWitness + "), but " + slot +
                        " holds functions that run as game code, and a game value cannot depend on a screen";
             if (fn.TouchesBot)
                 return "'" + fn.Name + "' uses bot state (bot.…) (at " + fn.BotTouchWitness + "), but " + slot +

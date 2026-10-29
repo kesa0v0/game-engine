@@ -394,6 +394,22 @@ def hit_marks(me):
 - 보이는 범위는 7장과 같다. 못 보는 엔티티는 가려진다.
 - 질문이 열리거나 닫히면 이 함수를 읽은 화면 함수를 호스트가 다시 부른다(영수증).
 - 질문 값은 담아 둘 수 없다. `ui.…`·`bot.…`에 넣거나 `submit`의 인자로 넘기면 오류다. 필요한 칸(`q.name`, 선택지 번호)만 꺼내 둔다.
+
+그 질문에 답하려면 `respond(q, 커맨드, 인자=…)`를 쓴다.
+
+```python
+# 맞은 유닛을 누르면 그 유닛의 맞음 질문에 "물러남"으로 답한다
+@ui_action
+def retreat(unit: Ref[Unit]):
+    for q in questions("skirmish-hit"):
+        if q.data["unit"] == unit:
+            respond(q, "engine.pick", choice=1)
+```
+
+- 커맨드는 그 질문이 받는 응답 커맨드(`respond(q, "Move", to=cell)`)이거나, 선택지 질문이면 `"engine.pick"`(9장의 `choice=`·`by=`)이다.
+- `submit`과 같이 적어 두기만 하고, 동작이 끝나면 호스트가 그 질문에 낸다. `@ui_action`·`@bot`에서 문장으로만 쓴다.
+- `submit`은 엔진이 짝을 찾으므로 받는 질문이 둘 이상이면 거절된다. 같은 이름의 질문이 여럿 열릴 수 있으면 `respond`로 하나를 가리킨다.
+- 내는 때 그 질문이 이미 닫혔거나 그 커맨드를 받지 않으면 이유를 붙여 거절된다.
 - 게임 쪽 코드(`@command`·`@on`·`@when`·`acts_for`·보기 정책·`derived`)에서는 쓸 수 없다(`CMD007`). 연결마다 답할 질문이 달라서다.
 
 ### 콘솔에서

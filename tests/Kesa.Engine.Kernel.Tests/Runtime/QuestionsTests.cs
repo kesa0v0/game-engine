@@ -33,7 +33,11 @@ namespace Kesa.Engine.Tests.Runtime
             "def wrong():\n    return questions(3)\n" +
             "@ui_action\ndef count():\n    ui.Seen.count = len(questions(\"hit\"))\n" +
             "@ui_action\ndef keep():\n    submit(\"Strike\", p=questions()[0], n=1)\n" +
-            "@bot\ndef counter(me: Ref[Party]):\n    bot.Mind.count = len(questions())\n";
+            "@bot\ndef counter(me: Ref[Party]):\n    bot.Mind.count = len(questions())\n" +
+            "@ui_action\ndef retreat_all():\n    for q in questions(\"hit\"):\n        respond(q, \"engine.pick\", choice=1)\n" +
+            "@ui_action\ndef move():\n    for q in questions(\"turn\"):\n        respond(q, \"Move\", p=q.who[0])\n" +
+            "@ui_action\ndef wrong_kind():\n    for q in questions(\"hit\"):\n        respond(q, \"Move\", p=q.who[0])\n" +
+            "@bot\ndef retreater(me: Ref[Party]):\n    for q in questions():\n        respond(q, \"engine.pick\", choice=1)\n";
 
         private World _world = null!;
         private EntityId _red, _blue;
@@ -140,6 +144,74 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var e = Assert.Throws<WorldException>(() => _world.Call("core.names"))!;
             Assert.That(e.Message, Does.Contain("questions() can only be used on a screen, in a @ui_action or in a @bot"));
+        }
+
+        private long Hp(EntityId id) => ((IntValue)_world.Get(id, _world.Member("Hp", "v"))).Value;
+
+        private IReadOnlyList<UiSubmission> Act(string issuer, string action)
+        {
+            var act = _world.ViewAs(issuer).Act(_world.NewUiState(), action, new Dictionary<string, Value>());
+            Assert.That(act.Succeeded, Is.True, act.Error?.Message);
+            return act.Submissions;
+        }
+
+        [Test]
+        public void RespondAnswersEachOfTwoQuestionsOfTheSameName()
+        {
+            Strike(_red, 1);
+            Strike(_red, 2);
+            var answers = Act("alice", "core.retreat_all");
+            Assert.That(answers.Select(s => s.Request), Is.EqualTo(_world.OpenRequests.Select(q => (long?)q.Id)));
+            foreach (var s in answers) Assert.That(_world.Deliver("alice", s).Answered!.Succeeded, Is.True);
+            Assert.That(_world.OpenRequests, Is.Empty);
+            Assert.That(Hp(_red), Is.EqualTo(5));
+        }
+
+        [Test]
+        public void RespondAnswersWithAResponseCommand()
+        {
+            Assert.That(_world.Submit("alice", "core.Turn", new Dictionary<string, Value> { ["p"] = new EntityValue(_red) }).Succeeded, Is.True);
+            var answer = Act("alice", "core.move").Single();
+            Assert.That(_world.Deliver("alice", answer).Answered!.Succeeded, Is.True);
+            Assert.That(_world.OpenRequests, Is.Empty);
+        }
+
+        [Test]
+        public void AnAnswerToAClosedQuestionOrWithTheWrongCommandIsRefused()
+        {
+            Strike(_red, 1);
+            var stale = Act("alice", "core.retreat_all").Single();
+            var wrong = Act("alice", "core.wrong_kind").Single();
+            Assert.That(_world.Deliver("alice", wrong).Refusal, Is.EqualTo("request " + stale.Request + " does not accept core.Move"));
+            Assert.That(_world.Answer("alice", stale.Request!.Value, _red, 0).Succeeded, Is.True);
+            Assert.That(_world.Deliver("alice", stale).Refusal, Is.EqualTo("request " + stale.Request + " is no longer open"));
+        }
+
+        [Test]
+        public void ABotRespondsToItsOwnQuestionsOnly()
+        {
+            Strike(_red, 1);
+            Strike(_blue, 2);
+            var bot = _world.NewBot("core.retreater", _blue, new Dictionary<string, Value>());
+            var thought = _world.ViewAs("bob").Think(bot);
+            Assert.That(_world.Deliver("bob", thought.Submissions.Single()).Answered!.Succeeded, Is.True);
+            Assert.That(Hp(_blue), Is.EqualTo(4));
+            Assert.That(_world.OpenRequests.Single().Who.Single(), Is.EqualTo(_red));
+        }
+
+        [TestCase("@ui_action\ndef a():\n    x = [respond(q, \"engine.pick\", choice=0) for q in questions()]\n",
+            "respond() asks the host to answer a question, so it can only be called as a statement")]
+        [TestCase("@ui_action\ndef a():\n    for q in questions():\n        respond(q, \"Nope\")\n",
+            "respond() names 'Nope', but there is no command 'core.Nope'")]
+        [TestCase("@ui_action\ndef a():\n    for q in questions():\n        respond(q, \"engine.pick\", 0)\n",
+            "respond() takes the command's arguments by name")]
+        [TestCase("@command(free=True, acts_for=None)\ndef Peek():\n    for q in []:\n        respond(q, \"engine.pick\", choice=0)\n",
+            "the @command 'Peek' uses UI state (ui.…, submit or respond), so it cannot run as game code")]
+        public void MisusedRespondIsALoadError(string defs, string message)
+        {
+            Mod("core", schema: Schema, defs: "Party(\"Red\")\n" + defs);
+            Load(out var diags);
+            Assert.That(diags.Select(d => d.Message), Does.Contain(message));
         }
 
         [TestCase("@command(free=True, acts_for=None)\ndef Peek():\n    n = len(questions())\n", "the @command 'Peek'")]

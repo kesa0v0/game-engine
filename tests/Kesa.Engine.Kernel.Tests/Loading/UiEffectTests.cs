@@ -43,7 +43,7 @@ namespace Kesa.Engine.Tests.Loading
             Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.CmdUiEffect));
-            Assert.That(d.Message, Is.EqualTo("the @command 'Go' uses UI state (ui.… or submit), so it cannot run as game code"));
+            Assert.That(d.Message, Is.EqualTo("the @command 'Go' uses UI state (ui.…, submit or respond), so it cannot run as game code"));
             Assert.That(d.Related.Single().Line, Is.EqualTo(5)); // 증거는 부른 곳
         }
 
@@ -54,7 +54,7 @@ namespace Kesa.Engine.Tests.Loading
                 defs: Attack + "@on(Hit)\ndef react(who):\n    submit(\"Attack\", target=who)\n");
             Load(out var diags);
             Assert.That(diags.Select(d => d.Message),
-                Is.EqualTo(new[] { "the @on handler 'react' uses UI state (ui.… or submit), so it cannot run as game code" }));
+                Is.EqualTo(new[] { "the @on handler 'react' uses UI state (ui.…, submit or respond), so it cannot run as game code" }));
         }
 
         [Test]
@@ -192,7 +192,7 @@ namespace Kesa.Engine.Tests.Loading
             Mod("core", schema: GoalSchema, defs: GoalFunctions + "Goal(\"A\", check=peek, effect=ok)\nGoal(\"B\", check=ok, effect=peek)\n");
             var result = Load(out var diags);
             Assert.That(diags.Select(d => d.Code), Is.EqualTo(new[] { Codes.ValType, Codes.ValType }));
-            Assert.That(diags[0].Message, Does.StartWith("'check': 'peek' uses UI state (ui.… or submit) (at core/defs/defs.py:4:"));
+            Assert.That(diags[0].Message, Does.StartWith("'check': 'peek' uses UI state (ui.…, submit or respond) (at core/defs/defs.py:4:"));
             Assert.That(diags[0].Message, Does.EndWith("a game value cannot depend on a screen"));
             Assert.That(diags[1].Message, Does.StartWith("'effect': 'peek' uses UI state").And.Contain("Action[\"Goal\"]"));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
@@ -207,7 +207,7 @@ namespace Kesa.Engine.Tests.Loading
             var result = Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.PatBadValue));
-            Assert.That(d.Message, Does.StartWith("'peek' uses UI state (ui.… or submit) (at addon/defs/defs.py:2:"));
+            Assert.That(d.Message, Does.StartWith("'peek' uses UI state (ui.…, submit or respond) (at addon/defs/defs.py:2:"));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "addon" }));
         }
     }

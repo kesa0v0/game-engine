@@ -141,6 +141,7 @@ namespace Kesa.Engine.Stubs
             "    responses: list[str]\n" +
             "    who: list[Any]\n" +
             "def questions(name: str = ..., /) -> list[Question]: ...\n" +
+            "def respond(question: Question, command: str, /, **args: Any) -> None: ...\n" +
             "def wait(*, ticks: int, about: Any = ...) -> None: ...\n" +
             "def advance(ticks: int, /) -> None: ...\n" +
             "def emit(signal: Any, /) -> None: ...\n" +

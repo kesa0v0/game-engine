@@ -241,7 +241,7 @@ namespace Kesa.Engine.Script
             {
                 if (fn == null) return;
                 if (fn.TouchesUi)
-                    context.Error(Codes.CmdUiEffect, what + " uses UI state (ui.… or submit), so it cannot run as game code", span, gameHint,
+                    context.Error(Codes.CmdUiEffect, what + " uses UI state (ui.…, submit or respond), so it cannot run as game code", span, gameHint,
                         new[] { fn.UiTouchWitness!.Value });
                 else if (fn.TouchesBot)
                     context.Error(Codes.CmdUiEffect, what + " uses bot state (bot.…), so it cannot run as game code", span, botHint,
@@ -269,9 +269,11 @@ namespace Kesa.Engine.Script
                         "call it on its own line in a @bot or in another function that changes bot state (spec-gaps G374)",
                         new[] { call.Callee.BotWriteWitness!.Value });
                 }
-                foreach (var span in body.SubmitExpressions)
-                    context.Error(Codes.CmdUiEffect, "submit() asks the host to submit a command, so it can only be called as a statement",
-                        span, statementHint);
+                foreach (var pair in body.SubmitExpressions)
+                    context.Error(Codes.CmdUiEffect, pair.Key == PureBuiltins.RespondName
+                            ? "respond() asks the host to answer a question, so it can only be called as a statement"
+                            : "submit() asks the host to submit a command, so it can only be called as a statement",
+                        pair.Value, statementHint);
 
                 var fn = body.Function;
                 if (fn.IsUiAction)
@@ -337,7 +339,7 @@ namespace Kesa.Engine.Script
                 if (fn.TouchesUi)
                 {
                     context.Error(Codes.CmdUiEffect,
-                        what + " uses '" + fn.Name + "', which uses UI state (ui.… or submit); game values cannot depend on a screen",
+                        what + " uses '" + fn.Name + "', which uses UI state (ui.…, submit or respond); game values cannot depend on a screen",
                         span, "UI state is different on every screen and is not saved (spec-gaps G282)", new[] { fn.UiTouchWitness!.Value });
                     return;
                 }
@@ -426,7 +428,7 @@ namespace Kesa.Engine.Script
             public SourceSpan? FirstUiWrite { get; set; }
 
             /// <summary>식 안의 <c>submit(...)</c> (G282: 문장으로만 부른다).</summary>
-            public List<SourceSpan> SubmitExpressions { get; } = new List<SourceSpan>();
+            public List<KeyValuePair<string, SourceSpan>> SubmitExpressions { get; } = new List<KeyValuePair<string, SourceSpan>>();
 
             public void TouchUi(SourceSpan span)
             {
@@ -521,13 +523,15 @@ namespace Kesa.Engine.Script
                     span, Suggest.Hint(member, members));
             }
 
-            public void Positional(SourceSpan span) =>
-                _context.Error(Codes.CmdSubmit, "submit() takes the command's arguments by name", span,
-                    "write submit(\"Attack\", target=enemy) (spec-gaps G278)");
+            public void Positional(string kind, SourceSpan span) =>
+                _context.Error(Codes.CmdSubmit, kind + "() takes the command's arguments by name", span, kind == PureBuiltins.RespondName
+                    ? "write respond(q, \"Move\", to=cell) (spec-gaps G384)"
+                    : "write submit(\"Attack\", target=enemy) (spec-gaps G278)");
 
-            public void SubmitValue(SourceSpan span) =>
-                _context.Error(Codes.CmdUiEffect, "submit can only be called, not used as a value", span,
-                    "call submit(\"Command\", ...) on its own line (spec-gaps G282)");
+            public void SubmitValue(string kind, SourceSpan span) =>
+                _context.Error(Codes.CmdUiEffect, kind + " can only be called, not used as a value", span, kind == PureBuiltins.RespondName
+                    ? "call respond(q, \"Command\", ...) on its own line (spec-gaps G384)"
+                    : "call submit(\"Command\", ...) on its own line (spec-gaps G282)");
 
             public void Bare(SourceSpan span) =>
                 _context.Error(Codes.CmdUiEffect, _bot
@@ -582,11 +586,17 @@ namespace Kesa.Engine.Script
             }
 
             /// <summary>문장 <c>submit("커맨드", 이름=값)</c>: 커맨드 인자는 이름으로만 넘긴다 (G278).</summary>
-            private void Submit(CallExpr call, SortedSet<string> locals)
+            /// <summary>덮어쓰지 않은 <c>submit</c>이나 <c>respond</c>(G384)면 그 이름.</summary>
+            private string? SubmitKind(Expr callee, SortedSet<string> locals) =>
+                IsRuntime(callee, PureBuiltins.SubmitName, locals) ? PureBuiltins.SubmitName :
+                IsRuntime(callee, PureBuiltins.RespondName, locals) ? PureBuiltins.RespondName : null;
+
+            /// <summary><c>submit("커맨드", 이름=…)</c>, <c>respond(q, "커맨드", 이름=…)</c>: 앞의 것 뒤로는 이름으로만 넘긴다.</summary>
+            private void Submit(CallExpr call, string kind, SortedSet<string> locals)
             {
-                for (int i = 1; i < call.Arguments.Count; i++)
+                for (int i = kind == PureBuiltins.RespondName ? 2 : 1; i < call.Arguments.Count; i++)
                     if (call.Arguments[i].Name == null)
-                        _ui.Positional(call.Arguments[i].Value.Span);
+                        _ui.Positional(kind, call.Arguments[i].Value.Span);
                 foreach (var arg in call.Arguments) Expr(arg.Value, locals);
             }
 
@@ -636,10 +646,10 @@ namespace Kesa.Engine.Script
             /// <summary>문장 자리의 호출: 한 줄 전체이거나 이름 대입의 오른쪽 전체 (G117·G135).</summary>
             private void StatementCall(CallExpr call, SortedSet<string> locals)
             {
-                if (IsRuntime(call.Callee, PureBuiltins.SubmitName, locals))
+                if (SubmitKind(call.Callee, locals) is string kind)
                 {
                     _body.WriteUi(call.Span);
-                    Submit(call, locals);
+                    Submit(call, kind, locals);
                     return;
                 }
                 var callee = Resolve(call.Callee, locals);
@@ -716,10 +726,10 @@ namespace Kesa.Engine.Script
             {
                 switch (expr)
                 {
-                    case CallExpr call when IsRuntime(call.Callee, PureBuiltins.SubmitName, locals):
+                    case CallExpr call when SubmitKind(call.Callee, locals) is string kind:
                         _body.TouchUi(call.Span);
-                        _body.SubmitExpressions.Add(call.Span);
-                        Submit(call, locals);
+                        _body.SubmitExpressions.Add(new KeyValuePair<string, SourceSpan>(kind, call.Span));
+                        Submit(call, kind, locals);
                         break;
                     case CallExpr call:
                         var callee = Resolve(call.Callee, locals);
@@ -739,9 +749,9 @@ namespace Kesa.Engine.Script
                         _body.Touch(bare, name.Span);
                         (bare ? _bot : _ui).Bare(name.Span);
                         break;
-                    case NameExpr name when IsRuntime(name, PureBuiltins.SubmitName, locals):
+                    case NameExpr name when SubmitKind(name, locals) is string kind:
                         _body.TouchUi(name.Span);
-                        _ui.SubmitValue(name.Span);
+                        _ui.SubmitValue(kind, name.Span);
                         break;
                     case NameExpr name when IsRuntime(name, PureBuiltins.QuestionsName, locals):
                         if (_body.FirstQuestions == null) _body.FirstQuestions = name.Span;

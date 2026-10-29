@@ -312,7 +312,7 @@ namespace Kesa.Engine.Runtime
         public ActResult Show(ActResult result)
         {
             var submissions = new List<UiSubmission>(result.Submissions.Count);
-            foreach (var s in result.Submissions) submissions.Add(new UiSubmission(s.Command, MaskArguments(s.Arguments)!));
+            foreach (var s in result.Submissions) submissions.Add(new UiSubmission(s.Command, MaskArguments(s.Arguments)!, s.Request));
             return new ActResult(result.Action, result.Outcome)
             {
                 Arguments = MaskArguments(result.Arguments),
