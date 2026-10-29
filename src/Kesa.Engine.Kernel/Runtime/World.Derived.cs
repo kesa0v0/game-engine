@@ -391,6 +391,10 @@ namespace Kesa.Engine.Runtime
                 case ComponentViewBase _:
                     throw new ScriptRuntimeException(Codes.RunType,
                         "'" + display + "' returned a component, which cannot be a value", "return one of its members");
+                case LookValue look:
+                    var keys = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+                    foreach (var pair in look.Keys) keys[pair.Key] = ToPlain(display, pair.Value);
+                    return new LookValue(look.Name, keys);
                 case QuestionValue _:
                 case ChoiceView _:
                     throw new ScriptRuntimeException(Codes.RunType,

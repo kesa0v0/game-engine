@@ -63,6 +63,15 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         [Test]
+        public void AnotherSlotWithTheSameNameIsStillGameData()
+        {
+            Mod("core", schema: Schema + "component(\"Order\", where=field(int, default=0))\ndeftype(\"Job\", components=[\"Order\"])\n",
+                defs: "Unit(\"Foot\", look=\"pine\", where=lambda u: 0)\n" +
+                      "@command(free=True, acts_for=None)\ndef Go(j: Ref[Job]):\n    j.Order.where = j.Order.where + 1\n");
+            LoadClean();
+        }
+
+        [Test]
         public void ALookValueCarriesItsNameAndPlainKeysInOrder()
         {
             Mod("core", schema: Schema,
@@ -98,7 +107,7 @@ namespace Kesa.Engine.Tests.Loading
             var world = new World(LoadClean());
             var u = world.Create("core:Foot");
             var e = Assert.Throws<WorldException>(() => world.Get(u, world.Member("Hp", "seen")))!;
-            Assert.That(e.Message, Does.Contain("look"));
+            Assert.That(e.Message, Does.EndWith("expected str, found look"));
         }
     }
 }

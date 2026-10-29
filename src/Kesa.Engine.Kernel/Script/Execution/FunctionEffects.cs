@@ -318,21 +318,21 @@ namespace Kesa.Engine.Script
                 Game(policy.Function, "the " + policy.Noun + " '" + policy.Function.Name + "'", policy.Function.Definition!.Span);
         }
 
-        /// <summary>스키마가 선언한 순수 자리에 이 모드의 쓰기 함수가 있으면 오류다.</summary>
-        /// <summary><c>Look</c>·<c>Where</c> 칸의 이름들 (G388·G393).</summary>
+        /// <summary><c>Look</c>·<c>Where</c> 칸을 <c>"선언한 타입이나 컴포넌트.칸"</c>으로 (G388·G393).</summary>
         private static SortedSet<string> ScreenSlotNames(SchemaSet schema)
         {
             var names = new SortedSet<string>(System.StringComparer.Ordinal);
-            void Add(IEnumerable<MemberDecl> members)
+            void Add(string owner, IEnumerable<MemberDecl> members)
             {
                 foreach (var m in members)
-                    if (m.Spec.Type is FunctionTypeRef slot && slot.IsScreen) names.Add(m.Name);
+                    if (m.Spec.Type is FunctionTypeRef slot && slot.IsScreen) names.Add(owner + "." + m.Name);
             }
-            foreach (var component in schema.Components) Add(component.Members);
-            foreach (var type in schema.Types) Add(type.Consts);
+            foreach (var component in schema.Components) Add(component.Name, component.Members);
+            foreach (var type in schema.Types) Add(type.Name, type.Consts);
             return names;
         }
 
+        /// <summary>스키마가 선언한 순수 자리에 이 모드의 쓰기 함수가 있으면 오류다.</summary>
         private static void CheckPureSlots(SchemaSet schema, CallContext context)
         {
             void Pure(FunctionValue? fn, string what, SourceSpan span)
@@ -573,7 +573,7 @@ namespace Kesa.Engine.Script
             /// <summary><c>모드id.이름</c>으로 쓸 수 있는 모드들 (G309).</summary>
             public ModNames Mods { get; set; } = ModNames.None;
 
-            /// <summary><c>Look</c>·<c>Where</c> 칸의 이름들.</summary>
+            /// <summary><c>Look</c>·<c>Where</c> 칸의 <c>"타입이나 컴포넌트.칸"</c>.</summary>
             public SortedSet<string> ScreenSlots { get; set; } = new SortedSet<string>(System.StringComparer.Ordinal);
 
             public Walker(ModScope scope, Body body, HostNames hosts, UiNames ui, UiNames bot)
@@ -802,8 +802,9 @@ namespace Kesa.Engine.Script
                         else if (attr.Target is NameExpr root && IsModRoot(root.Name, locals)) Resolve(attr, locals);
                         else
                         {
-                            // Look·Where 칸의 함수는 화면 쪽이라 이름이 같은 칸을 읽는 곳은 UI를 만진 곳으로 센다 (G388)
-                            if (ScreenSlots.Contains(attr.Name)) _body.TouchUi(attr.Span);
+                            // Look·Where 칸의 함수는 화면 쪽이라 x.Unit.look처럼 그 칸을 읽는 곳은 UI를 만진 곳으로 센다 (G388)
+                            if (attr.Target is AttributeExpr owner && ScreenSlots.Contains(owner.Name + "." + attr.Name))
+                                _body.TouchUi(attr.Span);
                             Expr(attr.Target, locals);
                         }
                         break;
