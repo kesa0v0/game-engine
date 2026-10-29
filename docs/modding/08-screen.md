@@ -369,6 +369,33 @@ def selection(me):
 - 호스트는 그 연결의 기록과 함께 부른다. 기록이 바뀌면 다시 부른다(영수증).
 - 화면 함수는 기록을 읽기만 한다. 쓰는 함수는 호스트가 부르지 않는다.
 
+### 열린 질문 읽기: `questions()`
+
+화면 함수·`@ui_action`·`@bot`은 이 연결이 지금 답할 수 있는 열린 질문(5장의 `ask`)을 읽을 수 있다.
+
+```python
+# 맞은 유닛마다 강조할 칸
+def hit_marks(me):
+    return [q.data["unit"] for q in questions("skirmish-hit")]
+```
+
+- `questions()`는 이 연결이 답할 수 있는 열린 질문 전부, `questions("이름")`은 `ask(name=)`이 그 이름인 것만 준다. 늘 목록이다.
+  같은 이름의 질문이 동시에 여럿 열릴 수 있다(두 유닛이 함께 맞음).
+- 질문 값의 칸:
+
+| 칸 | 뜻 |
+|---|---|
+| `q.name` | `ask`의 `name=` |
+| `q.title`, `q.hint`, `q.data` | `ask`에 적은 것. `hint`가 없으면 `None` |
+| `q.choices` | 선택지마다 `value`·`label`·`desc`·`style`·`data`·`index`. `index`는 `engine.pick`에 넘길 번호 |
+| `q.responses` | 받는 응답 커맨드(`"모드.이름"`) |
+| `q.who` | 이 질문에 답할 수 있는 내 엔티티들 |
+
+- 보이는 범위는 7장과 같다. 못 보는 엔티티는 가려진다.
+- 질문이 열리거나 닫히면 이 함수를 읽은 화면 함수를 호스트가 다시 부른다(영수증).
+- 질문 값은 담아 둘 수 없다. `ui.…`·`bot.…`에 넣거나 `submit`의 인자로 넘기면 오류다. 필요한 칸(`q.name`, 선택지 번호)만 꺼내 둔다.
+- 게임 쪽 코드(`@command`·`@on`·`@when`·`acts_for`·보기 정책·`derived`)에서는 쓸 수 없다(`CMD007`). 연결마다 답할 질문이 달라서다.
+
 ### 콘솔에서
 
 - 콘솔은 자리마다 기록 하나를 든다. `ui/console.txt`의 함수는 늘 그 기록과 함께 부른다.

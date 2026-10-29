@@ -16,6 +16,7 @@ namespace Kesa.Engine.Runtime
         private readonly long[] _sourceVersions;
         private readonly long? _tick;
         private readonly long? _seats;
+        private readonly long? _requests;
         private UiState? _ui;
         private long _uiVersion;
 
@@ -28,9 +29,10 @@ namespace Kesa.Engine.Runtime
         }
 
         internal CallResult(string function, Value value, World world, long[] reads, string?[] readNames, long[] readVersions,
-            string[] sources, long[] sourceVersions, long? tick, long? seats)
+            string[] sources, long[] sourceVersions, long? tick, long? seats, long? requests = null)
         {
             _seats = seats;
+            _requests = requests;
             Function = function;
             Value = value;
             _world = world;
@@ -51,7 +53,7 @@ namespace Kesa.Engine.Runtime
         /// 다시 불러야 하나: 함수가 읽은 (엔티티, 컴포넌트)·역방향 컬렉션(죽음 포함), <c>query</c>로 읽은 목록, 읽은 틱 가운데 하나라도
         /// 그 뒤 바뀌었다. 같은 엔티티의 읽지 않은 컴포넌트가 바뀌어도 거짓이다 (G290). Def와 그 <c>const</c>, Ref가 가리키는 대상은
         /// 죽었는지만 본다. 보는 쪽으로 불렀으면 보기 정책이 읽은 것도 들고, 배정 표가 바뀌어도 참이다 (G248). 다른 월드(불러온 월드 포함)면
-        /// 늘 참이다. UI 기록과 함께 불렀고 <c>ui.…</c>를 읽었으면 그 기록이 바뀌어도 참이다(기록 단위, G279).
+        /// 늘 참이다. <c>questions()</c>를 읽었으면 열린 질문이 바뀌어도 참이다(G383). UI 기록과 함께 불렀고 <c>ui.…</c>를 읽었으면 그 기록이 바뀌어도 참이다(기록 단위, G279).
         /// </summary>
         public bool Changed(World world)
         {
@@ -59,6 +61,7 @@ namespace Kesa.Engine.Runtime
             if (_ui != null && _ui.Version != _uiVersion) return true;
             if (_tick != null && world.Tick != _tick.Value) return true;
             if (_seats != null && world.SeatsVersion != _seats.Value) return true;
+            if (_requests != null && world.RequestsVersion != _requests.Value) return true;
             for (int i = 0; i < _reads.Length; i++)
                 if (world.ReadVersion(_reads[i], _readNames[i]) != _readVersions[i]) return true;
             for (int i = 0; i < _sources.Length; i++)

@@ -122,6 +122,14 @@ namespace Kesa.Engine.Loading
                     new[] { fn.BotTouchWitness!.Value });
                 ok = false;
             }
+            else if (fn.ReadsQuestions)
+            {
+                context.Error(Codes.CmdUiEffect, "the @wrap '" + fn.Name + "' of the command '" + target.Name +
+                                                 "' reads the open questions of a connection (questions()), so it cannot run as game code",
+                    fn.Definition!.Span, "a command wrapper runs like the command's body (spec-gaps G320, G383)",
+                    new[] { fn.QuestionsWitness!.Value });
+                ok = false;
+            }
             var walker = new InnerWalker(fn.Parameters[0].Name);
             walker.Block(fn.Definition!.Body);
             foreach (var span in walker.Misused)
@@ -187,11 +195,13 @@ namespace Kesa.Engine.Loading
                 fn.WritesUi && !target.WritesUi ? "changes UI state" :
                 fn.TouchesUi && !target.TouchesUi ? "uses ui.…" :
                 fn.WritesBot && !target.WritesBot ? "changes bot state" :
-                fn.TouchesBot && !target.TouchesBot ? "uses bot.…" : null;
+                fn.TouchesBot && !target.TouchesBot ? "uses bot.…" :
+                fn.ReadsQuestions && !target.ReadsQuestions ? "uses questions()" : null;
             if (wider == null) return true;
             var witness = fn.Writes && !target.Writes ? fn.WriteWitness : fn.Random && !target.Random ? fn.RandomWitness :
                 fn.WritesUi && !target.WritesUi ? fn.UiWriteWitness : fn.TouchesUi && !target.TouchesUi ? fn.UiTouchWitness :
-                fn.WritesBot && !target.WritesBot ? fn.BotWriteWitness : fn.BotTouchWitness;
+                fn.WritesBot && !target.WritesBot ? fn.BotWriteWitness : fn.TouchesBot && !target.TouchesBot ? fn.BotTouchWitness :
+                fn.QuestionsWitness;
             context.Error(Codes.CmdWriteEffect,
                 "'" + fn.Name + "' " + wider + " but '" + target.Name + "' does not, so it cannot wrap it", w.Span,
                 "a wrapper can do no more than the function it wraps, because it runs everywhere that function is called (spec-gaps G311)",

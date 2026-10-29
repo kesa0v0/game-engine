@@ -114,6 +114,7 @@ namespace Kesa.Engine.Script
             Propagate(bodies, f => f.UsesUiState, b => b.FirstUiState, true, (f, w) => f.UiStateWitness = w);
             Propagate(bodies, f => f.TouchesBot, b => b.FirstBotTouch, true, (f, w) => f.BotTouchWitness = w);
             Propagate(bodies, f => f.WritesBot, b => b.FirstBotWrite, false, (f, w) => f.BotWriteWitness = w);
+            Propagate(bodies, f => f.ReadsQuestions, b => b.FirstQuestions, true, (f, w) => f.QuestionsWitness = w);
 
             // 사전 조건은 UI가 거듭 확인하므로 같은 답을 내야 한다 (G178)
             const string randomHint = "draw random numbers in the body instead; derived values, conditions and preconditions must give " +
@@ -200,6 +201,10 @@ namespace Kesa.Engine.Script
             a.Line < b.Line || (a.Line == b.Line && a.Col < b.Col);
 
         /// <summary>본문에 직접 있거나 그런 함수를 부르면(<paramref name="expressions"/>면 식 안의 호출도) 표시한다, 고정점까지.</summary>
+        /// <summary><c>questions()</c>를 게임 쪽에서 썼을 때의 안내 (G383).</summary>
+        internal const string QuestionsHint = "the questions a connection can answer differ for each player; read them in a screen function, " +
+                                              "a @ui_action or a @bot (spec-gaps G383)";
+
         private static void Propagate(List<Body> bodies, Func<FunctionValue, bool> has, Func<Body, SourceSpan?> first,
             bool expressions, Action<FunctionValue, SourceSpan> set)
         {
@@ -241,6 +246,9 @@ namespace Kesa.Engine.Script
                 else if (fn.TouchesBot)
                     context.Error(Codes.CmdUiEffect, what + " uses bot state (bot.…), so it cannot run as game code", span, botHint,
                         new[] { fn.BotTouchWitness!.Value });
+                else if (fn.ReadsQuestions)
+                    context.Error(Codes.CmdUiEffect, what + " reads the open questions of a connection (questions()), so it cannot run as game code",
+                        span, QuestionsHint, new[] { fn.QuestionsWitness!.Value });
             }
 
             const string statementHint = "call it on its own line in a @ui_action or in another function that changes UI state (spec-gaps G282)";
@@ -340,6 +348,13 @@ namespace Kesa.Engine.Script
                         span, "a bot's memory belongs to that bot and is not game state (spec-gaps G374)", new[] { fn.BotTouchWitness!.Value });
                     return;
                 }
+                if (fn.ReadsQuestions)
+                {
+                    context.Error(Codes.CmdUiEffect,
+                        what + " uses '" + fn.Name + "', which reads the open questions of a connection (questions()); game values cannot depend on who looks",
+                        span, QuestionsHint, new[] { fn.QuestionsWitness!.Value });
+                    return;
+                }
                 if (!fn.Writes) return;
                 context.Error(Codes.CmdWriteEffect,
                     what + " uses '" + fn.Name + "', which changes the world; it can only read", span,
@@ -432,6 +447,9 @@ namespace Kesa.Engine.Script
 
             /// <summary>본문의 첫 <c>bot.X.y</c> 대입 (G374).</summary>
             public SourceSpan? FirstBotWrite { get; set; }
+
+            /// <summary>본문의 첫 <c>questions</c> (G383).</summary>
+            public SourceSpan? FirstQuestions { get; set; }
 
             /// <summary><c>ui.…</c>(<paramref name="bot"/>면 <c>bot.…</c>) 기록을 건드린다.</summary>
             public void Touch(bool bot, SourceSpan span)
@@ -630,7 +648,7 @@ namespace Kesa.Engine.Script
                 {
                     if (_body.FirstWrite == null) _body.FirstWrite = call.Span;
                 }
-                else if (!IsNamed(call.Callee, locals)) Expr(call.Callee, locals);
+                else if (!IsNamed(call.Callee, locals) || IsRuntime(call.Callee, PureBuiltins.QuestionsName, locals)) Expr(call.Callee, locals);
                 foreach (var arg in call.Arguments) Expr(arg.Value, locals);
             }
 
@@ -713,7 +731,8 @@ namespace Kesa.Engine.Script
                         }
                         else if (builtin != null)
                             _body.BuiltinExpressionCalls.Add(new KeyValuePair<string, SourceSpan>(builtin, call.Span));
-                        else if (!IsNamed(call.Callee, locals)) Expr(call.Callee, locals);
+                        else if (!IsNamed(call.Callee, locals) || IsRuntime(call.Callee, PureBuiltins.QuestionsName, locals))
+                            Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
                         break;
                     case NameExpr name when StateRoot(name, locals) is bool bare:
@@ -723,6 +742,9 @@ namespace Kesa.Engine.Script
                     case NameExpr name when IsRuntime(name, PureBuiltins.SubmitName, locals):
                         _body.TouchUi(name.Span);
                         _ui.SubmitValue(name.Span);
+                        break;
+                    case NameExpr name when IsRuntime(name, PureBuiltins.QuestionsName, locals):
+                        if (_body.FirstQuestions == null) _body.FirstQuestions = name.Span;
                         break;
                     case NameExpr name:
                         Resolve(name, locals); // 값으로 쓴 커맨드 이름을 기록한다 (G118)

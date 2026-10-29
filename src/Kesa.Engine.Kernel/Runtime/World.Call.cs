@@ -29,13 +29,15 @@ namespace Kesa.Engine.Runtime
             var savedReads = _whenReads;
             var savedSources = _whenReadsSources;
             bool savedTick = _whenReadsTick;
+            bool savedQuestions = _readsQuestions;
             var reads = new SortedSet<CallRead>();
             var sources = new SortedSet<string>(StringComparer.Ordinal);
             _whenReads = reads;
             _whenReadsSources = sources;
             _whenReadsTick = false;
+            _readsQuestions = false;
             Value value;
-            bool tick;
+            bool tick, questions;
             try
             {
                 value = RunGateFunction(fn, args, function);
@@ -43,11 +45,13 @@ namespace Kesa.Engine.Runtime
             finally
             {
                 tick = _whenReadsTick;
+                questions = _readsQuestions;
+                _readsQuestions = savedQuestions;
                 _whenReads = savedReads;
                 _whenReadsSources = savedSources;
                 _whenReadsTick = savedTick;
             }
-            return Receipt(function, value, reads, sources, tick);
+            return Receipt(function, value, reads, sources, tick, questions);
         }
 
         // ---- 보는 쪽으로 부르기 (G248) ----
@@ -169,7 +173,7 @@ namespace Kesa.Engine.Runtime
             return s.ByName != null && s.ByName.TryGetValue(name, out var v) ? v : s.Created;
         }
 
-        private CallResult Receipt(string function, Value value, SortedSet<CallRead> reads, SortedSet<string> sources, bool tick)
+        private CallResult Receipt(string function, Value value, SortedSet<CallRead> reads, SortedSet<string> sources, bool tick, bool questions)
         {
             var ids = new long[reads.Count];
             var readNames = new string?[reads.Count];
@@ -187,7 +191,7 @@ namespace Kesa.Engine.Runtime
             var sourceVersions = new long[names.Length];
             for (int i = 0; i < names.Length; i++) sourceVersions[i] = SourceVersion(names[i]);
             return new CallResult(function, value, this, ids, readNames, versions, names, sourceVersions, tick ? _tick : (long?)null,
-                _viewer != null && _viewRules.Count > 0 ? SeatsVersion : (long?)null);
+                _viewer != null && (_viewRules.Count > 0 || questions) ? SeatsVersion : (long?)null, questions ? RequestsVersion : (long?)null);
         }
 
         /// <summary>

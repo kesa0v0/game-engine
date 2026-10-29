@@ -391,6 +391,11 @@ namespace Kesa.Engine.Runtime
                 case ComponentViewBase _:
                     throw new ScriptRuntimeException(Codes.RunType,
                         "'" + display + "' returned a component, which cannot be a value", "return one of its members");
+                case QuestionValue _:
+                case ChoiceView _:
+                    throw new ScriptRuntimeException(Codes.RunType,
+                        "'" + display + "' holds a " + value.KindName + " from questions(), which cannot be kept",
+                        "a question is gone once it is answered; keep what you need from it, such as q.name or a choice's index (spec-gaps G383)");
             }
             return value;
         }

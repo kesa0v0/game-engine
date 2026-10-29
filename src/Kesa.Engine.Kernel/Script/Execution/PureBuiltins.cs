@@ -90,6 +90,9 @@ namespace Kesa.Engine.Script
         /// </summary>
         public const string SubmitName = "submit";
 
+        /// <summary>이 연결이 답할 수 있는 열린 질문 목록 (G383). "내게"가 있는 화면 함수·<c>@ui_action</c>·<c>@bot</c>만 쓴다.</summary>
+        public const string QuestionsName = "questions";
+
         /// <summary>
         /// 월드를 바꾸거나 멈추거나 신호를 내는 내장. 부르면 쓰기다 (G135·G136·G146). 이름 집합보다 먼저 초기화되어야 한다.
         /// </summary>
@@ -120,7 +123,7 @@ namespace Kesa.Engine.Script
 
         private static SortedSet<string> NameSet()
         {
-            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, DefDataName, DefsName, UiName, BotName, SubmitName };
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, DefDataName, DefsName, UiName, BotName, SubmitName, QuestionsName };
             set.UnionWith(WritingNameArray);
             return set;
         }

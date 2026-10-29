@@ -80,7 +80,11 @@ namespace Kesa.Engine.Runtime
         private void StampRequests()
         {
             if (!_rewinding) ++_clock;
+            ++RequestsVersion;
         }
+
+        /// <summary>열린 질문이 바뀐 횟수: <c>questions()</c>를 읽은 영수증이 본다 (G383). 되감아도 내리지 않는다(다시 계산할 뿐이다).</summary>
+        internal long RequestsVersion { get; private set; }
 
         /// <summary>되감는 중이면 참: 되감기가 부르는 기본 연산은 도장을 찍지 않는다(도장은 따로 되감긴다).</summary>
         private bool _rewinding;

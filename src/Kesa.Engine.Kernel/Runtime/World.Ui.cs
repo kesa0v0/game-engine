@@ -360,6 +360,7 @@ namespace Kesa.Engine.Runtime
         {
             table.Add(PureBuiltins.UiName, new UiRoot(this));
             table.Add(PureBuiltins.BotName, new UiRoot(this, bot: true));
+            table.Add(PureBuiltins.QuestionsName, new PureBuiltin(PureBuiltins.QuestionsName, QuestionsBuiltin));
             table.Add(PureBuiltins.SubmitName,
                 new PureBuiltin(PureBuiltins.SubmitName, (p, k) => SubmitBuiltin(_evaluator?.ScriptMod ?? "", p, k))
                 {

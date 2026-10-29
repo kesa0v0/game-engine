@@ -125,6 +125,22 @@ namespace Kesa.Engine.Stubs
             "    interrupted: bool\n" +
             "def ask(who: Any, title: str | Text, /, *, name: str, choices: list[Any] = ..., responses: list[str] = ..., hint: Any = ..., " +
             "data: Any = ..., blocks_time: bool = ..., deadline: int = ..., about: Any = ..., on_timeout: Any = ...) -> Answer: ...\n" +
+            "class Choice:\n" +
+            "    value: Any\n" +
+            "    label: Any\n" +
+            "    desc: Any\n" +
+            "    style: str | None\n" +
+            "    data: Any\n" +
+            "    index: int\n" +
+            "class Question:\n" +
+            "    name: str\n" +
+            "    title: Any\n" +
+            "    hint: str | None\n" +
+            "    data: Any\n" +
+            "    choices: list[Choice]\n" +
+            "    responses: list[str]\n" +
+            "    who: list[Any]\n" +
+            "def questions(name: str = ..., /) -> list[Question]: ...\n" +
             "def wait(*, ticks: int, about: Any = ...) -> None: ...\n" +
             "def advance(ticks: int, /) -> None: ...\n" +
             "def emit(signal: Any, /) -> None: ...\n" +

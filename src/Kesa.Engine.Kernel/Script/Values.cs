@@ -173,6 +173,13 @@ namespace Kesa.Engine.Script
 
         public bool WritesBot => BotWriteWitness != null;
 
+        /// <summary>
+        /// <c>questions()</c>로 이 연결이 답할 열린 질문을 읽는 곳 (G383). "내게"가 있는 화면 함수·<c>@ui_action</c>·<c>@bot</c>에서만 쓴다. 아니면 null.
+        /// </summary>
+        public SourceSpan? QuestionsWitness { get; internal set; }
+
+        public bool ReadsQuestions => QuestionsWitness != null;
+
         /// <summary><c>@command</c> 함수인가 (G109). 로직에서 쓸 수 없다 (G118).</summary>
         public bool IsCommand => Definition != null && Definition.IsCommand;
 
