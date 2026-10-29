@@ -136,7 +136,10 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>화면 함수를 연결의 UI 기록과 함께 부른다 (G279·G280). 기록은 읽기만 한다(쓰는 함수는 거절된다).</summary>
-        internal CallResult CallAs(WorldView viewer, UiState ui, string function, Value[] arguments)
+        internal CallResult CallAs(WorldView viewer, UiState ui, string function, Value[] arguments) =>
+            ViewingWithUi(viewer, ui, () => Call(function, arguments, withUi: true));
+
+        private CallResult ViewingWithUi(WorldView viewer, UiState ui, Func<CallResult> call)
         {
             if (!ui.Belongs(_schema)) throw new ArgumentException("this UiState was made by another world", nameof(ui));
             if (_act != null) throw new InvalidOperationException("a view function cannot be called while a UI action runs");
@@ -147,7 +150,7 @@ namespace Kesa.Engine.Runtime
             _act = run;
             try
             {
-                var result = Call(function, arguments, withUi: true);
+                var result = call();
                 return run.ReadUi ? result.WithUi(ui, version) : result;
             }
             finally

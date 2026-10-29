@@ -69,6 +69,15 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public CallResult Call(UiState ui, string function, params Value[] arguments) => _world.CallAs(this, ui, function, arguments);
 
+        /// <summary>이 연결이 보는, 지도에 올릴 수 있는 타입(<c>look</c>·<c>where</c> 칸, G403)의 엔티티 (id 순).</summary>
+        public IReadOnlyList<EntityId> WorldEntities() => _world.WorldEntitiesAs(this);
+
+        /// <summary>
+        /// 그 엔티티의 <c>[그림, 자리]</c>(G401·G405)를 이 연결의 UI 기록과 함께. 그리지 않을 엔티티면 값이 <c>None</c>이다. 칸 함수의 오류는
+        /// <see cref="WorldException"/>이다. 영수증은 <see cref="Call(UiState, string, Value[])"/>와 같다.
+        /// </summary>
+        public CallResult WorldObject(UiState ui, EntityId id) => _world.WorldObjectAs(this, ui, id);
+
         /// <summary>
         /// 이 연결의 <c>@ui_action</c>을 부른다 (spec-gaps G278·G280): 인자 검사 → 사전 조건 → 본문. 본문의 읽기는 모두 이 연결로서의 거른
         /// 읽기이고, <c>ui.…</c> 쓰기는 성공했을 때만 <paramref name="ui"/>에 들어간다. 게임은 바뀌지 않는다. 적어 둔 <c>submit</c>은

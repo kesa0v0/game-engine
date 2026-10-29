@@ -19,6 +19,14 @@ namespace Kesa.Engine.Bridge.Local
         /// <summary>키마다의 영수증. 지난 부르기가 실패했으면 null(다시 부를 것).</summary>
         private readonly SortedDictionary<string, CallResult?> _receipts = new SortedDictionary<string, CallResult?>(StringComparer.Ordinal);
 
+        /// <summary>월드 물체마다 지난 계산(G401). 영수증이 null이면 다시 계산한다.</summary>
+        private readonly SortedDictionary<long, Tracked> _objects = new SortedDictionary<long, Tracked>();
+
+        /// <summary>빠진 엔티티와 빠진 때의 도장.</summary>
+        private readonly SortedDictionary<long, long> _gone = new SortedDictionary<long, long>();
+
+        private long _objectStamp;
+
         internal LocalSession(LocalHost host, string connection)
         {
             _host = host;
@@ -86,6 +94,82 @@ namespace Kesa.Engine.Bridge.Local
         {
             _receipts.Remove(key);
             return default;
+        }
+
+        public ValueTask<BridgeWorldObjects> WorldObjects(long since)
+        {
+            var view = View;
+            var ids = new SortedSet<long>();
+            foreach (var id in view.WorldEntities()) ids.Add(id.Value);
+            var left = new List<long>();
+            foreach (var id in _objects.Keys)
+                if (!ids.Contains(id)) left.Add(id);
+            foreach (var id in left)
+            {
+                if (_objects[id].Shown != null) _gone[id] = ++_objectStamp;
+                _objects.Remove(id);
+            }
+            foreach (var id in ids)
+            {
+                if (_objects.TryGetValue(id, out var old) && old.Receipt != null && !old.Receipt.Changed(World)) continue;
+                var shown = Compute(view, id, out var receipt);
+                var before = old?.Shown;
+                long stamp = old?.Stamp ?? 0;
+                if (!Equals(shown, before))
+                {
+                    stamp = ++_objectStamp;
+                    if (shown == null) _gone[id] = stamp;
+                    else _gone.Remove(id);
+                }
+                _objects[id] = new Tracked(receipt, shown, stamp);
+            }
+            var changed = new List<BridgeWorldObject>();
+            foreach (var pair in _objects)
+                if (pair.Value.Shown != null && pair.Value.Stamp > since) changed.Add(pair.Value.Shown);
+            var gone = new List<long>();
+            foreach (var pair in _gone)
+                if (pair.Value > since) gone.Add(pair.Key);
+            return Done(new BridgeWorldObjects(_objectStamp, changed, gone));
+        }
+
+        public ValueTask<BridgeWorldObject?> WorldObject(string key, long entity)
+        {
+            var shown = Compute(View, entity, out var receipt);
+            _receipts[key] = receipt;
+            return Done(shown);
+        }
+
+        /// <summary>한 엔티티의 월드 물체. 그리지 않으면 null이고, 칸 함수가 실패하면 영수증 없이 오류를 싣는다.</summary>
+        private BridgeWorldObject? Compute(WorldView view, long id, out CallResult? receipt)
+        {
+            var entity = new EntityId(id);
+            try
+            {
+                receipt = view.WorldObject(_ui, entity);
+                if (!(receipt.Value is ListValue pair)) return null;
+                var defOf = DefOf(view);
+                return new BridgeWorldObject(new BridgeEntity(id, defOf(entity)), KernelValues.ToBridge(pair.Items[0], defOf).AsLook,
+                    KernelValues.ToBridge(pair.Items[1], defOf).AsWhere, null);
+            }
+            catch (Exception e) when (e is WorldException || e is BridgeValueException)
+            {
+                receipt = null;
+                return new BridgeWorldObject(new BridgeEntity(id, World.IsAlive(entity) ? World.DefOf(entity) : null), null, null, e.Message);
+            }
+        }
+
+        private sealed class Tracked
+        {
+            public Tracked(CallResult? receipt, BridgeWorldObject? shown, long stamp)
+            {
+                Receipt = receipt;
+                Shown = shown;
+                Stamp = stamp;
+            }
+
+            public CallResult? Receipt { get; }
+            public BridgeWorldObject? Shown { get; }
+            public long Stamp { get; }
         }
 
         public ValueTask<IReadOnlyList<BridgeListed>> Entities()

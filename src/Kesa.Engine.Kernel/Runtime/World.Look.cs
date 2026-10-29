@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Schema;
 using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Runtime
@@ -78,5 +79,84 @@ namespace Kesa.Engine.Runtime
 
         private static ScriptRuntimeException LookError(string message, string? hint) =>
             new ScriptRuntimeException(Codes.RunType, message, hint);
+
+        // ---- 월드 물체 (G401·G403·G405·G407) ----
+
+        internal const string LookSlot = "look";
+        internal const string WhereSlot = "where";
+
+        /// <summary>이 타입의 엔티티를 지도에 올리나: 이름이 <c>look</c>인 <c>Look</c> 칸과 <c>where</c>인 <c>Where</c> 칸이 둘 다 있다 (G403).</summary>
+        private static bool IsWorldType(DefType type)
+        {
+            bool look = false, where = false;
+            foreach (var decl in type.Consts)
+            {
+                if (!(decl.Spec.Type is FunctionTypeRef slot)) continue;
+                if (decl.Name == LookSlot && slot.Kind == FunctionSlotKind.Look) look = true;
+                if (decl.Name == WhereSlot && slot.Kind == FunctionSlotKind.Where) where = true;
+            }
+            return look && where;
+        }
+
+        /// <summary>그 연결이 보는, 지도에 올릴 수 있는 타입의 엔티티 (id 순). 그릴지는 <see cref="WorldObjectAs"/>가 정한다.</summary>
+        internal IReadOnlyList<EntityId> WorldEntitiesAs(WorldView viewer)
+        {
+            var ids = new SortedSet<long>();
+            foreach (var type in _schema.Types)
+                if (IsWorldType(type) && _byType.TryGetValue(type, out var set)) ids.UnionWith(set);
+            var result = new List<EntityId>(ids.Count);
+            foreach (var id in ids)
+                if (viewer.Sees(new EntityId(id))) result.Add(new EntityId(id));
+            return result;
+        }
+
+        /// <summary>
+        /// 그 엔티티의 <c>[그림, 자리]</c>를 연결의 UI 기록과 함께 계산한다. 없거나 못 보거나 올릴 타입이 아니거나 칸 하나가 <c>None</c>이면
+        /// <c>None</c>이다 (G405). 영수증은 엔티티가 죽거나 보기 정책이 바뀌는 것도 본다.
+        /// </summary>
+        internal CallResult WorldObjectAs(WorldView viewer, UiState ui, EntityId id) =>
+            ViewingWithUi(viewer, ui, () => Traced("#" + id.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), reads =>
+            {
+                reads.Add(new CallRead(id.Value, ""));
+                if (!_entities.TryGetValue(id.Value, out var entity) || !viewer.Sees(id) || !IsWorldType(entity.Def.Type))
+                    return NoneValue.Instance;
+                var look = SlotValue(entity, id, LookSlot);
+                if (look is NoneValue) return look;
+                var where = SlotValue(entity, id, WhereSlot);
+                if (where is NoneValue) return where;
+                return new ListValue(new[] { look, where });
+            }));
+
+        private Value SlotValue(EntityRecord entity, EntityId id, string slot)
+        {
+            string label = entity.Def.Id + "." + slot;
+            Value raw;
+            try
+            {
+                raw = ConstOf(entity.Def, entity.Def.Type, slot);
+            }
+            catch (ScriptRuntimeException e)
+            {
+                throw ToWorldException(e, label);
+            }
+            Value value = raw switch
+            {
+                StrValue name when slot == LookSlot => name,
+                FunctionValue fn => RunGateFunction(fn, new Value[] { new EntityView(this, id) }, label),
+                _ => throw new WorldException(Codes.RunType, "'" + label + "' holds a " + raw.KindName + ", which cannot be called here yet"),
+            };
+            switch (value)
+            {
+                case NoneValue _:
+                case LookValue _ when slot == LookSlot:
+                case WhereValue _ when slot == WhereSlot:
+                    return value;
+                case StrValue name when slot == LookSlot && name.Value.Length > 0:
+                    return new LookValue(name.Value, new SortedDictionary<string, Value>(StringComparer.Ordinal));
+            }
+            throw new WorldException(Codes.RunType, "'" + label + "' returned " + value.KindName + ", but a " + slot + " slot gives " +
+                                                    (slot == LookSlot ? "look(...) or the name of a look" : "at(...), onto(...) or between(...)") +
+                                                    ", or None to leave it off the screen (spec-gaps G405)");
+        }
     }
 }

@@ -25,6 +25,12 @@ namespace Kesa.Engine.Runtime
             var fn = Callable(function, arguments.Length, withUi);
             var args = new List<Value>(arguments.Length);
             foreach (var a in arguments) args.Add(ToScript(a));
+            return Traced(function, _ => RunGateFunction(fn, args, function));
+        }
+
+        /// <summary><paramref name="body"/>가 읽은 곳을 모아 영수증과 함께 돌려준다. 몸체는 읽은 곳 목록에 직접 더할 수도 있다.</summary>
+        private CallResult Traced(string function, Func<SortedSet<CallRead>, Value> body)
+        {
             // 목록 출처와 틱은 when 조건과 같은 장치로, 읽은 엔티티는 (엔티티, 칸 이름) 단위로 모은다 (G246·G290)
             var savedReads = _whenReads;
             var savedSources = _whenReadsSources;
@@ -41,7 +47,7 @@ namespace Kesa.Engine.Runtime
             SortedSet<string>? questions;
             try
             {
-                value = RunGateFunction(fn, args, function);
+                value = body(reads);
             }
             finally
             {

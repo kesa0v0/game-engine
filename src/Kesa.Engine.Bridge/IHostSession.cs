@@ -41,6 +41,15 @@ namespace Kesa.Engine.Bridge
         /// <summary>그 키의 영수증을 놓는다 (패널을 닫음).</summary>
         ValueTask Unbind(string key);
 
+        /// <summary>
+        /// 그릴 엔티티의 그림과 자리 (G401·G407). <paramref name="since"/>가 0이면 전부, 아니면 그 도장 뒤에 바뀐 것과 빠진 것
+        /// (사라짐, 안 보이게 됨, <c>look</c>·<c>where</c>가 <c>None</c>, G405). 결과의 <see cref="BridgeWorldObjects.Stamp"/>를 다음에 넘긴다.
+        /// </summary>
+        ValueTask<BridgeWorldObjects> WorldObjects(long since);
+
+        /// <summary>한 엔티티의 그림과 자리. 그리지 않을 엔티티면 null. 영수증은 <see cref="Call"/>처럼 <paramref name="key"/>에 둔다.</summary>
+        ValueTask<BridgeWorldObject?> WorldObject(string key, long entity);
+
         /// <summary>이 연결에게 보이는 엔티티를 (스키마의 종류 순, id 순)으로, 도장과 함께 (G329).</summary>
         ValueTask<IReadOnlyList<BridgeListed>> Entities();
 

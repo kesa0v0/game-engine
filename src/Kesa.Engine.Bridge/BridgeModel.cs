@@ -106,6 +106,46 @@ namespace Kesa.Engine.Bridge
         public bool Succeeded => Error == null;
     }
 
+    /// <summary>
+    /// 월드 물체 하나 (G401·G407): 엔티티와 그 그림·자리. 칸 함수가 실패했으면 <see cref="Look"/>·<see cref="Where"/>가 null이고
+    /// <see cref="Error"/>가 이유다(호스트는 대체 그림과 경고 한 번, G392).
+    /// </summary>
+    public sealed class BridgeWorldObject
+    {
+        public BridgeWorldObject(BridgeEntity entity, BridgeLook? look, BridgeWhere? where, string? error)
+        {
+            Entity = entity;
+            Look = look;
+            Where = where;
+            Error = error;
+        }
+
+        public BridgeEntity Entity { get; }
+        public BridgeLook? Look { get; }
+        public BridgeWhere? Where { get; }
+        public string? Error { get; }
+
+        public override bool Equals(object? obj) =>
+            obj is BridgeWorldObject o && o.Entity.Equals(Entity) && Equals(o.Look, Look) && Equals(o.Where, Where) && o.Error == Error;
+
+        public override int GetHashCode() => Entity.GetHashCode();
+    }
+
+    /// <summary><see cref="IHostSession.WorldObjects"/>의 결과: 바뀐 것(id 순), 빠진 엔티티 id(순서대로), 다음에 넘길 도장.</summary>
+    public sealed class BridgeWorldObjects
+    {
+        public BridgeWorldObjects(long stamp, IReadOnlyList<BridgeWorldObject> changed, IReadOnlyList<long> gone)
+        {
+            Stamp = stamp;
+            Changed = changed;
+            Gone = gone;
+        }
+
+        public long Stamp { get; }
+        public IReadOnlyList<BridgeWorldObject> Changed { get; }
+        public IReadOnlyList<long> Gone { get; }
+    }
+
     /// <summary>그 연결이 보는 열린 질문 하나 (G234: <see cref="Who"/>는 그 연결이 답할 수 있는 대상만).</summary>
     public sealed class BridgeRequest
     {
