@@ -75,6 +75,13 @@ namespace Kesa.Engine.Stubs
             "def option(value: Any, /, *, label: str | Text | None = ..., desc: str | Text | None = ..., style: str | None = ..., " +
             "data: dict[str, Any] | None = ...) -> Option: ...\n" +
             "def look(name: str, /, **keys: Any) -> Any: ...\n" +
+            "class Location: ...\n" +
+            "@overload\n" +
+            "def at(value: Any, /) -> Location: ...\n" +
+            "@overload\n" +
+            "def at(space: str, value: Any, /) -> Location: ...\n" +
+            "def onto(entity: Any, point: str = ..., /) -> Location: ...\n" +
+            "def between(first: Location, second: Location, /) -> Location: ...\n" +
             "def floor(x: int | float, /) -> int: ...\n" +
             "def ceil(x: int | float, /) -> int: ...\n" +
             "def clamp(x: Any, low: Any, high: Any, /) -> Any: ...\n" +
@@ -723,7 +730,7 @@ namespace Kesa.Engine.Stubs
                         {
                             case FunctionSlotKind.Cond: return "Callable[..., bool]";
                             case FunctionSlotKind.Look: return "Callable[..., Any] | str";
-                            case FunctionSlotKind.Where: return "Callable[..., Any]";
+                            case FunctionSlotKind.Where: return "Callable[..., Location | None]";
                             default: return "Callable[..., None]";
                         }
                 }

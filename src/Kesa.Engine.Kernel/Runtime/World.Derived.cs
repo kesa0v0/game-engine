@@ -395,6 +395,13 @@ namespace Kesa.Engine.Runtime
                     var keys = new SortedDictionary<string, Value>(StringComparer.Ordinal);
                     foreach (var pair in look.Keys) keys[pair.Key] = ToPlain(display, pair.Value);
                     return new LookValue(look.Name, keys);
+                case WhereValue where:
+                    return where.Kind switch
+                    {
+                        WhereKind.At => WhereValue.At(where.Name, ToPlain(display, where.Target!)),
+                        WhereKind.Onto => WhereValue.Onto(ToPlain(display, where.Target!), where.Name),
+                        _ => WhereValue.Between((WhereValue)ToPlain(display, where.First!), (WhereValue)ToPlain(display, where.Second!)),
+                    };
                 case QuestionValue _:
                 case ChoiceView _:
                     throw new ScriptRuntimeException(Codes.RunType,

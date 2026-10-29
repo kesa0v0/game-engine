@@ -99,6 +99,11 @@ namespace Kesa.Engine.Script
         /// <summary>그림 값 <c>look(이름, 키=값…)</c>을 만드는 내장 (G389).</summary>
         public const string LookName = "look";
 
+        /// <summary>자리 값 <c>at</c>·<c>onto</c>·<c>between</c> (G394·G406).</summary>
+        public const string AtName = "at";
+        public const string OntoName = "onto";
+        public const string BetweenName = "between";
+
         /// <summary>
         /// 월드를 바꾸거나 멈추거나 신호를 내는 내장. 부르면 쓰기다 (G135·G136·G146). 이름 집합보다 먼저 초기화되어야 한다.
         /// </summary>
@@ -129,7 +134,7 @@ namespace Kesa.Engine.Script
 
         private static SortedSet<string> NameSet()
         {
-            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, DefDataName, DefsName, UiName, BotName, SubmitName, QuestionsName, RespondName, LookName };
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, DefDataName, DefsName, UiName, BotName, SubmitName, QuestionsName, RespondName, LookName, AtName, OntoName, BetweenName };
             set.UnionWith(WritingNameArray);
             return set;
         }

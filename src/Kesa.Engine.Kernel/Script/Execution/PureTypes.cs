@@ -390,4 +390,57 @@ namespace Kesa.Engine.Script
 
         public override string KindName => "look";
     }
+
+    public enum WhereKind
+    {
+        /// <summary>호스트의 이름 붙은 공간의 한 자리 (<c>at</c>).</summary>
+        At,
+
+        /// <summary>그 엔티티의 물체에 붙음 (<c>onto</c>).</summary>
+        Onto,
+
+        /// <summary>두 자리 사이 (<c>between</c>).</summary>
+        Between,
+    }
+
+    /// <summary>
+    /// 자리 값 <c>at(공간, 값)</c>·<c>onto(엔티티, 붙는 곳)</c>·<c>between(자리, 자리)</c> (G394·G406). 공간과 붙는 곳의 뜻은 호스트가 정한다.
+    /// 화면으로만 나가며 저장하거나 칸에 담을 수 없다.
+    /// </summary>
+    public sealed class WhereValue : Value, IValueEquality
+    {
+        private WhereValue(WhereKind kind, string? name, Value? target, WhereValue? first, WhereValue? second)
+        {
+            Kind = kind;
+            Name = name;
+            Target = target;
+            First = first;
+            Second = second;
+        }
+
+        public static WhereValue At(string? space, Value value) => new WhereValue(WhereKind.At, space, value, null, null);
+
+        public static WhereValue Onto(Value entity, string? point) => new WhereValue(WhereKind.Onto, point, entity, null, null);
+
+        public static WhereValue Between(WhereValue first, WhereValue second) => new WhereValue(WhereKind.Between, null, null, first, second);
+
+        public WhereKind Kind { get; }
+
+        /// <summary>At의 공간 이름(null이면 기본 공간), Onto의 붙는 곳(null이면 물체 자체).</summary>
+        public string? Name { get; }
+
+        /// <summary>At의 자리 값, Onto의 엔티티.</summary>
+        public Value? Target { get; }
+
+        public WhereValue? First { get; }
+        public WhereValue? Second { get; }
+
+        public bool ValueEquals(Value other) =>
+            other is WhereValue o && o.Kind == Kind && o.Name == Name && Same(o.Target, Target) && Same(o.First, First) &&
+            Same(o.Second, Second);
+
+        private static bool Same(Value? a, Value? b) => a == null ? b == null : b != null && PureOps.ValuesEqual(a, b);
+
+        public override string KindName => "location";
+    }
 }
