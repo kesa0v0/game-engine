@@ -219,7 +219,10 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(Cards(alice).Where(c => c.Classes.Contains("hit")), Is.EqualTo(new[] { Card(alice, target) }));
             Assert.That(Button(alice, target, "retreat").Flags["display"], Is.True);
             Assert.That(Button(alice, UnitsOf(_red)[1], "retreat").Flags["display"], Is.False);
+            Assert.That(Button(alice, target, "retreat").Enabled, Is.True, "the button's check reads the question too");
+            Assert.That(Button(alice, UnitsOf(_red)[1], "hold").Enabled, Is.False);
             Assert.That(Cards(bob).Any(c => c.Classes.Contains("hit")), Is.False, "the question is red's to answer");
+            Assert.That(Button(bob, target, "retreat").Enabled, Is.False);
 
             var results = new List<BridgeResult>();
             alice.Ui.ActionResult += (_, r) => results.Add(r);
@@ -228,6 +231,7 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(_world.OpenRequests.Any(q => q.Name == "skirmish-hit"), Is.False);
             Assert.That(((IntValue)_world.Get(new EntityId(target), _world.Member("Pos", "y"))).Value, Is.EqualTo(3), "it stepped back");
             Assert.That(Card(alice, target).Classes.Contains("hit"), Is.False, "the question closed, so the card was read again");
+            Assert.That(Button(alice, target, "retreat").Enabled, Is.False);
         }
 
         [Test]
