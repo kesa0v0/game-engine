@@ -11,7 +11,11 @@
 ```python
 @bot
 def skirmisher(me: Ref[Party]):
-    submit("engine.pick", choice=0)
+    hits = questions("skirmish-hit")              # 맞아서 버틸지 물으면 모두 버틴다
+    for q in hits:
+        respond(q, "engine.pick", choice=0)
+    if len(hits) > 0 or len(questions("skirmish-turn")) == 0:
+        return                                    # 내 차례가 아니면 아무것도 적지 않는다
     ready = [u for u in query(Unit) if u.Owner.party == me and not u.Ready.acted]
     for u in ready:
         for t in query(Unit):

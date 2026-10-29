@@ -186,6 +186,51 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task AHitUnitsCardLightsUpAndItsRetreatButtonAnswersTheQuestion()
+        {
+            var alice = await Open("alice", _red);
+            var bob = await Open("bob", _blue);
+            await alice.Renderer.Named("ask-end").Press();
+            await alice.Renderer.Named("endturn").Press();
+
+            // 파랑이 (2,1)에서 (2,2)의 빨강을 친다. 뒤 칸 (2,3)이 비어 있어 맞으면 버틸지 물러날지 묻는다. 빗나가면 다음 유닛으로
+            long target = UnitsOf(_red)[0];
+            Place(target, 2, 2);
+            foreach (long attacker in UnitsOf(_blue))
+            {
+                var at = (_world.Get(new EntityId(attacker), _world.Member("Pos", "x")), _world.Get(new EntityId(attacker), _world.Member("Pos", "y")));
+                Place(attacker, 2, 1);
+                var attack = await bob.Session.Deliver("skirmish.Attack", new Dictionary<string, BridgeValue>
+                {
+                    ["party"] = bob.Party, ["unit"] = new BridgeEntity(attacker, null), ["target"] = new BridgeEntity(target, null),
+                });
+                Assert.That(attack.Succeeded, Is.True, attack.ToString());
+                if (_world.OpenRequests.Any(q => q.Name == "skirmish-hit")) break;
+                Place(attacker, ((IntValue)at.Item1).Value, ((IntValue)at.Item2).Value);
+            }
+            Assert.That(_world.OpenRequests.Count(q => q.Name == "skirmish-hit"), Is.EqualTo(1), "one of the three attacks hit");
+
+            await alice.Ui.RefreshAsync();
+            await bob.Ui.RefreshAsync();
+            var order = _world.All("Unit").Select(u => u.Value).ToList();
+            MemoryRenderer.El Card(Seat seat, long unit) => Cards(seat)[order.IndexOf(unit)];
+            MemoryRenderer.El Button(Seat seat, long unit, string name) =>
+                Card(seat, unit).Children.Single(e => e.Attributes.GetValueOrDefault("name") == name);
+            Assert.That(Cards(alice).Where(c => c.Classes.Contains("hit")), Is.EqualTo(new[] { Card(alice, target) }));
+            Assert.That(Button(alice, target, "retreat").Flags["display"], Is.True);
+            Assert.That(Button(alice, UnitsOf(_red)[1], "retreat").Flags["display"], Is.False);
+            Assert.That(Cards(bob).Any(c => c.Classes.Contains("hit")), Is.False, "the question is red's to answer");
+
+            var results = new List<BridgeResult>();
+            alice.Ui.ActionResult += (_, r) => results.Add(r);
+            await Button(alice, target, "retreat").Press();
+            Assert.That(results.Single().Succeeded, Is.True, results.Single().ToString());
+            Assert.That(_world.OpenRequests.Any(q => q.Name == "skirmish-hit"), Is.False);
+            Assert.That(((IntValue)_world.Get(new EntityId(target), _world.Member("Pos", "y"))).Value, Is.EqualTo(3), "it stepped back");
+            Assert.That(Card(alice, target).Classes.Contains("hit"), Is.False, "the question closed, so the card was read again");
+        }
+
+        [Test]
         public async Task ABotInBluesSeatPlaysItsTurnSoRedGetsTheNextOne()
         {
             await _host.Seat(_blue, "bot", ai: true);

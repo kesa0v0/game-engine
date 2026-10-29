@@ -1,6 +1,6 @@
 # 진영 봇 (spec-gaps G367~G379): 호스트가 봇 자리의 진영에 붙이고 판이 바뀔 때마다 한 번씩 부른다.
-# 한 번에 한 수만 적는다: 때릴 수 있으면 때리고, 아니면 가장 가까운 적에게 한 칸, 할 것이 없으면 차례를 넘긴다.
-# 차례가 아닐 때 적은 수는 엔진이 거절한다. 맞아서 버틸지 물러날지 물으면 버틴다.
+# 열린 질문(G383)을 보고 판단한다: 맞아서 버틸지 물러날지 물으면 버티고, 차례면 한 번에 한 수만 적는다.
+# 때릴 수 있으면 때리고, 아니면 가장 가까운 적에게 한 칸, 할 것이 없으면 차례를 넘긴다. 답할 질문이 없으면 아무것도 적지 않는다.
 
 def nearest_enemy(u, me):
     best = None
@@ -19,7 +19,11 @@ def step_toward(u, t):
 
 @bot
 def skirmisher(me: Ref[Party]):
-    submit("engine.pick", choice=0)
+    hits = questions("skirmish-hit")
+    for q in hits:
+        respond(q, "engine.pick", choice=0)
+    if len(hits) > 0 or len(questions("skirmish-turn")) == 0:
+        return
     ready = [u for u in query(Unit) if u.Owner.party == me and not u.Ready.acted]
     for u in ready:
         for t in query(Unit):

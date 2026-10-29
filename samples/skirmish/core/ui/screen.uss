@@ -3,6 +3,7 @@
     --edge: rgb(80, 84, 96);
     --mine: rgb(90, 140, 220);
     --chosen: rgb(250, 205, 70);
+    --hit: rgb(235, 85, 70);
 }
 
 #screen {
@@ -53,6 +54,11 @@
 
 .card.acted {
     opacity: 0.45;
+}
+
+.card.hit {
+    border-color: var(--hit);
+    background-color: rgb(72, 36, 36);
 }
 
 .card #kind {

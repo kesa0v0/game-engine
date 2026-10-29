@@ -75,3 +75,26 @@ def cancel_end_turn():
 
 def asking_end_turn():
     return ui.Confirm.turn != 0 and ui.Confirm.turn == turn_now()
+
+# 맞은 유닛의 질문 (rules.py의 resolve가 묻는다, G381·G383). 이 연결이 답할 수 있는 것만 보인다
+def hit_question(u):
+    for q in questions("skirmish-hit"):
+        if q.data["unit"] == u:
+            return q
+    return None
+
+# UXML 화면이 카드마다 부른다: 이 유닛이 버틸지 물러날지 답을 기다리는가
+def is_hit(u):
+    return hit_question(u) is not None
+
+@ui_action
+def hold(unit: Ref[Unit]):
+    with preconditions:
+        choose(unit, where=lambda u: is_hit(u))
+    respond(hit_question(unit), "engine.pick", choice=0)
+
+@ui_action
+def retreat(unit: Ref[Unit]):
+    with preconditions:
+        choose(unit, where=lambda u: is_hit(u))
+    respond(hit_question(unit), "engine.pick", choice=1)
