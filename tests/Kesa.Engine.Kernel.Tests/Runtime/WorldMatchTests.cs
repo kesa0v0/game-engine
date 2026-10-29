@@ -23,11 +23,11 @@ namespace Kesa.Engine.Tests.Runtime
             "Party(\"Red\")\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Turn(p: Ref[Party]):\n" +
-            "    r = ask(p, \"turn\", choices=[\"attack\", \"wait\", \"flee\"])\n" +
+            "    r = ask(p, \"turn\", choices=[\"attack\", \"wait\", \"flee\"], name=\"turn\")\n" +
             "    match r.choice:\n" +
             "        case \"attack\":\n" +
             "            p.Score.v += 10\n" +
-            "            again = ask(p, \"again?\", choices=[\"yes\", \"no\"])\n" +
+            "            again = ask(p, \"again?\", choices=[\"yes\", \"no\"], name=\"again?\")\n" +
             "            match again.choice:\n" +
             "                case \"yes\":\n" +
             "                    p.Score.v += 100\n" +

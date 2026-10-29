@@ -249,6 +249,13 @@ namespace Kesa.Engine.Script
             private bool IsShadowed(string name, SortedSet<string> locals) =>
                 locals.Contains(name) || _globals.Contains(name) || IsSchemaName(name);
 
+            private static bool HasKeyword(CallExpr call, string name)
+            {
+                foreach (var a in call.Arguments)
+                    if (a.Name == name) return true;
+                return false;
+            }
+
             private bool IsSchemaName(string name) => !_globals.Contains(name) && !Schema.EngineSignals.IsEngine(name) && _isSchemaRuntimeName(name);
 
             private string ShadowKind(string name, SortedSet<string> locals) =>
@@ -317,6 +324,11 @@ namespace Kesa.Engine.Script
                             }
                             Submits.Add(new SubmitUse(command.Value, names, spans, command.Span));
                         }
+                        // ask는 질문 종류의 이름 name=을 꼭 받는다 (G382)
+                        if (call.Callee is NameExpr ask && ask.Name == PureBuiltins.AskName && !IsShadowed(ask.Name, locals) &&
+                            !HasKeyword(call, "name"))
+                            _context.Error(Codes.EvlArguments, "ask() needs name=, the name of this kind of question", call.Span,
+                                "add name=\"…\" so the UI and bots can tell which question this is, e.g. name=\"skirmish-hit\" (spec-gaps G382)");
                         // 덮어쓰지 않은 query에 리터럴로 적은 출처 이름은 ⑤ 링크가 본다 (G192)
                         if (call.Callee is NameExpr query && query.Name == PureBuiltins.QueryName && !IsShadowed(query.Name, locals))
                             CheckQuery(call, locals);

@@ -109,10 +109,11 @@ namespace Kesa.Engine.Bridge
     /// <summary>그 연결이 보는 열린 질문 하나 (G234: <see cref="Who"/>는 그 연결이 답할 수 있는 대상만).</summary>
     public sealed class BridgeRequest
     {
-        public BridgeRequest(long id, IReadOnlyList<string> responses, IReadOnlyList<BridgeEntity> who, BridgeValue title,
+        public BridgeRequest(long id, string name, IReadOnlyList<string> responses, IReadOnlyList<BridgeEntity> who, BridgeValue title,
             IReadOnlyList<BridgeOption> choices, string? hint, BridgeValue data, bool blocksTime, long? deadline)
         {
             Id = id;
+            Name = name;
             Responses = responses;
             Who = who;
             Title = title;
@@ -124,6 +125,8 @@ namespace Kesa.Engine.Bridge
         }
 
         public long Id { get; }
+        /// <summary>질문 종류의 이름 (<c>ask(name=)</c>, G382). 같은 이름의 질문이 동시에 여럿일 수 있다.</summary>
+        public string Name { get; }
         public IReadOnlyList<string> Responses { get; }
         public IReadOnlyList<BridgeEntity> Who { get; }
         /// <summary>제목: 텍스트 키(문자열)나 글.</summary>

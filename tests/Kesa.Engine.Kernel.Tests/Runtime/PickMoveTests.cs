@@ -26,7 +26,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    return not entity.Fog.hidden\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Open(a: Ref[Party], b: Ref[Party], u: Ref[Unit]):\n" +
-            "    r = ask([a, b], \"go\", choices=[\"left\", u], responses=[\"Wait\"])\n" +
+            "    r = ask([a, b], \"go\", choices=[\"left\", u], responses=[\"Wait\"], name=\"go\")\n" +
             "    r.by.Score.v = 1000 if r.response is None else 2000\n" +
             "    r.by.Score.v += r.index if r.index is not None else 0\n" +
             "@command(acts_for=lambda party: party)\n" +

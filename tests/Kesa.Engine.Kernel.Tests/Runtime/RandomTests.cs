@@ -26,7 +26,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    if boom:\n        x = 1 // 0\n" +
             "@command(free=True, acts_for=None)\ndef Other(u: Ref[Unit]):\n    u.Roll.c = random.randint(1, 1000000)\n" +
             "@command(free=True, acts_for=None)\ndef Duel(u: Ref[Unit]):\n" +
-            "    u.Roll.a = random.randint(1, 1000000)\n    r = ask(u, \"Q\", choices=[\"x\", \"y\"])\n" +
+            "    u.Roll.a = random.randint(1, 1000000)\n    r = ask(u, \"Q\", choices=[\"x\", \"y\"], name=\"Q\")\n" +
             "    u.Roll.b = random.randint(1, 1000000)\n    u.Roll.c = roll()\n" +
             "def roll():\n    return random.randint(1, 1000000)\n";
 
@@ -152,7 +152,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             // 이어 간 구간이 실패하면 Flow는 답하기 전으로 돌아간다(C9): 다시 답하면 같은 값이어야 한다
             var content = Content("@command(free=True, acts_for=None)\ndef Risky(u: Ref[Unit]):\n" +
-                                  "    r = ask(u, \"Q\", choices=[\"bad\", \"good\"])\n    u.Roll.a = random.randint(1, 1000000)\n" +
+                                  "    r = ask(u, \"Q\", choices=[\"bad\", \"good\"], name=\"Q\")\n    u.Roll.a = random.randint(1, 1000000)\n" +
                                   "    if r.index == 0:\n        x = 1 // 0\n");
             var plain = Make(content);
             var q = Run(plain, "Risky").OpenedRequest!;

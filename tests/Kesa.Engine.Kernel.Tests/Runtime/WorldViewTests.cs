@@ -43,7 +43,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    pass\n" +
             "@command(free=True, acts_for=lambda party: party)\n" +
             "def Target(party: Ref[Party], unit: Ref[Unit]):\n" +
-            "    r = ask(party, text(\"q.target\", who=unit), choices=[unit, \"skip\"], data={\"u\": unit})\n" +
+            "    r = ask(party, text(\"q.target\", who=unit), choices=[unit, \"skip\"], data={\"u\": unit}, name=\"q.target\")\n" +
             "    party.Hand.cards = r.index\n";
 
         private World _w = null!;
@@ -159,7 +159,7 @@ namespace Kesa.Engine.Tests.Runtime
             // 남(A)에게 묻는 질문을 연다
             "@command(free=True, acts_for=lambda party: party)\n" +
             "def Poke(party: Ref[Party], other: Ref[Party]):\n" +
-            "    r = ask(other, \"q.poke\", choices=[\"ok\"])\n" +
+            "    r = ask(other, \"q.poke\", choices=[\"ok\"], name=\"q.poke\")\n" +
             "    pass\n";
 
         private SubmitResult SubmitAs(string issuer, string command, params (string, EntityId)[] args)
@@ -517,7 +517,7 @@ namespace Kesa.Engine.Tests.Runtime
             NewWorld(Defs +
                      "@command(free=True, acts_for=None)\n" +
                      "def Vote(a: Ref[Party], b: Ref[Party]):\n" +
-                     "    r = ask([a, b], \"vote\", choices=[\"yes\", \"no\"])\n");
+                     "    r = ask([a, b], \"vote\", choices=[\"yes\", \"no\"], name=\"vote\")\n");
             var r = _w.Submit("A", "banking.Vote", new Dictionary<string, Value>
             {
                 ["a"] = new EntityValue(_a), ["b"] = new EntityValue(_b),

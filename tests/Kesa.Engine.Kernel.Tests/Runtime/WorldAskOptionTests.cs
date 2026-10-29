@@ -30,7 +30,7 @@ namespace Kesa.Engine.Tests.Runtime
             "def Offer(p: Ref[Party], u: Ref[Unit]):\n" +
             "    opts = [option(\"accept\", label=\"cult-accept\", desc=text(\"cult-accept-desc\", unit=u), style=\"purple-fire\"," +
             " data={\"cost\": 3, \"unit\": u}), \"decline\", option(u)]\n" +
-            "    r = ask(p, \"cult-offer\", choices=opts, deadline=5, on_timeout=\"decline\")\n" +
+            "    r = ask(p, \"cult-offer\", choices=opts, deadline=5, on_timeout=\"decline\", name=\"cult-offer\")\n" +
             "    p.Score.v = len(opts) * 10 + r.index\n" +
             "    if r.choice == \"accept\":\n" +
             "        p.Score.v += 100\n" +
@@ -46,8 +46,8 @@ namespace Kesa.Engine.Tests.Runtime
             "        o = option(\"a\", label=5)\n" +
             "    else:\n" +
             "        o = \"a\"\n" +
-            "        ask(p, \"q\", choices=[\"a\"], data={\"o\": option(\"a\")})\n" +
-            "    ask(p, \"q\", choices=[o])\n";
+            "        ask(p, \"q\", choices=[\"a\"], data={\"o\": option(\"a\")}, name=\"q\")\n" +
+            "    ask(p, \"q\", choices=[o], name=\"q\")\n";
 
         private World _w = null!;
         private EntityId _red, _scout;

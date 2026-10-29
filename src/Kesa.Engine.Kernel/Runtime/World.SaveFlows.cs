@@ -182,6 +182,7 @@ namespace Kesa.Engine.Runtime
             foreach (var n in request.ResponseNames) names.Add(new JsonString(n));
             return new JsonObject()
                 .Add("id", new JsonNumber(request.Id))
+                .Add("name", new JsonString(request.Name))
                 .Add("who", who)
                 .Add("title", SaveValue(request.Title))
                 .Add("choices", choices)

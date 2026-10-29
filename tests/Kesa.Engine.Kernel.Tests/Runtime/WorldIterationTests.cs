@@ -163,7 +163,7 @@ namespace Kesa.Engine.Tests.Runtime
         [TestCase("x = c.units + []")]
         [TestCase("x = min(c.units)")]
         [TestCase("x = random.choice(c.units)")]
-        [TestCase("r = ask(c, \"Pick\", choices=c.units)")]
+        [TestCase("r = ask(c, \"Pick\", choices=c.units, name=\"Pick\")")]
         public void ListOnlyPlacesPointToACopy(string stmt)
         {
             Make("@command(free=True, acts_for=None)\ndef Use(c: Ref[City]):\n    " + stmt + "\n");
@@ -202,7 +202,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             Make("@command(free=True, acts_for=None)\ndef Patrol(c: Ref[City]):\n" +
                  "    for u in c.units:\n" +
-                 "        r = ask(u, \"Report?\", choices=[\"yes\"])\n" +
+                 "        r = ask(u, \"Report?\", choices=[\"yes\"], name=\"Report?\")\n" +
                  "        c.Tally.n += 1\n");
             Ok(RunOnCity("Patrol"));
             var open = _w.OpenRequests.Single();

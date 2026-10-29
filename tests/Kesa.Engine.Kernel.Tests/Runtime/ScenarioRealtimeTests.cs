@@ -32,7 +32,7 @@ namespace Kesa.Engine.Tests.Runtime
             // 기한 3틱의 선택. 시간은 흐르고, 답이나 기본 답이 오면 같은 스크립트가 이어진다
             "@command(free=True, acts_for=lambda party: party)\n" +
             "def Raid(party: Ref[Party]):\n" +
-            "    r = ask(party, \"raid.where\", choices=[\"north\", \"south\", \"retreat\"], deadline=3, on_timeout=\"retreat\")\n" +
+            "    r = ask(party, \"raid.where\", choices=[\"north\", \"south\", \"retreat\"], deadline=3, on_timeout=\"retreat\", name=\"raid.where\")\n" +
             "    party.Army.decided = now()\n" +
             "    if r.choice != \"retreat\":\n" +
             "        party.Army.at = r.choice\n" +
@@ -50,7 +50,7 @@ namespace Kesa.Engine.Tests.Runtime
             // 기한 없는 질문은 시간을 막는다 (G159)
             "@command(free=True, acts_for=lambda party: party)\n" +
             "def Ambush(party: Ref[Party]):\n" +
-            "    r = ask(party, text(\"ambush.where\", by=party), choices=[\"pass\", \"woods\"])\n" +
+            "    r = ask(party, text(\"ambush.where\", by=party), choices=[\"pass\", \"woods\"], name=\"ambush.where\")\n" +
             "    party.Army.at = r.choice\n";
 
         private ContentLoadResult _content = null!;

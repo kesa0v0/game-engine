@@ -28,7 +28,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    p.Score.v = p.Score.v + n\n" +
             // 한 줄 전체로 불려 결과를 버리는 도우미 안의 ask
             "def confirm(p):\n" +
-            "    ask(p, \"Ok\", choices=[\"ok\"])\n" +
+            "    ask(p, \"Ok\", choices=[\"ok\"], name=\"Ok\")\n" +
             // 끝난 함수의 묶음이 프레임의 묶음을 잡은 람다를 든다 / 자기를 잡은 묶음 (G143)
             "def make(h):\n" +
             "    k = lambda: h(1)\n" +
@@ -44,7 +44,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    key = lambda o: o.Score.v\n" +
             "    for o in others:\n" +
             "        h = o.Score\n" +
-            "        r = ask(p, text(\"Pick\", who=o), choices=[o, \"skip\"], data={\"o\": o})\n" +
+            "        r = ask(p, text(\"Pick\", who=o), choices=[o, \"skip\"], data={\"o\": o}, name=\"Pick\")\n" +
             "        if r.index == 0:\n" +
             "            picked = picked + [r.choice]\n" +
             "            bump(o, 1)\n" +
@@ -72,21 +72,21 @@ namespace Kesa.Engine.Tests.Runtime
             "    cv = Score(v=lam)\n" +
             "    tv = text(\"k\", f=p)\n" +
             "    sg = Hit(who=p, n=2)\n" +
-            "    r0 = ask(p, \"Start\", choices=[\"go\", \"rush\"])\n" +
+            "    r0 = ask(p, \"Start\", choices=[\"go\", \"rush\"], name=\"Start\")\n" +
             "    bonus = 5\n" +
             "    picked = survey(p, [p, q])\n" +
             "    for i in rg:\n" +
-            "        r2 = ask(q, \"Again\", choices=[\"x\", \"y\", \"z\"], hint=\"std.choice\")\n" +
+            "        r2 = ask(q, \"Again\", choices=[\"x\", \"y\", \"z\"], hint=\"std.choice\", name=\"Again\")\n" +
             "        if r2.index == 0:\n" +
             "            bump(p, 10)\n" +
             "        elif r2.index == 1:\n" +
-            "            r3 = ask(p, \"Sure\", choices=[\"yes\", \"no\"])\n" +
+            "            r3 = ask(p, \"Sure\", choices=[\"yes\", \"no\"], name=\"Sure\")\n" +
             "            if r3.index == 0 and p.Wounded is None:\n" +
             "                attach(p, w)\n" +
             "        else:\n" +
             "            hv.v = \"oops\"\n" +
             "    for each in [lam, same]:\n" +
-            "        ask(p, \"Each\", choices=[\"ok\"])\n" +
+            "        ask(p, \"Each\", choices=[\"ok\"], name=\"Each\")\n" +
             "    confirm(q)\n" +
             "    hv.v = hv.v + f(len(picked)) + g([1, 2]) + tier.tier + row.level + r0.index * 100\n" +
             "    hv.log = hv.log + (\"S\" if sk == p.Skill else \"-\") + (\"H\" if hv == p.Score else \"-\")\n" +
@@ -308,13 +308,13 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("banking", schema: Schema, defs: "Party(\"Red\")\n" +
                                                  "@command(free=True, acts_for=None)\n" +
                                                  "def Hold(p: Ref[Party]):\n" +
-                                                 "    r = ask(p, \"Go\", choices=[\"a\", 1, None, True, 1.5])\n" +
+                                                 "    r = ask(p, \"Go\", choices=[\"a\", 1, None, True, 1.5], name=\"Go\")\n" +
                                                  "    p.Score.v = -r.index if r.index > 0 else len([lambda x: x[0]])\n");
             var world = new World(LoadClean());
             var red = world.Create("banking:Red");
             world.Seat(red, "host");
             world.Submit("host", "banking.Hold", new Dictionary<string, Value> { ["p"] = new EntityValue(red) });
-            Assert.That(Encoding.UTF8.GetString(world.Save()), Does.Contain("\"hash\": \"15198fccf5c8e6bb4be771e5743b6936\""));
+            Assert.That(Encoding.UTF8.GetString(world.Save()), Does.Contain("\"hash\": \"c529deb686312147dcb45ffad812bd3d\""));
         }
 
         [Test]
@@ -447,7 +447,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    passes = 0\n" +
             "    for i in range(6):\n" +
             "        p = a if i % 2 == 0 else b\n" +
-            "        r = ask(p, \"Bid\", responses=[\"Pass\", \"Bid\"])\n" +
+            "        r = ask(p, \"Bid\", responses=[\"Pass\", \"Bid\"], name=\"Bid\")\n" +
             "        if last is not None and last.response == \"Bid\":\n" +
             "            a.Score.log = a.Score.log + (\"b\" if last.by == b else \"a\")\n" +
             "        last = r\n" +

@@ -24,7 +24,7 @@ namespace Kesa.Engine.Tests.Loading
             "def base(s):\n    return 10\n" +
             "def bump(s):\n    s.Mark.n += 1\n" +
             "def roll():\n    return random.randint(1, 6)\n" +
-            "def step(s):\n    r = ask(s, \"Go\", choices=[1, 2])\n    s.Mark.n += r.choice\n" +
+            "def step(s):\n    r = ask(s, \"Go\", choices=[1, 2], name=\"Go\")\n    s.Mark.n += r.choice\n" +
             "@command(free=True, acts_for=None)\ndef Use(s: Ref[Ship]):\n    s.Mark.n = base(s)\n" +
             "@command(free=True, acts_for=None)\ndef Bump(s: Ref[Ship]):\n    bump(s)\n" +
             "@command(free=True, acts_for=None)\ndef Step(s: Ref[Ship]):\n    step(s)\n    s.Mark.n *= 10\n" +

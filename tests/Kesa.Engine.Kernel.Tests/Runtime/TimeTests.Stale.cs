@@ -78,7 +78,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             // 재현했던 것: 답할 엔티티가 모두 사라진 막는 질문이 Advance를 0틱에 멈추고, 파괴된 엔티티로서 한 답이 받아졌다
             var world = Make(Kill + "@command(free=True, acts_for=None)\ndef Ask():\n" +
-                             "    x = spawn(\"Scout\")\n    r = ask(x, \"Raid?\", choices=[\"fight\"])\n    spawn(\"Scout\")\n");
+                             "    x = spawn(\"Scout\")\n    r = ask(x, \"Raid?\", choices=[\"fight\"], name=\"Raid?\")\n    spawn(\"Scout\")\n");
             var q = world.Submit("host", "core.Ask", new Dictionary<string, Value>()).OpenedRequest!;
             var x = q.Who.Single();
             var canceled = Destroy(world, x).Reactions.Single();
@@ -94,7 +94,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void AQuestionKeepsGoingWhileSomeoneCanStillAnswer()
         {
             var world = Make(Kill + "@command(free=True, acts_for=None)\ndef Ask(u: Ref[Unit]):\n" +
-                             "    x = spawn(\"Scout\")\n    r = ask([x, u], \"Raid?\", choices=[\"fight\"])\n");
+                             "    x = spawn(\"Scout\")\n    r = ask([x, u], \"Raid?\", choices=[\"fight\"], name=\"Raid?\")\n");
             var q = world.Submit("host", "core.Ask", new Dictionary<string, Value> { ["u"] = new EntityValue(_u) }).OpenedRequest!;
             var x = q.Who.First(id => id != _u);
             Assert.That(Destroy(world, x).Reactions, Is.Empty);
@@ -200,7 +200,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void AQuestionStillEndsWhenNobodyCanAnswerWhateverItIsAbout()
         {
-            var world = Ruled("    r = ask(town.Rule.ruler, \"Tax?\", choices=[\"yes\"], about=[])\n");
+            var world = Ruled("    r = ask(town.Rule.ruler, \"Tax?\", choices=[\"yes\"], about=[], name=\"Tax?\")\n");
             Assert.That(Destroy(world, _ruler).Reactions.Single().Message, Does.Contain("everyone who could answer"));
         }
 
@@ -289,7 +289,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             // 표준 모드의 턴 루프 모양 (U3): 차례를 묻고(시간을 막는다), 답이 오면 한 틱 진행하고 다시 묻는다
             var world = Make("@command(free=True, acts_for=None)\ndef Go(u: Ref[Unit]):\n    for i in range(2):\n" +
-                             "        r = ask(u, \"your_turn\", choices=[\"end\"])\n        advance(1)\n    u.Out.s = \"over\"\n");
+                             "        r = ask(u, \"your_turn\", choices=[\"end\"], name=\"your_turn\")\n        advance(1)\n    u.Out.s = \"over\"\n");
             var q = Go(world).OpenedRequest!;
             Assert.That(world.Advance().Blocked, Is.True, "the turn question blocks time");
             var a = world.Answer("host", q.Id, _u, 0);
@@ -305,7 +305,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void ABlockingQuestionStopsAScriptAdvance()
         {
-            var world = Make("@command(free=True, acts_for=None)\ndef Hold(u: Ref[Unit]):\n    r = ask(u, \"Q\", choices=[\"a\"])\n" +
+            var world = Make("@command(free=True, acts_for=None)\ndef Hold(u: Ref[Unit]):\n    r = ask(u, \"Q\", choices=[\"a\"], name=\"Q\")\n" +
                              "@command(free=True, acts_for=None)\ndef Go(u: Ref[Unit]):\n    n = advance(3)\n    u.Out.n = n + 10\n");
             world.Submit("host", "core.Hold", new Dictionary<string, Value> { ["u"] = new EntityValue(_u) });
             Go(world);
@@ -442,7 +442,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var world = Make("@command(acts_for=lambda u: u)\ndef Pass(u: Ref[Unit]):\n    pass\n" +
                              "@command(free=True, acts_for=None)\ndef Raid(u: Ref[Unit]):\n" +
-                             "    r = ask(u, \"Raid?\", choices=[\"Pass\"], responses=[\"Pass\"], deadline=1, on_timeout=\"Pass\")\n");
+                             "    r = ask(u, \"Raid?\", choices=[\"Pass\"], responses=[\"Pass\"], deadline=1, on_timeout=\"Pass\", name=\"Raid?\")\n");
             var r = Raid(world);
             Assert.That(r.Error!.Message, Does.Contain("is both a choice and a response"));
         }

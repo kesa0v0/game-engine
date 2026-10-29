@@ -21,7 +21,7 @@ namespace Kesa.Engine.Tests.Runtime
             "Party(\"Side\")\nUnit(\"Pawn\")\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Open(a: Ref[Party], b: Ref[Party]):\n" +
-            "    r = ask([a, b], \"go\", responses=[\"Step\", \"Push\", \"Wait\", \"Bid\"])\n" +
+            "    r = ask([a, b], \"go\", responses=[\"Step\", \"Push\", \"Wait\", \"Bid\"], name=\"go\")\n" +
             // 답하는 진영이 매개변수 그대로: 엔진이 질문 대상으로 채운다
             "@command(acts_for=lambda party: party)\n" +
             "def Step(party: Ref[Party], unit: Ref[Unit], d: int):\n" +

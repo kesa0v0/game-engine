@@ -230,8 +230,11 @@ namespace Kesa.Engine.Runtime
             var hintNode = Field(r, "hint");
             string? hint = hintNode is JsonNull ? null : Text(hintNode, "a hint");
             var data = LoadValue(Field(r, "data"));
+            // name이 생기기 전(G382)의 세이브는 이름 없는 질문으로 불러온다
+            var nameNode = r.Get("name");
             var request = new Request(requestId, flow, command, who, title, choices, responses, names, hint, data)
             {
+                Name = nameNode == null ? "" : Text(nameNode, "a question name"),
                 BlocksTime = Bool(Field(r, "blocks_time"), "blocks_time"),
                 Deadline = Field(r, "deadline") is JsonNull ? (long?)null : Long(Field(r, "deadline"), "a deadline"),
             };

@@ -123,7 +123,7 @@ namespace Kesa.Engine.Stubs
             "    by: Any\n" +
             "    response: Any\n" +
             "    interrupted: bool\n" +
-            "def ask(who: Any, title: str | Text, /, *, choices: list[Any] = ..., responses: list[str] = ..., hint: Any = ..., " +
+            "def ask(who: Any, title: str | Text, /, *, name: str, choices: list[Any] = ..., responses: list[str] = ..., hint: Any = ..., " +
             "data: Any = ..., blocks_time: bool = ..., deadline: int = ..., about: Any = ..., on_timeout: Any = ...) -> Answer: ...\n" +
             "def wait(*, ticks: int, about: Any = ...) -> None: ...\n" +
             "def advance(ticks: int, /) -> None: ...\n" +

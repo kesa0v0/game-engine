@@ -274,8 +274,8 @@ namespace Kesa.Engine.Tests.Runtime
         {
             // ask → 답 → wait(자는 동안 저장·불러오기) → 깨어나 ask → 답. "request"와 "wake_at"이 서로 바뀌는 저장 (C1·C4)
             const string defs = "@command(free=True, acts_for=None)\ndef Quest(u: Ref[Unit]):\n" +
-                                "    r = ask(u, \"Go?\", choices=[\"a\", \"b\"])\n    u.Out.s = r.choice\n    wait(ticks=2)\n" +
-                                "    q = ask(u, \"Again?\", choices=[\"c\", \"d\"])\n    u.Out.s = u.Out.s + q.choice\n";
+                                "    r = ask(u, \"Go?\", choices=[\"a\", \"b\"], name=\"Go?\")\n    u.Out.s = r.choice\n    wait(ticks=2)\n" +
+                                "    q = ask(u, \"Again?\", choices=[\"c\", \"d\"], name=\"Again?\")\n    u.Out.s = u.Out.s + q.choice\n";
             var world = Make(defs);
             var first = world.Submit("host", "core.Quest", new Dictionary<string, Value> { ["u"] = new EntityValue(_u) }).OpenedRequest!;
             var a = world.Answer("host", first.Id, _u, 1);
@@ -326,9 +326,9 @@ namespace Kesa.Engine.Tests.Runtime
 
         private const string Asker =
             "@command(free=True, acts_for=None)\ndef Raid(u: Ref[Unit], stop: bool):\n" +
-            "    r = ask(u, \"Raid?\", choices=[\"fight\", \"hide\"], blocks_time=stop)\n    u.Out.s = r.choice\n" +
+            "    r = ask(u, \"Raid?\", choices=[\"fight\", \"hide\"], blocks_time=stop, name=\"Raid?\")\n    u.Out.s = r.choice\n" +
             "@command(free=True, acts_for=None)\ndef Plain(u: Ref[Unit]):\n" +
-            "    r = ask(u, \"Raid?\", choices=[\"fight\", \"hide\"])\n    u.Out.s = r.choice\n";
+            "    r = ask(u, \"Raid?\", choices=[\"fight\", \"hide\"], name=\"Raid?\")\n    u.Out.s = r.choice\n";
 
         private SubmitResult Raid(World w, bool stop) => w.Submit("host", "core.Raid",
             new Dictionary<string, Value> { ["u"] = new EntityValue(_u), ["stop"] = stop ? BoolValue.True : BoolValue.False });
@@ -368,7 +368,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             // 매 틱 전에 다시 본다 (X2): 틱 2에 깨어난 Flow가 막는 질문을 열면 advance(5)는 2틱에서 멈춘다
             var world = Make("@command(free=True, acts_for=None)\ndef Later(u: Ref[Unit]):\n    wait(ticks=2)\n" +
-                             "    r = ask(u, \"Now?\", choices=[\"yes\"])\n    u.Out.s = r.choice\n");
+                             "    r = ask(u, \"Now?\", choices=[\"yes\"], name=\"Now?\")\n    u.Out.s = r.choice\n");
             world.Submit("host", "core.Later", new Dictionary<string, Value> { ["u"] = new EntityValue(_u) });
             var r = world.Advance(5);
             Assert.That(r.Advanced, Is.EqualTo(2));
@@ -396,7 +396,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void BlocksTimeMustBeABool()
         {
             var world = Make("@command(free=True, acts_for=None)\ndef Raid(u: Ref[Unit]):\n" +
-                             "    r = ask(u, \"Raid?\", choices=[\"fight\"], blocks_time=1)\n");
+                             "    r = ask(u, \"Raid?\", choices=[\"fight\"], blocks_time=1, name=\"Raid?\")\n");
             var r = world.Submit("host", "core.Raid", new Dictionary<string, Value> { ["u"] = new EntityValue(_u) });
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
             Assert.That(r.Error!.Message, Does.Contain("blocks_time= of ask() must be True or False, not int"));
@@ -405,7 +405,7 @@ namespace Kesa.Engine.Tests.Runtime
         // ---- deadline (spec X2, spec-gaps G159·G160) ----
 
         private World Deadlined(string extra) => Make("@command(free=True, acts_for=None)\ndef Raid(u: Ref[Unit]):\n" +
-                                                       "    r = ask(u, \"Raid?\", choices=[\"fight\", \"hide\"]" + extra + ")\n");
+                                                       "    r = ask(u, \"Raid?\", choices=[\"fight\", \"hide\"]" + extra + ", name=\"Raid?\")\n");
 
         private SubmitResult Raid(World w) =>
             w.Submit("host", "core.Raid", new Dictionary<string, Value> { ["u"] = new EntityValue(_u) });
@@ -459,7 +459,7 @@ namespace Kesa.Engine.Tests.Runtime
             var save = world.Save();
             Assert.That(Encoding.UTF8.GetString(save), Does.Contain("\"deadline\": 5"));
             var back = World.Load(Content("@command(free=True, acts_for=None)\ndef Raid(u: Ref[Unit]):\n" +
-                                          "    r = ask(u, \"Raid?\", choices=[\"fight\", \"hide\"], deadline=4, on_timeout=\"hide\")\n"), save).World!;
+                                          "    r = ask(u, \"Raid?\", choices=[\"fight\", \"hide\"], deadline=4, on_timeout=\"hide\", name=\"Raid?\")\n"), save).World!;
             Assert.That(back.Save(), Is.EqualTo(save), "C4");
             Assert.That(back.OpenRequests.Single().Deadline, Is.EqualTo(5));
         }
@@ -468,7 +468,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private const string Timed =
             "@command(free=True, acts_for=None)\ndef Raid(u: Ref[Unit]):\n" +
-            "    r = ask(u, \"Raid?\", choices=[\"fight\", \"hide\"], deadline=2, on_timeout=\"hide\")\n" +
+            "    r = ask(u, \"Raid?\", choices=[\"fight\", \"hide\"], deadline=2, on_timeout=\"hide\", name=\"Raid?\")\n" +
             "    u.Out.s = r.choice\n    u.Out.n = r.index\n    if r.by is None:\n        u.Out.n = r.index + 10\n";
 
         [Test]
@@ -501,7 +501,7 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var world = Make("@command(acts_for=lambda u: u)\ndef Pass(u: Ref[Unit]):\n    u.Out.n = 99\n" +
                              "@command(free=True, acts_for=None)\ndef Raid(u: Ref[Unit]):\n" +
-                             "    r = ask(u, \"Raid?\", responses=[\"Pass\"], deadline=1, on_timeout=\"Pass\")\n" +
+                             "    r = ask(u, \"Raid?\", responses=[\"Pass\"], deadline=1, on_timeout=\"Pass\", name=\"Raid?\")\n" +
                              "    u.Out.s = r.response\n    if r.by is None:\n        u.Out.s = r.response + \" None\"\n");
             Assert.That(Raid(world).OpenedRequest!.TimeoutResponse, Is.EqualTo(0));
             world.Advance();
@@ -523,7 +523,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void AFailingTimeoutIsRolledBackAndDropped()
         {
             var world = Make("@command(free=True, acts_for=None)\ndef Raid(u: Ref[Unit]):\n" +
-                             "    r = ask(u, \"Raid?\", choices=[\"fight\"], deadline=1, on_timeout=\"fight\")\n" +
+                             "    r = ask(u, \"Raid?\", choices=[\"fight\"], deadline=1, on_timeout=\"fight\", name=\"Raid?\")\n" +
                              "    u.Out.s = \"half\"\n    x = 1 // 0\n");
             Raid(world);
             var timed = world.Advance().Reactions.Single();

@@ -29,7 +29,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(acts_for=lambda party: party)\n" +
             "def Attack(party: Ref[Party], target: Ref[Party]):\n" +
             "    party.Score.log = party.Score.log + \"A\"\n" +
-            "    r = ask(target, \"Block\", choices=[\"block\", \"take\"], responses=[\"Counter\"])\n" +
+            "    r = ask(target, \"Block\", choices=[\"block\", \"take\"], responses=[\"Counter\"], name=\"Block\")\n" +
             "    if r.response == \"Counter\":\n" +
             "        party.Score.log = party.Score.log + \"c\"\n" +
             "    elif r.index == 0:\n" +
@@ -40,7 +40,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(acts_for=lambda party: party)\n" +
             "def Counter(party: Ref[Party]):\n" +
             "    party.Score.log = party.Score.log + \"C\"\n" +
-            "    ask(party, \"Sure\", choices=[\"yes\"])\n" +
+            "    ask(party, \"Sure\", choices=[\"yes\"], name=\"Sure\")\n" +
             "    party.Score.log = party.Score.log + \"!\"\n" +
             "@command(acts_for=lambda party: party)\n" +
             "def Nap(party: Ref[Party]):\n" +
@@ -53,7 +53,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    party.Score.v = party.Score.v + n\n" +
             "@command(acts_for=lambda party: party)\n" +
             "def Fumble(party: Ref[Party]):\n" +
-            "    r = ask(party, \"Q\", choices=[\"ok\", \"bad\"])\n" +
+            "    r = ask(party, \"Q\", choices=[\"ok\", \"bad\"], name=\"Q\")\n" +
             "    party.Score.log = party.Score.log + \"f\"\n" +
             "    if r.index == 1:\n" +
             "        party.Score.v = \"oops\"\n" +
@@ -72,7 +72,7 @@ namespace Kesa.Engine.Tests.Runtime
             "def Round(a: Ref[Party], b: Ref[Party]):\n" +
             "    for i in range(3):\n" +
             "        p = a if i % 2 == 0 else b\n" +
-            "        r = ask(p, \"Turn\", responses=[\"Attack\", \"Pass\", \"Nap\", \"Hop\", \"Fumble\", \"Doze\", \"Leap\"])\n" +
+            "        r = ask(p, \"Turn\", responses=[\"Attack\", \"Pass\", \"Nap\", \"Hop\", \"Fumble\", \"Doze\", \"Leap\"], name=\"Turn\")\n" +
             "        a.Score.log = a.Score.log + \"[\" + r.response + (\"~\" if r.interrupted else \"\") + \"]\"\n" +
             "        r.by.Score.v = r.by.Score.v + 100\n" +
             "    a.Score.v = a.Score.v + 1000\n";

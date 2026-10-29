@@ -20,7 +20,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\n" +
             "def Branch(p: Ref[Party]):\n" +
             "    p.Score.v = 100\n" +
-            "    r = ask(p, \"Q\", choices=[\"low\", \"high\"], hint=\"std.choice\", data={\"n\": 2, \"who\": p})\n" +
+            "    r = ask(p, \"Q\", choices=[\"low\", \"high\"], hint=\"std.choice\", data={\"n\": 2, \"who\": p}, name=\"Q\")\n" +
             "    if r.index == 1:\n" +
             "        x = 50\n" +
             "    else:\n" +
@@ -29,7 +29,7 @@ namespace Kesa.Engine.Tests.Runtime
             "def pick_three(p):\n" +
             "    total = 0\n" +
             "    for i in range(3):\n" +
-            "        r = ask(p, text(\"Pick\", round=i), choices=[\"a\", \"b\"])\n" +
+            "        r = ask(p, text(\"Pick\", round=i), choices=[\"a\", \"b\"], name=\"Pick\")\n" +
             "        total = total * 10 + r.index + 1\n" +
             "        p.Score.v = p.Score.v + 1\n" +
             "    return total\n" +
@@ -39,18 +39,18 @@ namespace Kesa.Engine.Tests.Runtime
             "    p.Score.v = n\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Target(p: Ref[Party], a: Ref[Party], b: Ref[Party]):\n" +
-            "    r = ask([p, a], \"Hit\", choices=[a, b])\n" +
+            "    r = ask([p, a], \"Hit\", choices=[a, b], name=\"Hit\")\n" +
             "    r.choice.Score.v = 7\n" +
             "    r.by.Score.v = r.by.Score.v + 1\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Boom(p: Ref[Party]):\n" +
-            "    r = ask(p, \"Q\", choices=[\"ok\", \"bad\"])\n" +
+            "    r = ask(p, \"Q\", choices=[\"ok\", \"bad\"], name=\"Q\")\n" +
             "    p.Score.v = 1\n" +
             "    if r.index == 1:\n" +
             "        p.Score.v = \"oops\"\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Silent(p: Ref[Party]):\n" +
-            "    ask(p, \"Q\", choices=[\"ok\"])\n" +
+            "    ask(p, \"Q\", choices=[\"ok\"], name=\"Q\")\n" +
             "    p.Score.v = 9\n" +
             // 응답 커맨드 (G139): 우선권 한 바퀴처럼 번갈아 묻고 둘 다 연속으로 넘기면 끝
             "@command(acts_for=lambda party: party)\n" +
@@ -70,7 +70,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    passes = 0\n" +
             "    for i in range(6):\n" +
             "        p = a if i % 2 == 0 else b\n" +
-            "        r = ask(p, \"Bid\", responses=[\"Pass\", \"Bid\", \"Crash\"], choices=[\"Fold\"])\n" +
+            "        r = ask(p, \"Bid\", responses=[\"Pass\", \"Bid\", \"Crash\"], choices=[\"Fold\"], name=\"Bid\")\n" +
             "        if r.response == \"Pass\":\n" +
             "            passes += 1\n" +
             "            if passes == 2:\n" +
@@ -181,7 +181,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ALambdaSeesLocalsAssignedAfterResume()
         {
             Mod("banking", schema: Schema, defs: "Party(\"Red\")\n@command(free=True, acts_for=None)\ndef Late(p: Ref[Party]):\n" +
-                "    k = lambda: n\n    n = 1\n    r = ask(p, \"Q\", choices=[\"a\"])\n    n = 2\n    p.Score.v = k()\n");
+                "    k = lambda: n\n    n = 1\n    r = ask(p, \"Q\", choices=[\"a\"], name=\"Q\")\n    n = 2\n    p.Score.v = k()\n");
             var world = new World(LoadClean());
             var red = world.Create("banking:Red");
             world.Seat(red, "host");
@@ -210,7 +210,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ALambdaKeepsItsIdentityAcrossResume()
         {
             Assert.That(RunLate(
-                "    f = lambda: 1\n    g = f\n    h = lambda: 1\n    r = ask(p, \"Q\", choices=[\"a\"])\n" +
+                "    f = lambda: 1\n    g = f\n    h = lambda: 1\n    r = ask(p, \"Q\", choices=[\"a\"], name=\"Q\")\n" +
                 "    p.Score.v = (10 if f == g else 0) + (1 if f == h else 0)\n"), Is.EqualTo(10));
         }
 
@@ -219,7 +219,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ALambdaInsideAValueKeepsItsIdentityAcrossResume()
         {
             Assert.That(RunLate(
-                "    lam = lambda: 1\n    c = Score(v=lam)\n    t = option(\"a\", data={\"f\": lam})\n    r = ask(p, \"Q\", choices=[\"a\"])\n" +
+                "    lam = lambda: 1\n    c = Score(v=lam)\n    t = option(\"a\", data={\"f\": lam})\n    r = ask(p, \"Q\", choices=[\"a\"], name=\"Q\")\n" +
                 "    p.Score.v = (10 if c == Score(v=lam) else 0) + (1 if t == option(\"a\", data={\"f\": lam}) else 0)\n"), Is.EqualTo(11));
         }
 
@@ -228,7 +228,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void ALambdaHeldByAFinishedFunctionSeesLocalsAfterResume()
         {
             Assert.That(RunLate(
-                "    n = 1\n    h = lambda: n\n    k = make(h)\n    r = ask(p, \"Q\", choices=[\"a\"])\n    n = 2\n    p.Score.v = k()\n"),
+                "    n = 1\n    h = lambda: n\n    k = make(h)\n    r = ask(p, \"Q\", choices=[\"a\"], name=\"Q\")\n    n = 2\n    p.Score.v = k()\n"),
                 Is.EqualTo(2));
         }
 
@@ -388,15 +388,17 @@ namespace Kesa.Engine.Tests.Runtime
             return world.Submit("host", "banking.C", new Dictionary<string, Value> { ["p"] = new EntityValue(red) });
         }
 
-        [TestCase("    r = ask(p, \"Q\")\n", "ask() needs choices=[...] or responses=[...]")]
-        [TestCase("    r = ask(p, \"Q\", choices=[])\n", "non-empty list")]
-        [TestCase("    r = ask(3, \"Q\", choices=[\"a\"])\n", "ask() asks entities, not int")]
-        [TestCase("    r = ask(p, 3, choices=[\"a\"])\n", "title of ask()")]
-        [TestCase("    r = ask(p, \"Q\", responses=[\"Nope\"])\n", "there is no command 'banking.Nope'")]
-        [TestCase("    r = ask(p, \"Q\", responses=[\"C\"])\n", "banking.C is a free command, so it cannot answer a question")]
-        [TestCase("    r = ask(p, \"Q\", responses=[3])\n", "takes command names (str), not int")]
-        [TestCase("    r = ask(p, \"Q\", choices=[\"a\"], hnit=\"x\")\n", "ask() has no argument 'hnit'")]
-        [TestCase("    r = ask(p, \"Q\", choices=[lambda x: x])\n", "cannot hold")]
+        [TestCase("    r = ask(p, \"Q\", name=\"Q\")\n", "ask() needs choices=[...] or responses=[...]")]
+        [TestCase("    r = ask(p, \"Q\", choices=[], name=\"Q\")\n", "non-empty list")]
+        [TestCase("    r = ask(3, \"Q\", choices=[\"a\"], name=\"Q\")\n", "ask() asks entities, not int")]
+        [TestCase("    r = ask(p, 3, choices=[\"a\"], name=\"q\")\n", "title of ask()")]
+        [TestCase("    r = ask(p, \"Q\", responses=[\"Nope\"], name=\"Q\")\n", "there is no command 'banking.Nope'")]
+        [TestCase("    r = ask(p, \"Q\", responses=[\"C\"], name=\"Q\")\n", "banking.C is a free command, so it cannot answer a question")]
+        [TestCase("    r = ask(p, \"Q\", responses=[3], name=\"Q\")\n", "takes command names (str), not int")]
+        [TestCase("    r = ask(p, \"Q\", choices=[\"a\"], hnit=\"x\", name=\"Q\")\n", "ask() has no argument 'hnit'")]
+        [TestCase("    r = ask(p, \"Q\", choices=[lambda x: x], name=\"Q\")\n", "cannot hold")]
+        [TestCase("    r = ask(p, \"Q\", choices=[\"a\"], name=\"\")\n", "name= of ask() must not be empty")]
+        [TestCase("    r = ask(p, \"Q\", choices=[\"a\"], name=3)\n", "name= of ask() must be a str, not int")]
         public void MisusedAskIsAScriptError(string body, string message)
         {
             var r = Run(body);
@@ -408,7 +410,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void AnUnknownAttributeOfTheAnswerIsAScriptError()
         {
-            Mod("banking", schema: Schema, defs: Command("    r = ask(p, \"Q\", choices=[\"a\"])\n    n = r.nope\n"));
+            Mod("banking", schema: Schema, defs: Command("    r = ask(p, \"Q\", choices=[\"a\"], name=\"Q\")\n    n = r.nope\n"));
             var world = new World(LoadClean());
             var red = world.Create("banking:Red");
             world.Seat(red, "host");
@@ -428,16 +430,36 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void AskInsideAnExpressionIsALoadError()
         {
-            var d = LoadWith(Command("    n = ask(p, \"Q\", choices=[\"a\"]).index + 1\n"))
+            var d = LoadWith(Command("    n = ask(p, \"Q\", choices=[\"a\"], name=\"Q\").index + 1\n"))
                 .Single(x => x.Code == Codes.CmdWriteEffect);
             Assert.That(d.Message, Is.EqualTo("ask() waits for an answer, so it can only be called as a statement"));
+        }
+
+        [Test]
+        public void AskWithoutANameIsALoadError()
+        {
+            var d = LoadWith(Command("    r = ask(p, \"Q\", choices=[\"a\"])\n")).Single(x => x.Code == Codes.EvlArguments);
+            Assert.That(d.Message, Is.EqualTo("ask() needs name=, the name of this kind of question"));
+        }
+
+        [Test]
+        public void TheNameOfAQuestionIsKeptAndSurvivesSaveAndLoad()
+        {
+            Mod("banking", schema: Schema, defs: Command("    r = ask(p, text(\"Q\"), choices=[\"a\"], name=\"pick-one\")\n"));
+            var world = new World(LoadClean());
+            var red = world.Create("banking:Red");
+            world.Seat(red, "host");
+            Assert.That(world.Submit("host", "banking.C", new Dictionary<string, Value> { ["p"] = new EntityValue(red) }).OpenedRequest!.Name,
+                Is.EqualTo("pick-one"));
+            var loaded = World.Load(LoadClean(), world.Save()).World!;
+            Assert.That(loaded.OpenRequests.Single().Name, Is.EqualTo("pick-one"));
         }
 
         [Test]
         public void AskInPreconditionsIsALoadError()
         {
             var diags = LoadWith(Command(
-                "    with preconditions:\n        r = ask(p, \"Q\", choices=[\"a\"])\n        require(True, text(\"m\"))\n    pass\n"));
+                "    with preconditions:\n        r = ask(p, \"Q\", choices=[\"a\"], name=\"Q\")\n        require(True, text(\"m\"))\n    pass\n"));
             Assert.That(diags.Any(x => x.Code == Codes.CmdWriteEffect && x.Message.StartsWith("ask() waits")), Is.True,
                 string.Join("\n", diags));
         }
@@ -446,7 +468,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void AFunctionThatAsksCannotBeAPureSlot()
         {
             var diags = LoadWith(Command("    pass\n") +
-                "def helper(p):\n    r = ask(p, \"Q\", choices=[\"a\"])\n    return 1\n" +
+                "def helper(p):\n    r = ask(p, \"Q\", choices=[\"a\"], name=\"Q\")\n    return 1\n" +
                 "@command(free=True, acts_for=None)\ndef D(p: Ref[Party]):\n    n = helper(p) + 1\n");
             Assert.That(diags.Any(x => x.Code == Codes.CmdWriteEffect && x.Message.Contains("'helper'")), Is.True,
                 string.Join("\n", diags));
@@ -457,7 +479,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void AskReachedThroughAPureCallIsARuntimeError()
         {
             var r = Run("    f = helper\n    n = f(p) + 1\n" +
-                "def helper(p):\n    r = ask(p, \"Q\", choices=[\"a\"])\n    return 1\n");
+                "def helper(p):\n    r = ask(p, \"Q\", choices=[\"a\"], name=\"Q\")\n    return 1\n");
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
             Assert.That(r.Error!.Message, Does.Contain("ask() waits for an answer, so it cannot be called here"));
         }

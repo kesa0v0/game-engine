@@ -356,7 +356,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void AReactionCanAskAndItsFlowWaits()
         {
-            var world = Make("@when(lambda u: u.Out.n >= 5)\ndef warn(u: Ref[Unit]):\n    a = ask(u, \"Careful?\", choices=[\"ok\"])\n    u.Out.s = \"seen\"\n");
+            var world = Make("@when(lambda u: u.Out.n >= 5)\ndef warn(u: Ref[Unit]):\n    a = ask(u, \"Careful?\", choices=[\"ok\"], name=\"Careful?\")\n    u.Out.s = \"seen\"\n");
             var r = Set(world, _a, 5);
             var held = r.Reactions.Single();
             Assert.That(held.Outcome, Is.EqualTo(ReactionOutcome.Suspended));

@@ -129,7 +129,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private const string Asks =
             "@on(Damaged, now=True)\ndef first(target):\n    note(target, \"a\")\n" +
-            "    r = ask(target, \"Go\", choices=[\"x\", \"y\"])\n    note(target, r.choice)\n" +
+            "    r = ask(target, \"Go\", choices=[\"x\", \"y\"], name=\"Go\")\n    note(target, r.choice)\n" +
             "@on(Damaged, now=True)\ndef second(target):\n    note(target, \"b\")\n";
 
         [Test]
@@ -165,9 +165,9 @@ namespace Kesa.Engine.Tests.Runtime
 
         [TestCase("    wait(ticks=1)\n", "wait() cannot be used in an @on(..., now=True) handler")]
         [TestCase("    pause()\n", "wait() cannot be used in an @on(..., now=True) handler")]
-        [TestCase("    ask(target, \"Go\", choices=[\"x\"], deadline=3, on_timeout=\"x\")\n",
+        [TestCase("    ask(target, \"Go\", choices=[\"x\"], deadline=3, on_timeout=\"x\", name=\"Go\")\n",
             "ask() with a deadline or blocks_time=False cannot be used in an @on(..., now=True) handler")]
-        [TestCase("    ask(target, \"Go\", choices=[\"x\"], blocks_time=False)\n",
+        [TestCase("    ask(target, \"Go\", choices=[\"x\"], blocks_time=False, name=\"Go\")\n",
             "ask() with a deadline or blocks_time=False cannot be used in an @on(..., now=True) handler")]
         [TestCase("    advance(1)\n", "advance() cannot be used in an @on(..., now=True) handler")]
         public void TimeCannotPassInsideAnImmediateHandler(string body, string message)

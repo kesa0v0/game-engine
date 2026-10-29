@@ -276,6 +276,7 @@ namespace Kesa.Engine.Runtime
             }
             return new Request(q.Id, q.Flow, q.Command, who, Mask(q.Title), choices, q.Responses, q.ResponseNames, q.Hint, Mask(q.Data))
             {
+                Name = q.Name,
                 BlocksTime = q.BlocksTime,
                 Deadline = q.Deadline,
                 TimeoutChoice = q.TimeoutChoice,

@@ -25,7 +25,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\n" +
             "def Ask(p: Ref[Party]):\n" +
             "    while p.Score.v >= 0:\n" +
-            "        r = ask(p, \"more?\", choices=[\"more\", \"stop\"])\n" +
+            "        r = ask(p, \"more?\", choices=[\"more\", \"stop\"], name=\"more?\")\n" +
             "        if r.index == 1:\n" +
             "            p.Score.v = -p.Score.v\n" +
             "        else:\n" +
@@ -162,7 +162,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void AskInTheConditionIsALoadError()
         {
             var diags = Diags("@command(free=True, acts_for=None)\ndef C(p: Ref[Party]):\n" +
-                              "    while ask(p, \"Q\", choices=[\"a\"]).index == 0:\n        pass\n");
+                              "    while ask(p, \"Q\", choices=[\"a\"], name=\"Q\").index == 0:\n        pass\n");
             Assert.That(diags, Is.Not.Empty);
             Assert.That(diags.Select(d => d.Message), Has.Some.Contains("waits for an answer"), string.Join("\n", diags));
         }

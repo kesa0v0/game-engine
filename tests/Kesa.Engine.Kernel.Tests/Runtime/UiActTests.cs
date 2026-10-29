@@ -37,7 +37,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\ndef Kill(target: Ref[Unit]):\n    destroy(target)\n" +
             // 응답 커맨드: Turn이 연 질문의 답으로만 들어간다
             "@command(acts_for=lambda party: party)\ndef Strike(party: Ref[Party], target: Ref[Unit]):\n    target.Hp.v -= 2\n" +
-            "@command(free=True, acts_for=None)\ndef Turn(p: Ref[Party]):\n    ask(p, \"turn\", responses=[\"Strike\"])\n" +
+            "@command(free=True, acts_for=None)\ndef Turn(p: Ref[Party]):\n    ask(p, \"turn\", responses=[\"Strike\"], name=\"turn\")\n" +
             // 첫 클릭은 고르기, 두 번째 클릭은 공격
             "@ui_action\ndef click(u: Ref[Unit]):\n" +
             "    if ui.Selection.unit is None:\n        ui.Selection.unit = u\n" +

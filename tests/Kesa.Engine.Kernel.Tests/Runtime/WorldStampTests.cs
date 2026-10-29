@@ -24,7 +24,10 @@ namespace Kesa.Engine.Tests.Runtime
             // 쓰고, 만들고, 붙인 뒤 실패한다: 모두 되감긴다
             "@command(free=True, acts_for=None)\ndef Boom(u: Ref[Unit], c: Ref[City]):\n" +
             "    u.Out.n = 9\n    u.Home.city = c\n    spawn(\"Town\")\n    attach(u, Tag(x=1))\n    u.Out.n = 10\n    destroy(c)\n" +
-            "    u.Tag.x = [1][5]\n";
+            "    u.Tag.x = [1][5]\n" +
+            // 상태 쓰기 없이 묻고, 답하면 다시 묻는다 (G385)
+            "@command(free=True, acts_for=None)\ndef Twice(u: Ref[Unit]):\n" +
+            "    ask(u, \"first\", name=\"first\", choices=[\"a\", \"b\"])\n    ask(u, \"second\", name=\"second\", choices=[\"a\", \"b\"])\n";
 
         private World _w = null!;
         private EntityId _u1, _u2, _city;
@@ -118,6 +121,26 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(_w.Submit("x", "banking.Bump", Args(("u", _u2))).Succeeded, Is.True);
             Assert.That(_w.Version(_u2, "Out"), Is.EqualTo(clock + 1));
             Assert.That(_w.Version(_u1), Is.EqualTo(u1));
+        }
+
+        [Test]
+        public void OpeningAndClosingAQuestionMovesTheClockButStampsNoEntity()
+        {
+            _w.Seat(_u1, "alice");
+            long clock = _w.Version(), u1 = _w.Version(_u1);
+            var opened = _w.Submit("host", "banking.Twice", Args(("u", _u1)));
+            Assert.That(opened.Succeeded, Is.True, opened.Error?.ToString());
+            Assert.That(_w.Version(), Is.GreaterThan(clock), "a question opened without any write");
+            Assert.That(_w.Version(_u1), Is.EqualTo(u1));
+
+            clock = _w.Version();
+            var answered = _w.Answer("alice", opened.OpenedRequest!.Id, _u1, 0);
+            Assert.That(answered.Succeeded, Is.True, answered.Error?.ToString());
+            Assert.That(_w.Version(), Is.GreaterThan(clock), "the first closed and the second opened");
+
+            clock = _w.Version();
+            Assert.That(_w.Answer("alice", opened.OpenedRequest.Id, _u1, 0).Succeeded, Is.False, "already answered");
+            Assert.That(_w.Version(), Is.EqualTo(clock), "a refused answer moves nothing");
         }
 
         [Test]

@@ -124,12 +124,12 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>
-        /// <c>ask(who, title, choices=[...], responses=[...], hint=, data=)</c>의 인자를 검사해 질문의 내용을 만든다 (G138).
+        /// <c>ask(who, title, name=, choices=[...], responses=[...], hint=, data=)</c>의 인자를 검사해 질문의 내용을 만든다 (G138).
         /// 멈추는 것은 실행기가 한다. 응답 커맨드 이름은 부른 함수의 모드에서 찾고, 다른 모드의 것은 <c>"모드id.이름"</c>으로 적는다.
         /// </summary>
         private Value Ask(string mod, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
-            const string usage = "ask(who, \"Title_Key\", choices=[...], responses=[...])";
+            const string usage = "ask(who, \"Title_Key\", name=\"kind\", choices=[...], responses=[...])";
             if (positional.Count != 2)
             {
                 throw new ScriptRuntimeException(Codes.RunScript,
@@ -165,6 +165,7 @@ namespace Kesa.Engine.Runtime
             var responses = new List<string>();
             var responseNames = new List<string>();
             string? hint = null;
+            string? kind = null;
             Value data = NoneValue.Instance;
             bool hasChoices = false;
             bool? blocksTime = null; // 적지 않으면 마감 유무로 정한다 (G159)
@@ -198,6 +199,15 @@ namespace Kesa.Engine.Runtime
                             responses.Add(id);
                             responseNames.Add(name.Value);
                         }
+                        break;
+                    case "name":
+                        if (!(pair.Value is StrValue named))
+                            throw new ScriptRuntimeException(Codes.RunType, "name= of ask() must be a str, not " + pair.Value.KindName,
+                                "the name tells the UI and bots which kind of question this is, e.g. name=\"skirmish-hit\" (spec-gaps G382)");
+                        if (named.Value.Length == 0)
+                            throw new ScriptRuntimeException(Codes.RunType, "name= of ask() must not be empty",
+                                "the name tells the UI and bots which kind of question this is, e.g. name=\"skirmish-hit\" (spec-gaps G382)");
+                        kind = named.Value;
                         break;
                     case "hint":
                         if (pair.Value is StrValue h) hint = h.Value;
@@ -233,9 +243,11 @@ namespace Kesa.Engine.Runtime
                         break;
                     default:
                         throw new ScriptRuntimeException(Codes.RunScript, "ask() has no argument '" + pair.Key + "'",
-                            Suggest.Hint(pair.Key, new[] { "choices", "responses", "hint", "data", "blocks_time", "deadline", "on_timeout", "about" }));
+                            Suggest.Hint(pair.Key, new[] { "name", "choices", "responses", "hint", "data", "blocks_time", "deadline", "on_timeout", "about" }));
                 }
             }
+            if (kind == null)
+                throw new ScriptRuntimeException(Codes.RunScript, "ask() needs name=, the name of this kind of question", "write " + usage + " (spec-gaps G382)");
             long? timeoutChoice = null, timeoutResponse = null;
             if (onTimeout != null) TimeoutAnswer(mod, onTimeout, deadline, choices, responses, out timeoutChoice, out timeoutResponse);
             else if (deadline != null)
@@ -255,6 +267,7 @@ namespace Kesa.Engine.Runtime
                 TimeoutChoice = timeoutChoice,
                 TimeoutResponse = timeoutResponse,
                 About = about,
+                Name = kind,
             };
         }
 
@@ -382,6 +395,8 @@ namespace Kesa.Engine.Runtime
 
             public long? TimeoutChoice { get; set; }
             public long? TimeoutResponse { get; set; }
+
+            public string Name { get; set; } = "";
 
             /// <summary><c>about=</c>으로 적은 대상 (G165). 적지 않았으면 null.</summary>
             public List<EntityId>? About { get; set; }

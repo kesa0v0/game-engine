@@ -16,7 +16,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("core", schema: "component(\"S\", n=field(int, default=0))\ndeftype(\"Unit\", components=[\"S\"])\n",
                 defs: "Unit(\"Scout\")\n" +
                       "@command(free=True, acts_for=None)\ndef Go(u: Ref[Unit]):\n" +
-                      "    r = ask(u, \"q\", responses=[\"Bump\"])\n    u.S.n += 10\n" +
+                      "    r = ask(u, \"q\", responses=[\"Bump\"], name=\"q\")\n    u.S.n += 10\n" +
                       "@command(acts_for=lambda u: u)\ndef Bump(u: Ref[Unit]):\n    u.S.n += 1\n");
             var w = new World(LoadClean());
             var u = w.Create("core:Scout");

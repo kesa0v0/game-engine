@@ -30,7 +30,7 @@ namespace Kesa.Engine.Bridge.Tests
             "@command(free=True, acts_for=None)\ndef Hit(target: Ref[Unit]):\n    with preconditions:\n" +
             "        choose(target, where=lambda t: True)\n" +
             "        require(target.Hp.v > 1, text(\"arena-too-weak\", hp=target.Hp.v))\n    target.Hp.v -= 1\n" +
-            "@command(free=True, acts_for=None)\ndef Duel(h: Ref[Hero]):\n    r = ask(h, \"arena-duel\", choices=[1, 2])\n    h.Hp.v += r.choice\n" +
+            "@command(free=True, acts_for=None)\ndef Duel(h: Ref[Hero]):\n    r = ask(h, \"arena-duel\", choices=[1, 2], name=\"arena-duel\")\n    h.Hp.v += r.choice\n" +
             // 첫 클릭은 고르기, 두 번째 클릭은 때리기
             "@ui_action\ndef click(u: Ref[Unit]):\n" +
             "    if ui.Selection.unit is None:\n        ui.Selection.unit = u\n" +
@@ -301,6 +301,7 @@ namespace Kesa.Engine.Bridge.Tests
             var request = (await _alice.OpenRequests()).Single();
             Assert.That(request.Who.Single().Def, Is.EqualTo("arena:Red"));
             Assert.That(request.Title, Is.EqualTo(new BridgeStr("arena-duel")));
+            Assert.That(request.Name, Is.EqualTo("arena-duel"));
             Assert.That(request.Choices.Select(c => c.Value), Is.EqualTo(new BridgeValue[] { new BridgeInt(1), new BridgeInt(2) }));
 
             var moves = await _alice.LegalResponses(request.Id, 10);

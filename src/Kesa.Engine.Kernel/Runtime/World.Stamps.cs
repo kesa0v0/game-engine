@@ -76,6 +76,12 @@ namespace Kesa.Engine.Runtime
             Journal(() => _stamps.Add(id, s));
         }
 
+        /// <summary>질문이 열리거나 닫혔다 (G385): 시계만 오르고 엔티티 도장은 없다.</summary>
+        private void StampRequests()
+        {
+            if (!_rewinding) ++_clock;
+        }
+
         /// <summary>되감는 중이면 참: 되감기가 부르는 기본 연산은 도장을 찍지 않는다(도장은 따로 되감긴다).</summary>
         private bool _rewinding;
 

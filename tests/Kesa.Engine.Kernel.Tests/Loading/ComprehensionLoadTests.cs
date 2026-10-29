@@ -67,7 +67,7 @@ namespace Kesa.Engine.Tests.Loading
                 "@command(free=True, acts_for=None)\ndef Plan(u: Ref[Unit]):\n" +
                 "    base = 1\n" +
                 "    fs = [lambda: i * 10 + base for i in range(3)]\n" +
-                "    r = ask(u, \"Go\", choices=[\"a\", \"b\"])\n" +
+                "    r = ask(u, \"Go\", choices=[\"a\", \"b\"], name=\"Go\")\n" +
                 "    u.Moves.left = fs[0]() + fs[1]() + r.index\n");
             var content = LoadClean();
 

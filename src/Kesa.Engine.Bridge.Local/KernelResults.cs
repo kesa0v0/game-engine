@@ -32,7 +32,7 @@ namespace Kesa.Engine.Bridge.Local
             foreach (var e in q.Who) who.Add(new BridgeEntity(e.Value, defOf(e)));
             var choices = new List<BridgeOption>(q.Choices.Count);
             foreach (var c in q.Choices) choices.Add((BridgeOption)KernelValues.ToBridge(c, defOf));
-            return new BridgeRequest(q.Id, q.Responses, who, KernelValues.ToBridge(q.Title, defOf), choices, q.Hint,
+            return new BridgeRequest(q.Id, q.Name, q.Responses, who, KernelValues.ToBridge(q.Title, defOf), choices, q.Hint,
                 KernelValues.ToBridge(q.Data, defOf), q.BlocksTime, q.Deadline);
         }
 

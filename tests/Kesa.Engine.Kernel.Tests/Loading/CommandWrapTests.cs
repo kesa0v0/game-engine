@@ -25,7 +25,7 @@ namespace Kesa.Engine.Tests.Loading
             "@command(free=True, acts_for=None)\ndef Keep(s: Ref[Ship]):\n" +
             "    with preconditions:\n        k = s.Mark.n\n    s.Mark.n = k + 1\n" +
             "@command(free=True, acts_for=None)\ndef Step(s: Ref[Ship]):\n" +
-            "    with preconditions:\n        k = s.Mark.n\n    r = ask(s, \"Go\", choices=[1, 2])\n    s.Mark.n = k + r.choice\n" +
+            "    with preconditions:\n        k = s.Mark.n\n    r = ask(s, \"Go\", choices=[1, 2], name=\"Go\")\n    s.Mark.n = k + r.choice\n" +
             "Ship(\"Sloop\")\n";
 
         private const string Depends = ", dependencies=[\"banking\"]";
@@ -163,7 +163,7 @@ namespace Kesa.Engine.Tests.Loading
         {
             // 감싸는 쪽이 원래 커맨드 전에 묻고 멈춘다: 사전 조건을 마친 안쪽 프레임(k = 4)이 저장에 남는다
             Mod("banking", schema: Schema, defs: Core);
-            Mod("scouts", defs: "@wrap(banking.Keep)\ndef first(original, s):\n    r = ask(s, \"Sure\", choices=[1, 2])\n" +
+            Mod("scouts", defs: "@wrap(banking.Keep)\ndef first(original, s):\n    r = ask(s, \"Sure\", choices=[1, 2], name=\"Sure\")\n" +
                                 "    s.Mark.n = 50\n    original(s)\n    s.Mark.n += r.choice * 100\n", extra: Depends);
             var content = LoadClean();
             _world = new World(content);

@@ -141,6 +141,7 @@ namespace Kesa.Engine.Runtime
             var request = new Request(requestId, id, command, ask.Who, ask.Title, ask.Choices, ask.Responses, ask.ResponseNames,
                 ask.Hint, ask.Data)
             {
+                Name = ask.Name,
                 BlocksTime = ask.BlocksTime,
                 Deadline = ask.DeadlineIn == null ? (long?)null : _tick + ask.DeadlineIn.Value,
                 TimeoutChoice = ask.TimeoutChoice,
@@ -148,6 +149,7 @@ namespace Kesa.Engine.Runtime
             };
             _flows.Add(id, new FlowRecord(id, command, run, request, handler) { Rand = _rand?.Copy(), Subjects = subjects, About = ask.About });
             Journal(() => _flows.Remove(id));
+            StampRequests();
             return request;
         }
 
@@ -233,6 +235,7 @@ namespace Kesa.Engine.Runtime
         {
             _flows.Remove(flow.Id);
             Journal(() => _flows[flow.Id] = flow);
+            if (flow.Request != null) StampRequests();
         }
 
         /// <summary>

@@ -29,18 +29,18 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\n" +
             "def Show(p: Ref[Party], u: Ref[Unit]):\n" +
             "    t = text(\"scout-seen\", unit=u, n=3, f=1.5, s=\"banking:Red\", b=True, z=None, inner=text(\"k\"))\n" +
-            "    ask(p, t, choices=[\"a\"])\n" +
+            "    ask(p, t, choices=[\"a\"], name=\"t\")\n" +
             "    p.Score.v = 1 if t == text(\"scout-seen\", unit=u, n=3, f=1.5, s=\"banking:Red\", b=True, z=None, inner=text(\"k\")) else 2\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Gone(p: Ref[Party]):\n" +
             "    x = spawn(\"Scout\")\n" +
             "    t = text(\"scout-lost\", unit=x)\n" +
             "    destroy(x)\n" +
-            "    ask(p, t, choices=[\"a\"])\n" +
+            "    ask(p, t, choices=[\"a\"], name=\"t\")\n" +
             "    p.Score.v = 1 if t == text(\"scout-lost\", unit=x) else 2\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Plain(p: Ref[Party]):\n" +
-            "    ask(p, text(\"plain\", n=3), choices=[\"a\"])\n" +
+            "    ask(p, text(\"plain\", n=3), choices=[\"a\"], name=\"plain\")\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Bad(p: Ref[Party], n: int):\n" +
             "    if n == 0:\n" +

@@ -252,7 +252,7 @@ namespace Kesa.Engine.Tests.Runtime
                                                 "@command(free=True, acts_for=None)\n" +
                                                 "def Probe(u: Ref[Unit]):\n" +
                                                 "    d = Damaged(target=u, amount=3)\n" +
-                                                "    ask(u, \"Go\", choices=[\"ok\"])\n" +
+                                                "    ask(u, \"Go\", choices=[\"ok\"], name=\"Go\")\n" +
                                                 "    u.Out.n = d.amount\n");
             var world = new World(LoadClean());
             var u = world.Create("combat:Scout");
@@ -264,7 +264,7 @@ namespace Kesa.Engine.Tests.Runtime
                 "@command(free=True, acts_for=None)\n" +
                 "def Probe(u: Ref[Unit]):\n" +
                 "    d = Damaged(target=u, amount=3)\n" +
-                "    ask(u, \"Go\", choices=[\"ok\"])\n" +
+                "    ask(u, \"Go\", choices=[\"ok\"], name=\"Go\")\n" +
                 "    u.Out.n = d.amount\n");
             var result = World.Load(LoadClean(), save);
             Assert.That(result.Diagnostics.Where(d => d.Code != Codes.SaveModsChanged).Select(d => d.Code + " " + d.Message), Is.EqualTo(new[]

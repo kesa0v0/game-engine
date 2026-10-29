@@ -38,7 +38,7 @@ namespace Kesa.Engine.Tests.Runtime
             "        emit(AskPick(who=p))\n" +
             "@on(AskPick)\n" +
             "def ask_pick(who):\n" +
-            "    r = ask(who, \"rps.pick\", choices=[\"rock\", \"paper\", \"scissors\"])\n" +
+            "    r = ask(who, \"rps.pick\", choices=[\"rock\", \"paper\", \"scissors\"], name=\"rps.pick\")\n" +
             "    who.Pick.choice = r.index\n" +
             "    who.Ready.done = True\n" +
             // 모두 골랐으면 공개하고, 각자 이긴 상대 수만큼 점수

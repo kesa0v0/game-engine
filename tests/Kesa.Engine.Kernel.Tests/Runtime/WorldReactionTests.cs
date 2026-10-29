@@ -118,7 +118,7 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void HandlersRunWhenTheCommandStopsAtAsk()
         {
-            var world = Make(Command("    emit(Ping(target=u, tag=\"a\"))\n    r = ask(u, \"Q\", choices=[\"ok\"])\n    u.Out.n = 5\n") +
+            var world = Make(Command("    emit(Ping(target=u, tag=\"a\"))\n    r = ask(u, \"Q\", choices=[\"ok\"], name=\"Q\")\n    u.Out.n = 5\n") +
                              "@on(Ping)\ndef log(target):\n    target.Out.s = \"ran\"\n");
             var r = Go(world);
             Assert.That(r.OpenedRequest, Is.Not.Null);
@@ -130,7 +130,7 @@ namespace Kesa.Engine.Tests.Runtime
         public void AHandlerCanAskAndIsAnsweredLater()
         {
             var world = Make(Command("    emit(Ping(target=u, tag=\"a\"))\n") +
-                             "@on(Ping)\ndef choose(target):\n    r = ask(target, \"Q\", choices=[\"x\", \"y\"])\n" +
+                             "@on(Ping)\ndef choose(target):\n    r = ask(target, \"Q\", choices=[\"x\", \"y\"], name=\"Q\")\n" +
                              "    target.Out.s = r.choice\n    emit(Pong(target=target, tag=\"after\"))\n" +
                              "@on(Pong)\ndef after(target, tag):\n    target.Out.n = 9\n");
             var r = Go(world);
@@ -237,7 +237,7 @@ namespace Kesa.Engine.Tests.Runtime
         // ---- 멈춘 핸들러 Flow의 저장 ----
 
         private const string AskingHandler =
-            "@on(Ping)\ndef choose(target):\n    r = ask(target, \"Q\", choices=[\"x\", \"y\"])\n    target.Out.s = r.choice\n";
+            "@on(Ping)\ndef choose(target):\n    r = ask(target, \"Q\", choices=[\"x\", \"y\"], name=\"Q\")\n    target.Out.s = r.choice\n";
 
         [Test]
         public void APausedHandlerFlowIsSavedAndContinuesAfterLoading()

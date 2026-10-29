@@ -31,6 +31,9 @@ namespace Kesa.Engine.Runtime
         /// <summary><see cref="Responses"/>를 <c>ask</c>에 적은 그대로 (<c>r.response</c>로 돌려준다).</summary>
         internal IReadOnlyList<string> ResponseNames { get; }
 
+        /// <summary>질문 종류를 알아보는 이름 (<c>ask(name=)</c>, G382). 같은 이름의 질문이 동시에 여럿 열릴 수 있다.</summary>
+        public string Name { get; internal set; } = "";
+
         /// <summary>질문 번호. 시뮬레이션 상태 안의 카운터다 (X1). 답은 이 번호로 낸다.</summary>
         public long Id { get; }
 

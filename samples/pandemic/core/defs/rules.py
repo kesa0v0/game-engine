@@ -288,7 +288,7 @@ def Start():
     p = alice
     begin_turn(g, p)
     while not g.Match.over:
-        r = ask(p, "pandemic-turn", responses=["Move", "DirectFlight", "BuildStation", "Treat", "DiscoverCure", "EndTurn"],
+        r = ask(p, "pandemic-turn", name="pandemic-turn", responses=["Move", "DirectFlight", "BuildStation", "Treat", "DiscoverCure", "EndTurn"],
             data={"turn": g.Match.turn, "left": p.Actions.left})
         if g.Match.over:
             break
@@ -296,7 +296,7 @@ def Start():
             draw_phase(g, p)
             # 손이 넘치면 한도까지 버려야 한다
             while p.Hand.over and not g.Match.over:
-                ask(p, "pandemic-discard", responses=["Discard"], data={"size": p.Hand.size})
+                ask(p, "pandemic-discard", name="pandemic-discard", responses=["Discard"], data={"size": p.Hand.size})
             if not g.Match.over:
                 infect(g)
             p = p.Order.next

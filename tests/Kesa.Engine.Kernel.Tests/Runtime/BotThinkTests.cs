@@ -32,7 +32,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@bot\ndef dice(me: Ref[Party]):\n    bot.Mind.rolls = bot.Mind.rolls + [random.randint(1, 1000000)]\n" +
             "@bot\ndef spin(me: Ref[Party]):\n    bot.Mind.turns = 9\n    submit(\"Hit\", target=None)\n    while True:\n        pass\n" +
             "@bot\ndef idle(me: Ref[Party]):\n    pass\n" +
-            "@command(free=True, acts_for=None)\ndef Duel(p: Ref[Party]):\n    r = ask(p, \"duel\", choices=[10, 20])\n    p.Hp.v += r.choice\n" +
+            "@command(free=True, acts_for=None)\ndef Duel(p: Ref[Party]):\n    r = ask(p, \"duel\", choices=[10, 20], name=\"duel\")\n    p.Hp.v += r.choice\n" +
             "@bot\ndef chooser(me: Ref[Party]):\n    submit(\"engine.pick\", choice=1)\n";
 
         private World _world = null!;

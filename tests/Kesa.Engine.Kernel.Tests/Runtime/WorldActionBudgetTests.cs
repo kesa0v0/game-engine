@@ -43,7 +43,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    pass\n" +
             "@command(free=True, acts_for=None)\n" +
             "def AskThenFeed(u: Ref[Unit]):\n" +
-            "    r = ask(u, \"go?\", choices=[\"go\"])\n" +
+            "    r = ask(u, \"go?\", choices=[\"go\"], name=\"go?\")\n" +
             "    for x in query(Unit):\n" +
             "        x.Food.amount += 1\n";
 

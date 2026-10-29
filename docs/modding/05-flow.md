@@ -11,7 +11,7 @@
 # 용선 제안: 3틱 안에 답하지 않으면 거절한 것으로 친다. 받아들이면 2틱 뒤 생선이 들어온다
 @command(free=True, acts_for=lambda house: house)
 def Charter(house: Ref[House]):
-    r = ask(house, text("harbor-charter", gold=5), choices=["harbor-charter-accept", "harbor-charter-decline"],
+    r = ask(house, text("harbor-charter", gold=5), name="harbor-charter", choices=["harbor-charter-accept", "harbor-charter-decline"],
             deadline=3, on_timeout="harbor-charter-decline")
     if r.choice == "harbor-charter-accept":
         house.Purse.gold += 5
@@ -24,7 +24,8 @@ def Charter(house: Ref[House]):
 | 인자 | 뜻 |
 |---|---|
 | 누구 | 답할 엔티티, 또는 엔티티 목록. 그 엔티티에 앉은 연결이 답한다(7장) |
-| 제목 | 문자열 키나 `text(...)` |
+| 제목 | 화면에 보일 제목. 문자열 키나 `text(...)` |
+| `name="..."` | 꼭 적는다. 이 질문 종류를 알아보는 이름. 화면과 봇이 어떤 질문인지 이것으로 안다 |
 | `choices=[...]` | 고를 선택지. 답은 몇 번째를 골랐나. 문자열 선택지는 화면이 번역 키로 보인다(8장) |
 | `responses=["Move", ...]` | 답으로 낼 수 있는 응답 커맨드 이름(다른 모드 것은 `"mod.Name"`) |
 | `data={...}` | 화면에 보일 덧붙임 값 |
@@ -45,7 +46,7 @@ def Charter(house: Ref[House]):
 선택지마다 화면에 보일 이름·설명·모양을 함께 적으려면 `option(값, ...)`으로 감싼다. 꾸밈이 없으면 맨 값을 그대로 쓴다.
 
 ```python
-r = ask(house, text("harbor-charter", gold=5), choices=[
+r = ask(house, text("harbor-charter", gold=5), name="harbor-charter", choices=[
     option("harbor-charter-accept", desc=text("harbor-charter-accept-desc"), style="gold-glow"),
     "harbor-charter-decline",
 ])
@@ -74,7 +75,7 @@ if r.choice == "harbor-charter-accept":   # 답은 감싼 것이 아니라 안�
     p = red
     while g.Match.winner is None:
         # Attack의 본문이 맞은 쪽에 물으면 그 답까지 끝난 뒤에 여기로 돌아온다 (G243)
-        r = ask(p, "turn", responses=["Move", "Attack", "EndTurn"], data={"turn": g.Match.turn})
+        r = ask(p, "turn", name="turn", responses=["Move", "Attack", "EndTurn"], data={"turn": g.Match.turn})
         match r.response:
             case "Attack" if alive(p.Order.next) == 0:
                 g.Match.winner = p

@@ -168,7 +168,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("core", schema: Schema, defs: Commands +
                 "@command(free=True, acts_for=None)\ndef Poll(u: Ref[Unit]):\n" +
                 "    towns = query(Settlement)\n" +
-                "    r = ask(u, \"Go\", choices=[\"a\", \"b\"])\n" +
+                "    r = ask(u, \"Go\", choices=[\"a\", \"b\"], name=\"Go\")\n" +
                 "    spawn(\"Town\")\n" +
                 "    u.Out.n = len(towns) * 10 + len(query(Settlement))\n");
             var content = LoadClean();

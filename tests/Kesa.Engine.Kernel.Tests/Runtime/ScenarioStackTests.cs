@@ -34,7 +34,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    if s.Pending.victim is not None:\n" +
             "        destroy(s.Pending.victim)\n" +
             "def charm(s):\n" +
-            "    r = ask(s.Pending.by, \"charm\", choices=[\"heal\", \"drain\"])\n" +
+            "    r = ask(s.Pending.by, \"charm\", choices=[\"heal\", \"drain\"], name=\"charm\")\n" +
             "    if r.index == 0:\n" +
             "        s.Pending.by.Life.hp += 2\n" +
             "    else:\n" +
@@ -56,7 +56,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    passes = 0\n" +
             // 끝이 참가자들에게 달린 반복: 상한은 단계 예산이고, 바퀴마다 묻기 때문에 걸리지 않는다 (G195)
             "    while top() is not None:\n" +
-            "        r = ask(p, \"priority\", responses=[\"Pass\", \"Zap\", \"Negate\"], data={\"top\": top()})\n" +
+            "        r = ask(p, \"priority\", responses=[\"Pass\", \"Zap\", \"Negate\"], data={\"top\": top()}, name=\"priority\")\n" +
             "        if r.response == \"Pass\":\n" +
             "            passes += 1\n" +
             "            if passes == seats():\n" +
