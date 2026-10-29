@@ -33,7 +33,7 @@
    - 경계 값 `BridgeLook`·`BridgeWhere`(At·Onto·Between)와 JSON(G402).
    - 지도에 올리는 칸은 이름이 정확히 `look`·`where`(G403). 둘 중 하나가 `None`이면 지금은 안 올림(G405).
    - 경계 `WorldObjects(since)`(전부 또는 도장 뒤 바뀐 것·빠진 것)와 `WorldObject(key, entity)`(G401·G407). 칸 함수 오류는 `BridgeWorldObject.Error`로 실림(호스트가 대체 그림, G392). 커널은 `WorldView.WorldEntities()`·`WorldObject(ui, id)`.
-   - ①에 남은 것: `@world_click("타입")`·`@world_click_space`·`@world_marks`와 `mark(...)`(G393·G395), 입력 상태 읽기 내장(G397, 이름 정해야 함), `@world_fx`(G398), 모드 선언 `presentation=`(G399). 호스트 함수(C#)는 그림·자리를 돌려줄 수 없어 `Look`·`Where` 칸에 넣으면 로드 오류다. 별칭으로 칸을 부르는 게임 코드는 실행 중에 막힌다(`questions()`와 같은 안전망).
+   - ①에 남은 것(③ skirmish가 쓰는 만큼만): `@world_marks`와 `mark(...)`(G395), 필요하면 `@world_click("타입")`·`@world_click_space`(G393). skirmish는 질문 데이터에 물러날 칸 `to`를 더해 그 칸에 표시를 그린다. 입력 상태 읽기 내장(G397, 이름 정해야 함)은 쓸 곳이 생길 때. `@world_fx`(G398)·`presentation=`(G399)은 ④. ① 끝에 `docs/modding` 해당 장과 10장을 고친다. 호스트 함수(C#)는 그림·자리를 돌려줄 수 없어 `Look`·`Where` 칸에 넣으면 로드 오류다. 별칭으로 칸을 부르는 게임 코드는 실행 중에 막힌다(`questions()`와 같은 안전망).
    - 설계 요약: 뜻은 호스트가 읽는 XML 그래픽 정의(UXML 장치 재사용, 요소 종류는 호스트가 등록, G390), 모델은 확장자로 로더를 고르고 첫 로더는 glTFast(G391), 로드 때 검사만 하고 처음 보일 때 읽음(G392). 공간 종류는 호스트(G394). 표시는 그림 이름+놓을 곳(또는 `key=`)으로 알아봄(G396). 연출 방식(바로 그리기·붙잡고 재생)은 모드 선언이 고르고 커널은 모름(G399).
 3. 그 밖: UXML 컴포넌트 재사용, `hint`·선택지 `style`을 모양에 잇기, 데모 로그(봇 거절·열린 질문).
 4. 봇 점수 도우미: 함수 칸 `Score["T"]`·`BotAction["T"]`(G374)와 `std.ai` 모드(Wesnoth RCA식). 먼저 skirmish 봇을 이 꼴로 다시 써 보며 모양을 정한다.
