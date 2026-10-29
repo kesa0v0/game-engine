@@ -36,5 +36,6 @@
 | `migrate`(저장 옮기기) | 위의 저장 호환 규칙 안에서 고친다 |
 | 엔진이 만드는 레퍼런스 페이지 | 스텁(`engine stubs`)을 본다 |
 | Unity 화면(UXML)의 일부 | 규칙(8장)과 해석기, Unity 패키지(`hosts/unity/uk.kesa.engine.unity`)가 있고 창 없는 확인이 통과했다. 창(`window`, 모달, ESC, 끌기)도 있다. 모드 USS(`<Style src>`, Unity USS 그대로)도 있다. 아직 없는 것: USS의 `@import`와 `url()`로 그림 밖의 파일 읽기, 인라인 `style`, IL2CPP 빌드에서 돌려 본 확인, Unity 안에서 눌림·끌기·ESC와 프레임마다 갱신을 돌려 본 확인 |
+| 월드 표시(판 위의 그림)의 나머지 | `look`·`where` 칸과 `look`·`at`·`onto`·`between`은 있다(8장). 아직 없는 것: Unity에서 그리기(그래픽 정의 파일, 공간 종류, glTF 모델), 판 위 클릭(`@world_click`), 엔티티가 아닌 표시(`@world_marks`·`mark`), 한 번 일어나는 효과(`@world_fx`), 연출 방식 선언, 커서·끌기 같은 입력 상태 읽기 |
 
 이 목록은 엔진이 자라면서 줄어든다. 무엇이 정해졌는지는 `docs/decisions/`(결정 기록)에 있다.

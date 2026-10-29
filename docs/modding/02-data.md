@@ -33,7 +33,7 @@ deftype("Ship", components=["Hull", "Owner"],
 | `ref("타입", optional=, inverse=)` | 다른 엔티티를 가리키는 값 | `house=ref("House", optional=True, inverse="ships")` |
 
 - 타입: `int`, `fixed`(소수, 아래), `bool`, `str`, `TextKey`(번역 키), `list[T]`, `dict[K, V]`, `DefId["타입"]`(Def id),
-  `Ref["타입"]`(엔티티, `const`·신호 안에서).
+  `Ref["타입"]`(엔티티, `const`·신호 안에서), `Look["타입"]`·`Where["타입"]`(판에 그릴 그림과 자리를 주는 함수, `const`만, 8장).
 - `field`에는 리스트·사전을 둘 수 없다. 여러 개를 들고 싶으면 키 컴포넌트(아래)나 `ref(..., inverse=)`를 쓴다.
 - `min`/`max`를 넘는 값을 쓰면 실행 오류다. 깎을 때는 `max(0, hp - n)`이나 `clamp`를 쓴다.
 - `field(..., default_from="max_hp")`처럼 처음 값을 다른 멤버에서 가져올 수 있다.

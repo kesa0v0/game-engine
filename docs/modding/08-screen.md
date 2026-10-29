@@ -443,3 +443,64 @@ def retreat(unit: Ref[Unit]):
   9) [red] [화면] skirmish.strike(target=#8 궁수)
 > [red] skirmish.Attack(party=#1 빨강, target=#8 궁수, unit=#5 궁수): ok
 ```
+
+## 월드 표시: 그림과 자리
+
+패널(UXML) 말고 판 위에 놓이는 물체(유닛 스프라이트, 3D 모델, 칸 위의 표시)도 모드 함수가 정한다. 모드는 **그림의 이름**과
+**놓을 자리**만 말하고, 그 이름이 어떤 스프라이트·모델인지와 자리가 화면의 어디인지는 호스트(그래픽 파일과 공간 종류)가 정한다.
+지금은 엔진과 경계까지 있고 Unity에서 그리는 쪽은 아직 없다(10장).
+
+### `look`·`where` 칸
+
+```python
+# 판에 올릴 타입: 이름이 정확히 look과 where인 칸이 둘 다 있으면 보는 쪽 눈에 보일 때 판에 올라간다
+deftype("Unit", components=["Pos", "Life", "Owner", "Ready"],
+    max_hp=const(int), attack=const(int), reach=const(int),
+    look=const(Look["Unit"]), where=const(Where["Unit"]))
+```
+
+```python
+def unit_look(u):
+    return look("soldier", team=u.Owner.party, hurt=u.Life.hp < u.Unit.max_hp, picked=ui.Selection.unit == u)
+
+def unit_where(u):
+    return at("square", [u.Pos.x, u.Pos.y])
+
+Unit("Soldier", max_hp=3, attack=2, reach=1, look=unit_look, where=unit_where)
+Unit("Tree", ..., look="pine", where=lambda u: at("square", [u.Pos.x, u.Pos.y]))   # 늘 같은 그림이면 이름만
+```
+
+- 칸 타입은 `Look["타입"]`·`Where["타입"]`이다. 값은 그 엔티티 하나를 받는 함수이고, `look`에는 그림 이름 글자를 바로 적어도 된다.
+- 판에 올리는 것은 이름이 정확히 `look`·`where`인 칸뿐이다. `portrait=const(Look["Unit"])`처럼 다른 이름의 칸은 화면 함수가 꺼내 쓰는 보통 값이다.
+  다른 모드의 타입에 붙이려면 `extend`로 `look`·`where`를 더한다.
+- 칸 함수는 화면 함수와 같은 규칙이다. `ui.…`와 `questions()`를 읽을 수 있고, 세계를 바꾸거나 난수를 쓰면 로드 오류다.
+  호스트 함수(C#)는 그림·자리를 돌려줄 수 없어 넣을 수 없다.
+- 둘 중 하나가 `None`을 돌려주면 그 엔티티는 지금은 판에 올리지 않는다(수송선 안의 유닛처럼). 엔티티 자체는 그대로 보이므로 패널에서는 읽힌다.
+- 칸 함수가 다른 것을 돌려주거나 실행 오류가 나면 그 물체만 오류이고 오류 문구가 그 물체에 실려 호스트로 간다. 다른 물체는 그대로 그려진다.
+- 게임 쪽 코드(`@command`·`@on`·`derived` 등)는 이 칸을 읽을 수 없다(`CMD007`). 화면마다 다른 값이기 때문이다.
+
+### 그림: `look(이름, 키=값…)`
+
+- 이름은 호스트 그래픽 파일의 정의를 고른다. 키=값은 아무 평범한 값(수·`fixed`·글자·`bool`·`None`·엔티티·`text(…)`·목록·사전)이고,
+  그 뜻(변형을 고를지, 색을 칠할지)은 그래픽 파일이 정한다. 엔진은 키를 모른다.
+- 못 보는 엔티티는 가려진 값으로 실린다(7장).
+
+### 자리: `at`·`onto`·`between`
+
+| 쓰는 법 | 뜻 |
+|---|---|
+| `at("공간", 값)` | 호스트의 이름 붙은 공간(네모 칸, 육각 칸, 연속 좌표, 구역+순번 등)의 한 자리. 값은 아무 평범한 값 |
+| `at(값)` | 게임의 기본 공간 |
+| `onto(엔티티, "붙는 곳")` | 그 엔티티의 물체에 붙어 함께 움직인다. 붙는 곳은 그 그림 정의의 노드 이름이고, 빼면 물체 자체 |
+| `between(자리, 자리)` | 두 자리 사이. 공간을 건너도 된다 |
+
+- 공간 이름과 값의 뜻(어느 칸이 화면의 어디인지, 한 칸에 여럿일 때 어떻게 늘어놓는지)은 호스트의 공간 종류가 정한다.
+
+### 어디서 쓰나
+
+`look`·`at`·`onto`·`between`이 만든 값은 화면으로만 나가고 담아 둘 수 없다. 그래서 화면 쪽 코드(칸 함수, 화면 함수,
+`@ui_action`)에서만 만든다.
+
+- 게임 쪽 코드에서 쓰면 로드 오류다(`CMD007`). `Cond`·`Action` 칸과 `@wrap`도 같다.
+- 칸을 변수에 담아 부르는 것처럼 이름으로 드러나지 않는 길은 실행 중에 오류가 난다(`at() can only be used on a screen`).
+- `field`에 담으면 타입이 맞지 않아 오류다.

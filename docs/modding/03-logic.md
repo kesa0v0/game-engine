@@ -285,4 +285,4 @@ component("Fleet", strength=derived(int, lambda f: sum([s.Hull.hp for s in f.ent
 Goal("B", check=core.goals.reached)
 ```
 
-칸이 부르는 꼴(그 Def 하나를 받음)과 안 맞으면 로드 오류다. `Cond[...]` 칸은 거기에 더해 읽기 함수이고 `bool`을 돌려줘야 한다.
+칸이 부르는 꼴(그 Def 하나를 받음)과 안 맞으면 로드 오류다. `Cond[...]` 칸은 거기에 더해 읽기 함수이고 `bool`을 돌려줘야 한다. `Look[...]`·`Where[...]` 칸(8장)에는 넣을 수 없다. 호스트 함수는 그림·자리를 돌려줄 수 없다.
