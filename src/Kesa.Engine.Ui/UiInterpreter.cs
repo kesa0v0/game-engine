@@ -117,6 +117,7 @@ namespace Kesa.Engine.Ui
             await RecheckAsync();
             _version = await _session.Version();
             _uiVersion = await _session.UiVersion();
+            await SyncFallbackAsync();
             SyncWindows();
             return new UiMountResult(new UiPanel(root), problems);
         }
@@ -176,6 +177,7 @@ namespace Kesa.Engine.Ui
                     _uiVersion = uiVersion;
                     await RecheckAsync();
                 }
+                await SyncFallbackAsync();
                 SyncWindows();
             }
             finally

@@ -141,6 +141,21 @@ namespace Kesa.Engine.Bridge.Local
             return Done<IReadOnlyList<BridgeRequest>>(requests);
         }
 
+        public ValueTask<IReadOnlyList<BridgeRequest>> UndrawnRequests()
+        {
+            var view = View;
+            var defOf = DefOf(view);
+            var requests = new List<BridgeRequest>();
+            foreach (var q in view.OpenRequests)
+            {
+                bool drawn = false;
+                foreach (var receipt in _receipts.Values)
+                    if (receipt != null && receipt.ReadsQuestion(q.Name)) drawn = true;
+                if (!drawn) requests.Add(KernelResults.Request(q, defOf));
+            }
+            return Done<IReadOnlyList<BridgeRequest>>(requests);
+        }
+
         public ValueTask<BridgeMoves> LegalResponses(long request, int max)
         {
             var view = View;

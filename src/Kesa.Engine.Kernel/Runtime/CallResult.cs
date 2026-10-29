@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Runtime
@@ -17,6 +19,7 @@ namespace Kesa.Engine.Runtime
         private readonly long? _tick;
         private readonly long? _seats;
         private readonly long? _requests;
+        private readonly IReadOnlyCollection<string>? _questions;
         private UiState? _ui;
         private long _uiVersion;
 
@@ -29,8 +32,10 @@ namespace Kesa.Engine.Runtime
         }
 
         internal CallResult(string function, Value value, World world, long[] reads, string?[] readNames, long[] readVersions,
-            string[] sources, long[] sourceVersions, long? tick, long? seats, long? requests = null)
+            string[] sources, long[] sourceVersions, long? tick, long? seats, long? requests = null,
+            IReadOnlyCollection<string>? questions = null)
         {
+            _questions = questions;
             _seats = seats;
             _requests = requests;
             Function = function;
@@ -43,6 +48,9 @@ namespace Kesa.Engine.Runtime
             _sourceVersions = sourceVersions;
             _tick = tick;
         }
+
+        /// <summary>함수가 <c>questions()</c>로 이 이름의 질문을 읽었나(이름 없이 모두 읽었어도 참) (G386).</summary>
+        public bool ReadsQuestion(string name) => _questions != null && (_questions.Contains("") || _questions.Contains(name));
 
         /// <summary>부른 함수 <c>모드.함수</c>.</summary>
         public string Function { get; }

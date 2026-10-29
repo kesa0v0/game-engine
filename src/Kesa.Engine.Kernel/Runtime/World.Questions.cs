@@ -12,8 +12,11 @@ namespace Kesa.Engine.Runtime
     /// </summary>
     public sealed partial class World
     {
-        /// <summary>호스트가 부른 함수가 <c>questions()</c>를 읽었다: 영수증이 열린 질문의 바뀜을 본다.</summary>
-        private bool _readsQuestions;
+        /// <summary>
+        /// 호스트가 부른 함수가 <c>questions()</c>로 읽은 질문 이름(이름 없이 읽었으면 빈 문자열). 영수증이 열린 질문의 바뀜을 보고,
+        /// 호스트는 아무도 읽지 않은 질문을 기본 창으로 보인다(G386). 읽지 않았으면 null.
+        /// </summary>
+        private SortedSet<string>? _questionsRead;
 
         private Value QuestionsBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
@@ -31,7 +34,7 @@ namespace Kesa.Engine.Runtime
             string? name = positional.Count == 1 ? ((StrValue)positional[0]).Value : null;
             if (_whenReads != null)
             {
-                _readsQuestions = true;
+                (_questionsRead ??= new SortedSet<string>(StringComparer.Ordinal)).Add(name ?? "");
                 foreach (var q in OpenRequests)
                 foreach (var who in q.Who)
                     Read(who.Value, AliveRead);

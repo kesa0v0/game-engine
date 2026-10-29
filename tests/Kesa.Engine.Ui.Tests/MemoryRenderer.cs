@@ -36,6 +36,9 @@ namespace Kesa.Engine.Ui.Tests
 
         public El? Root { get; private set; }
 
+        /// <summary>부모 없이 만든 요소들, 만든 순서.</summary>
+        public List<El> Tops { get; } = new List<El>();
+
         public List<string> Log { get; } = new List<string>();
 
         public El Get(ElementId id) => _all[id.Value];
@@ -52,7 +55,8 @@ namespace Kesa.Engine.Ui.Tests
             _all[el.Id] = el;
             if (parent == null)
             {
-                Root = el;
+                Root ??= el; // 뒤에 오는 맨 위 요소는 엔진 기본 창 같은 창이다
+                Tops.Add(el);
             }
             else
             {

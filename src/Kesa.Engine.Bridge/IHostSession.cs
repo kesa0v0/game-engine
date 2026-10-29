@@ -50,6 +50,12 @@ namespace Kesa.Engine.Bridge
         /// <summary>이 연결이 보는 열린 질문들 (G200·G234).</summary>
         ValueTask<IReadOnlyList<BridgeRequest>> OpenRequests();
 
+        /// <summary>
+        /// 열린 질문 가운데 지금 든 영수증의 화면 함수 어느 것도 <c>questions()</c>로 그 이름을 읽지 않은 것 (G386). 호스트는 이것만 엔진
+        /// 기본 창으로 보인다.
+        /// </summary>
+        ValueTask<IReadOnlyList<BridgeRequest>> UndrawnRequests();
+
         /// <summary>그 질문에 이 연결이 낼 수 있는 답(선택지 <see cref="BridgeNames.Pick"/>와 응답 커맨드) (G232·G272).</summary>
         ValueTask<BridgeMoves> LegalResponses(long request, int max);
 
