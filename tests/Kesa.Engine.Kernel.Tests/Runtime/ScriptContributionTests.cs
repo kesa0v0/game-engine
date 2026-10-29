@@ -153,9 +153,9 @@ namespace Kesa.Engine.Tests.Runtime
         public void APureFunctionCannotAddContributions()
         {
             Mod("scouts", schema:
-                "component(\"Look\", base=field(int, default=0), v=derived(int, lambda l: grow(l)))\n" +
+                "component(\"Sight\", base=field(int, default=0), v=derived(int, lambda l: grow(l)))\n" +
                 "def grow(l):\n    row = add_contrib(l, \"v\", \"add\", 1)\n    return row\n" +
-                "deftype(\"Eye\", components=[\"Look\"])\n");
+                "deftype(\"Eye\", components=[\"Sight\"])\n");
             Load(out var diags);
             var d = diags.Single();
             Assert.That(d.Code, Is.EqualTo(Codes.CmdWriteEffect));

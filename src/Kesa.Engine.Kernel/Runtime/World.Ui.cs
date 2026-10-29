@@ -392,6 +392,21 @@ namespace Kesa.Engine.Runtime
                     WritesUi = true,
                     CallerBody = SubmitBuiltin,
                 });
+            table.Add(PureBuiltins.LookName, new PureBuiltin(PureBuiltins.LookName, LookBuiltin));
+        }
+
+        private Value LookBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
+            if (positional.Count != 1)
+                throw new ScriptRuntimeException(Codes.RunType, "look() takes the name of a look, got " + positional.Count + " arguments",
+                    "write look(\"infantry\", hurt=True) (spec-gaps G389)");
+            if (!(positional[0] is StrValue name) || name.Value.Length == 0)
+                throw new ScriptRuntimeException(Codes.RunType,
+                    "look() takes the name of a look as a non-empty str, not " + (positional[0] is StrValue ? "an empty str" : positional[0].KindName));
+            var keys = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+            foreach (var pair in keywords) keys[pair.Key] = Savable(pair.Key + "= of look()", pair.Value,
+                "a look holds numbers, str, text(...), entities and lists or dicts of them (spec-gaps G389)");
+            return new LookValue(name.Value, keys);
         }
 
         private static ScriptRuntimeException OutsideUi(string what) =>

@@ -4,7 +4,7 @@ using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Schema
 {
-    /// <summary><c>list</c>, <c>dict</c>, <c>Ref</c>, <c>Cond</c>, <c>Action</c>: <c>[...]</c>로 타입을 만든다.</summary>
+    /// <summary><c>list</c>, <c>dict</c>, <c>Ref</c>, <c>Cond</c>, <c>Action</c>, <c>Look</c>, <c>Where</c>: <c>[...]</c>로 타입을 만든다.</summary>
     public sealed class GenericType : Value, ISubscriptable
     {
         public static readonly GenericType List = new GenericType("list");
@@ -13,6 +13,8 @@ namespace Kesa.Engine.Schema
         public static readonly GenericType DefId = new GenericType("DefId");
         public static readonly GenericType Cond = new GenericType("Cond");
         public static readonly GenericType Action = new GenericType("Action");
+        public static readonly GenericType Look = new GenericType("Look");
+        public static readonly GenericType Where = new GenericType("Where");
 
         private GenericType(string name) => Name = name;
 
@@ -47,6 +49,12 @@ namespace Kesa.Engine.Schema
                 case "Cond":
                     Expect(ctx, span, indices, 1, "Cond[\"Type\"]");
                     return new FunctionTypeRef(FunctionSlotKind.Cond, AsName(ctx, span, indices[0]));
+                case "Look":
+                    Expect(ctx, span, indices, 1, "Look[\"Type\"]");
+                    return new FunctionTypeRef(FunctionSlotKind.Look, AsName(ctx, span, indices[0]));
+                case "Where":
+                    Expect(ctx, span, indices, 1, "Where[\"Type\"]");
+                    return new FunctionTypeRef(FunctionSlotKind.Where, AsName(ctx, span, indices[0]));
                 default:
                     Expect(ctx, span, indices, 1, "Action[\"Type\"]");
                     return new FunctionTypeRef(FunctionSlotKind.Action, AsName(ctx, span, indices[0]));

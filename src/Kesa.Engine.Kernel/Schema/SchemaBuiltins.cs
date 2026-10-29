@@ -90,6 +90,8 @@ namespace Kesa.Engine.Schema
             yield return new KeyValuePair<string, Value>("DefId", GenericType.DefId);
             yield return new KeyValuePair<string, Value>("Cond", GenericType.Cond);
             yield return new KeyValuePair<string, Value>("Action", GenericType.Action);
+            yield return new KeyValuePair<string, Value>("Look", GenericType.Look);
+            yield return new KeyValuePair<string, Value>("Where", GenericType.Where);
             yield return new KeyValuePair<string, Value>("Contrib", ContribTypeRef.Instance);
         }
 

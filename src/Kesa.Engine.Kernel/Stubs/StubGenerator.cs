@@ -74,6 +74,7 @@ namespace Kesa.Engine.Stubs
             "class Option: ...\n" +
             "def option(value: Any, /, *, label: str | Text | None = ..., desc: str | Text | None = ..., style: str | None = ..., " +
             "data: dict[str, Any] | None = ...) -> Option: ...\n" +
+            "def look(name: str, /, **keys: Any) -> Any: ...\n" +
             "def floor(x: int | float, /) -> int: ...\n" +
             "def ceil(x: int | float, /) -> int: ...\n" +
             "def clamp(x: Any, low: Any, high: Any, /) -> Any: ...\n" +
@@ -199,6 +200,8 @@ namespace Kesa.Engine.Stubs
             "DefId: Any\n" +
             "Cond: Any\n" +
             "Action: Any\n" +
+            "Look: Any\n" +
+            "Where: Any\n" +
             "\n" +
             "def deftype(name: str, /, *, components: list[str] = ..., **consts: MemberDecl) -> None: ...\n" +
             "def component(name: str, /, *, key: Any = ..., keys: Literal[\"all\", \"listed\"] = ..., **members: MemberDecl) -> None: ...\n" +
@@ -716,7 +719,13 @@ namespace Kesa.Engine.Stubs
                     case OptionalTypeRef optional:
                         return TypeText(optional.Inner) + " | None";
                     case FunctionTypeRef f:
-                        return f.Kind == FunctionSlotKind.Cond ? "Callable[..., bool]" : "Callable[..., None]";
+                        switch (f.Kind)
+                        {
+                            case FunctionSlotKind.Cond: return "Callable[..., bool]";
+                            case FunctionSlotKind.Look: return "Callable[..., Any] | str";
+                            case FunctionSlotKind.Where: return "Callable[..., Any]";
+                            default: return "Callable[..., None]";
+                        }
                 }
                 return "Any";
             }

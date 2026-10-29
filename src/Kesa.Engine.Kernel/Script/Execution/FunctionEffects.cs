@@ -22,6 +22,7 @@ namespace Kesa.Engine.Script
             HostNames? hosts = null, Func<string, bool>? sees = null, ModNames? mods = null)
         {
             var bodies = new List<Body>();
+            var screenSlots = ScreenSlotNames(schema);
             foreach (var function in functions.Functions)
             {
                 var body = new Body(function);
@@ -29,6 +30,7 @@ namespace Kesa.Engine.Script
                     new UiNames(schema, sees ?? (_ => true), context, true))
                 {
                     Mods = mods ?? ModNames.None,
+                    ScreenSlots = screenSlots,
                 };
                 if (function.Definition != null)
                     walker.Block(function.Definition.Body, FunctionLocals.Of(function.Definition));
@@ -317,6 +319,20 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary>스키마가 선언한 순수 자리에 이 모드의 쓰기 함수가 있으면 오류다.</summary>
+        /// <summary><c>Look</c>·<c>Where</c> 칸의 이름들 (G388·G393).</summary>
+        private static SortedSet<string> ScreenSlotNames(SchemaSet schema)
+        {
+            var names = new SortedSet<string>(System.StringComparer.Ordinal);
+            void Add(IEnumerable<MemberDecl> members)
+            {
+                foreach (var m in members)
+                    if (m.Spec.Type is FunctionTypeRef slot && slot.IsScreen) names.Add(m.Name);
+            }
+            foreach (var component in schema.Components) Add(component.Members);
+            foreach (var type in schema.Types) Add(type.Consts);
+            return names;
+        }
+
         private static void CheckPureSlots(SchemaSet schema, CallContext context)
         {
             void Pure(FunctionValue? fn, string what, SourceSpan span)
@@ -557,6 +573,9 @@ namespace Kesa.Engine.Script
             /// <summary><c>모드id.이름</c>으로 쓸 수 있는 모드들 (G309).</summary>
             public ModNames Mods { get; set; } = ModNames.None;
 
+            /// <summary><c>Look</c>·<c>Where</c> 칸의 이름들.</summary>
+            public SortedSet<string> ScreenSlots { get; set; } = new SortedSet<string>(System.StringComparer.Ordinal);
+
             public Walker(ModScope scope, Body body, HostNames hosts, UiNames ui, UiNames bot)
             {
                 _scope = scope;
@@ -781,7 +800,12 @@ namespace Kesa.Engine.Script
                         }
                         // 값으로 쓴 다른 모드의 커맨드 이름을 기록한다 (G118·G309)
                         else if (attr.Target is NameExpr root && IsModRoot(root.Name, locals)) Resolve(attr, locals);
-                        else Expr(attr.Target, locals);
+                        else
+                        {
+                            // Look·Where 칸의 함수는 화면 쪽이라 이름이 같은 칸을 읽는 곳은 UI를 만진 곳으로 센다 (G388)
+                            if (ScreenSlots.Contains(attr.Name)) _body.TouchUi(attr.Span);
+                            Expr(attr.Target, locals);
+                        }
                         break;
                     case IndexExpr index:
                         Expr(index.Target, locals);

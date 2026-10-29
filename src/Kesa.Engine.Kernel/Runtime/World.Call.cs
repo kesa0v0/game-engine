@@ -245,7 +245,7 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>호스트가 부르지 않는 함수면 그 이유, 아니면 null (G245).</summary>
-        private static string? Refusal(FunctionValue fn, bool withUi)
+        internal static string? Refusal(FunctionValue fn, bool withUi)
         {
             if (fn.IsUiAction) return "it is a @ui_action, which the host runs as an action, not as a value to show";
             if (fn.IsBot) return "it is a @bot, which the host runs in a bot's seat, not as a value to show";

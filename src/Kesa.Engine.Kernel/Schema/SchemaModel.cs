@@ -101,6 +101,12 @@ namespace Kesa.Engine.Schema
 
         /// <summary>바꾸는 함수 자리 (Flow 본문으로 실행).</summary>
         Action,
+
+        /// <summary>그 엔티티의 그림 값 <c>look(…)</c>을 주는 화면 쪽 함수 자리 (G388). 글자를 넣으면 늘 그 이름이다.</summary>
+        Look,
+
+        /// <summary>그 엔티티가 화면의 어디에 보이는지 주는 화면 쪽 함수 자리 (G393·G394·G400).</summary>
+        Where,
     }
 
     /// <summary>
@@ -117,6 +123,9 @@ namespace Kesa.Engine.Schema
 
         public FunctionSlotKind Kind { get; }
         public NameRef Target { get; }
+
+        /// <summary>호스트가 화면마다 부르는 자리(<c>Look</c>·<c>Where</c>): 화면 함수처럼 UI 기록과 열린 질문을 읽을 수 있다.</summary>
+        public bool IsScreen => Kind == FunctionSlotKind.Look || Kind == FunctionSlotKind.Where;
         public override string Display => Kind + "[\"" + Target.Name + "\"]";
     }
 

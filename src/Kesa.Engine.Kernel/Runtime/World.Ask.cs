@@ -337,7 +337,7 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>질문에 담아 저장할 수 있는 값으로 (spec S2 표: Request 값은 저장되므로 정규형). 엔티티는 id로 바꾼다.</summary>
-        private Value Savable(string display, Value value)
+        private Value Savable(string display, Value value, string? hint = null)
         {
             switch (value)
             {
@@ -351,19 +351,19 @@ namespace Kesa.Engine.Runtime
                     return new EntityValue(e.EntityId);
                 case TextValue t:
                     var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
-                    foreach (var pair in t.Args) args[pair.Key] = Savable(display, pair.Value);
+                    foreach (var pair in t.Args) args[pair.Key] = Savable(display, pair.Value, hint);
                     return new TextValue(t.Key, args, t.EntityDefs);
                 case ListValue list:
                     var items = new List<Value>(list.Items.Count);
-                    foreach (var item in list.Items) items.Add(Savable(display, item));
+                    foreach (var item in list.Items) items.Add(Savable(display, item, hint));
                     return new ListValue(items);
                 case DictValue dict:
                     var entries = new List<DictItem>(dict.Items.Count);
-                    foreach (var item in dict.Items) entries.Add(new DictItem(item.Key, Savable(display, item.Value), item.Span));
+                    foreach (var item in dict.Items) entries.Add(new DictItem(item.Key, Savable(display, item.Value, hint), item.Span));
                     return new DictValue(entries);
             }
             throw new ScriptRuntimeException(Codes.RunType, display + " cannot hold " + value.KindName,
-                "a question is saved, so it holds numbers, str, text(...), entities and lists or dicts of them");
+                hint ?? "a question is saved, so it holds numbers, str, text(...), entities and lists or dicts of them");
         }
 
         /// <summary><c>ask</c>가 실행기에 넘기는 질문의 내용. 실행기는 이것을 들고 멈추기만 한다.</summary>

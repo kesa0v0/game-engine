@@ -205,7 +205,7 @@ namespace Kesa.Engine.Tests.Loading
         public void APureFunctionCannotPay()
         {
             Mod("core", schema: PaySchema +
-                                "component(\"Look\", v=derived(bool, lambda l: check(l.entity)))\n" +
+                                "component(\"Sight\", v=derived(bool, lambda l: check(l.entity)))\n" +
                                 "def check(u):\n    ok = pay(u.Treasury.gold, 1)\n    return ok\n");
             Load(out var diags);
             var d = diags.Single();

@@ -362,4 +362,32 @@ namespace Kesa.Engine.Script
 
         public override string KindName => "option";
     }
+
+    /// <summary>
+    /// <c>look(이름, 키=값…)</c>의 값 (G388·G389). 이름은 호스트 그래픽 파일의 정의를 고르고, 키=값의 뜻은 커널이 모른다.
+    /// 화면으로만 나가며 저장하거나 칸에 담을 수 없다.
+    /// </summary>
+    public sealed class LookValue : Value, IValueEquality
+    {
+        public LookValue(string name, SortedDictionary<string, Value> keys)
+        {
+            Name = name;
+            Keys = keys;
+        }
+
+        public string Name { get; }
+
+        /// <summary>키 순으로 정렬된 키=값. 값은 저장할 수 있는 평범한 값이다.</summary>
+        public IReadOnlyDictionary<string, Value> Keys { get; }
+
+        public bool ValueEquals(Value other)
+        {
+            if (!(other is LookValue o) || o.Name != Name || o.Keys.Count != Keys.Count) return false;
+            foreach (var pair in Keys)
+                if (!o.Keys.TryGetValue(pair.Key, out var v) || !PureOps.ValuesEqual(v, pair.Value)) return false;
+            return true;
+        }
+
+        public override string KindName => "look";
+    }
 }

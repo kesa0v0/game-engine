@@ -229,8 +229,14 @@ namespace Kesa.Engine.Loading
                     return null;
 
                 case FunctionTypeRef f:
+                    // 고정 그림은 이름 글자만 적는다 (G388)
+                    if (f.Kind == FunctionSlotKind.Look && value is StrValue look)
+                        return look.Value.Length == 0 ? "the name of a look cannot be empty" : null;
                     if (value is HostReference host) return HostSlotMismatch(f, host);
-                    if (!(value is FunctionValue fn)) return "expected a function for " + f.Display + ", found " + value.KindName;
+                    if (!(value is FunctionValue fn))
+                        return "expected a function for " + f.Display + ", found " + value.KindName +
+                               (f.Kind == FunctionSlotKind.Look ? " (or write the name of a look as a str)" : "");
+                    if (f.IsScreen) return ScreenMismatch(fn, f.Display);
                     return FunctionMismatch(fn, f.Display, f.Kind == FunctionSlotKind.Cond);
             }
             return "values of type " + type.Display + " cannot be written in a patch";
@@ -259,6 +265,13 @@ namespace Kesa.Engine.Loading
                 return "'" + fn.Name + "' draws random numbers (at " + fn.RandomWitness + "), but " + slot +
                        " only holds functions that give the same answer every time";
             return null;
+        }
+
+        /// <summary><c>Look</c>·<c>Where</c> 칸의 함수: 호스트가 화면마다 부르므로 화면 함수와 같은 규칙이다 (G388·G393).</summary>
+        private static string? ScreenMismatch(FunctionValue fn, string slot)
+        {
+            string? refusal = Runtime.World.Refusal(fn, withUi: true);
+            return refusal == null ? null : "'" + fn.Name + "' cannot be a value of " + slot + ": " + refusal;
         }
 
         private const string WhenSlot = "contrib(when=...)";
@@ -293,7 +306,7 @@ namespace Kesa.Engine.Loading
         {
             string name = "'" + host.Name + "'";
             bool cond = slot.Kind == FunctionSlotKind.Cond;
-            if (cond && host.Writes)
+            if ((cond || slot.IsScreen) && host.Writes)
                 return name + " is a host function that changes the world, but " + slot.Display + " only holds functions that read";
             var signature = host.Signature;
             var parameters = signature.Parameters;
