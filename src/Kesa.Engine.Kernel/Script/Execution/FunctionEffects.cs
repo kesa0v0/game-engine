@@ -117,6 +117,7 @@ namespace Kesa.Engine.Script
             Propagate(bodies, f => f.TouchesBot, b => b.FirstBotTouch, true, (f, w) => f.BotTouchWitness = w);
             Propagate(bodies, f => f.WritesBot, b => b.FirstBotWrite, false, (f, w) => f.BotWriteWitness = w);
             Propagate(bodies, f => f.ReadsQuestions, b => b.FirstQuestions, true, (f, w) => f.QuestionsWitness = w);
+            Propagate(bodies, f => f.MakesLooks, b => b.FirstLook, true, (f, w) => f.LookWitness = w);
 
             // 사전 조건은 UI가 거듭 확인하므로 같은 답을 내야 한다 (G178)
             const string randomHint = "draw random numbers in the body instead; derived values, conditions and preconditions must give " +
@@ -207,6 +208,10 @@ namespace Kesa.Engine.Script
         internal const string QuestionsHint = "the questions a connection can answer differ for each player; read them in a screen function, " +
                                               "a @ui_action or a @bot (spec-gaps G383)";
 
+        internal const string LookNames = "look(), at(), onto() or between()";
+
+        internal const string LookHint = "looks and places only go to the screen; make them in a Look or Where slot or a screen function (spec-gaps G389)";
+
         private static void Propagate(List<Body> bodies, Func<FunctionValue, bool> has, Func<Body, SourceSpan?> first,
             bool expressions, Action<FunctionValue, SourceSpan> set)
         {
@@ -251,6 +256,9 @@ namespace Kesa.Engine.Script
                 else if (fn.ReadsQuestions)
                     context.Error(Codes.CmdUiEffect, what + " reads the open questions of a connection (questions()), so it cannot run as game code",
                         span, QuestionsHint, new[] { fn.QuestionsWitness!.Value });
+                else if (fn.MakesLooks)
+                    context.Error(Codes.CmdUiEffect, what + " makes a look or a place (" + LookNames + "), so it cannot run as game code",
+                        span, LookHint, new[] { fn.LookWitness!.Value });
             }
 
             const string statementHint = "call it on its own line in a @ui_action or in another function that changes UI state (spec-gaps G282)";
@@ -373,6 +381,13 @@ namespace Kesa.Engine.Script
                         span, QuestionsHint, new[] { fn.QuestionsWitness!.Value });
                     return;
                 }
+                if (fn.MakesLooks)
+                {
+                    context.Error(Codes.CmdUiEffect,
+                        what + " uses '" + fn.Name + "', which makes a look or a place (" + LookNames + "); game values cannot hold them",
+                        span, LookHint, new[] { fn.LookWitness!.Value });
+                    return;
+                }
                 if (!fn.Writes) return;
                 context.Error(Codes.CmdWriteEffect,
                     what + " uses '" + fn.Name + "', which changes the world; it can only read", span,
@@ -468,6 +483,9 @@ namespace Kesa.Engine.Script
 
             /// <summary>본문의 첫 <c>questions</c> (G383).</summary>
             public SourceSpan? FirstQuestions { get; set; }
+
+            /// <summary>본문의 첫 <c>look</c>·<c>at</c>·<c>onto</c>·<c>between</c> (G389).</summary>
+            public SourceSpan? FirstLook { get; set; }
 
             /// <summary><c>ui.…</c>(<paramref name="bot"/>면 <c>bot.…</c>) 기록을 건드린다.</summary>
             public void Touch(bool bot, SourceSpan span)
@@ -594,6 +612,10 @@ namespace Kesa.Engine.Script
             private bool IsRuntime(Expr expr, string name, SortedSet<string> locals) =>
                 expr is NameExpr n && n.Name == name && !locals.Contains(name) && !_scope.TryLookup(name, out _);
 
+            private bool LookMaker(Expr expr, SortedSet<string> locals) =>
+                IsRuntime(expr, PureBuiltins.LookName, locals) || IsRuntime(expr, PureBuiltins.AtName, locals) ||
+                IsRuntime(expr, PureBuiltins.OntoName, locals) || IsRuntime(expr, PureBuiltins.BetweenName, locals);
+
             /// <summary><c>ui.기록.칸</c>(G279)이면 거짓, <c>bot.기록.칸</c>(G371)이면 참. 이름을 검사한다. 아니면 null.</summary>
             private bool? StateField(Expr expr, SortedSet<string> locals)
             {
@@ -677,7 +699,8 @@ namespace Kesa.Engine.Script
                 {
                     if (_body.FirstWrite == null) _body.FirstWrite = call.Span;
                 }
-                else if (!IsNamed(call.Callee, locals) || IsRuntime(call.Callee, PureBuiltins.QuestionsName, locals)) Expr(call.Callee, locals);
+                else if (!IsNamed(call.Callee, locals) || IsRuntime(call.Callee, PureBuiltins.QuestionsName, locals) || LookMaker(call.Callee, locals))
+                    Expr(call.Callee, locals);
                 foreach (var arg in call.Arguments) Expr(arg.Value, locals);
             }
 
@@ -760,7 +783,8 @@ namespace Kesa.Engine.Script
                         }
                         else if (builtin != null)
                             _body.BuiltinExpressionCalls.Add(new KeyValuePair<string, SourceSpan>(builtin, call.Span));
-                        else if (!IsNamed(call.Callee, locals) || IsRuntime(call.Callee, PureBuiltins.QuestionsName, locals))
+                        else if (!IsNamed(call.Callee, locals) || IsRuntime(call.Callee, PureBuiltins.QuestionsName, locals) ||
+                                 LookMaker(call.Callee, locals))
                             Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
                         break;
@@ -774,6 +798,9 @@ namespace Kesa.Engine.Script
                         break;
                     case NameExpr name when IsRuntime(name, PureBuiltins.QuestionsName, locals):
                         if (_body.FirstQuestions == null) _body.FirstQuestions = name.Span;
+                        break;
+                    case NameExpr name when LookMaker(name, locals):
+                        if (_body.FirstLook == null) _body.FirstLook = name.Span;
                         break;
                     case NameExpr name:
                         Resolve(name, locals); // 값으로 쓴 커맨드 이름을 기록한다 (G118)

@@ -9,7 +9,9 @@ namespace Kesa.Engine.Bridge
     /// 경계 값의 정규형 JSON (spec-gaps G326). 저장 형식의 값 규칙(<c>World.Save</c>)에 엔티티의 Def와 숨김을 더한 것이다:
     /// <c>null</c>, bool, 수(int), 문자열, 배열(리스트), <c>{"fixed": raw}</c>, <c>{"entity": id, "def": "모드:Def"}</c>(Def를 모르면
     /// <c>{"entity": id}</c>), <c>{"hidden": true}</c>, <c>{"dict": [[키, 값], ...]}</c>(넣은 순), <c>{"text": 키, "args": {...}}</c>(인자 이름 순),
-    /// <c>{"option": 값, "label": …, "desc": …, "style": …, "data": …}</c>. 빈칸 없이 쓰고 같은 값은 같은 글자다.
+    /// <c>{"option": 값, "label": …, "desc": …, "style": …, "data": …}</c>, <c>{"look": 이름, "keys": {...}}</c>(키 이름 순),
+    /// <c>{"at": 공간|null, "value": 값}</c>, <c>{"onto": 엔티티, "point": 이름|null}</c>, <c>{"between": [자리, 자리]}</c>.
+    /// 빈칸 없이 쓰고 같은 값은 같은 글자다.
     /// </summary>
     public static class BridgeJson
     {
@@ -64,15 +66,9 @@ namespace Kesa.Engine.Bridge
                 case BridgeText t:
                     sb.Append("{\"text\":");
                     Quote(sb, t.Key);
-                    sb.Append(",\"args\":{");
-                    for (int k = 0; k < t.Args.Count; k++)
-                    {
-                        if (k > 0) sb.Append(',');
-                        Quote(sb, t.Args[k].Key);
-                        sb.Append(':');
-                        Write(sb, t.Args[k].Value);
-                    }
-                    sb.Append("}}");
+                    sb.Append(",\"args\":");
+                    Named(sb, t.Args);
+                    sb.Append('}');
                     break;
                 case BridgeOption o:
                     sb.Append("{\"option\":");
@@ -88,9 +84,60 @@ namespace Kesa.Engine.Bridge
                     Optional(sb, o.Data);
                     sb.Append('}');
                     break;
+                case BridgeLook look:
+                    sb.Append("{\"look\":");
+                    Quote(sb, look.Name);
+                    sb.Append(",\"keys\":");
+                    Named(sb, look.Keys);
+                    sb.Append('}');
+                    break;
+                case BridgeWhere w:
+                    switch (w.Shape)
+                    {
+                        case BridgeWhereShape.At:
+                            sb.Append("{\"at\":");
+                            Name(sb, w.Name);
+                            sb.Append(",\"value\":");
+                            Write(sb, w.Target!);
+                            break;
+                        case BridgeWhereShape.Onto:
+                            sb.Append("{\"onto\":");
+                            Write(sb, w.Target!);
+                            sb.Append(",\"point\":");
+                            Name(sb, w.Name);
+                            break;
+                        default:
+                            sb.Append("{\"between\":[");
+                            Write(sb, w.First!);
+                            sb.Append(',');
+                            Write(sb, w.Second!);
+                            sb.Append(']');
+                            break;
+                    }
+                    sb.Append('}');
+                    break;
                 default:
                     throw new InvalidOperationException("unknown bridge value " + value.Kind);
             }
+        }
+
+        private static void Named(StringBuilder sb, IReadOnlyList<KeyValuePair<string, BridgeValue>> pairs)
+        {
+            sb.Append('{');
+            for (int k = 0; k < pairs.Count; k++)
+            {
+                if (k > 0) sb.Append(',');
+                Quote(sb, pairs[k].Key);
+                sb.Append(':');
+                Write(sb, pairs[k].Value);
+            }
+            sb.Append('}');
+        }
+
+        private static void Name(StringBuilder sb, string? name)
+        {
+            if (name == null) sb.Append("null");
+            else Quote(sb, name);
         }
 
         private static void Optional(StringBuilder sb, BridgeValue? value)
@@ -298,19 +345,34 @@ namespace Kesa.Engine.Bridge
                         string key2 = String();
                         Expect(',');
                         Field("args");
-                        var args = new List<KeyValuePair<string, BridgeValue>>();
-                        Expect('{');
-                        if (!Take('}'))
-                        {
-                            do
-                            {
-                                string name = String();
-                                Expect(':');
-                                args.Add(new KeyValuePair<string, BridgeValue>(name, Value()));
-                            } while (Take(','));
-                            Expect('}');
-                        }
-                        result = new BridgeText(key2, args);
+                        result = new BridgeText(key2, Named());
+                        break;
+                    case "look":
+                        string lookName = String();
+                        Expect(',');
+                        Field("keys");
+                        result = new BridgeLook(lookName, Named());
+                        break;
+                    case "at":
+                        string? space = OptionalName();
+                        Expect(',');
+                        Field("value");
+                        result = BridgeWhere.At(space, Value());
+                        break;
+                    case "onto":
+                        var entity = Value();
+                        if (entity.Kind != BridgeKind.Entity && entity.Kind != BridgeKind.Hidden) throw Error("onto needs an entity");
+                        Expect(',');
+                        Field("point");
+                        result = BridgeWhere.Onto(entity, OptionalName());
+                        break;
+                    case "between":
+                        Expect('[');
+                        var first = Value() as BridgeWhere ?? throw Error("between needs two places");
+                        Expect(',');
+                        var second = Value() as BridgeWhere ?? throw Error("between needs two places");
+                        Expect(']');
+                        result = BridgeWhere.Between(first, second);
                         break;
                     case "option":
                         var value = Value();
@@ -333,6 +395,29 @@ namespace Kesa.Engine.Bridge
                 }
                 Expect('}');
                 return result;
+            }
+
+            private List<KeyValuePair<string, BridgeValue>> Named()
+            {
+                var pairs = new List<KeyValuePair<string, BridgeValue>>();
+                Expect('{');
+                if (!Take('}'))
+                {
+                    do
+                    {
+                        string name = String();
+                        Expect(':');
+                        pairs.Add(new KeyValuePair<string, BridgeValue>(name, Value()));
+                    } while (Take(','));
+                    Expect('}');
+                }
+                return pairs;
+            }
+
+            private string? OptionalName()
+            {
+                Peek();
+                return Word("null") ? null : String();
             }
 
             private long NumberValue()

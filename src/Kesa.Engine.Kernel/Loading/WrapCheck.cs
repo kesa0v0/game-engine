@@ -130,6 +130,14 @@ namespace Kesa.Engine.Loading
                     new[] { fn.QuestionsWitness!.Value });
                 ok = false;
             }
+            else if (fn.MakesLooks)
+            {
+                context.Error(Codes.CmdUiEffect, "the @wrap '" + fn.Name + "' of the command '" + target.Name +
+                                                 "' makes a look or a place (" + FunctionEffects.LookNames + "), so it cannot run as game code",
+                    fn.Definition!.Span, "a command wrapper runs like the command's body (spec-gaps G320, G389)",
+                    new[] { fn.LookWitness!.Value });
+                ok = false;
+            }
             var walker = new InnerWalker(fn.Parameters[0].Name);
             walker.Block(fn.Definition!.Body);
             foreach (var span in walker.Misused)
@@ -196,12 +204,13 @@ namespace Kesa.Engine.Loading
                 fn.TouchesUi && !target.TouchesUi ? "uses ui.…" :
                 fn.WritesBot && !target.WritesBot ? "changes bot state" :
                 fn.TouchesBot && !target.TouchesBot ? "uses bot.…" :
-                fn.ReadsQuestions && !target.ReadsQuestions ? "uses questions()" : null;
+                fn.ReadsQuestions && !target.ReadsQuestions ? "uses questions()" :
+                fn.MakesLooks && !target.MakesLooks ? "makes looks or places" : null;
             if (wider == null) return true;
             var witness = fn.Writes && !target.Writes ? fn.WriteWitness : fn.Random && !target.Random ? fn.RandomWitness :
                 fn.WritesUi && !target.WritesUi ? fn.UiWriteWitness : fn.TouchesUi && !target.TouchesUi ? fn.UiTouchWitness :
                 fn.WritesBot && !target.WritesBot ? fn.BotWriteWitness : fn.TouchesBot && !target.TouchesBot ? fn.BotTouchWitness :
-                fn.QuestionsWitness;
+                fn.ReadsQuestions && !target.ReadsQuestions ? fn.QuestionsWitness : fn.LookWitness;
             context.Error(Codes.CmdWriteEffect,
                 "'" + fn.Name + "' " + wider + " but '" + target.Name + "' does not, so it cannot wrap it", w.Span,
                 "a wrapper can do no more than the function it wraps, because it runs everywhere that function is called (spec-gaps G311)",

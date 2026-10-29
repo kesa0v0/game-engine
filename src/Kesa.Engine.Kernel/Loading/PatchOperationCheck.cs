@@ -258,6 +258,9 @@ namespace Kesa.Engine.Loading
             if (fn.ReadsQuestions)
                 return "'" + fn.Name + "' reads the open questions of a connection (questions()) (at " + fn.QuestionsWitness + "), but " + slot +
                        " holds functions that run as game code, and a game value cannot depend on who looks";
+            if (fn.MakesLooks)
+                return "'" + fn.Name + "' makes a look or a place (at " + fn.LookWitness + "), but " + slot +
+                       " holds functions that run as game code, and looks and places only go to the screen";
             // 확인용 자리에는 쓰기 함수를 둘 수 없다 (G117). 판정은 ②b 끝에 끝나 있다
             if (reads && fn.Writes)
                 return "'" + fn.Name + "' changes the world (at " + fn.WriteWitness + "), but " + slot + " only holds functions that read";

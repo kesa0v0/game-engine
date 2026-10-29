@@ -180,6 +180,11 @@ namespace Kesa.Engine.Script
 
         public bool ReadsQuestions => QuestionsWitness != null;
 
+        /// <summary><c>look</c>·<c>at</c>·<c>onto</c>·<c>between</c>으로 화면에만 나가는 값을 만드는 곳 (G389). 게임 코드에서는 쓰지 않는다. 아니면 null.</summary>
+        public SourceSpan? LookWitness { get; internal set; }
+
+        public bool MakesLooks => LookWitness != null;
+
         /// <summary><c>@command</c> 함수인가 (G109). 로직에서 쓸 수 없다 (G118).</summary>
         public bool IsCommand => Definition != null && Definition.IsCommand;
 

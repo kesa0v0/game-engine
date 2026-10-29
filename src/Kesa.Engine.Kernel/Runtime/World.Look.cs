@@ -26,7 +26,7 @@ namespace Kesa.Engine.Runtime
             string name = Name("look()", "the name of a look", positional[0]);
             var keys = new SortedDictionary<string, Value>(StringComparer.Ordinal);
             foreach (var pair in keywords)
-                keys[pair.Key] = Savable(pair.Key + "= of look()", pair.Value, "a look holds " + PlainHint + " (spec-gaps G389)");
+                keys[pair.Key] = Savable(pair.Key + "= of look()", pair.Value, "a look holds " + PlainHint + " (spec-gaps G389)", hidden: true);
             return new LookValue(name, keys);
         }
 
@@ -34,10 +34,10 @@ namespace Kesa.Engine.Runtime
         {
             NoPlaceKeywords("at()", keywords);
             const string usage = "write at(\"hex\", (3, 4)), or at((3, 4)) for the game's default space (spec-gaps G394)";
-            if (positional.Count == 1) return WhereValue.At(null, Savable("the value of at()", positional[0], usage));
+            if (positional.Count == 1) return WhereValue.At(null, Savable("the value of at()", positional[0], usage, hidden: true));
             if (positional.Count != 2) throw LookError("at() takes a space and a value, got " + positional.Count + " arguments", usage);
             return WhereValue.At(Name("at()", "the space name", positional[0]),
-                Savable("the value of at()", positional[1], "a place holds " + PlainHint + " (spec-gaps G394)"));
+                Savable("the value of at()", positional[1], "a place holds " + PlainHint + " (spec-gaps G394)", hidden: true));
         }
 
         private Value OntoBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
@@ -46,10 +46,14 @@ namespace Kesa.Engine.Runtime
             const string usage = "write onto(ship, \"deck\") (spec-gaps G406)";
             if (positional.Count < 1 || positional.Count > 2)
                 throw LookError("onto() takes an entity and where on it, got " + positional.Count + " arguments", usage);
-            if (!(positional[0] is IEntityReference entity))
-                throw LookError("onto() takes an entity, not " + positional[0].KindName, usage);
+            Value target = positional[0] switch
+            {
+                IEntityReference entity => new EntityValue(entity.EntityId),
+                HiddenValue hidden => hidden,
+                _ => throw LookError("onto() takes an entity, not " + positional[0].KindName, usage),
+            };
             string? point = positional.Count == 2 ? Name("onto()", "the attach point", positional[1]) : null;
-            return WhereValue.Onto(new EntityValue(entity.EntityId), point);
+            return WhereValue.Onto(target, point);
         }
 
         private Value BetweenBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)

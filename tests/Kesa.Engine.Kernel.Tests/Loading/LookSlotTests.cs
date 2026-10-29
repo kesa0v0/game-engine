@@ -62,6 +62,20 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(d.Message, Does.StartWith("the @command 'Go'"));
         }
 
+        [TestCase("@command(free=True, acts_for=None)\ndef Go(u: Ref[Unit]):\n    p = spot(u)\n    u.Hp.v = 1\n",
+            "the @command 'Go' makes a look or a place (look(), at(), onto() or between()), so it cannot run as game code")]
+        [TestCase("Goal(\"G\", ok=lambda g: spot(g) is not None)\n",
+            "'ok': '<lambda>' makes a look or a place (at core/defs/defs.py:4:28), but Cond[\"Goal\"] holds functions that run as game code, " +
+            "and looks and places only go to the screen")]
+        public void GameCodeCannotMakeALookOrAPlace(string defs, string message)
+        {
+            // 멈춘 흐름에 남으면 저장할 수 없는 값이다
+            Mod("core", schema: Schema + "deftype(\"Goal\", ok=const(Cond[\"Goal\"]))\n",
+                defs: "def spot(u):\n    return at(\"hex\", 1)\n" + "Unit(\"Foot\", look=\"pine\", where=lambda u: at(0))\n" + defs);
+            Load(out var diags);
+            Assert.That(diags.Single().Message, Is.EqualTo(message));
+        }
+
         [Test]
         public void AnotherSlotWithTheSameNameIsStillGameData()
         {
@@ -118,6 +132,27 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(((EntityValue)bare[0].Target!).Id, Is.EqualTo(u));
         }
 
+        [Test]
+        public void AnEntityTheViewerCannotSeeIsHiddenInPlace()
+        {
+            // 화면 쪽에서 못 보는 엔티티는 읽는 순간 가려진 값이 되고, 그림과 자리는 그것을 그대로 싣는다
+            Mod("core", schema: Schema.Replace("components=[\"Hp\"]", "components=[\"Hp\", \"Aim\"]") +
+                                "component(\"Aim\", target=ref(\"Unit\", optional=True))\n",
+                defs: "Unit(\"Foot\", look=\"pine\", where=lambda u: at(0))\n" +
+                      "@view_rule(Unit)\ndef unseen(viewer, entity):\n    return entity.Hp.v != 1\n" +
+                      "def show(a: Ref[Unit]):\n    t = a.Aim.target\n    return [look(\"x\", who=t), onto(t), at(\"hex\", [a, t])]\n");
+            var world = new World(LoadClean());
+            var a = world.Create("core:Foot");
+            var b = world.Create("core:Foot");
+            world.Set(b, world.Member("Hp", "v"), new IntValue(1));
+            world.Set(a, world.Member("Aim", "target"), new EntityValue(b));
+            Assert.That(world.ViewAs("alice").Sees(b), Is.False, "precondition");
+            var items = ((ListValue)world.ViewAs("alice").Call("core.show", new EntityValue(a)).Value).Items;
+            Assert.That(((LookValue)items[0]).Keys["who"], Is.SameAs(HiddenValue.Instance));
+            Assert.That(((WhereValue)items[1]).Target, Is.SameAs(HiddenValue.Instance));
+            Assert.That(((ListValue)((WhereValue)items[2]).Target!).Items[1], Is.SameAs(HiddenValue.Instance), "kept in its place");
+        }
+
         [TestCase("at()", "at() takes a space and a value, got 0")]
         [TestCase("at(\"\", 1)", "the space name as a non-empty str")]
         [TestCase("at(\"hex\", show)", "cannot hold")]
@@ -139,10 +174,8 @@ namespace Kesa.Engine.Tests.Loading
         {
             Mod("core", schema: Schema.Replace("v=field(int, default=3)", "v=field(int, default=3), seen=derived(str, lambda h: look(\"a\"))"),
                 defs: "Unit(\"Foot\", look=\"pine\", where=lambda u: at(0))\n");
-            var world = new World(LoadClean());
-            var u = world.Create("core:Foot");
-            var e = Assert.Throws<WorldException>(() => world.Get(u, world.Member("Hp", "seen")))!;
-            Assert.That(e.Message, Does.EndWith("expected str, found look"));
+            Load(out var diags);
+            Assert.That(diags.Single().Message, Does.StartWith("derived 'Hp.seen' uses '<lambda>', which makes a look or a place"));
         }
     }
 }

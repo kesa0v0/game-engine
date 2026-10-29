@@ -65,6 +65,20 @@ namespace Kesa.Engine.Bridge.Tests
         }
 
         [Test]
+        public void LooksAndPlacesCrossWithTheDefsOfTheirEntities()
+        {
+            var keys = new SortedDictionary<string, Value>(StringComparer.Ordinal) { ["owner"] = new EntityValue(new EntityId(1)) };
+            var look = KernelValues.ToBridge(new LookValue("infantry", keys), Defs).AsLook;
+            Assert.That(look.Name, Is.EqualTo("infantry"));
+            Assert.That(look.Keys[0].Value.AsEntity.Def, Is.EqualTo("pandemic:Alice"));
+            var place = KernelValues.ToBridge(
+                WhereValue.Between(WhereValue.At(null, new IntValue(3)), WhereValue.Onto(new EntityValue(new EntityId(2)), "deck")), Defs).AsWhere;
+            Assert.That(place, Is.EqualTo(BridgeWhere.Between(BridgeWhere.At(null, BridgeValue.Of(3)),
+                BridgeWhere.Onto(new BridgeEntity(2, "pandemic:Bob"), "deck"))));
+            Assert.Throws<BridgeValueException>(() => KernelValues.ToKernel(place));
+        }
+
+        [Test]
         public void AValueThatIsNotDataDoesNotCross()
         {
             var e = Assert.Throws<BridgeValueException>(() => KernelValues.ToBridge(new ListValue(new Value[] { new RangeValue(0, 1, 3) }), Defs));

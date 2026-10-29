@@ -49,11 +49,24 @@ namespace Kesa.Engine.Bridge.Local
                 case OptionValue o:
                     return new BridgeOption(ToBridge(o.Value, defOf), Optional(o.Label, defOf), Optional(o.Desc, defOf), o.Style,
                         Optional(o.Data, defOf));
+                case LookValue look:
+                    var keys = new List<KeyValuePair<string, BridgeValue>>(look.Keys.Count);
+                    foreach (var pair in look.Keys) keys.Add(new KeyValuePair<string, BridgeValue>(pair.Key, ToBridge(pair.Value, defOf)));
+                    return new BridgeLook(look.Name, keys);
+                case WhereValue where:
+                    return Where(where, defOf);
             }
             throw new BridgeValueException("a " + value.KindName + " value cannot cross the host boundary (spec-gaps G326)");
         }
 
         private static BridgeValue? Optional(Value? value, Func<EntityId, string?> defOf) => value == null ? null : ToBridge(value, defOf);
+
+        private static BridgeWhere Where(WhereValue where, Func<EntityId, string?> defOf) => where.Kind switch
+        {
+            WhereKind.At => BridgeWhere.At(where.Name, ToBridge(where.Target!, defOf)),
+            WhereKind.Onto => BridgeWhere.Onto(ToBridge(where.Target!, defOf), where.Name),
+            _ => BridgeWhere.Between(Where(where.First!, defOf), Where(where.Second!, defOf)),
+        };
 
         /// <summary>
         /// 들어오는 값(커맨드·화면 동작의 인자). 엔티티는 id만 쓴다. 숨김·글·선택지는 인자가 될 수 없어

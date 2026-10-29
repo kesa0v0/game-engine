@@ -17,6 +17,8 @@ namespace Kesa.Engine.Bridge
         Hidden,
         Text,
         Option,
+        Look,
+        Where,
     }
 
     /// <summary>
@@ -37,6 +39,8 @@ namespace Kesa.Engine.Bridge
         public BridgeEntity AsEntity => As<BridgeEntity>(BridgeKind.Entity);
         public BridgeText AsText => As<BridgeText>(BridgeKind.Text);
         public BridgeOption AsOption => As<BridgeOption>(BridgeKind.Option);
+        public BridgeLook AsLook => As<BridgeLook>(BridgeKind.Look);
+        public BridgeWhere AsWhere => As<BridgeWhere>(BridgeKind.Where);
 
         public bool IsNone => Kind == BridgeKind.None;
 
@@ -254,5 +258,80 @@ namespace Kesa.Engine.Bridge
             obj is BridgeOption o && o.Style == Style && o.Value.Equals(Value) && Same(o.Label, Label) && Same(o.Desc, Desc) && Same(o.Data, Data);
 
         public override int GetHashCode() => Value.GetHashCode();
+    }
+
+    /// <summary>그림 값 (G389·G402): 호스트 그래픽 파일의 정의 이름과 키=값(키 순). 뜻은 그래픽 파일이 정한다.</summary>
+    public sealed class BridgeLook : BridgeValue
+    {
+        public BridgeLook(string name, IReadOnlyList<KeyValuePair<string, BridgeValue>> keys)
+        {
+            Name = name;
+            var sorted = new List<KeyValuePair<string, BridgeValue>>(keys);
+            sorted.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key));
+            Keys = sorted;
+        }
+
+        public string Name { get; }
+        public IReadOnlyList<KeyValuePair<string, BridgeValue>> Keys { get; }
+        public override BridgeKind Kind => BridgeKind.Look;
+
+        public override bool Equals(object? obj)
+        {
+            if (!(obj is BridgeLook l) || l.Name != Name || l.Keys.Count != Keys.Count) return false;
+            for (int i = 0; i < Keys.Count; i++)
+                if (l.Keys[i].Key != Keys[i].Key || !l.Keys[i].Value.Equals(Keys[i].Value)) return false;
+            return true;
+        }
+
+        public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Name);
+    }
+
+    public enum BridgeWhereShape
+    {
+        /// <summary>이름 붙은 공간의 한 자리.</summary>
+        At,
+
+        /// <summary>그 엔티티의 물체에 붙음.</summary>
+        Onto,
+
+        /// <summary>두 자리 사이.</summary>
+        Between,
+    }
+
+    /// <summary>
+    /// 자리 값 (G394·G402·G406). At은 공간 이름(<see cref="Name"/>, null이면 기본 공간)과 값(<see cref="Target"/>),
+    /// Onto는 엔티티(<see cref="Target"/>, 못 보면 <see cref="BridgeHidden"/>)와 붙는 곳(<see cref="Name"/>, null이면 물체 자체),
+    /// Between은 두 자리(<see cref="First"/>·<see cref="Second"/>).
+    /// </summary>
+    public sealed class BridgeWhere : BridgeValue
+    {
+        private BridgeWhere(BridgeWhereShape shape, string? name, BridgeValue? target, BridgeWhere? first, BridgeWhere? second)
+        {
+            Shape = shape;
+            Name = name;
+            Target = target;
+            First = first;
+            Second = second;
+        }
+
+        public static BridgeWhere At(string? space, BridgeValue value) => new BridgeWhere(BridgeWhereShape.At, space, value, null, null);
+
+        public static BridgeWhere Onto(BridgeValue entity, string? point) => new BridgeWhere(BridgeWhereShape.Onto, point, entity, null, null);
+
+        public static BridgeWhere Between(BridgeWhere first, BridgeWhere second) =>
+            new BridgeWhere(BridgeWhereShape.Between, null, null, first, second);
+
+        public BridgeWhereShape Shape { get; }
+        public string? Name { get; }
+        public BridgeValue? Target { get; }
+        public BridgeWhere? First { get; }
+        public BridgeWhere? Second { get; }
+        public override BridgeKind Kind => BridgeKind.Where;
+
+        public override bool Equals(object? obj) =>
+            obj is BridgeWhere w && w.Shape == Shape && w.Name == Name && Same(w.Target, Target) && Same(w.First, First) &&
+            Same(w.Second, Second);
+
+        public override int GetHashCode() => (int)Shape;
     }
 }

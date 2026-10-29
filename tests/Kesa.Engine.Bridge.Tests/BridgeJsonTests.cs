@@ -89,6 +89,27 @@ namespace Kesa.Engine.Bridge.Tests
         }
 
         [Test]
+        public void LooksAndPlacesHaveOneWritingAndReadBack()
+        {
+            var look = new BridgeLook("infantry", new[] { A("team", S("#cc3333")), A("hurt", BridgeValue.Of(true)) });
+            Assert.That(BridgeJson.Write(look), Is.EqualTo("{\"look\":\"infantry\",\"keys\":{\"hurt\":true,\"team\":\"#cc3333\"}}"));
+            var place = BridgeWhere.Between(BridgeWhere.At("hex", new BridgeList(new[] { I(3), I(4) })),
+                BridgeWhere.Onto(BridgeHidden.Instance, null));
+            Assert.That(BridgeJson.Write(place),
+                Is.EqualTo("{\"between\":[{\"at\":\"hex\",\"value\":[3,4]},{\"onto\":{\"hidden\":true},\"point\":null}]}"));
+            Assert.That(BridgeJson.Write(BridgeWhere.At(null, I(2))), Is.EqualTo("{\"at\":null,\"value\":2}"), "the default space");
+            foreach (var value in new BridgeValue[] { look, place, BridgeWhere.Onto(new BridgeEntity(7, "m:Ship"), "deck") })
+            {
+                var back = BridgeJson.Read(BridgeJson.Write(value));
+                Assert.That(back, Is.EqualTo(value));
+                Assert.That(BridgeJson.Write(back), Is.EqualTo(BridgeJson.Write(value)));
+            }
+            Assert.That(BridgeJson.Read(" { \"at\" : null , \"value\" : 1 } "), Is.EqualTo(BridgeWhere.At(null, I(1))));
+            Assert.Throws<FormatException>(() => BridgeJson.Read("{\"onto\":3,\"point\":null}"));
+            Assert.Throws<FormatException>(() => BridgeJson.Read("{\"between\":[1,2]}"));
+        }
+
+        [Test]
         public void AnEntityIsTheSameEntityWhateverDefItCarries()
         {
             Assert.That(new BridgeEntity(5, "m:A"), Is.EqualTo(new BridgeEntity(5, null)));

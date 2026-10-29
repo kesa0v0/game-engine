@@ -336,11 +336,15 @@ namespace Kesa.Engine.Runtime
                 o.Data == null ? null : Savable("data= of " + display, o.Data));
         }
 
-        /// <summary>질문에 담아 저장할 수 있는 값으로 (spec S2 표: Request 값은 저장되므로 정규형). 엔티티는 id로 바꾼다.</summary>
-        private Value Savable(string display, Value value, string? hint = null)
+        /// <summary>
+        /// 질문에 담아 저장할 수 있는 값으로 (spec S2 표: Request 값은 저장되므로 정규형). 엔티티는 id로 바꾼다.
+        /// <paramref name="hidden"/>이면 보는 쪽이 못 보는 엔티티(화면 쪽에서 읽은 값)도 받는다.
+        /// </summary>
+        private Value Savable(string display, Value value, string? hint = null, bool hidden = false)
         {
             switch (value)
             {
+                case HiddenValue _ when hidden:
                 case NoneValue _:
                 case IntValue _:
                 case FixedValue _:
@@ -351,15 +355,15 @@ namespace Kesa.Engine.Runtime
                     return new EntityValue(e.EntityId);
                 case TextValue t:
                     var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
-                    foreach (var pair in t.Args) args[pair.Key] = Savable(display, pair.Value, hint);
+                    foreach (var pair in t.Args) args[pair.Key] = Savable(display, pair.Value, hint, hidden);
                     return new TextValue(t.Key, args, t.EntityDefs);
                 case ListValue list:
                     var items = new List<Value>(list.Items.Count);
-                    foreach (var item in list.Items) items.Add(Savable(display, item, hint));
+                    foreach (var item in list.Items) items.Add(Savable(display, item, hint, hidden));
                     return new ListValue(items);
                 case DictValue dict:
                     var entries = new List<DictItem>(dict.Items.Count);
-                    foreach (var item in dict.Items) entries.Add(new DictItem(item.Key, Savable(display, item.Value, hint), item.Span));
+                    foreach (var item in dict.Items) entries.Add(new DictItem(item.Key, Savable(display, item.Value, hint, hidden), item.Span));
                     return new DictValue(entries);
             }
             throw new ScriptRuntimeException(Codes.RunType, display + " cannot hold " + value.KindName,
