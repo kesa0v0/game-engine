@@ -411,6 +411,7 @@ def retreat(unit: Ref[Unit]):
 - `submit`은 엔진이 짝을 찾으므로 받는 질문이 둘 이상이면 거절된다. 같은 이름의 질문이 여럿 열릴 수 있으면 `respond`로 하나를 가리킨다.
 - 내는 때 그 질문이 이미 닫혔거나 그 커맨드를 받지 않으면 이유를 붙여 거절된다.
 - 게임 쪽 코드(`@command`·`@on`·`@when`·`acts_for`·보기 정책·`derived`)에서는 쓸 수 없다(`CMD007`). 연결마다 답할 질문이 달라서다.
+  이 연결이 앉은 엔티티를 주는 `seats()`(아래 "판 위 엔티티 누르기")도 같다.
 
 ### 아무도 그리지 않은 질문: 엔진 기본 창
 
@@ -540,6 +541,30 @@ def inspect(unit: Ref[Unit]):
 - 같은 입력과 타입의 핸들러가 여러 모드에 있으면 나중에 불러온 모드의 것부터 사전 조건을 본다. 통과한 첫 것이 받고, 막히면 다음 것으로 넘어간다.
   그래서 고르기 모드를 더하는 모드는 `require(…)`로 제 차례만 받는 핸들러를 더하면 되고 남의 것을 덮지 않는다.
   모두 막히면 처음 막힌 이유가 호스트에 간다. 한 모드 안에서 같은 입력과 타입을 두 번 받으면 로드 오류다.
+- 대상을 `choose(unit, where=…)`로 거르면 콘솔 같은 호스트가 누를 수 있는 유닛을 나열할 수 있다.
+
+누른 유닛이 내 것인지는 `seats()`로 안다. skirmish의 주 누름은 내 유닛이면 고르고, 고른 유닛의 사거리 안 적이면 공격한다.
+
+```python
+def is_mine(u):
+    return u.Owner.party in seats()
+
+@world_input("primary", "Unit")
+@ui_action
+def press_unit(unit: Ref[Unit]):
+    with preconditions:
+        require(playing(), text("skirmish-over"))
+        choose(unit, where=lambda u: can_pick(u) or can_strike(u))
+    if can_pick(unit):
+        ui.Selection.unit = unit
+    else:
+        u = chosen()
+        submit("Attack", party=u.Owner.party, unit=u, target=unit)
+        ui.Selection.unit = None
+```
+
+- `seats()`는 이 연결이 앉은 엔티티 목록(id 순, 관전자면 빈 목록), `seats(Party)`는 그 가운데 그 타입(또는 컴포넌트)인 것만이다.
+- `questions()`와 같이 화면 쪽 코드에서만 쓰고, 자리가 바뀌면 읽은 화면 함수를 다시 부른다.
 
 ### Unity: 그림 정의 `.look.xml`과 공간 `.space.xml`
 

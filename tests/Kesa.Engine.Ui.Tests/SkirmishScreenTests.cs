@@ -289,13 +289,37 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(stage.Problems, Is.Empty, string.Join(", ", stage.Problems));
             string spot = stage.Keys.Single(k => k.StartsWith("mark:"));
             Assert.That(renderer.Dump(spot), Is.EqualTo("@(2.0, -3.0, 0.0) Sprite[src=art/white.png,tint=#4080ff80]"));
-            Assert.That(await board.PressAsync(new[] { "entity:" + target }), Is.Null, "a unit takes no primary press yet");
-
-            var result = await board.PressAsync(new[] { spot });
+            var result = await board.PressAsync(new[] { spot, "entity:" + target });
             Assert.That(result!.Succeeded, Is.True, result.ToString());
             await board.RefreshAsync();
             Assert.That(stage.Keys.Any(k => k.StartsWith("mark:")), Is.False, "answered, so the mark is gone");
             Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -3.0, 0.0) "), "the unit stepped back onto the marked square");
+        }
+
+        [Test]
+        public async Task PressingAUnitPicksItAndPressingAnEnemyInReachAttacks()
+        {
+            var renderer = new MemoryLookRenderer();
+            var stage = new LookStage(LookLibrary.Load(new LookSource[0], LookKinds.Standard()), renderer);
+            var alice = await Open("alice", _red);
+            var board = new LookBoard(alice.Session, stage);
+            long mine = UnitsOf(_red)[0], enemy = UnitsOf(_blue)[0];
+            Place(mine, 2, 2);
+            Place(enemy, 2, 1);
+
+            var refused = await board.PressAsync(new[] { "entity:" + enemy });
+            Assert.That(refused!.Succeeded, Is.False, "nothing is picked and it is not ours");
+            Assert.That(refused.Outcome, Is.EqualTo("PreconditionsFailed"), refused.ToString());
+
+            var picked = await board.PressAsync(new[] { "entity:" + mine });
+            Assert.That(picked!.Succeeded, Is.True, picked.ToString());
+            var chosen = await alice.Session.Call("chosen", "skirmish.chosen", new BridgeValue[0]);
+            Assert.That(((BridgeEntity)chosen.Value!).Id, Is.EqualTo(mine));
+
+            var attacked = await board.PressAsync(new[] { "entity:" + enemy });
+            Assert.That(attacked!.Succeeded, Is.True, attacked.ToString());
+            Assert.That(attacked.Deliveries.Single().Command, Is.EqualTo("skirmish.Attack"));
+            Assert.That(attacked.Deliveries.Single().Result.Succeeded, Is.True, attacked.Deliveries.Single().Result.ToString());
         }
 
         [Test]

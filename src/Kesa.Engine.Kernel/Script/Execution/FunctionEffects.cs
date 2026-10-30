@@ -205,7 +205,7 @@ namespace Kesa.Engine.Script
 
         /// <summary>본문에 직접 있거나 그런 함수를 부르면(<paramref name="expressions"/>면 식 안의 호출도) 표시한다, 고정점까지.</summary>
         /// <summary><c>questions()</c>를 게임 쪽에서 썼을 때의 안내 (G383).</summary>
-        internal const string QuestionsHint = "the questions a connection can answer differ for each player; read them in a screen function, " +
+        internal const string QuestionsHint = "the open questions and the seats differ for each player; read them in a screen function, " +
                                               "a @ui_action or a @bot (spec-gaps G383)";
 
         internal const string LookNames = "look(), at(), onto(), between() or mark()";
@@ -254,7 +254,7 @@ namespace Kesa.Engine.Script
                     context.Error(Codes.CmdUiEffect, what + " uses bot state (bot.…), so it cannot run as game code", span, botHint,
                         new[] { fn.BotTouchWitness!.Value });
                 else if (fn.ReadsQuestions)
-                    context.Error(Codes.CmdUiEffect, what + " reads the open questions of a connection (questions()), so it cannot run as game code",
+                    context.Error(Codes.CmdUiEffect, what + " reads what one connection sees (questions() or seats()), so it cannot run as game code",
                         span, QuestionsHint, new[] { fn.QuestionsWitness!.Value });
                 else if (fn.MakesLooks)
                     context.Error(Codes.CmdUiEffect, what + " makes a look or a place (" + LookNames + "), so it cannot run as game code",
@@ -385,7 +385,7 @@ namespace Kesa.Engine.Script
                 if (fn.ReadsQuestions)
                 {
                     context.Error(Codes.CmdUiEffect,
-                        what + " uses '" + fn.Name + "', which reads the open questions of a connection (questions()); game values cannot depend on who looks",
+                        what + " uses '" + fn.Name + "', which reads what one connection sees (questions() or seats()); game values cannot depend on who looks",
                         span, QuestionsHint, new[] { fn.QuestionsWitness!.Value });
                     return;
                 }
@@ -620,6 +620,10 @@ namespace Kesa.Engine.Script
             private bool IsRuntime(Expr expr, string name, SortedSet<string> locals) =>
                 expr is NameExpr n && n.Name == name && !locals.Contains(name) && !_scope.TryLookup(name, out _);
 
+            /// <summary><c>questions()</c>·<c>seats()</c>: 보는 연결마다 다른 것을 읽는다 (G383·G421).</summary>
+            private bool ReadsConnection(Expr expr, SortedSet<string> locals) =>
+                IsRuntime(expr, PureBuiltins.QuestionsName, locals) || IsRuntime(expr, PureBuiltins.SeatsName, locals);
+
             private bool LookMaker(Expr expr, SortedSet<string> locals) =>
                 IsRuntime(expr, PureBuiltins.LookName, locals) || IsRuntime(expr, PureBuiltins.AtName, locals) ||
                 IsRuntime(expr, PureBuiltins.OntoName, locals) || IsRuntime(expr, PureBuiltins.BetweenName, locals) ||
@@ -708,7 +712,7 @@ namespace Kesa.Engine.Script
                 {
                     if (_body.FirstWrite == null) _body.FirstWrite = call.Span;
                 }
-                else if (!IsNamed(call.Callee, locals) || IsRuntime(call.Callee, PureBuiltins.QuestionsName, locals) || LookMaker(call.Callee, locals))
+                else if (!IsNamed(call.Callee, locals) || ReadsConnection(call.Callee, locals) || LookMaker(call.Callee, locals))
                     Expr(call.Callee, locals);
                 foreach (var arg in call.Arguments) Expr(arg.Value, locals);
             }
@@ -792,7 +796,7 @@ namespace Kesa.Engine.Script
                         }
                         else if (builtin != null)
                             _body.BuiltinExpressionCalls.Add(new KeyValuePair<string, SourceSpan>(builtin, call.Span));
-                        else if (!IsNamed(call.Callee, locals) || IsRuntime(call.Callee, PureBuiltins.QuestionsName, locals) ||
+                        else if (!IsNamed(call.Callee, locals) || ReadsConnection(call.Callee, locals) ||
                                  LookMaker(call.Callee, locals))
                             Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
@@ -805,7 +809,7 @@ namespace Kesa.Engine.Script
                         _body.TouchUi(name.Span);
                         _ui.SubmitValue(kind, name.Span);
                         break;
-                    case NameExpr name when IsRuntime(name, PureBuiltins.QuestionsName, locals):
+                    case NameExpr name when ReadsConnection(name, locals):
                         if (_body.FirstQuestions == null) _body.FirstQuestions = name.Span;
                         break;
                     case NameExpr name when LookMaker(name, locals):

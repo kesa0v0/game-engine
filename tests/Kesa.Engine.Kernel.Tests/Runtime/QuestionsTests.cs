@@ -223,7 +223,7 @@ namespace Kesa.Engine.Tests.Runtime
             Mod("core", schema: Schema, defs: "Party(\"Red\")\n" + defs);
             Load(out var diags);
             var d = diags.Single(x => x.Code == Codes.CmdUiEffect);
-            Assert.That(d.Message, Is.EqualTo(who + " reads the open questions of a connection (questions()), so it cannot run as game code"));
+            Assert.That(d.Message, Is.EqualTo(who + " reads what one connection sees (questions() or seats()), so it cannot run as game code"));
         }
     }
 }

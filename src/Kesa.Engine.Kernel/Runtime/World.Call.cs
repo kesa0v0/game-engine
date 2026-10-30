@@ -36,15 +36,18 @@ namespace Kesa.Engine.Runtime
             var savedSources = _whenReadsSources;
             bool savedTick = _whenReadsTick;
             var savedQuestions = _questionsRead;
+            bool savedSeats = _seatsRead;
             var reads = new SortedSet<CallRead>();
             var sources = new SortedSet<string>(StringComparer.Ordinal);
             _whenReads = reads;
             _whenReadsSources = sources;
             _whenReadsTick = false;
             _questionsRead = null;
+            _seatsRead = false;
             Value value;
             bool tick;
             SortedSet<string>? questions;
+            bool seats;
             try
             {
                 value = body(reads);
@@ -54,11 +57,13 @@ namespace Kesa.Engine.Runtime
                 tick = _whenReadsTick;
                 questions = _questionsRead;
                 _questionsRead = savedQuestions;
+                seats = _seatsRead;
+                _seatsRead = savedSeats;
                 _whenReads = savedReads;
                 _whenReadsSources = savedSources;
                 _whenReadsTick = savedTick;
             }
-            return Receipt(function, value, reads, sources, tick, questions);
+            return Receipt(function, value, reads, sources, tick, questions, seats);
         }
 
         // ---- 보는 쪽으로 부르기 (G248) ----
@@ -180,7 +185,8 @@ namespace Kesa.Engine.Runtime
             return s.ByName != null && s.ByName.TryGetValue(name, out var v) ? v : s.Created;
         }
 
-        private CallResult Receipt(string function, Value value, SortedSet<CallRead> reads, SortedSet<string> sources, bool tick, SortedSet<string>? questions)
+        private CallResult Receipt(string function, Value value, SortedSet<CallRead> reads, SortedSet<string> sources, bool tick, SortedSet<string>? questions,
+            bool seats)
         {
             var ids = new long[reads.Count];
             var readNames = new string?[reads.Count];
@@ -198,7 +204,7 @@ namespace Kesa.Engine.Runtime
             var sourceVersions = new long[names.Length];
             for (int i = 0; i < names.Length; i++) sourceVersions[i] = SourceVersion(names[i]);
             return new CallResult(function, value, this, ids, readNames, versions, names, sourceVersions, tick ? _tick : (long?)null,
-                _viewer != null && (_viewRules.Count > 0 || questions != null) ? SeatsVersion : (long?)null,
+                _viewer != null && (_viewRules.Count > 0 || questions != null || seats) ? SeatsVersion : (long?)null,
                 questions == null ? (long?)null : RequestsVersion, questions);
         }
 

@@ -25,6 +25,30 @@ def strike(me: Ref[Party], target: Ref[Unit]):
     submit("Attack", party=me, unit=chosen(), target=target)
     ui.Selection.unit = None
 
+# 판 위 유닛을 누름 (G416·G421): 내 유닛이면 고르고, 고른 유닛의 사거리 안 적이면 공격한다. 내 진영은 seats()로 안다
+def is_mine(u):
+    return u.Owner.party in seats()
+
+def can_pick(u):
+    return is_mine(u) and not u.Ready.acted and u != ui.Selection.unit
+
+def can_strike(t):
+    u = chosen()
+    return u is not None and is_mine(u) and not is_mine(t) and dist(u, t) <= u.Unit.reach
+
+@world_input("primary", "Unit")
+@ui_action
+def press_unit(unit: Ref[Unit]):
+    with preconditions:
+        require(playing(), text("skirmish-over"))
+        choose(unit, where=lambda u: can_pick(u) or can_strike(u))
+    if can_pick(unit):
+        ui.Selection.unit = unit
+    else:
+        u = chosen()
+        submit("Attack", party=u.Owner.party, unit=u, target=unit)
+        ui.Selection.unit = None
+
 # UXML 화면(ui/screen.uxml)이 부른다: 이 유닛이 고른 유닛인가
 def is_chosen(u):
     return ui.Selection.unit == u

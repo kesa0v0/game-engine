@@ -59,6 +59,35 @@ namespace Kesa.Engine.Runtime
             return result;
         }
 
+        /// <summary>호스트가 부른 함수가 <c>seats()</c>를 읽었나: 영수증이 배정 표의 바뀜을 본다 (G421).</summary>
+        private bool _seatsRead;
+
+        /// <summary><c>seats()</c>·<c>seats(타입)</c> (G421): 보는 연결이 앉은 엔티티, id 순. 이름을 주면 <c>query</c>처럼 거른다.</summary>
+        private Value SeatsBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
+            if (keywords.Count > 0 || positional.Count > 1)
+                throw new ScriptRuntimeException(Codes.RunType, "seats() takes nothing or one type or component",
+                    "write seats() for every entity this player sits at, or seats(Party) (spec-gaps G421)");
+            if (_viewer == null)
+                throw new ScriptRuntimeException(Codes.RunNotWritable, "seats() can only be used on a screen, in a @ui_action or in a @bot",
+                    FunctionEffects.QuestionsHint);
+            IReadOnlyList<EntityId> seated = SeatsOf(_viewer.Issuer);
+            if (positional.Count == 1)
+            {
+                var name = SchemaNameArgument(PureBuiltins.SeatsName, positional[0]);
+                var of = new HashSet<long>();
+                foreach (var id in Guard(() => Query(name))) of.Add(id.Value);
+                var kept = new List<EntityId>();
+                foreach (var id in seated)
+                    if (of.Contains(id.Value)) kept.Add(id);
+                seated = kept;
+            }
+            if (_whenReads != null) _seatsRead = true;
+            var result = new List<Value>(seated.Count);
+            foreach (var id in seated) result.Add(new EntityView(this, id));
+            return new ListValue(result);
+        }
+
         /// <summary>
         /// 로비가 보일 앉을 후보 (G239): <see cref="Schema.EngineComponents.Seatable"/>이 붙은 살아 있는 엔티티, id 순. 후보일 뿐
         /// <see cref="Seat"/>를 막지 않는다(AI 연결을 목록 밖 엔티티에 앉힐 수 있다).

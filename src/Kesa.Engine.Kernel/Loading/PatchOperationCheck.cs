@@ -256,7 +256,7 @@ namespace Kesa.Engine.Loading
                 return "'" + fn.Name + "' uses bot state (bot.…) (at " + fn.BotTouchWitness + "), but " + slot +
                        " holds functions that run as game code, and a game value cannot depend on a bot";
             if (fn.ReadsQuestions)
-                return "'" + fn.Name + "' reads the open questions of a connection (questions()) (at " + fn.QuestionsWitness + "), but " + slot +
+                return "'" + fn.Name + "' reads what one connection sees (questions() or seats()) (at " + fn.QuestionsWitness + "), but " + slot +
                        " holds functions that run as game code, and a game value cannot depend on who looks";
             if (fn.MakesLooks)
                 return "'" + fn.Name + "' makes a look or a place (at " + fn.LookWitness + "), but " + slot +

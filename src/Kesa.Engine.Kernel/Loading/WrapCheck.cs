@@ -125,7 +125,7 @@ namespace Kesa.Engine.Loading
             else if (fn.ReadsQuestions)
             {
                 context.Error(Codes.CmdUiEffect, "the @wrap '" + fn.Name + "' of the command '" + target.Name +
-                                                 "' reads the open questions of a connection (questions()), so it cannot run as game code",
+                                                 "' reads what one connection sees (questions() or seats()), so it cannot run as game code",
                     fn.Definition!.Span, "a command wrapper runs like the command's body (spec-gaps G320, G383)",
                     new[] { fn.QuestionsWitness!.Value });
                 ok = false;
