@@ -35,6 +35,8 @@ def playing():
     g = game()
     return g is not None and g.Match.winner is None
 
+# 판 위 유닛을 오른쪽 누름으로도 연다 (G416)
+@world_input("secondary", "Unit")
 @ui_action
 def inspect(unit: Ref[Unit]):
     with preconditions:

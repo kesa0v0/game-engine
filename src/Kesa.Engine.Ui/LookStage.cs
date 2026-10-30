@@ -53,10 +53,13 @@ namespace Kesa.Engine.Ui
         /// <summary>그 열쇠의 표시가 누르면 낼 화면 동작 (G395·G408). 엔티티와 누를 수 없는 표시는 null.</summary>
         public BridgeMarkClick? ClickOf(string key) => _shown.ContainsKey(key) && _clicks.TryGetValue(key, out var click) ? click : null;
 
+        /// <summary>엔티티 물체의 열쇠 앞머리. 뒤는 엔티티 id.</summary>
+        public const string EntityPrefix = "entity:";
+
         public void Apply(BridgeWorldObjects objects)
         {
-            foreach (var o in objects.Changed) Show("entity:" + o.Entity.Id, o.Look, o.Where);
-            foreach (var id in objects.Gone) Hide("entity:" + id);
+            foreach (var o in objects.Changed) Show(EntityPrefix + o.Entity.Id, o.Look, o.Where);
+            foreach (var id in objects.Gone) Hide(EntityPrefix + id);
         }
 
         /// <summary>그림이나 자리가 없거나 자리를 못 놓으면 숨긴다.</summary>

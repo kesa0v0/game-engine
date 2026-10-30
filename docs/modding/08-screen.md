@@ -518,6 +518,29 @@ def retreat_spots():
   자리가 바뀌어도 같은 표시로 이어 가려면(옮겨 가는 화살표) `key=`를 적는다.
 - 함수가 실패하면 그 함수의 표시만 사라지고 호스트가 경고한다.
 
+### 판 위 엔티티 누르기: `@world_input`
+
+판 위 엔티티에 들어온 입력은 `@ui_action` 위에 `@world_input("입력", "Def 타입")`을 쌓아 받는다.
+`samples/skirmish/core/defs/ui.py`:
+
+```python
+# 판 위 유닛을 오른쪽 누름으로도 연다
+@world_input("secondary", "Unit")
+@ui_action
+def inspect(unit: Ref[Unit]):
+    with preconditions:
+        require(playing(), text("skirmish-over"))
+        choose(unit, where=lambda u: u != ui.Inspect.unit)
+    ui.Inspect.unit = unit
+```
+
+- 입력은 이름이다. 엔진 내장은 `primary`(왼쪽 누름·탭)와 `secondary`(오른쪽 누름)이고, 실제 단추를 이름으로 바꾸는 것은 호스트다.
+- 화면 동작은 매개변수 하나, 그 타입의 엔티티(`Ref[타입]`)만 받는다. 한 동작에 `@world_input`을 여러 줄 쌓아도 된다.
+- 누르면 그 자리의 표시가 먼저 받고(`click=`, 주 누름만), 없으면 커서 아래 엔티티를 위에서부터 본다.
+- 같은 입력과 타입의 핸들러가 여러 모드에 있으면 나중에 불러온 모드의 것부터 사전 조건을 본다. 통과한 첫 것이 받고, 막히면 다음 것으로 넘어간다.
+  그래서 고르기 모드를 더하는 모드는 `require(…)`로 제 차례만 받는 핸들러를 더하면 되고 남의 것을 덮지 않는다.
+  모두 막히면 처음 막힌 이유가 호스트에 간다. 한 모드 안에서 같은 입력과 타입을 두 번 받으면 로드 오류다.
+
 ### Unity: 그림 정의 `.look.xml`과 공간 `.space.xml`
 
 그림 이름과 공간 이름의 뜻은 Unity 패키지가 읽는 XML 파일에 적는다. 확장자로 알아보므로 모드 안 어디에 두어도 되고, 관례는
@@ -566,7 +589,7 @@ def retreat_spots():
 - 로드 때 모르는 요소·속성·공간 종류·설정, 틀린 값, 없는 그림 파일을 알린다. 그릴 때 모르는 그림 이름은 눈에 띄는 대체 그림과 경고,
   모르는 공간 이름과 틀린 자리 값은 경고와 함께 그리지 않는다. 판은 멈추지 않는다.
 - 게임은 C#으로 요소 종류와 공간 종류를 더할 수 있다(`LookKinds`).
-- 판을 누르면 그 자리에 그린 표시 중 `click=`이 있는 것이 받는다. 화면 UXML이 판 위를 덮고 있으면 그 요소는 누름을 가로채므로,
+- 판을 누르면 그 자리에 그린 표시 중 `click=`이 있는 것이, 없으면 엔티티의 `@world_input`이 받는다. 오른쪽 누름은 `secondary`다. 화면 UXML이 판 위를 덮고 있으면 그 요소는 누름을 가로채므로,
   자리만 잡는 요소에는 Unity UXML의 `picking-mode="Ignore"`를 적는다(skirmish `ui/screen.uxml`의 `screen`·`units`).
 
 ### 어디서 쓰나

@@ -401,15 +401,27 @@ namespace Kesa.Engine.Script
         /// </summary>
         public IReadOnlyList<Expr> Decorators { get; }
 
-        /// <summary>첫 데코레이터의 이름 (<c>@command</c>·<c>@command(...)</c> → <c>command</c>). 없거나 이름 모양이 아니면 null.</summary>
-        public string? DecoratorName
+        /// <summary>
+        /// 본 데코레이터의 이름 (<c>@command</c>·<c>@command(...)</c> → <c>command</c>). 위에 쌓인 <c>@world_input(…)</c>(G416)은 건너뛴다.
+        /// 없거나 이름 모양이 아니면 null.
+        /// </summary>
+        public string? DecoratorName => Decorators.Count == 0 ? null : NameOf(Decorators[MainDecorator]);
+
+        /// <summary>본 데코레이터의 자리: 앞의 <c>@world_input</c>들 다음. 모두 <c>@world_input</c>이면 마지막 것.</summary>
+        public int MainDecorator
         {
             get
             {
-                if (Decorators.Count == 0) return null;
-                var head = Decorators[0] is CallExpr call ? call.Callee : Decorators[0];
-                return head is NameExpr name ? name.Name : null;
+                int i = 0;
+                while (i < Decorators.Count - 1 && NameOf(Decorators[i]) == Interpreter.WorldInputName) i++;
+                return i;
             }
+        }
+
+        public static string? NameOf(Expr decorator)
+        {
+            var head = decorator is CallExpr call ? call.Callee : decorator;
+            return head is NameExpr name ? name.Name : null;
         }
 
         /// <summary>

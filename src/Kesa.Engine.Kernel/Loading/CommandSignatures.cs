@@ -113,6 +113,44 @@ namespace Kesa.Engine.Loading
         }
 
         /// <summary>
+        /// <c>@world_input</c>의 대상과 매개변수 (G419): 대상은 Def 타입이고 화면 동작은 그 엔티티를 받는 <c>Ref[대상]</c> 하나만 받는다.
+        /// 화면 동작의 매개변수를 푼 뒤에 본다.
+        /// </summary>
+        public static void ResolveWorldInputs(IReadOnlyList<WorldInputDecl> inputs, SchemaSet schema, CallContext context)
+        {
+            foreach (var input in inputs)
+            {
+                if (!schema.TryGetType(input.Target, out _))
+                {
+                    context.Error(Codes.CmdBadDecorator, "@world_input takes a Def type to press on, and there is no Def type '" +
+                                                         input.Target + "'", input.TargetSpan,
+                        hint: "pressing on an empty place of a space is not supported yet; use a mark with click= (spec-gaps G395, G419)");
+                    continue;
+                }
+                var action = input.Action;
+                var definition = action.Function.Definition!;
+                if (definition.Parameters.Count != 1)
+                {
+                    context.Error(Codes.CmdParameterType, "the @ui_action '" + action.Id + "' under @world_input takes one parameter: the " +
+                                                          input.Target + " it is pressed on", definition.Span,
+                        hint: "write def " + definition.Name + "(it: Ref[" + input.Target + "]) and read the rest on its own (spec-gaps G419)");
+                    continue;
+                }
+                if (action.Parameters.Count != 1) continue; // 타입 오류는 이미 알렸다
+                var parameter = action.Parameters[0];
+                if (!(parameter.Type is EntityRefTypeRef entity) || entity.Target.Name != input.Target)
+                {
+                    context.Error(Codes.CmdParameterType, "the parameter of the @ui_action '" + action.Id + "' under @world_input is the " +
+                                                          input.Target + " it is pressed on, so it must be Ref[" + input.Target + "], not " +
+                                                          parameter.Type.Display, parameter.Span,
+                        hint: "write " + parameter.Name + ": Ref[" + input.Target + "] (spec-gaps G419)");
+                    continue;
+                }
+                input.Parameter = parameter.Name;
+            }
+        }
+
+        /// <summary>
         /// <c>@when</c> 반응의 매개변수를 푼다 (G169): <c>Ref[Def타입]</c>이어야 하고 그 타입이 <see cref="WhenDecl.Subject"/>가 된다.
         /// 단계 검사는 핸들러와 같다.
         /// </summary>

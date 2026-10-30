@@ -268,5 +268,34 @@ namespace Kesa.Engine.Runtime
                                                         ", but a @world_marks function gives a list of mark(...) (spec-gaps G395)");
             }));
         }
+
+        // ---- 판 위 입력 (G416·G419·G420) ----
+
+        private readonly IReadOnlyList<WorldInputDecl> _worldInputs = Array.Empty<WorldInputDecl>();
+
+        /// <summary>
+        /// 커서 아래 엔티티(위에서부터)에 들어온 입력을 그 타입의 <c>@world_input</c> 화면 동작에 준다. 같은 (입력, 타입)은 나중 모드부터 해 보아
+        /// 사전 조건을 통과한 첫 것에서 멈춘다. 모두 막히면 다음 엔티티로 가고, 끝내 못 주면 처음 막힌 결과, 받을 핸들러가 없으면 null.
+        /// </summary>
+        internal ActResult? WorldInputAs(WorldView viewer, UiState ui, string input, IReadOnlyList<EntityId> entities)
+        {
+            ActResult? refused = null;
+            foreach (var id in entities)
+            {
+                if (!_entities.TryGetValue(id.Value, out var entity) || !viewer.Sees(id)) continue;
+                string type = entity.Def.Type.Name;
+                for (int i = _worldInputs.Count - 1; i >= 0; i--)
+                {
+                    var handler = _worldInputs[i];
+                    if (handler.Input != input || handler.Target != type || handler.Parameter == null) continue;
+                    var args = new SortedDictionary<string, Value>(StringComparer.Ordinal) { [handler.Parameter] = new EntityValue(id) };
+                    var result = ActAs(viewer, ui, handler.Action.Id, args);
+                    // 스크립트 오류는 넘기지 않는다: 모드 버그가 아래 핸들러에 가려지지 않게
+                    if (result.Outcome == ActOutcome.Succeeded || result.Outcome == ActOutcome.ScriptError) return result;
+                    if (result.Outcome == ActOutcome.PreconditionsFailed && refused == null) refused = result;
+                }
+            }
+            return refused;
+        }
     }
 }

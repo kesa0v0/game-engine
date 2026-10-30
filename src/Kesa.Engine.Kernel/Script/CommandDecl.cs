@@ -84,6 +84,34 @@ namespace Kesa.Engine.Script
     }
 
     /// <summary>
+    /// <c>@ui_action</c> 위의 <c>@world_input("입력", "대상")</c> (G416·G419·G420): 판 위 대상에 그 입력이 들어오면 이 화면 동작을 부른다.
+    /// 대상이 Def 타입이면 매개변수 하나가 그 엔티티를 받는다.
+    /// </summary>
+    public sealed class WorldInputDecl
+    {
+        public WorldInputDecl(CommandDecl action, string input, string target, SourceSpan targetSpan, SourceSpan span)
+        {
+            Action = action;
+            Input = input;
+            Target = target;
+            TargetSpan = targetSpan;
+            Span = span;
+        }
+
+        public CommandDecl Action { get; }
+        public string Mod => Action.Mod;
+        public string Input { get; }
+        public string Target { get; }
+        public SourceSpan TargetSpan { get; }
+
+        /// <summary><c>@world_input</c> 데코레이터의 위치.</summary>
+        public SourceSpan Span { get; }
+
+        /// <summary>엔티티를 받는 매개변수 이름. 로더가 매개변수를 확인한 뒤에 채운다.</summary>
+        public string? Parameter { get; internal set; }
+    }
+
+    /// <summary>
     /// <c>@on(Damaged)</c>로 신호에 붙인 핸들러 (spec S5, spec-gaps G145). 매개변수는 신호의 인자 중 필요한 것을 이름으로 고른다.
     /// </summary>
     public sealed class HandlerDecl

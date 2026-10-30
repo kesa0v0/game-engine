@@ -85,6 +85,13 @@ namespace Kesa.Engine.Runtime
         public CallResult WorldMarks(UiState ui, string function) => _world.WorldMarksAs(this, ui, function);
 
         /// <summary>
+        /// 판 위 입력 (G419·G420): 커서 아래 엔티티(위에서부터)의 <c>@world_input</c> 화면 동작 가운데 사전 조건을 통과한 첫 것을 한다.
+        /// 모두 막혔으면 처음 막힌 결과, 받을 것이 없으면 null.
+        /// </summary>
+        public ActResult? WorldInput(UiState ui, string input, IReadOnlyList<EntityId> entities) =>
+            _world.WorldInputAs(this, ui, input, entities);
+
+        /// <summary>
         /// 이 연결의 <c>@ui_action</c>을 부른다 (spec-gaps G278·G280): 인자 검사 → 사전 조건 → 본문. 본문의 읽기는 모두 이 연결로서의 거른
         /// 읽기이고, <c>ui.…</c> 쓰기는 성공했을 때만 <paramref name="ui"/>에 들어간다. 게임은 바뀌지 않는다. 적어 둔 <c>submit</c>은
         /// 결과의 <see cref="ActResult.Submissions"/>이고 호스트가 <see cref="World.Deliver"/>로 낸다. 없는 이름만 호출자 오류다.

@@ -279,12 +279,17 @@ namespace Kesa.Engine.Ui.Tests
                 "@(2.0, -4.0, 0.0) -Sprite[src=art/ring.png,tint=#fac846ff] Sprite[layer=1,size=0.7,0.7,src=art/archer.png,tint=#d04848ff] " +
                 "-Sprite[layer=2,size=0.7,0.7,src=art/white.png,tint=#00000070]"));
 
+            var opened = await board.InputAsync(LookBoard.Secondary, new[] { "entity:" + archer });
+            Assert.That(opened!.Succeeded, Is.True, opened.ToString());
+            var inspected = await alice.Session.Call("inspected", "skirmish.inspected", new BridgeValue[0]);
+            Assert.That(((BridgeEntity)inspected.Value!).Id, Is.EqualTo(archer), "the right press opened the unit's window");
+
             long target = await HitRed(alice, bob);
             await board.RefreshAsync();
             Assert.That(stage.Problems, Is.Empty, string.Join(", ", stage.Problems));
             string spot = stage.Keys.Single(k => k.StartsWith("mark:"));
             Assert.That(renderer.Dump(spot), Is.EqualTo("@(2.0, -3.0, 0.0) Sprite[src=art/white.png,tint=#4080ff80]"));
-            Assert.That(await board.PressAsync(new[] { "entity:" + target }), Is.Null, "a unit takes no press yet");
+            Assert.That(await board.PressAsync(new[] { "entity:" + target }), Is.Null, "a unit takes no primary press yet");
 
             var result = await board.PressAsync(new[] { spot });
             Assert.That(result!.Succeeded, Is.True, result.ToString());

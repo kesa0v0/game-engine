@@ -14,6 +14,7 @@ namespace Kesa.Engine.Script
         public const string UiActionName = "ui_action";
         public const string BotName = "bot";
         public const string WorldMarksName = "world_marks";
+        public const string WorldInputName = "world_input";
 
         /// <summary>S5의 <c>on_stale=</c>. 이름만 예약했다: 지금은 기본 취소만 있다 (spec-gaps G166).</summary>
         public const string OnStaleName = "on_stale";
@@ -351,14 +352,32 @@ namespace Kesa.Engine.Script
         /// </summary>
         private void DeclareCommand(FunctionDef def, FunctionValue function)
         {
-            var decorator = def.Decorators[0];
-            if (def.Decorators.Count > 1)
+            int main = def.MainDecorator;
+            var decorator = def.Decorators[main];
+            if (def.Decorators.Count > main + 1)
             {
-                _context.Error(Codes.CmdBadDecorator, "a function can have only one decorator", def.Decorators[1].Span);
+                _context.Error(Codes.CmdBadDecorator, "a function can have only one decorator", def.Decorators[main + 1].Span,
+                    hint: main > 0 ? "put @world_input(...) above @ui_action, and nothing below it (spec-gaps G416)" : null);
                 return;
             }
 
             string? name = def.DecoratorName;
+            if (name == WorldInputName || main > 0)
+            {
+                if (!IsBuiltin(WorldInputName))
+                {
+                    _context.Error(Codes.CmdBadDecorator, "this mod defines its own '" + WorldInputName +
+                                                          "', so the built-in @" + WorldInputName + " cannot be used here",
+                        def.Decorators[0].Span, hint: "rename this mod's '" + WorldInputName + "' (spec-gaps G112)");
+                    return;
+                }
+                if (name != UiActionName)
+                {
+                    _context.Error(Codes.CmdBadDecorator, "@world_input goes on a @ui_action", def.Decorators[0].Span,
+                        hint: "write @world_input(\"primary\", \"Unit\") on the line above @ui_action (spec-gaps G416)");
+                    return;
+                }
+            }
             if ((name == CommandName || name == SubmitPolicyName || name == ViewPolicyName || name == ViewRuleName || name == OnName || name == WhenName ||
                  name == UiActionName || name == BotName || name == WrapName || name == WorldMarksName) && !IsBuiltin(name))
             {
@@ -404,7 +423,9 @@ namespace Kesa.Engine.Script
             }
             if (name == UiActionName)
             {
-                DeclareUiAction(function, decorator);
+                var action = DeclareUiAction(function, decorator);
+                if (action != null)
+                    for (int i = 0; i < main; i++) DeclareWorldInput(action, def.Decorators[i]);
                 return;
             }
             if (name == BotName)
@@ -425,7 +446,7 @@ namespace Kesa.Engine.Script
             if (name != CommandName)
             {
                 _context.Error(Codes.CmdBadDecorator,
-                    "unknown decorator; only @command, @on, @when, @ui_action, @bot, @wrap, @view_rule and @world_marks are supported",
+                    "unknown decorator; only @command, @on, @when, @ui_action, @bot, @wrap, @view_rule, @world_marks and @world_input are supported",
                     decorator.Span, hint: "write @command or @command(free=True, acts_for=...)");
                 return;
             }
@@ -503,7 +524,7 @@ namespace Kesa.Engine.Script
         /// <c>@ui_action</c> (spec S10 3항, spec-gaps G276·G280): 인자 없는 데코레이터. 매개변수는 커맨드처럼 타입을 적고 그 연결이 보는
         /// 엔티티도 매개변수로 받는다(G278). 누구로서 행동하지 않으므로 <c>acts_for</c>가 없다.
         /// </summary>
-        private void DeclareUiAction(FunctionValue function, Expr decorator)
+        private CommandDecl? DeclareUiAction(FunctionValue function, Expr decorator)
         {
             if (decorator is CallExpr call)
             {
@@ -513,9 +534,37 @@ namespace Kesa.Engine.Script
                         ? "@ui_action has no acts_for: it changes only the screen it is called on, so there is no gate to check"
                         : "@ui_action takes no arguments", span,
                     hint: "write @ui_action, and take the entity the screen is looking at as a parameter (spec-gaps G278)");
+                return null;
+            }
+            var action = new CommandDecl(_context.Mod, function, false, decorator.Span);
+            _context.Functions.UiActions.Add(action);
+            return action;
+        }
+
+        /// <summary>
+        /// <c>@world_input("입력", "대상")</c> (G416·G419): 글자 둘. 대상이 Def 타입인지 공간 이름인지, 매개변수가 맞는지는 로더가
+        /// 매개변수를 푼 뒤에 본다.
+        /// </summary>
+        private void DeclareWorldInput(CommandDecl action, Expr decorator)
+        {
+            const string usage = "write @world_input(\"primary\", \"Unit\"): the input's name, then the Def type it takes (spec-gaps G416)";
+            if (!(decorator is CallExpr call) || call.Arguments.Count != 2 || call.Arguments[0].Name != null || call.Arguments[1].Name != null ||
+                !(call.Arguments[0].Value is StringLiteral input) || !(call.Arguments[1].Value is StringLiteral target) ||
+                input.Value.Length == 0 || target.Value.Length == 0)
+            {
+                _context.Error(Codes.CmdBadDecorator, "@world_input takes two strings: the input and what it is pressed on",
+                    decorator.Span, hint: usage);
                 return;
             }
-            _context.Functions.UiActions.Add(new CommandDecl(_context.Mod, function, false, decorator.Span));
+            foreach (var other in _context.Functions.WorldInputs)
+            {
+                if (other.Input != input.Value || other.Target != target.Value) continue;
+                _context.Error(Codes.CmdBadDecorator,
+                    "this mod already takes @world_input(\"" + input.Value + "\", \"" + target.Value + "\") in '" + other.Action.Id + "'",
+                    decorator.Span, hint: "one mod has one handler for each input and target; branch inside it (spec-gaps G419)");
+                return;
+            }
+            _context.Functions.WorldInputs.Add(new WorldInputDecl(action, input.Value, target.Value, target.Span, decorator.Span));
         }
 
         /// <summary>

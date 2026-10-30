@@ -32,18 +32,31 @@ namespace Kesa.Engine.Ui
             _marks = marks.Stamp;
         }
 
+        /// <summary>내장 입력: 주 누름(왼쪽 클릭·탭)과 보조 누름 (G416).</summary>
+        public const string Primary = "primary";
+
+        public const string Secondary = "secondary";
+
         /// <summary>
-        /// 누른 곳의 물체들(위에 그린 것부터)에서 받을 것을 찾아 낸다 (G395: 표시의 <c>click</c>이 엔티티보다 먼저). 받을 것이 없으면 null.
-        /// 엔티티 누르기(<c>@world_click</c>)는 아직 없다.
+        /// 커서 아래 물체들(위에 그린 것부터)에 들어온 입력을 받을 것에 준다 (G395·G419): 그 입력을 받는 표시가 먼저, 없으면 엔티티들을
+        /// 경계의 <c>WorldInput</c>에 넘긴다. 받을 것이 없으면 null.
         /// </summary>
-        public async ValueTask<BridgeResult?> PressAsync(IEnumerable<string> keysUnderPointer)
+        public async ValueTask<BridgeResult?> InputAsync(string input, IEnumerable<string> keysUnderPointer)
         {
+            var entities = new List<long>();
             foreach (var key in keysUnderPointer)
             {
-                var click = Stage.ClickOf(key);
+                var click = input == Primary ? Stage.ClickOf(key) : null;
                 if (click != null) return await _session.Act(click.Action, click.Arguments);
+                if (key.StartsWith(LookStage.EntityPrefix, System.StringComparison.Ordinal) &&
+                    long.TryParse(key.Substring(LookStage.EntityPrefix.Length), System.Globalization.NumberStyles.None,
+                        System.Globalization.CultureInfo.InvariantCulture, out var id))
+                    entities.Add(id);
             }
-            return null;
+            return entities.Count == 0 ? null : await _session.WorldInput(input, entities);
         }
+
+        /// <summary>주 누름: <c>InputAsync(Primary, …)</c>.</summary>
+        public ValueTask<BridgeResult?> PressAsync(IEnumerable<string> keysUnderPointer) => InputAsync(Primary, keysUnderPointer);
     }
 }

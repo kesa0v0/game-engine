@@ -444,10 +444,22 @@ namespace Kesa.Engine.Bridge.Local
         /// <summary>화면 동작을 하고 적힌 <c>submit</c>을 차례로 낸다. 하나가 실패해도 나머지는 낸다(콘솔 호스트와 같다, G283).</summary>
         public ValueTask<BridgeResult> Act(string action, IReadOnlyDictionary<string, BridgeValue> arguments)
         {
-            var args = KernelValues.ToKernel(arguments);
             var view = View;
-            var acted = view.Show(view.Act(_ui, action, args));
-            if (!acted.Succeeded) return Done(KernelResults.Result(acted, DefOf(view)));
+            return Done(Delivered(view, view.Show(view.Act(_ui, action, KernelValues.ToKernel(arguments)))));
+        }
+
+        public ValueTask<BridgeResult?> WorldInput(string input, IReadOnlyList<long> entities)
+        {
+            var ids = new List<EntityId>(entities.Count);
+            foreach (var id in entities) ids.Add(new EntityId(id));
+            var view = View;
+            var acted = view.WorldInput(_ui, input, ids);
+            return Done(acted == null ? null : Delivered(view, view.Show(acted)));
+        }
+
+        private BridgeResult Delivered(WorldView view, ActResult acted)
+        {
+            if (!acted.Succeeded) return KernelResults.Result(acted, DefOf(view));
             var deliveries = new List<BridgeDelivery>(acted.Submissions.Count);
             foreach (var submission in acted.Submissions)
             {
@@ -456,7 +468,7 @@ namespace Kesa.Engine.Bridge.Local
                 deliveries.Add(new BridgeDelivery(submission.Command, KernelResults.Arguments(submission.Arguments, DefOf(view)),
                     KernelResults.Result(after.Show(delivered), DefOf(after))));
             }
-            return Done(new BridgeResult(true, acted.Outcome.ToString(), null, deliveries));
+            return new BridgeResult(true, acted.Outcome.ToString(), null, deliveries);
         }
 
         public ValueTask<IReadOnlyList<BridgeBot>> Bots()

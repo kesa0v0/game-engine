@@ -56,6 +56,7 @@ namespace Kesa.Engine.Loading
                 var uiActions = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var bots = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var worldMarks = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
+                var worldInputs = new List<WorldInputDecl>();
                 var handlers = new List<HandlerDecl>();
                 var whens = new List<WhenDecl>();
                 var wraps = new List<WrapDecl>();
@@ -83,6 +84,7 @@ namespace Kesa.Engine.Loading
                     foreach (var action in u.Functions.UiActions) uiActions.Add(action.Id, action);
                     foreach (var bot in u.Functions.Bots) bots.Add(bot.Id, bot);
                     foreach (var marks in u.Functions.WorldMarks) worldMarks.Add(marks.Id, marks);
+                    worldInputs.AddRange(u.Functions.WorldInputs);
                     handlers.AddRange(u.Functions.Handlers);
                     whens.AddRange(u.Functions.Whens);
                     viewRules.AddRange(u.Functions.ViewRules);
@@ -97,6 +99,7 @@ namespace Kesa.Engine.Loading
                     UiActions = uiActions,
                     Bots = bots,
                     WorldMarks = worldMarks,
+                    WorldInputs = worldInputs,
                     Order = order,
                     ModsRoot = modsRoot,
                     TextUses = textUses,
@@ -201,6 +204,7 @@ namespace Kesa.Engine.Loading
                     new CallContext(u.Manifest.Id, u.Bag));
                 CommandSignatures.Resolve(u.Functions.UiActions, schema, visibility, u.Scope,
                     new CallContext(u.Manifest.Id, u.Bag));
+                CommandSignatures.ResolveWorldInputs(u.Functions.WorldInputs, schema, new CallContext(u.Manifest.Id, u.Bag));
                 CommandSignatures.Resolve(u.Functions.Bots, schema, visibility, u.Scope, new CallContext(u.Manifest.Id, u.Bag));
                 HandlerStages.Check(u.Functions.Handlers, schema, visibility, new CallContext(u.Manifest.Id, u.Bag));
                 CommandSignatures.ResolveWhens(u.Functions.Whens, schema, visibility, u.Scope, new CallContext(u.Manifest.Id, u.Bag));

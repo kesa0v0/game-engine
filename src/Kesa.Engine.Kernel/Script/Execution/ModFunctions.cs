@@ -31,6 +31,9 @@ namespace Kesa.Engine.Script
         /// <summary><c>@world_marks</c>로 선언한 표시 함수, 정의된 순서대로 (G395). 매개변수가 없다(G397).</summary>
         public List<CommandDecl> WorldMarks { get; } = new List<CommandDecl>();
 
+        /// <summary><c>@ui_action</c> 위의 <c>@world_input</c>, 정의된 순서대로 (G416·G419).</summary>
+        public List<WorldInputDecl> WorldInputs { get; } = new List<WorldInputDecl>();
+
         /// <summary>
         /// <c>@view_rule(대상)</c>(G315)으로 선언한 보기 규칙, 정의된 순서대로. 한 모드가 한 대상에 둘을 걸면 로드 오류다.
         /// </summary>

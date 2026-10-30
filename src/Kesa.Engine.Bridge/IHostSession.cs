@@ -56,6 +56,13 @@ namespace Kesa.Engine.Bridge
         /// </summary>
         ValueTask<BridgeWorldMarks> WorldMarks(long since);
 
+        /// <summary>
+        /// 판 위 입력 (G416·G419·G420): <paramref name="input"/>이 커서 아래 엔티티(<paramref name="entities"/>, 위에서부터)에 들어왔다. 커널이 그
+        /// 타입의 <c>@world_input</c> 화면 동작 가운데 사전 조건을 통과한 첫 것을 하고 <see cref="Act"/>처럼 적힌 <c>submit</c>을 낸다. 모두 막혔으면
+        /// 처음 막힌 결과, 받을 것이 없으면 null. 표시의 누름은 호스트가 먼저 본다.
+        /// </summary>
+        ValueTask<BridgeResult?> WorldInput(string input, IReadOnlyList<long> entities);
+
         /// <summary>이 연결에게 보이는 엔티티를 (스키마의 종류 순, id 순)으로, 도장과 함께 (G329).</summary>
         ValueTask<IReadOnlyList<BridgeListed>> Entities();
 

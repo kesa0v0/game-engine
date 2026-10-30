@@ -83,6 +83,9 @@ namespace Kesa.Engine.Loading
         public IReadOnlyDictionary<string, CommandDecl> WorldMarks { get; internal set; } =
             new SortedDictionary<string, CommandDecl>(System.StringComparer.Ordinal);
 
+        /// <summary>판 위 입력 <c>@world_input</c> (G416·G420), 로드 순서대로(모드 안에서는 정의 순서). 같은 (입력, 대상)은 뒤의 것부터 묻는다.</summary>
+        public IReadOnlyList<WorldInputDecl> WorldInputs { get; internal set; } = new List<WorldInputDecl>();
+
         /// <summary>
         /// 보기 규칙 <c>@view_rule(대상) def f(viewer, entity)</c> (spec-gaps G196·G197·G203·G238·G315), 로드 순서대로(모드 안에서는 정의
         /// 순서). 같은 대상의 규칙은 뒤의 것부터 묻는다. 비었으면 거른 읽기는 모두 보인다.

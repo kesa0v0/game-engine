@@ -31,12 +31,12 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(result.Commands["naval.Move"].Mod, Is.EqualTo("naval"));
         }
 
-        [TestCase("@other\ndef f():\n    return 0\n", "unknown decorator; only @command, @on, @when, @ui_action, @bot, @wrap, @view_rule and @world_marks are supported")]
+        [TestCase("@other\ndef f():\n    return 0\n", "unknown decorator; only @command, @on, @when, @ui_action, @bot, @wrap, @view_rule, @world_marks and @world_input are supported")]
         [TestCase("@command(True)\ndef f():\n    return 0\n", "@command takes no positional arguments")]
         [TestCase("@command(cost=1)\ndef f():\n    return 0\n", "@command has no argument 'cost'")]
         [TestCase("@command(free=1)\ndef f():\n    return 0\n", "free= must be True or False")]
         [TestCase("@command(free=True, acts_for=None)\n@command(free=True, acts_for=None)\ndef f():\n    return 0\n", "a function can have only one decorator")]
-        [TestCase("@command.free\ndef f():\n    return 0\n", "unknown decorator; only @command, @on, @when, @ui_action, @bot, @wrap, @view_rule and @world_marks are supported")]
+        [TestCase("@command.free\ndef f():\n    return 0\n", "unknown decorator; only @command, @on, @when, @ui_action, @bot, @wrap, @view_rule, @world_marks and @world_input are supported")]
         public void BadDecoratorsAreLoadErrors(string defs, string message)
         {
             Mod("core", defs: defs);
@@ -45,6 +45,46 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(d.Code, Is.EqualTo(Codes.CmdBadDecorator));
             Assert.That(d.Message, Is.EqualTo(message));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
+        }
+
+        private const string UnitSchema = "component(\"Pos\", x=field(int, default=0))\ndeftype(\"Unit\", components=[\"Pos\"])\n";
+
+        [TestCase("@world_input(\"primary\", \"Unit\")\ndef f(u: Ref[Unit]):\n    pass\n", Codes.CmdBadDecorator,
+            "@world_input goes on a @ui_action")]
+        [TestCase("@world_input(\"primary\", \"Unit\")\n@command(free=True, acts_for=None)\ndef f(u: Ref[Unit]):\n    pass\n", Codes.CmdBadDecorator,
+            "@world_input goes on a @ui_action")]
+        [TestCase("@ui_action\n@world_input(\"primary\", \"Unit\")\ndef f(u: Ref[Unit]):\n    pass\n", Codes.CmdBadDecorator,
+            "a function can have only one decorator")]
+        [TestCase("@world_input(\"primary\")\n@ui_action\ndef f(u: Ref[Unit]):\n    pass\n", Codes.CmdBadDecorator,
+            "@world_input takes two strings: the input and what it is pressed on")]
+        [TestCase("@world_input(\"primary\", \"Unti\")\n@ui_action\ndef f(u: Ref[Unit]):\n    pass\n", Codes.CmdBadDecorator,
+            "@world_input takes a Def type to press on, and there is no Def type 'Unti'")]
+        [TestCase("@world_input(\"primary\", \"Unit\")\n@ui_action\ndef f(u: Ref[Unit], n: int):\n    pass\n", Codes.CmdParameterType,
+            "the @ui_action 'core.f' under @world_input takes one parameter: the Unit it is pressed on")]
+        [TestCase("@world_input(\"primary\", \"Unit\")\n@ui_action\ndef f(n: int):\n    pass\n", Codes.CmdParameterType,
+            "the parameter of the @ui_action 'core.f' under @world_input is the Unit it is pressed on, so it must be Ref[Unit], not int")]
+        [TestCase("@world_input(\"primary\", \"Unit\")\n@ui_action\ndef f(u: Ref[Unit]):\n    pass\n" +
+                  "@world_input(\"primary\", \"Unit\")\n@ui_action\ndef g(u: Ref[Unit]):\n    pass\n", Codes.CmdBadDecorator,
+            "this mod already takes @world_input(\"primary\", \"Unit\") in 'core.f'")]
+        public void BadWorldInputsAreLoadErrors(string defs, string code, string message)
+        {
+            Mod("core", schema: UnitSchema, defs: defs);
+            Load(out var diags);
+            var d = diags.Single();
+            Assert.That(d.Code, Is.EqualTo(code));
+            Assert.That(d.Message, Is.EqualTo(message));
+        }
+
+        [Test]
+        public void OneUiActionCanTakeSeveralWorldInputs()
+        {
+            Mod("core", schema: UnitSchema, defs: "@world_input(\"primary\", \"Unit\")\n@world_input(\"secondary\", \"Unit\")\n@ui_action\n" +
+                                                  "def f(u: Ref[Unit]):\n    pass\n");
+            var result = Load(out var diags);
+            Assert.That(diags, Is.Empty, string.Join("\n", diags));
+            Assert.That(result.UiActions.Keys, Is.EqualTo(new[] { "core.f" }));
+            Assert.That(result.WorldInputs.Select(w => w.Input + " " + w.Target + " " + w.Parameter),
+                Is.EqualTo(new[] { "primary Unit u", "secondary Unit u" }));
         }
 
         [Test]
