@@ -63,7 +63,7 @@ var board = match.Board(session, renderer);
 - 게임의 요소 종류: `LookKinds.Standard()`에 `LookElementKind`를 더해 `LoadedMods.Load(…, lookKinds:)`로 넘기고, 같은 이름으로 `renderer.AddKind(이름, assets => new 내View())`(`ILookElementView`)를 더한다. 공간 종류는 `SpaceKind`를 `LookKinds`에 더한다.
 - 누름은 입력 이름(`LookBoard.Primary`·`Secondary`, G416)과 함께 넘긴다. 광선이 지나는 물체를 위에 그린 것부터 찾고(`KeysAt`), 광선이 닿는 공간의 자리를 판 기준으로 되돌린다(`PlaceAt`, `grid`의 역계산). `InputAsync`는 `click`이 있는 표시를 먼저 보고(주 누름만), 없으면 엔티티들과 자리를 경계의 `WorldInput`에 넘겨 모드의 `@world_input`이 받게 한다(G419·G422). 키·단추를 입력 이름으로 바꾸는 것은 `ModInputs`다(G417·G423): `new ModInputs(mods.Inputs)`가 `primary`·`secondary`와 모드의 `.input.xml` 선언마다 Input System 액션을 만들고, 프레임마다 `PressedThisFrame()`이 눌린 이름을 준다(데모는 이것을 커서 자리와 함께 `InputAsync`에 넘김). 패키지는 `com.unity.inputsystem` 1.18.0에 기대므로 프로젝트의 Active Input Handling이 Input System Package나 Both여야 한다. 핸들러가 선언에 없는 입력을 받으면 `mods.Inputs.CheckHandlers(await session.WorldInputs())`가 문제로 주고(데모는 경고로 찍음, G424), `Match.Board`는 표시의 `inputs=`를 같은 기준으로 `Stage.Problems`에 알린다. 플레이어 키 바꾸기는 `ModInputs.Actions`에 Input System의 다시 묶기와 `SaveBindingOverridesAsJson`을 쓴다. 키 누름 자체는 창 없는 확인에서 흉내 내지 못해(편집 모드에서 액션이 갱신되지 않음) `SmokeTest`는 바인딩이 키로 풀리는지만 본다.
 - 연출(G429·G430·G437): `Match.Board`는 모드의 `presentation`을 따른다. `staged`면 효과 단계뿐 아니라 그 뒤의 옮기기·퇴장이 끝날 때까지 `board.Holding`이 참이다(`LookStage.Busy`). `staged`면 `ui.Hold = board`로 화면도 붙잡고, 붙잡는 동안(`board.Holding`) 봇은 쉬게 하고, 시간은 `board.Advance(밀리초)`로 넘긴다(단계를 넘긴다). 붙잡는 동안 판·UXML 누름은 건너뛰기가 된다.
-- 효과(G425·G426): `board.RefreshAsync()`가 새 효과도 받아 띄운다. 흐려지고 떠오르게 하려면 프레임마다 `board.Stage.Advance(밀리초)`를 부른다(데모는 `Time.deltaTime`). 투명도는 렌더러가 요소의 색에 곱한다(`ILookElementView.SetOpacity`, 기본은 그대로 둠).
+- 효과(G425·G426): `board.RefreshAsync()`가 새 효과도 받아 띄운다. 흐려지고 떠오르고 옮겨 가게 하려면 프레임마다 `board.Advance(밀리초)`를 부른다(무대의 시간과 staged 단계를 함께 넘김, 데모는 `Time.deltaTime`에 Playback Speed를 곱함). 투명도는 렌더러가 요소의 색에 곱한다(`ILookElementView.SetOpacity`, 기본은 그대로 둠).
 - 그림은 처음 보일 때 다른 스레드에서 읽고(G392), 다 읽을 때까지 그 요소는 비어 있다(보이지 않고 눌리지 않음). 텍스처는 판 GameObject에 붙은 `LookPicturePump`가 프레임마다 주 스레드에서 만든다. 같은 파일은 한 번 읽어 나눠 쓴다. 로딩 화면은 `renderer.Preload(mods.Looks, 그림 이름들)`을 기다리면 그 그림이 처음부터 보인다. 프레임이 돌지 않는 편집 모드 확인에서는 `LoadingPictures`가 거짓이 될 때까지 `FinishPictures()`를 부른다.
 
 ## 스타일시트 (USS)
@@ -88,7 +88,7 @@ Unity.exe -batchmode -nographics -projectPath <패키지를 manifest에 적은 �
 
 ## 데모 프로젝트
 
-`hosts/unity/demo`는 이 패키지를 `file:`로 가져다 쓰는 Unity 프로젝트다(`.gitignore`는 Unity 프로젝트용 템플릿). 먼저 저장소 루트에서 `dotnet build`를 한 뒤 Unity 6000.3으로 열고 `Assets/Scenes/Demo.unity`를 재생하면 `samples/skirmish`가 같은 프로세스에서 돌며 UXML 화면이 뜬다(`KesaDemo`). 창 없이 확인: `-executeMethod KesaDemoSetup.Check`. 카메라가 비춘 판을 PNG로 보려면 `-nographics` 없이 `-executeMethod KesaDemoSetup.Shot -kesaShot <png 경로>`(패널은 들어가지 않는다).
+`hosts/unity/demo`는 이 패키지를 `file:`로 가져다 쓰는 Unity 프로젝트다(`.gitignore`는 Unity 프로젝트용 템플릿). 먼저 저장소 루트에서 `dotnet build`를 한 뒤 Unity 6000.3으로 열고 `Assets/Scenes/Demo.unity`를 재생하면 `samples/skirmish`가 같은 프로세스에서 돌며 UXML 화면이 뜬다(`KesaDemo`). 창 없이 확인: `-executeMethod KesaDemoSetup.Check`(편집 모드는 프레임이 돌지 않아 `KesaDemo.Pass(밀리초)`로 시간을 넘기고 `Finish()`로 staged가 다 따라잡게 한다). 연출을 눈으로 따라가려면 재생 중 `KesaDemo`의 Playback Speed를 내린다(0.25면 4배 느림). 카메라가 비춘 판을 PNG로 보려면 `-nographics` 없이 `-executeMethod KesaDemoSetup.Shot -kesaShot <png 경로>`(패널은 들어가지 않는다).
 
 ## 아직 없는 것
 

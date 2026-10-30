@@ -620,6 +620,7 @@ def hit_flash(x, y, damage):
     return [fx("hit-flash", at=place), fx(look("damage-number", amount=-damage), at=place)]
 ```
 
+- skirmish는 빗나감도 `Miss(x, y)` 신호로 회색 "빗나감" 글(`miss-text`)을 띄운다. 효과가 없는 결과는 아무 일도 없던 것처럼 보이기 쉽다.
 - 매개변수는 `@on`처럼 신호의 값을 이름으로 고른다(타입·기본값은 적지 않는다). 돌려주는 것은 `fx(그림, at=자리)`의 리스트이고 `None`은 빈 리스트다.
 - 화면 함수와 같은 규칙이다: 판을 바꾸지 못하고, 그 연결이 보는 판으로 돈다. 못 보는 대상이면 빈 리스트를 돌려주면 된다.
   신호 자체는 화면으로 나가지 않으므로 비밀 신호가 새지 않는다.
