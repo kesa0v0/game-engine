@@ -448,12 +448,13 @@ namespace Kesa.Engine.Bridge.Local
             return Done(Delivered(view, view.Show(view.Act(_ui, action, KernelValues.ToKernel(arguments)))));
         }
 
-        public ValueTask<BridgeResult?> WorldInput(string input, IReadOnlyList<long> entities)
+        public ValueTask<BridgeResult?> WorldInput(string input, IReadOnlyList<long> entities, BridgeWhere? place = null)
         {
             var ids = new List<EntityId>(entities.Count);
             foreach (var id in entities) ids.Add(new EntityId(id));
+            bool at = place != null && place.Shape == BridgeWhereShape.At && place.Name != null && place.Target != null;
             var view = View;
-            var acted = view.WorldInput(_ui, input, ids);
+            var acted = view.WorldInput(_ui, input, ids, at ? place!.Name : null, at ? KernelValues.ToKernel(place!.Target!) : null);
             return Done(acted == null ? null : Delivered(view, view.Show(acted)));
         }
 

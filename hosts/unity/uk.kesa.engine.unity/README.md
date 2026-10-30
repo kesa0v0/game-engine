@@ -51,13 +51,15 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
 var renderer = new GameObjectLookRenderer(boardTransform, mods.Assets);
 var board = match.Board(session, renderer);
 // 프레임마다: await board.RefreshAsync();   그리다 난 문제는 board.Stage.Problems
-// 누를 때(패널이 받지 않았으면): await board.PressAsync(renderer.KeysAt(camera.ScreenPointToRay(mouse)));
+// 누를 때(패널이 받지 않았으면):
+//   var ray = camera.ScreenPointToRay(mouse);
+//   await board.InputAsync(LookBoard.Primary, renderer.KeysAt(ray), renderer.PlaceAt(board.Stage, ray));
 ```
 
 - 엔티티 물체(`WorldObjects`)와 표시(`WorldMarks`)를 받아 물체마다 GameObject 하나를 `boardTransform` 아래에 만든다. 물체는 공간 단위(`grid`의 `cell`)만큼 키우므로 그 안의 `size`·`offset`은 칸 단위다.
 - `Sprite`는 SpriteRenderer이고 그림의 긴 변이 1이다. `layer`는 조상 것을 더해 `sortingOrder`가 된다. 그림을 못 읽거나 그림 정의가 없으면 보라·검정 체크무늬다.
 - 게임의 요소 종류: `LookKinds.Standard()`에 `LookElementKind`를 더해 `LoadedMods.Load(…, lookKinds:)`로 넘기고, 같은 이름으로 `renderer.AddKind(이름, assets => new 내View())`(`ILookElementView`)를 더한다. 공간 종류는 `SpaceKind`를 `LookKinds`에 더한다.
-- 누름은 광선이 지나는 물체를 위에 그린 것부터 찾고(`KeysAt`), `PressAsync`가 그중 `click`이 있는 표시의 화면 동작을 낸다(G395). 엔티티와 빈 자리 누르기(`@world_click`)는 아직 없다.
+- 누름은 입력 이름(`LookBoard.Primary`·`Secondary`, G416)과 함께 넘긴다. 광선이 지나는 물체를 위에 그린 것부터 찾고(`KeysAt`), 광선이 닿는 공간의 자리를 판 기준으로 되돌린다(`PlaceAt`, `grid`의 역계산). `InputAsync`는 `click`이 있는 표시를 먼저 보고(주 누름만), 없으면 엔티티들과 자리를 경계의 `WorldInput`에 넘겨 모드의 `@world_input`이 받게 한다(G419·G422). 실제 단추와 입력 이름의 짝은 게임 코드가 정한다(데모는 왼쪽·오른쪽 단추). 모드 입력 선언 `.input.xml`(G417)은 아직 읽지 않는다.
 - 그림은 처음 보일 때 바로(동기) 읽는다. 비동기 읽기와 미리 읽기 목록(G392)은 아직 없다.
 
 ## 스타일시트 (USS)

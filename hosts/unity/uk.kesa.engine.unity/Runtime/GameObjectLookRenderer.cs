@@ -89,6 +89,21 @@ namespace Kesa.Engine.Unity
             return hits.ConvertAll(h => h.Key);
         }
 
+        /// <summary>
+        /// 광선이 닿는 공간의 자리 (G422): 판 기준 좌표로 바꿔 <see cref="LookStage.PlaceOnRay"/>에 묻는다. 누름은 이것을 <c>LookBoard.InputAsync</c>에
+        /// 함께 넘긴다.
+        /// </summary>
+        public Bridge.BridgeWhere? PlaceAt(LookStage stage, Ray ray)
+        {
+            var from = _board.InverseTransformPoint(ray.origin);
+            var direction = _board.InverseTransformDirection(ray.direction);
+            return stage.PlaceOnRay(Raw(from), Raw(direction));
+        }
+
+        private static LookPosition Raw(Vector3 v) => new LookPosition(Raw(v.x), Raw(v.y), Raw(v.z));
+
+        private static long Raw(float real) => (long)Math.Round(real * (double)Bridge.BridgeFixed.Scale);
+
         public void PlaceObject(ElementId obj, LookPosition position, long unit)
         {
             var t = _nodes[obj.Value].GameObject.transform;

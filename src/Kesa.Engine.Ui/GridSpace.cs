@@ -109,6 +109,37 @@ namespace Kesa.Engine.Ui
                     return false;
                 }
             }
+
+            public override bool TryPlaceOnRay(LookPosition from, LookPosition direction, out BridgeValue? place)
+            {
+                place = null;
+                // 바닥: xy는 Z = 0, xz는 높이(Y) = origin의 z
+                long level = _xz ? _origin[2] : 0;
+                long start = _xz ? from.Y : from.Z;
+                long step = _xz ? direction.Y : direction.Z;
+                if (step == 0 || (level - start) != 0 && (level - start > 0) != (step > 0)) return false;
+                try
+                {
+                    long a = checked(from.X + direction.X * (level - start) / step);
+                    long b = checked((_xz ? from.Z : from.Y) + (_xz ? direction.Z : direction.Y) * (level - start) / step);
+                    long x = Nearest(checked(a - _origin[0]), _cell);
+                    long y = Nearest(checked(b - _origin[1]), _cell);
+                    place = new BridgeList(new BridgeValue[] { new BridgeInt(x), new BridgeInt(_flip ? -y : y) });
+                    return true;
+                }
+                catch (OverflowException)
+                {
+                    return false;
+                }
+            }
+
+            /// <summary>가장 가까운 칸: <paramref name="d"/>/<paramref name="cell"/>을 반올림(음수도 아래로 내림한 뒤).</summary>
+            private static long Nearest(long d, long cell)
+            {
+                long twice = checked(2 * d + cell);
+                long q = twice / (2 * cell);
+                return twice % (2 * cell) < 0 ? q - 1 : q;
+            }
         }
     }
 }

@@ -323,6 +323,34 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task PressingAnEmptySquareNextToThePickedUnitMovesIt()
+        {
+            var stage = new LookStage(LookLibrary.Load(new LookSource[0], LookKinds.Standard()), new MemoryLookRenderer());
+            var alice = await Open("alice", _red);
+            var board = new LookBoard(alice.Session, stage);
+            long mine = UnitsOf(_red)[0];
+            Place(mine, 2, 2);
+            var taken = _world.All("Unit").Select(u => (X(u.Value), Y(u.Value))).ToHashSet();
+            var free = new[] { (1, 2), (3, 2), (2, 1), (2, 3) }.First(c => !taken.Contains(c));
+            BridgeWhere Square((int x, int y) c) => BridgeWhere.At("square", new BridgeList(new BridgeValue[] { new BridgeInt(c.x), new BridgeInt(c.y) }));
+
+            var refused = await board.InputAsync(LookBoard.Primary, new string[0], Square(free));
+            Assert.That(refused!.Succeeded, Is.False, "nothing is picked yet");
+            Assert.That(await board.InputAsync(LookBoard.Primary, new string[0], BridgeWhere.At("hexes", new BridgeInt(1))), Is.Null,
+                "no handler takes a place in another space");
+
+            Assert.That((await board.PressAsync(new[] { "entity:" + mine }))!.Succeeded, Is.True);
+            var moved = await board.InputAsync(LookBoard.Primary, new string[0], Square(free));
+            Assert.That(moved!.Succeeded, Is.True, moved.ToString());
+            Assert.That(moved.Deliveries.Single().Result.Succeeded, Is.True, moved.Deliveries.Single().Result.ToString());
+            Assert.That((X(mine), Y(mine)), Is.EqualTo(free));
+        }
+
+        private long X(long unit) => ((IntValue)_world.Get(new EntityId(unit), _world.Member("Pos", "x"))).Value;
+
+        private long Y(long unit) => ((IntValue)_world.Get(new EntityId(unit), _world.Member("Pos", "y"))).Value;
+
+        [Test]
         public async Task ABotInBluesSeatPlaysItsTurnSoRedGetsTheNextOne()
         {
             await _host.Seat(_blue, "bot", ai: true);

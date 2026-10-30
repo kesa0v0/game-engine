@@ -58,7 +58,7 @@ namespace Kesa.Engine.Tests.Loading
         [TestCase("@world_input(\"primary\")\n@ui_action\ndef f(u: Ref[Unit]):\n    pass\n", Codes.CmdBadDecorator,
             "@world_input takes two strings: the input and what it is pressed on")]
         [TestCase("@world_input(\"primary\", \"Unti\")\n@ui_action\ndef f(u: Ref[Unit]):\n    pass\n", Codes.CmdBadDecorator,
-            "@world_input takes a Def type to press on, and there is no Def type 'Unti'")]
+            "@world_input takes a Def type or a space to press on, and there is no Def type 'Unti'")]
         [TestCase("@world_input(\"primary\", \"Unit\")\n@ui_action\ndef f(u: Ref[Unit], n: int):\n    pass\n", Codes.CmdParameterType,
             "the @ui_action 'core.f' under @world_input takes one parameter: the Unit it is pressed on")]
         [TestCase("@world_input(\"primary\", \"Unit\")\n@ui_action\ndef f(n: int):\n    pass\n", Codes.CmdParameterType,
@@ -85,6 +85,16 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(result.UiActions.Keys, Is.EqualTo(new[] { "core.f" }));
             Assert.That(result.WorldInputs.Select(w => w.Input + " " + w.Target + " " + w.Parameter),
                 Is.EqualTo(new[] { "primary Unit u", "secondary Unit u" }));
+        }
+
+        [Test]
+        public void ATargetThatIsNotADefTypeIsASpaceAndTakesThePlaceValue()
+        {
+            Mod("core", schema: UnitSchema, defs: "@world_input(\"primary\", \"square\")\n@ui_action\ndef go(cell: list[int]):\n    pass\n");
+            var result = Load(out var diags);
+            Assert.That(diags, Is.Empty, string.Join("\n", diags));
+            var input = result.WorldInputs.Single();
+            Assert.That((input.Space, input.Parameter), Is.EqualTo((true, "cell")));
         }
 
         [Test]

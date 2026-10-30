@@ -38,10 +38,10 @@ namespace Kesa.Engine.Ui
         public const string Secondary = "secondary";
 
         /// <summary>
-        /// 커서 아래 물체들(위에 그린 것부터)에 들어온 입력을 받을 것에 준다 (G395·G419): 그 입력을 받는 표시가 먼저, 없으면 엔티티들을
-        /// 경계의 <c>WorldInput</c>에 넘긴다. 받을 것이 없으면 null.
+        /// 커서 아래 물체들(위에 그린 것부터)과 자리(<see cref="LookStage.PlaceOnRay"/>)에 들어온 입력을 받을 것에 준다 (G395·G419·G422): 그 입력을
+        /// 받는 표시가 먼저, 없으면 엔티티들과 자리를 경계의 <c>WorldInput</c>에 넘긴다. 받을 것이 없으면 null.
         /// </summary>
-        public async ValueTask<BridgeResult?> InputAsync(string input, IEnumerable<string> keysUnderPointer)
+        public async ValueTask<BridgeResult?> InputAsync(string input, IEnumerable<string> keysUnderPointer, BridgeWhere? place = null)
         {
             var entities = new List<long>();
             foreach (var key in keysUnderPointer)
@@ -53,7 +53,7 @@ namespace Kesa.Engine.Ui
                         System.Globalization.CultureInfo.InvariantCulture, out var id))
                     entities.Add(id);
             }
-            return entities.Count == 0 ? null : await _session.WorldInput(input, entities);
+            return entities.Count == 0 && place == null ? null : await _session.WorldInput(input, entities, place);
         }
 
         /// <summary>주 누름: <c>InputAsync(Primary, …)</c>.</summary>

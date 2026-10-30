@@ -137,7 +137,7 @@ public sealed class KesaDemo : MonoBehaviour
         await RefreshBoard();
     }
 
-    /// <summary>패널 요소가 받지 않은 누름을 판에 넘긴다 (G395·G419: 표시가 먼저, 다음 엔티티).</summary>
+    /// <summary>패널 요소가 받지 않은 누름을 판에 넘긴다 (G395·G419·G422: 표시가 먼저, 다음 엔티티, 다음 빈 자리).</summary>
     private async Task PressBoard(string input, Vector3 screenPoint)
     {
         var camera = Camera.main;
@@ -148,7 +148,8 @@ public sealed class KesaDemo : MonoBehaviour
             var picked = panel.Pick(RuntimePanelUtils.ScreenToPanel(panel, new Vector2(screenPoint.x, Screen.height - screenPoint.y)));
             if (picked != null && picked != _root && picked != panel.visualTree) return;
         }
-        var result = await _board.InputAsync(input, _boardRenderer.KeysAt(camera.ScreenPointToRay(screenPoint)));
+        var ray = camera.ScreenPointToRay(screenPoint);
+        var result = await _board.InputAsync(input, _boardRenderer.KeysAt(ray), _boardRenderer.PlaceAt(_board.Stage, ray));
         if (result != null && !result.Succeeded) Debug.LogWarning("Kesa board press -> " + result);
         if (_ui != null) await _ui.RefreshAsync();
     }

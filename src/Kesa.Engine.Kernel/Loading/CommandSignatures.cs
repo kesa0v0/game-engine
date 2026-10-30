@@ -113,31 +113,41 @@ namespace Kesa.Engine.Loading
         }
 
         /// <summary>
-        /// <c>@world_input</c>의 대상과 매개변수 (G419): 대상은 Def 타입이고 화면 동작은 그 엔티티를 받는 <c>Ref[대상]</c> 하나만 받는다.
-        /// 화면 동작의 매개변수를 푼 뒤에 본다.
+        /// <c>@world_input</c>의 대상과 매개변수 (G419·G422): 대상이 Def 타입이면 화면 동작은 그 엔티티를 받는 <c>Ref[대상]</c> 하나, 아니면
+        /// 공간 이름이고 그 자리 값을 받는 매개변수 하나(타입은 모더가 적음)만 받는다. 화면 동작의 매개변수를 푼 뒤에 본다.
         /// </summary>
         public static void ResolveWorldInputs(IReadOnlyList<WorldInputDecl> inputs, SchemaSet schema, CallContext context)
         {
             foreach (var input in inputs)
             {
-                if (!schema.TryGetType(input.Target, out _))
-                {
-                    context.Error(Codes.CmdBadDecorator, "@world_input takes a Def type to press on, and there is no Def type '" +
-                                                         input.Target + "'", input.TargetSpan,
-                        hint: "pressing on an empty place of a space is not supported yet; use a mark with click= (spec-gaps G395, G419)");
-                    continue;
-                }
+                bool space = !schema.TryGetType(input.Target, out _);
                 var action = input.Action;
                 var definition = action.Function.Definition!;
                 if (definition.Parameters.Count != 1)
                 {
                     context.Error(Codes.CmdParameterType, "the @ui_action '" + action.Id + "' under @world_input takes one parameter: the " +
-                                                          input.Target + " it is pressed on", definition.Span,
-                        hint: "write def " + definition.Name + "(it: Ref[" + input.Target + "]) and read the rest on its own (spec-gaps G419)");
+                                                          (space ? "place in the space '" + input.Target + "'" : input.Target) +
+                                                          " it is pressed on", definition.Span,
+                        hint: space
+                            ? "write def " + definition.Name + "(cell: list[int]) for at(\"" + input.Target + "\", [x, y]) (spec-gaps G422)"
+                            : "write def " + definition.Name + "(it: Ref[" + input.Target + "]) and read the rest on its own (spec-gaps G419)");
                     continue;
                 }
                 if (action.Parameters.Count != 1) continue; // 타입 오류는 이미 알렸다
                 var parameter = action.Parameters[0];
+                if (space)
+                {
+                    if (parameter.Type is EntityRefTypeRef)
+                    {
+                        context.Error(Codes.CmdBadDecorator, "@world_input takes a Def type or a space to press on, and there is no Def type '" +
+                                                             input.Target + "'", input.TargetSpan,
+                            hint: "the parameter is " + parameter.Type.Display + ", so name its Def type here (spec-gaps G419, G422)");
+                        continue;
+                    }
+                    input.Space = true;
+                    input.Parameter = parameter.Name;
+                    continue;
+                }
                 if (!(parameter.Type is EntityRefTypeRef entity) || entity.Target.Name != input.Target)
                 {
                     context.Error(Codes.CmdParameterType, "the parameter of the @ui_action '" + action.Id + "' under @world_input is the " +

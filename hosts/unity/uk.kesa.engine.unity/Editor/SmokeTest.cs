@@ -123,6 +123,11 @@ namespace Kesa.Engine.Unity.Editor
                 var keys = renderer.KeysAt(new Ray(new Vector3(2.2f, -3.1f, -10f), Vector3.forward));
                 Require(keys.Count == 1 && keys[0] == "test", "a ray through the square finds the mark, got " + string.Join(", ", keys));
                 Require(renderer.KeysAt(new Ray(new Vector3(0f, 0f, -10f), Vector3.forward)).Count == 0, "an empty square finds nothing");
+                boardObject.transform.position = new Vector3(10f, 0f, 0f);
+                var place = renderer.PlaceAt(board.Stage, new Ray(new Vector3(12.2f, -3.1f, -10f), Vector3.forward));
+                Require(place != null && place.Name == "square" && place.Target!.ToString() == "[2,3]",
+                    "a ray turns back into square (2, 3) in the board's own frame, got " + place);
+                boardObject.transform.position = Vector3.zero;
 
                 board.Stage.Show("test", new BridgeLook("no-such-look", new KeyValuePair<string, BridgeValue>[0]),
                     BridgeWhere.At("square", new BridgeList(new BridgeValue[] { new BridgeInt(0), new BridgeInt(0) })));

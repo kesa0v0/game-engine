@@ -53,6 +53,17 @@ namespace Kesa.Engine.Ui
         /// <summary>그 열쇠의 표시가 누르면 낼 화면 동작 (G395·G408). 엔티티와 누를 수 없는 표시는 null.</summary>
         public BridgeMarkClick? ClickOf(string key) => _shown.ContainsKey(key) && _clicks.TryGetValue(key, out var click) ? click : null;
 
+        /// <summary>
+        /// 반직선이 닿는 자리 (G422): 선언된 공간을 이름 순으로 보아 처음 되돌린 <c>at("공간", 값)</c>. 위치는 그림 물체와 같은 좌표계(판의 바탕 기준)다.
+        /// </summary>
+        public BridgeWhere? PlaceOnRay(LookPosition from, LookPosition direction)
+        {
+            foreach (var space in _library.Spaces.Values)
+                if (space.Layout.TryPlaceOnRay(from, direction, out var place) && place != null)
+                    return BridgeWhere.At(space.Name, place);
+            return null;
+        }
+
         /// <summary>엔티티 물체의 열쇠 앞머리. 뒤는 엔티티 id.</summary>
         public const string EntityPrefix = "entity:";
 

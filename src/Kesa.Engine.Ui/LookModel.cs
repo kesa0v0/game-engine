@@ -149,6 +149,16 @@ namespace Kesa.Engine.Ui
 
         /// <summary>공간 한 단위의 길이(고정소수점 원래 정수값). 물체 안의 <c>size</c>·<c>offset</c>과 기본 크기가 이 단위다 (G413).</summary>
         public abstract long Unit { get; }
+
+        /// <summary>
+        /// 누른 곳의 자리 값 (G422): <paramref name="from"/>에서 <paramref name="direction"/>으로 가는 반직선이 공간의 바닥과 만나는 곳. 만나지 않거나
+        /// 되돌릴 수 없는 공간이면 false.
+        /// </summary>
+        public virtual bool TryPlaceOnRay(LookPosition from, LookPosition direction, out BridgeValue? place)
+        {
+            place = null;
+            return false;
+        }
     }
 
     /// <summary>공간 종류 하나 (G394·G410): 이름, 받는 설정, 설정으로 공간을 만드는 일. 기본 종류도 게임의 종류도 이것으로 등록한다.</summary>

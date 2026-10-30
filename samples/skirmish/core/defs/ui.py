@@ -49,6 +49,25 @@ def press_unit(unit: Ref[Unit]):
         submit("Attack", party=u.Owner.party, unit=u, target=unit)
         ui.Selection.unit = None
 
+# 판의 빈 칸을 누름 (G422): 고른 유닛을 바로 옆 빈 칸으로 옮긴다. 칸은 at("square", [x, y])의 [x, y]
+def step_cells():
+    u = chosen()
+    if u is None or not is_mine(u):
+        return []
+    return [[u.Pos.x + DIRS[d][0], u.Pos.y + DIRS[d][1]] for d in open_dirs(u)]
+
+@world_input("primary", "square")
+@ui_action
+def press_square(cell: list[int]):
+    with preconditions:
+        require(playing(), text("skirmish-over"))
+        choose(cell, from_=step_cells())
+    u = chosen()
+    for d in open_dirs(u):
+        if [u.Pos.x + DIRS[d][0], u.Pos.y + DIRS[d][1]] == cell:
+            submit("Move", party=u.Owner.party, unit=u, dir=d)
+    ui.Selection.unit = None
+
 # UXML 화면(ui/screen.uxml)이 부른다: 이 유닛이 고른 유닛인가
 def is_chosen(u):
     return ui.Selection.unit == u

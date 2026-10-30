@@ -566,6 +566,24 @@ def press_unit(unit: Ref[Unit]):
 - `seats()`는 이 연결이 앉은 엔티티 목록(id 순, 관전자면 빈 목록), `seats(Party)`는 그 가운데 그 타입(또는 컴포넌트)인 것만이다.
 - `questions()`와 같이 화면 쪽 코드에서만 쓰고, 자리가 바뀌면 읽은 화면 함수를 다시 부른다.
 
+빈 자리는 대상에 공간 이름을 적어 받는다. 화면 동작은 `at("공간", 값)`의 값 하나를 받고, 타입은 그 공간의 자리 값 모양대로 적는다.
+
+```python
+# 고른 유닛을 바로 옆 빈 칸으로 옮긴다
+@world_input("primary", "square")
+@ui_action
+def press_square(cell: list[int]):
+    with preconditions:
+        require(playing(), text("skirmish-over"))
+        choose(cell, from_=step_cells())
+    ...
+```
+
+- 대상이 Def 타입이 아니면 공간 이름이다. 공간은 호스트 파일(`.space.xml`)에 있어서 이름이 맞는지는 엔진이 아니라 호스트가 알린다.
+  매개변수가 `Ref[…]`인데 대상이 Def 타입이 아니면 타입 이름 오타로 보고 로드 오류다.
+- 커서 아래 엔티티가 그 입력을 받지 않으면(핸들러가 없거나 모두 막힘) 그 자리의 공간 핸들러가 받는다. 유닛이 선 칸도 그렇다.
+- `choose(cell, from_=[…])`로 갈 수 있는 칸을 적으면 콘솔도 수를 나열한다.
+
 ### Unity: 그림 정의 `.look.xml`과 공간 `.space.xml`
 
 그림 이름과 공간 이름의 뜻은 Unity 패키지가 읽는 XML 파일에 적는다. 확장자로 알아보므로 모드 안 어디에 두어도 되고, 관례는

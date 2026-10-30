@@ -232,5 +232,32 @@ namespace Kesa.Engine.Ui.Tests
             stage.Apply(new BridgeWorldMarks(2, new BridgeMark[0], new[] { "f/dot@1" }));
             Assert.That(stage.Keys, Is.Empty);
         }
+
+        private static LookPosition P(double x, double y, double z) =>
+            new LookPosition((long)(x * BridgeFixed.Scale), (long)(y * BridgeFixed.Scale), (long)(z * BridgeFixed.Scale));
+
+        [TestCase("<Space name=\"square\" kind=\"grid\" />", 2.0, 3.4, -10.0, 0, 0, 1, "[2,3]")]
+        [TestCase("<Space name=\"square\" kind=\"grid\" />", -1.6, -0.4, -10.0, 0, 0, 1, "[-2,0]")]
+        [TestCase("<Space name=\"square\" kind=\"grid\" flip-y=\"true\" />", 2.0, -3.0, -10.0, 0, 0, 1, "[2,3]")]
+        [TestCase("<Space name=\"square\" kind=\"grid\" cell=\"2\" origin=\"1,1\" />", 4.9, 1.0, 5.0, 0, 0, -1, "[2,0]")]
+        // 기울어진 반직선: (0, 1, -2)에서 (1, 0, 1) 쪽으로 2만큼 가면 바닥 z=0의 (2, 1)
+        [TestCase("<Space name=\"square\" kind=\"grid\" />", 0.0, 1.0, -2.0, 1, 0, 1, "[2,1]")]
+        // 3D 바닥: 위에서 내려다보면 높이 Y가 0이 되는 곳, 모드 y는 Z
+        [TestCase("<Space name=\"square\" kind=\"grid\" plane=\"xz\" />", 3.0, 10.0, 4.2, 0, -1, 0, "[3,4]")]
+        public void APressedRayTurnsBackIntoAPlace(string space, double x, double y, double z, int dx, int dy, int dz, string expected)
+        {
+            var stage = Stage(Looks("<Looks />", "<Spaces>" + space + "</Spaces>"));
+            var place = stage.PlaceOnRay(P(x, y, z), P(dx, dy, dz));
+            Assert.That(place!.Name, Is.EqualTo("square"));
+            Assert.That(place.Target!.ToString(), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void ARayThatMissesTheFloorGivesNoPlace()
+        {
+            var stage = Stage(Looks("<Looks />"));
+            Assert.That(stage.PlaceOnRay(P(0, 0, -10), P(1, 0, 0)), Is.Null, "parallel to the floor");
+            Assert.That(stage.PlaceOnRay(P(0, 0, -10), P(0, 0, -1)), Is.Null, "pointing away from it");
+        }
     }
 }

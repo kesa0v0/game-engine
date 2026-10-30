@@ -85,11 +85,12 @@ namespace Kesa.Engine.Runtime
         public CallResult WorldMarks(UiState ui, string function) => _world.WorldMarksAs(this, ui, function);
 
         /// <summary>
-        /// 판 위 입력 (G419·G420): 커서 아래 엔티티(위에서부터)의 <c>@world_input</c> 화면 동작 가운데 사전 조건을 통과한 첫 것을 한다.
+        /// 판 위 입력 (G419·G420·G422): 커서 아래 엔티티(위에서부터)의 <c>@world_input</c> 화면 동작 가운데 사전 조건을 통과한 첫 것을 하고,
+        /// 엔티티가 모두 받지 않으면 커서 아래 자리(<paramref name="space"/>의 <paramref name="place"/>, 없으면 null)의 공간 핸들러에 준다.
         /// 모두 막혔으면 처음 막힌 결과, 받을 것이 없으면 null.
         /// </summary>
-        public ActResult? WorldInput(UiState ui, string input, IReadOnlyList<EntityId> entities) =>
-            _world.WorldInputAs(this, ui, input, entities);
+        public ActResult? WorldInput(UiState ui, string input, IReadOnlyList<EntityId> entities, string? space = null, Value? place = null) =>
+            _world.WorldInputAs(this, ui, input, entities, space, place);
 
         /// <summary>
         /// 이 연결의 <c>@ui_action</c>을 부른다 (spec-gaps G278·G280): 인자 검사 → 사전 조건 → 본문. 본문의 읽기는 모두 이 연결로서의 거른

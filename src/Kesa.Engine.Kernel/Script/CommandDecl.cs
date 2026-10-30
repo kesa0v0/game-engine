@@ -107,8 +107,11 @@ namespace Kesa.Engine.Script
         /// <summary><c>@world_input</c> 데코레이터의 위치.</summary>
         public SourceSpan Span { get; }
 
-        /// <summary>엔티티를 받는 매개변수 이름. 로더가 매개변수를 확인한 뒤에 채운다.</summary>
+        /// <summary>대상을 받는 매개변수 이름. 로더가 매개변수를 확인한 뒤에 채운다.</summary>
         public string? Parameter { get; internal set; }
+
+        /// <summary>대상이 Def 타입이 아니라 공간 이름인가 (G422). 그러면 매개변수는 <c>at(공간, 값)</c>의 값을 받는다.</summary>
+        public bool Space { get; internal set; }
     }
 
     /// <summary>
