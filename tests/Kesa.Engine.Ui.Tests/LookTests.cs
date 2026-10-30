@@ -132,6 +132,17 @@ namespace Kesa.Engine.Ui.Tests
                 Is.EqualTo(new[] { "looks/a.look.xml:1: src=\"art/gone.png\": no such file in the mods" }));
         }
 
+        [Test]
+        public void AKeyTheLookValueLeavesOutReadsAsNoneSoOnlyTheStatesThatAreOnArePassed()
+        {
+            var stage = Stage(Looks("<Looks><Look name=\"soldier\"><Sprite src=\"a.png\" /><Sprite src=\"hurt.png\" bind-display=\"hurt\" /></Look></Looks>"));
+            stage.Show("u", Look("soldier"), At(0, 0));
+            Assert.That(_renderer.Dump("u"), Is.EqualTo("@(0.0, 0.0, 0.0) Sprite[src=a.png] -Sprite[src=hurt.png]"));
+            stage.Show("u", Look("soldier", ("hurt", BridgeBool.True)), At(0, 0));
+            Assert.That(_renderer.Dump("u"), Is.EqualTo("@(0.0, 0.0, 0.0) Sprite[src=a.png] Sprite[src=hurt.png]"));
+            Assert.That(stage.Problems, Is.Empty);
+        }
+
         // ---- 펼치기 ----
 
         [Test]
@@ -197,7 +208,7 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(stage.Problems.Select(p => p.ToString()), Is.EqualTo(new[]
             {
                 "missing: no look is named 'dor' (did you mean 'dot'?)",
-                "looks/units.look.xml:1: look 'dot', bind-src=\"art\": the look value has no key 'art'",
+                "looks/units.look.xml:1: look 'dot', bind-src=\"art\": a path is text, got a none",
                 "space: no space is named 'sqare' (did you mean 'square'?)",
                 "bad: space 'square': a grid place is a list of 2 or 3 whole numbers like [2, 3], got \"e4\"",
                 "high: space 'square': a height (z) on plane=\"xy\" is not supported yet, got [0,0,1]",

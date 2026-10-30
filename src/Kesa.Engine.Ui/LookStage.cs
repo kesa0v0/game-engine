@@ -195,10 +195,12 @@ namespace Kesa.Engine.Ui
 
         private static bool TryRead(VarExpr expression, UiScope scope, out BridgeValue value, out string error)
         {
-            if (!scope.TryGet(expression.Name, out value))
+            // 그림 값에 없는 키는 None (G415): 켜진 상태만 넘기면 된다
+            if (!scope.TryGet(expression.Name, out _))
             {
-                error = "the look value has no key '" + expression.Name + "'";
-                return false;
+                value = BridgeNone.Instance;
+                error = "";
+                return true;
             }
             return UiInterpreter.ResolveVariable(expression, scope, out value, out error);
         }
