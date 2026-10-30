@@ -1,0 +1,4 @@
+<!-- 판의 칸 (G414): at("square", [x, y]) -->
+<Spaces>
+  <Space name="square" kind="grid" cell="1" />
+</Spaces>

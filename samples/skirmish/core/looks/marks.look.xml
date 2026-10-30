@@ -1,0 +1,6 @@
+<!-- 판 위 표시의 그림 (G413): 물러날 칸은 반투명 파란 칸 -->
+<Looks>
+  <Look name="retreat-spot">
+    <Sprite src="art/white.png" tint="#4080ff80" />
+  </Look>
+</Looks>

@@ -259,6 +259,31 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task TheRetreatMarkIsDrawnFromTheSamplesLookFilesAndGoesAwayWhenAnswered()
+        {
+            var files = Directory.GetFiles(_modFolder, "*.xml", SearchOption.AllDirectories).OrderBy(f => f, System.StringComparer.Ordinal)
+                .Select(f => new LookSource("skirmish", Path.GetRelativePath(_modFolder, f).Replace('\\', '/'), File.ReadAllText(f)));
+            var library = LookLibrary.Load(files, LookKinds.Standard(), path => File.Exists(Path.Combine(_modFolder, path)));
+            Assert.That(library.Problems, Is.Empty, string.Join("\n", library.Problems));
+            var renderer = new MemoryLookRenderer();
+            var stage = new LookStage(library, renderer);
+
+            var alice = await Open("alice", _red);
+            var bob = await Open("bob", _blue);
+            await HitRed(alice, bob);
+            var marks = await alice.Session.WorldMarks(0);
+            stage.Apply(marks);
+            Assert.That(stage.Problems, Is.Empty, string.Join("\n", stage.Problems));
+            Assert.That(renderer.Dump(stage.Keys.Single()), Is.EqualTo("@(2.0, 3.0, 0.0) Sprite[src=art/white.png,tint=#4080ff80]"));
+
+            var spot = marks.Changed.Single();
+            Assert.That((await alice.Session.Act(spot.Click!.Action, spot.Click.Arguments)).Succeeded, Is.True);
+            stage.Apply(await alice.Session.WorldMarks(marks.Stamp));
+            Assert.That(stage.Keys, Is.Empty);
+            Assert.That(renderer.Nodes, Is.Empty);
+        }
+
+        [Test]
         public async Task ABotInBluesSeatPlaysItsTurnSoRedGetsTheNextOne()
         {
             await _host.Seat(_blue, "bot", ai: true);

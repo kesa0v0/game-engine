@@ -119,6 +119,9 @@ namespace Kesa.Engine.Ui
 
         public void Set(string name, BridgeValue value) => _values[name] = value;
 
+        /// <summary>이 범위의 값만 지운다(바깥은 그대로).</summary>
+        public void Clear() => _values.Clear();
+
         public bool TryGet(string name, out BridgeValue value)
         {
             for (var scope = this; scope != null; scope = scope.Parent)

@@ -195,7 +195,7 @@ namespace Kesa.Engine.Ui
             }
         }
 
-        private static bool ResolveVariable(VarExpr variable, UiScope scope, out BridgeValue value, out string error)
+        internal static bool ResolveVariable(VarExpr variable, UiScope scope, out BridgeValue value, out string error)
         {
             error = "";
             if (!scope.TryGet(variable.Name, out value))

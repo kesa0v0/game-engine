@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- UXML 해석의 그리지 않는 부분 (spec-gaps G343·G345). 경계만 알고 Unity를 모른다 -->
+    <!-- 화면 UXML과 판 위 그림 정의의 그리지 않는 해석 (spec-gaps G343·G345·G412). 경계만 알고 Unity를 모른다 -->
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <RootNamespace>Kesa.Engine.Ui</RootNamespace>

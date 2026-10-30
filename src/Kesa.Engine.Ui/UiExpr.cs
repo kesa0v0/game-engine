@@ -76,6 +76,13 @@ namespace Kesa.Engine.Ui
             return expr;
         }
 
+        /// <summary>숫자 하나(정수는 <see cref="BridgeInt"/>, 소수는 <see cref="BridgeFixed"/>). 틀리면 <see cref="UiSyntaxException"/>.</summary>
+        internal static BridgeValue ParseNumber(string text)
+        {
+            var p = new Parser(text.Trim());
+            return p.ParseNumberOnly();
+        }
+
         private sealed class Parser
         {
             private readonly string _s;
@@ -110,6 +117,13 @@ namespace Kesa.Engine.Ui
                 SkipSpace();
                 if (Peek() != '\0') throw Fail("unexpected '" + Peek() + "'; use one function call or one variable (nesting and operators are not allowed)");
                 return result;
+            }
+
+            public BridgeValue ParseNumberOnly()
+            {
+                var value = ReadNumber();
+                if (Peek() != '\0') throw Fail("unexpected '" + Peek() + "' after the number");
+                return value;
             }
 
             private UiExpr ParseCall(List<string> path, int start)
