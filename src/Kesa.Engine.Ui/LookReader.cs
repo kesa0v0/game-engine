@@ -219,8 +219,9 @@ namespace Kesa.Engine.Ui
                         continue;
                     }
                     var value = LookAttributes.FromText(attributeType, v, out string error);
-                    if (value == null) Problem(place, n + "=\"" + v + "\": " + error);
-                    else attributes.Add(new KeyValuePair<string, LookAttributeValue>(n, value));
+                    string? wrong = value != null ? kind.Check?.Invoke(n, value) : error;
+                    if (wrong != null) Problem(place, n + "=\"" + v + "\": " + wrong);
+                    else attributes.Add(new KeyValuePair<string, LookAttributeValue>(n, value!));
                 }
 
                 var children = node.Elements().Select(Read).ToList();

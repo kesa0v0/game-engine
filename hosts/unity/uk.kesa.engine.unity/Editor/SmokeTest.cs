@@ -24,18 +24,37 @@ namespace Kesa.Engine.Unity.Editor
     {
         public static void Run()
         {
-            int code = 0;
             try
             {
                 Check().GetAwaiter().GetResult();
-                Debug.Log("KESA SMOKE TEST: OK");
             }
             catch (Exception e)
             {
-                Debug.LogError("KESA SMOKE TEST FAILED: " + e);
-                code = 1;
+                Fail(e);
+                return;
             }
-            EditorApplication.Exit(code);
+            // 모델은 glTFast가 에디터 프레임을 타고 읽으므로 막고 기다리지 않고 프레임마다 본다
+            var models = CheckModels();
+            var until = DateTime.UtcNow.AddSeconds(60);
+            void Poll()
+            {
+                if (!models.IsCompleted && DateTime.UtcNow < until) return;
+                EditorApplication.update -= Poll;
+                if (!models.IsCompleted) Fail(new TimeoutException("the model check did not finish in 60 s"));
+                else if (models.IsFaulted) Fail(models.Exception!.GetBaseException());
+                else
+                {
+                    Debug.Log("KESA SMOKE TEST: OK");
+                    EditorApplication.Exit(0);
+                }
+            }
+            EditorApplication.update += Poll;
+        }
+
+        private static void Fail(Exception e)
+        {
+            Debug.LogError("KESA SMOKE TEST FAILED: " + e);
+            EditorApplication.Exit(1);
         }
 
         private static string Arg(string name)
@@ -150,6 +169,75 @@ namespace Kesa.Engine.Unity.Editor
             {
                 UnityEngine.Object.DestroyImmediate(boardObject);
             }
+        }
+
+        /// <summary>
+        /// 모델 (G391·G433): 코드로 만든 삼각형 하나짜리 <c>.glb</c>를 임시 모드 폴더에 두고 <c>Model</c>로 그리면 그 메시가 물체 아래에 붙는다.
+        /// 없는 파일은 보라색 상자다.
+        /// </summary>
+        private static async Task CheckModels()
+        {
+            string folder = Path.Combine(Path.GetTempPath(), "kesa-model-check");
+            Directory.CreateDirectory(Path.Combine(folder, "models"));
+            File.WriteAllBytes(Path.Combine(folder, "models", "tri.glb"), Triangle());
+            var boardObject = new GameObject("kesa-models-check");
+            try
+            {
+                var kinds = GameObjectLookRenderer.StandardKinds();
+                var assets = new ModFolderAssets(new[] { folder });
+                var library = LookLibrary.Load(new[]
+                {
+                    new LookSource("check", "check/models.look.xml",
+                        "<Looks><Look name=\"tri\"><Model src=\"models/tri.glb\" /></Look><Look name=\"gone\"><Model bind-src=\"file\" /></Look></Looks>"),
+                    new LookSource("check", "check/board.space.xml", "<Spaces><Space name=\"square\" kind=\"grid\" /></Spaces>"),
+                }, kinds, path => assets.Find(path) != null);
+                Require(library.Problems.Count == 0, "the model look reads cleanly: " + string.Join("; ", library.Problems));
+                var renderer = new GameObjectLookRenderer(boardObject.transform, assets);
+                var stage = new LookStage(library, renderer);
+                var at = BridgeWhere.At("square", new BridgeList(new BridgeValue[] { new BridgeInt(2), new BridgeInt(0) }));
+                stage.Show("a", new BridgeLook("tri", new KeyValuePair<string, BridgeValue>[0]), at);
+                stage.Show("b", new BridgeLook("gone", new[] { new KeyValuePair<string, BridgeValue>("file", new BridgeStr("models/none.glb")) }), at);
+                Require(renderer.LoadingPictures, "the models are loading");
+                while (renderer.LoadingPictures) await Task.Yield();
+                var mesh = boardObject.transform.Find("a").GetComponentInChildren<MeshFilter>();
+                Require(mesh != null && mesh.sharedMesh != null && mesh.sharedMesh.vertexCount == 3, "the glTF triangle is under the object");
+                Require(mesh!.gameObject.activeInHierarchy && mesh.gameObject.name == "tri", "the clone is shown with its node name, got " + mesh.gameObject.name);
+                var missing = boardObject.transform.Find("b/Model/missing-model");
+                Require(missing != null, "a model that cannot be read shows the missing box");
+                Require(stage.Problems.Count == 0, "the models show cleanly: " + string.Join("; ", stage.Problems));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(boardObject);
+                Directory.Delete(folder, true);
+            }
+        }
+
+        // glTF 2.0 바이너리: 위치 세 개짜리 삼각형 하나, 노드 이름 "tri"
+        private static byte[] Triangle()
+        {
+            var positions = new float[] { 0, 0, 0, 1, 0, 0, 0, 1, 0 };
+            var bin = new byte[positions.Length * 4];
+            Buffer.BlockCopy(positions, 0, bin, 0, bin.Length);
+            string json = "{\"asset\":{\"version\":\"2.0\"},\"scene\":0,\"scenes\":[{\"nodes\":[0]}],\"nodes\":[{\"mesh\":0,\"name\":\"tri\"}]," +
+                          "\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0}}]}],\"buffers\":[{\"byteLength\":36}]," +
+                          "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":0,\"byteLength\":36}]," +
+                          "\"accessors\":[{\"bufferView\":0,\"componentType\":5126,\"count\":3,\"type\":\"VEC3\",\"min\":[0,0,0],\"max\":[1,1,0]}]}";
+            while (json.Length % 4 != 0) json += " ";
+            var jsonBytes = Encoding.UTF8.GetBytes(json);
+            using var stream = new MemoryStream();
+            using var w = new BinaryWriter(stream);
+            w.Write(0x46546C67u);
+            w.Write(2u);
+            w.Write((uint)(12 + 8 + jsonBytes.Length + 8 + bin.Length));
+            w.Write((uint)jsonBytes.Length);
+            w.Write(0x4E4F534Au);
+            w.Write(jsonBytes);
+            w.Write((uint)bin.Length);
+            w.Write(0x004E4942u);
+            w.Write(bin);
+            w.Flush();
+            return stream.ToArray();
         }
 
         /// <summary>미리 읽기 (G392): 끝나면 그 그림은 그릴 때 바로 걸린다.</summary>

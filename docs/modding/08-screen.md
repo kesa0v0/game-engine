@@ -707,6 +707,7 @@ def hit_flash(x, y, damage):
 |---|---|
 | `Sprite` | `src`(그림 경로), `size`(`"1,0.5"`, 빼면 긴 변이 한 칸이고 그림 비율을 지킴), `tint`(`#rrggbb`·`#rrggbbaa`) |
 | `Text` | `text`(글), `size`(글자 높이, 칸 단위, 기본 0.5), `color`(`#rrggbb`·`#rrggbbaa`). 글꼴은 호스트 기본 |
+| `Model` | `src`(모델 파일, 확장자로 로더를 고름. Unity는 glTF `.glb`·`.gltf`). 모델 단위 1이 칸 하나다. 맡을 로더가 없는 확장자는 로드 문제
 | `Group` | 자식을 함께 옮기고 함께 숨긴다 |
 | 모든 요소 | `layer`(정수, 큰 것이 위), `offset`(`"0,0.5"`, 묶음 안에서는 부모 기준), `bind-속성`, `bind-display`, `for` |
 

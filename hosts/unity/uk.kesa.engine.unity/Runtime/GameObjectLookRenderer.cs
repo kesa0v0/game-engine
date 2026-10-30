@@ -9,7 +9,7 @@ namespace Kesa.Engine.Unity
 {
     /// <summary>
     /// 판 위 그림을 GameObject로 그린다 (G412·G413). 물체 하나는 GameObject 하나이고 공간 단위만큼 키워 그 안의 <c>size</c>·<c>offset</c>이 칸 단위가 된다.
-    /// 고정소수점은 여기서 처음 실수가 된다. 기본 종류는 <c>Sprite</c>(SpriteRenderer)·<c>Text</c>(TextMesh)·<c>Group</c>이고 게임은 <see cref="AddKind"/>로 더한다.
+    /// 고정소수점은 여기서 처음 실수가 된다. 기본 종류는 <c>Sprite</c>(SpriteRenderer)·<c>Text</c>(TextMesh)·<c>Model</c>(glTF, G391)·<c>Group</c>이고 게임은 <see cref="AddKind"/>로 더한다.
     /// </summary>
     public sealed class GameObjectLookRenderer : ILookRenderer
     {
@@ -38,6 +38,8 @@ namespace Kesa.Engine.Unity
         private readonly Transform _board;
         private readonly IUiAssets _assets;
         private readonly LookPictures _pictures;
+        private readonly List<IModelLoader> _modelLoaders = new List<IModelLoader> { new GltfModelLoader() };
+        private LookModels? _models;
         private readonly Dictionary<string, Func<IUiAssets, ILookElementView>> _kinds = new Dictionary<string, Func<IUiAssets, ILookElementView>>(StringComparer.Ordinal);
         private readonly Dictionary<long, Node> _nodes = new Dictionary<long, Node>();
         private long _next;
@@ -54,10 +56,38 @@ namespace Kesa.Engine.Unity
             AddKind("Sprite", _ => new SpriteView(_pictures));
             AddKind("Group", _ => new GroupView());
             AddKind("Text", _ => new TextView());
+            AddKind("Model", _ => new ModelView(Models()));
         }
 
-        /// <summary>읽고 있는 그림이 있는가 (G392).</summary>
-        public bool LoadingPictures => _pictures.Loading;
+        /// <summary>기본 요소 종류에 기본 모델 로더의 확장자(glTF)를 등록한 것. 게임이 제 종류를 더할 바탕 (G391).</summary>
+        public static LookKinds StandardKinds()
+        {
+            var kinds = LookKinds.Standard();
+            foreach (var extension in new GltfModelLoader().Extensions) kinds.AddModelFormat(extension);
+            return kinds;
+        }
+
+        /// <summary>모델 로더를 더한다. 그 확장자를 <see cref="LookKinds.AddModelFormat"/>에도 등록해야 로드 때 받는다. 그리기 전에 부른다.</summary>
+        public void AddModelLoader(IModelLoader loader)
+        {
+            _modelLoaders.Add(loader);
+            _models?.Add(loader);
+        }
+
+        // 모델 원본은 처음 쓸 때 판 아래 꺼진 물체에 둔다
+        private LookModels Models()
+        {
+            if (_models != null) return _models;
+            var holder = new GameObject("kesa-models");
+            holder.SetActive(false);
+            holder.transform.SetParent(_board, false);
+            _models = new LookModels(_assets, holder.transform);
+            foreach (var loader in _modelLoaders) _models.Add(loader);
+            return _models;
+        }
+
+        /// <summary>읽고 있는 그림이나 모델이 있는가 (G392).</summary>
+        public bool LoadingPictures => _pictures.Loading || (_models?.Loading ?? false);
 
         /// <summary>
         /// 다 읽힌 그림을 물체에 건다. 플레이 중에는 판 GameObject가 프레임마다 부르고, 프레임이 돌지 않는 편집 모드 확인에서 쓴다.
@@ -80,8 +110,9 @@ namespace Kesa.Engine.Unity
         {
             foreach (var element in elements)
             {
-                foreach (var attribute in element.Attributes)
-                    if (attribute.Value.Type == LookAttributeType.Path) into.Add(attribute.Value.Text!);
+                if (element.Kind != "Model")
+                    foreach (var attribute in element.Attributes)
+                        if (attribute.Value.Type == LookAttributeType.Path) into.Add(attribute.Value.Text!);
                 Paths(element.Children, into);
             }
         }
@@ -413,6 +444,61 @@ namespace Kesa.Engine.Unity
 
             // TextMesh의 한 줄 높이는 대략 characterSize × fontSize / 10
             private void Height(float height) => _mesh.characterSize = height * 10f / FontSize;
+        }
+
+        /// <summary><c>Model</c>: 로더가 읽은 원본을 복제해 단다. 모델 단위 1이 공간 단위 1이다. 다 읽을 때까지 비어 있고, 못 읽으면 보라색 상자 (G391).</summary>
+        private sealed class ModelView : ILookElementView
+        {
+            private readonly LookModels _models;
+            private string? _src;
+            private GameObject? _shown;
+
+            public ModelView(LookModels models)
+            {
+                _models = models;
+                GameObject = new GameObject("Model");
+            }
+
+            public GameObject GameObject { get; }
+
+            public void Set(string attribute, LookAttributeValue value)
+            {
+                if (attribute != "src") return;
+                string path = value.Text!;
+                _src = path;
+                Clear();
+                _models.Request(path, template =>
+                {
+                    if (GameObject == null || _src != path) return;
+                    Clear();
+                    _shown = template != null ? UnityEngine.Object.Instantiate(template, GameObject.transform, false) : Missing();
+                    _shown.SetActive(true);
+                });
+            }
+
+            public void SetSortingOrder(int order)
+            {
+            }
+
+            private void Clear()
+            {
+                if (_shown == null) return;
+                if (Application.isPlaying) UnityEngine.Object.Destroy(_shown);
+                else UnityEngine.Object.DestroyImmediate(_shown);
+                _shown = null;
+            }
+
+            private GameObject Missing()
+            {
+                var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                UnityEngine.Object.DestroyImmediate(cube.GetComponent<Collider>());
+                cube.name = "missing-model";
+                cube.transform.SetParent(GameObject.transform, false);
+                cube.transform.localScale = Vector3.one * 0.5f;
+                var renderer = cube.GetComponent<MeshRenderer>();
+                renderer.sharedMaterial = new Material(renderer.sharedMaterial) { color = new Color(1f, 0f, 1f) };
+                return cube;
+            }
         }
     }
 }

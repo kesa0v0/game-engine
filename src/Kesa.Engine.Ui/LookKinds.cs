@@ -4,13 +4,35 @@ using System.Collections.Generic;
 namespace Kesa.Engine.Ui
 {
     /// <summary>
-    /// 그림 요소 종류와 공간 종류를 등록하는 자리 (G390·G394·G413). <see cref="Standard"/>가 기본 종류(<c>Sprite</c>·<c>Group</c>·<c>grid</c>)를
+    /// 그림 요소 종류와 공간 종류를 등록하는 자리 (G390·G394·G413). <see cref="Standard"/>가 기본 종류(<c>Sprite</c>·<c>Text</c>·<c>Model</c>·<c>Group</c>·<c>grid</c>)를
     /// 넣은 것을 주고 게임은 여기에 제 종류를 더한다. 해석기는 기본 종류를 따로 알지 않는다.
     /// </summary>
     public sealed class LookKinds
     {
         private readonly SortedDictionary<string, LookElementKind> _elements = new SortedDictionary<string, LookElementKind>(StringComparer.Ordinal);
         private readonly SortedDictionary<string, SpaceKind> _spaces = new SortedDictionary<string, SpaceKind>(StringComparer.Ordinal);
+        private readonly SortedSet<string> _modelFormats = new SortedSet<string>(StringComparer.Ordinal);
+
+        /// <summary>모델 로더가 맡는 확장자(소문자, 점 포함) (G391). 호스트가 로더를 등록하며 더한다.</summary>
+        public IEnumerable<string> ModelFormats => _modelFormats;
+
+        /// <summary><c>Model</c>의 <c>src</c>가 이 확장자면 로드 때 받는다.</summary>
+        public void AddModelFormat(string extension)
+        {
+            if (!extension.StartsWith(".", StringComparison.Ordinal) || extension.Length < 2)
+                throw new ArgumentException("a model format is an extension like '.glb', got '" + extension + "'");
+            _modelFormats.Add(extension.ToLowerInvariant());
+        }
+
+        /// <summary>그 경로를 맡을 모델 로더가 없으면 이유.</summary>
+        public string? CheckModel(string path)
+        {
+            int dot = path.LastIndexOf('.');
+            string extension = dot < 0 || dot < path.LastIndexOf('/') ? "" : path.Substring(dot).ToLowerInvariant();
+            if (_modelFormats.Contains(extension)) return null;
+            return "no model loader takes " + (extension.Length == 0 ? "a file without an extension" : "'" + extension + "'") +
+                   (_modelFormats.Count == 0 ? " (this host registers none)" : " (can be: " + string.Join(", ", _modelFormats) + ")") + " (spec-gaps G391)";
+        }
 
         /// <summary>모든 요소가 받는 속성 (G413). 묶음(<c>Group</c>) 안에서는 부모 기준이다.</summary>
         public static readonly IReadOnlyDictionary<string, LookAttributeType> Common = new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
@@ -39,6 +61,10 @@ namespace Kesa.Engine.Ui
                 ["size"] = LookAttributeType.Number,
                 ["color"] = LookAttributeType.Color,
             }, acceptsChildren: false));
+            kinds.Add(new LookElementKind("Model", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
+            {
+                ["src"] = LookAttributeType.Path,
+            }, acceptsChildren: false, check: (name, value) => name == "src" ? kinds.CheckModel(value.Text!) : null));
             kinds.Add(new LookElementKind("Group", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal), acceptsChildren: true));
             kinds.Add(new GridSpace());
             return kinds;

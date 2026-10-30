@@ -107,12 +107,17 @@ namespace Kesa.Engine.Ui
     /// <summary>그림 요소 종류 하나 (G413): 이름, 받는 속성과 값 종류, 자식을 받는지. 기본 요소도 게임의 요소도 이것으로 등록한다.</summary>
     public sealed class LookElementKind
     {
-        public LookElementKind(string name, IReadOnlyDictionary<string, LookAttributeType> attributes, bool acceptsChildren)
+        /// <param name="check">적힌 속성 값(이름, 값)을 더 본다. 틀리면 이유, 맞으면 null. 묶인 값은 그릴 때 호스트가 본다.</param>
+        public LookElementKind(string name, IReadOnlyDictionary<string, LookAttributeType> attributes, bool acceptsChildren,
+            Func<string, LookAttributeValue, string?>? check = null)
         {
             Name = name;
             Attributes = attributes;
             AcceptsChildren = acceptsChildren;
+            Check = check;
         }
+
+        public Func<string, LookAttributeValue, string?>? Check { get; }
 
         public string Name { get; }
 

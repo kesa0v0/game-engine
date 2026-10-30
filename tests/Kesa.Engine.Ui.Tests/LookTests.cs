@@ -296,5 +296,29 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(stage.PlaceOnRay(P(0, 0, -10), P(1, 0, 0)), Is.Null, "parallel to the floor");
             Assert.That(stage.PlaceOnRay(P(0, 0, -10), P(0, 0, -1)), Is.Null, "pointing away from it");
         }
+
+        /// <summary>모델 (G391): 확장자로 로더를 고르고, 맡을 로더가 없으면 로드 때 등록된 확장자와 함께 알린다.</summary>
+        [Test]
+        public void AModelsFileNeedsARegisteredLoader()
+        {
+            List<string> Problems(LookKinds kinds) => LookLibrary.Load(new[]
+            {
+                new LookSource("core", "core/units.look.xml",
+                    "<Looks><Look name=\"a\"><Model src=\"m/tank.GLB\" /></Look><Look name=\"b\"><Model src=\"m/tank.fbx\" /></Look></Looks>"),
+            }, kinds).Problems.Select(p => p.ToString()).ToList();
+
+            var kinds = LookKinds.Standard();
+            Assert.That(Problems(kinds), Is.EqualTo(new[]
+            {
+                "core/units.look.xml:1: src=\"m/tank.GLB\": no model loader takes '.glb' (this host registers none) (spec-gaps G391)",
+                "core/units.look.xml:1: src=\"m/tank.fbx\": no model loader takes '.fbx' (this host registers none) (spec-gaps G391)",
+            }));
+            kinds.AddModelFormat(".glb");
+            kinds.AddModelFormat(".gltf");
+            Assert.That(Problems(kinds), Is.EqualTo(new[]
+            {
+                "core/units.look.xml:1: src=\"m/tank.fbx\": no model loader takes '.fbx' (can be: .glb, .gltf) (spec-gaps G391)",
+            }));
+        }
     }
 }

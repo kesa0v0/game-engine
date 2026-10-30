@@ -2,7 +2,8 @@
     "name": "Kesa.Engine.Unity",
     "rootNamespace": "Kesa.Engine.Unity",
     "references": [
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "glTFast"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

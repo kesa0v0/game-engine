@@ -68,7 +68,7 @@ namespace Kesa.Engine.Unity
 
         /// <summary>
         /// <paramref name="modsRoot"/>의 모드를 불러온다. 오류가 난 모드는 빼고 남은 모드로 만들며 던지지 않는다 (G353).
-        /// <paramref name="lookKinds"/>는 그림 요소·공간 종류(G413). 없으면 기본 종류이고, 게임은 <see cref="LookKinds.Standard"/>에 제 종류를 더해 넘긴다.
+        /// <paramref name="lookKinds"/>는 그림 요소·공간 종류(G413). 없으면 기본 종류(glTF 모델 포함)이고, 게임은 <see cref="GameObjectLookRenderer.StandardKinds"/>에 제 종류를 더해 넘긴다.
         /// </summary>
         public static LoadedMods Load(string modsRoot, IReadOnlyList<string> languages, string? hostLocaleFolder = null, LookKinds? lookKinds = null)
         {
@@ -80,7 +80,7 @@ namespace Kesa.Engine.Unity
             var folders = content.Mods.Select(m => Path.Combine(content.ModsRoot, m.Directory)).ToList();
             var assets = new ModFolderAssets(folders);
             var sources = HostSources(content).ToList();
-            var looks = LookLibrary.Load(sources, lookKinds ?? LookKinds.Standard(), path => assets.Find(path) != null);
+            var looks = LookLibrary.Load(sources, lookKinds ?? GameObjectLookRenderer.StandardKinds(), path => assets.Find(path) != null);
             var inputs = InputLibrary.Load(sources, ModInputs.KeyNames);
             return new LoadedMods(content, translator, assets, folders, bag.ToSortedList(), looks, inputs);
         }
