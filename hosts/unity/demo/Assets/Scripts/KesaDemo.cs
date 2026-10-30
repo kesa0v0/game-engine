@@ -167,6 +167,18 @@ public sealed class KesaDemo : MonoBehaviour
         for (; _boardProblems < problems.Count; _boardProblems++) Debug.LogWarning("Kesa board: " + problems[_boardProblems]);
     }
 
+    /// <summary>판 그림을 다 읽을 때까지 기다린다 (확인용: 편집 모드에서는 프레임이 돌지 않음, G392).</summary>
+    public void WaitPictures()
+    {
+        if (_boardRenderer == null) return;
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (_boardRenderer.LoadingPictures && DateTime.UtcNow < until)
+        {
+            System.Threading.Thread.Sleep(5);
+            _boardRenderer.FinishPictures();
+        }
+    }
+
     /// <summary>봇이 할 일을 기다리지 않고 모두 하고 화면을 다시 그린다 (확인용).</summary>
     public async Task Step()
     {

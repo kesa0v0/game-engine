@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Kesa.Engine.Ui;
 using UnityEngine;
 
@@ -36,6 +37,7 @@ namespace Kesa.Engine.Unity
 
         private readonly Transform _board;
         private readonly IUiAssets _assets;
+        private readonly LookPictures _pictures;
         private readonly Dictionary<string, Func<IUiAssets, ILookElementView>> _kinds = new Dictionary<string, Func<IUiAssets, ILookElementView>>(StringComparer.Ordinal);
         private readonly Dictionary<long, Node> _nodes = new Dictionary<long, Node>();
         private long _next;
@@ -45,8 +47,42 @@ namespace Kesa.Engine.Unity
         {
             _board = board;
             _assets = assets;
-            AddKind("Sprite", a => new SpriteView(a));
+            _pictures = new LookPictures(assets);
+            var pump = board.gameObject.GetComponent<LookPicturePump>();
+            if (pump == null) pump = board.gameObject.AddComponent<LookPicturePump>();
+            pump.Pictures = _pictures;
+            AddKind("Sprite", _ => new SpriteView(_pictures));
             AddKind("Group", _ => new GroupView());
+        }
+
+        /// <summary>읽고 있는 그림이 있는가 (G392).</summary>
+        public bool LoadingPictures => _pictures.Loading;
+
+        /// <summary>
+        /// 다 읽힌 그림을 물체에 건다. 플레이 중에는 판 GameObject가 프레임마다 부르고, 프레임이 돌지 않는 편집 모드 확인에서 쓴다.
+        /// </summary>
+        public void FinishPictures() => _pictures.Pump();
+
+        /// <summary>
+        /// 미리 읽기 (G392): 그 그림 정의들에 적힌 파일을 읽는다. 게임의 로딩 화면이 기다린다. 값에 묶인 경로(<c>bind-src</c>)는 그릴 때 안다.
+        /// 끝나는 것은 프레임이 돌 때다.
+        /// </summary>
+        public Task Preload(LookLibrary library, IEnumerable<string> looks)
+        {
+            var paths = new List<string>();
+            foreach (var name in looks)
+                if (library.Looks.TryGetValue(name, out var look)) Paths(look.Elements, paths);
+            return _pictures.Preload(paths);
+        }
+
+        private static void Paths(IReadOnlyList<LookElement> elements, List<string> into)
+        {
+            foreach (var element in elements)
+            {
+                foreach (var attribute in element.Attributes)
+                    if (attribute.Value.Type == LookAttributeType.Path) into.Add(attribute.Value.Text!);
+                Paths(element.Children, into);
+            }
         }
 
         /// <summary>요소 종류를 더한다. 이름은 <see cref="LookKinds"/>에 등록한 것과 같아야 한다.</summary>
@@ -114,7 +150,7 @@ namespace Kesa.Engine.Unity
 
         public void ShowMissing(ElementId obj)
         {
-            var view = new SpriteView(_assets);
+            var view = new SpriteView(_pictures);
             view.ShowMissing();
             view.GameObject.transform.SetParent(_nodes[obj.Value].GameObject.transform, false);
         }
@@ -214,16 +250,16 @@ namespace Kesa.Engine.Unity
         /// </summary>
         private sealed class SpriteView : ILookElementView
         {
-            private static readonly Dictionary<IUiAssets, Dictionary<string, Sprite?>> Sprites = new Dictionary<IUiAssets, Dictionary<string, Sprite?>>();
             private static Sprite? _missing;
 
-            private readonly IUiAssets _assets;
+            private readonly LookPictures _pictures;
             private readonly SpriteRenderer _renderer;
             private Vector2? _size;
+            private string? _src;
 
-            public SpriteView(IUiAssets assets)
+            public SpriteView(LookPictures pictures)
             {
-                _assets = assets;
+                _pictures = pictures;
                 GameObject = new GameObject("Sprite");
                 _renderer = GameObject.AddComponent<SpriteRenderer>();
             }
@@ -235,8 +271,7 @@ namespace Kesa.Engine.Unity
                 switch (attribute)
                 {
                     case "src":
-                        _renderer.sprite = Load(value.Text!);
-                        Resize();
+                        Load(value.Text!);
                         break;
                     case "size":
                         _size = new Vector2(Real(value.Numbers[0]), Real(value.Numbers[1]));
@@ -269,22 +304,18 @@ namespace Kesa.Engine.Unity
                 GameObject.transform.localScale = new Vector3(_size.Value.x / bounds.x, _size.Value.y / bounds.y, 1f);
             }
 
-            private Sprite Load(string path)
+            // 다 읽을 때까지는 비워 두고(보이지 않고 눌리지 않음), 그동안 src가 또 바뀌었으면 늦게 온 그림은 버린다
+            private void Load(string path)
             {
-                if (!Sprites.TryGetValue(_assets, out var cache)) Sprites[_assets] = cache = new Dictionary<string, Sprite?>(StringComparer.Ordinal);
-                if (!cache.TryGetValue(path, out var sprite))
+                _src = path;
+                if (_renderer.sprite != null) _renderer.sprite = null;
+                _pictures.Request(path, sprite =>
                 {
-                    var texture = _assets.LoadImage(path);
-                    if (texture == null) Debug.LogWarning("Kesa look: the picture '" + path + "' cannot be read; showing the missing picture");
-                    sprite = texture == null ? null : FromTexture(texture);
-                    cache[path] = sprite;
-                }
-                return sprite ?? Missing();
+                    if (_renderer == null || _src != path) return;
+                    _renderer.sprite = sprite ?? Missing();
+                    Resize();
+                });
             }
-
-            // 긴 변을 1 단위로: 그림 해상도가 바뀌어도 판 위 크기는 그대로다
-            private static Sprite FromTexture(Texture2D texture) =>
-                Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f), Math.Max(texture.width, texture.height));
 
             private static Sprite Missing()
             {
@@ -294,7 +325,7 @@ namespace Kesa.Engine.Unity
                     for (int x = 0; x < 8; x++)
                         texture.SetPixel(x, y, ((x / 4) + (y / 4)) % 2 == 0 ? new Color(1f, 0f, 1f) : Color.black);
                 texture.Apply();
-                _missing = FromTexture(texture);
+                _missing = LookPictures.FromTexture(texture);
                 return _missing;
             }
         }

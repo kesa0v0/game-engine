@@ -76,6 +76,7 @@ public static class KesaDemoSetup
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
             var demo = UnityEngine.Object.FindFirstObjectByType<KesaDemo>()!;
             demo.Begin(new VisualElement()).GetAwaiter().GetResult();
+            demo.WaitPictures();
             var camera = Camera.main!;
             var target = new RenderTexture(960, 540, 24);
             camera.targetTexture = target;
@@ -149,6 +150,7 @@ public static class KesaDemoSetup
     /// </summary>
     private static async Task VerifyBoard(KesaDemo demo)
     {
+        demo.WaitPictures();
         var board = demo.transform.Find("Board") ?? throw new InvalidOperationException("the demo has no Board object");
         var units = Enumerable.Range(0, board.childCount).Select(board.GetChild).Where(t => t.name.StartsWith("entity:")).ToList();
         if (units.Count != 6) throw new InvalidOperationException("six unit objects expected, got " + string.Join(", ", units.Select(u => u.name)));
@@ -171,6 +173,7 @@ public static class KesaDemoSetup
         await demo.PressBoard("primary", ScreenOf(from));
         await demo.PressBoard("primary", ScreenOf(from + Vector3.up));
         await demo.Step();
+        demo.WaitPictures();
         if (Vector3.Distance(mover.localPosition, from + Vector3.up) > 0.01f)
             throw new InvalidOperationException("the unit object should step up one square from " + from + ", is at " + mover.localPosition);
     }

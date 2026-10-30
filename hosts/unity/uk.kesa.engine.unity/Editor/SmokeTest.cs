@@ -92,8 +92,44 @@ namespace Kesa.Engine.Unity.Editor
             Require(host.Q("screen").styleSheets.count == 1, "the mod's ui/screen.uss is on the screen element");
             CheckWindows(mods.Assets);
             await CheckBoard(game, session);
+            await CheckPreload(game, session);
             await CheckInputs(game.Mods, session);
             UssCheck.Run();
+        }
+
+        /// <summary>편집 모드에서는 프레임이 돌지 않으므로 다 읽힌 그림을 손으로 건다 (G392).</summary>
+        private static void WaitPictures(GameObjectLookRenderer renderer)
+        {
+            var until = DateTime.UtcNow.AddSeconds(10);
+            while (renderer.LoadingPictures)
+            {
+                Require(DateTime.UtcNow < until, "pictures finish loading");
+                System.Threading.Thread.Sleep(5);
+                renderer.FinishPictures();
+            }
+        }
+
+        /// <summary>미리 읽기 (G392): 끝나면 그 그림은 그릴 때 바로 걸린다.</summary>
+        private static async Task CheckPreload(Match game, IHostSession session)
+        {
+            var boardObject = new GameObject("kesa-preload");
+            try
+            {
+                var renderer = new GameObjectLookRenderer(boardObject.transform, game.Mods.Assets);
+                var preload = renderer.Preload(game.Mods.Looks, new[] { "retreat-spot" });
+                Require(!preload.IsCompleted, "a preload waits for the pictures");
+                WaitPictures(renderer);
+                Require(preload.IsCompleted, "the preload finishes once the pictures are in");
+                var board = game.Board(session, renderer);
+                board.Stage.Show("test", new BridgeLook("retreat-spot", new KeyValuePair<string, BridgeValue>[0]),
+                    BridgeWhere.At("square", new BridgeList(new BridgeValue[] { new BridgeInt(0), new BridgeInt(0) })));
+                Require(!renderer.LoadingPictures && boardObject.GetComponentInChildren<SpriteRenderer>().sprite != null, "a preloaded picture shows at once");
+                await Task.CompletedTask;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(boardObject);
+            }
         }
 
         /// <summary>
@@ -145,6 +181,8 @@ namespace Kesa.Engine.Unity.Editor
                 var renderer = new GameObjectLookRenderer(boardObject.transform, game.Mods.Assets);
                 var board = game.Board(session, renderer);
                 await board.RefreshAsync();
+                Require(renderer.LoadingPictures, "unit pictures are read off the main thread, not while drawing");
+                WaitPictures(renderer);
                 Require(board.Stage.Keys.Count(k => k.StartsWith("entity:")) == 6 && !board.Stage.Keys.Any(k => k.StartsWith("mark:")),
                     "six units and no marks before a hit: " + string.Join(", ", board.Stage.Keys));
                 Require(board.Stage.Problems.Count == 0, "the units draw cleanly: " + string.Join("; ", board.Stage.Problems));
@@ -153,6 +191,7 @@ namespace Kesa.Engine.Unity.Editor
 
                 var spot = new BridgeLook("retreat-spot", new KeyValuePair<string, BridgeValue>[0]);
                 board.Stage.Show("test", spot, BridgeWhere.At("square", new BridgeList(new BridgeValue[] { new BridgeInt(2), new BridgeInt(3) })));
+                WaitPictures(renderer);
                 Require(boardObject.transform.childCount == 1, "one object on the board");
                 var obj = boardObject.transform.GetChild(0);
                 Require(obj.localPosition == new Vector3(2, -3, 0) && obj.localScale == Vector3.one, "placed on square (2, 3) with y down, got " + obj.localPosition);

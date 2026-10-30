@@ -60,7 +60,7 @@ var board = match.Board(session, renderer);
 - `Sprite`는 SpriteRenderer이고 그림의 긴 변이 1이다. `layer`는 조상 것을 더해 `sortingOrder`가 된다. 그림을 못 읽거나 그림 정의가 없으면 보라·검정 체크무늬다.
 - 게임의 요소 종류: `LookKinds.Standard()`에 `LookElementKind`를 더해 `LoadedMods.Load(…, lookKinds:)`로 넘기고, 같은 이름으로 `renderer.AddKind(이름, assets => new 내View())`(`ILookElementView`)를 더한다. 공간 종류는 `SpaceKind`를 `LookKinds`에 더한다.
 - 누름은 입력 이름(`LookBoard.Primary`·`Secondary`, G416)과 함께 넘긴다. 광선이 지나는 물체를 위에 그린 것부터 찾고(`KeysAt`), 광선이 닿는 공간의 자리를 판 기준으로 되돌린다(`PlaceAt`, `grid`의 역계산). `InputAsync`는 `click`이 있는 표시를 먼저 보고(주 누름만), 없으면 엔티티들과 자리를 경계의 `WorldInput`에 넘겨 모드의 `@world_input`이 받게 한다(G419·G422). 키·단추를 입력 이름으로 바꾸는 것은 `ModInputs`다(G417·G423): `new ModInputs(mods.Inputs)`가 `primary`·`secondary`와 모드의 `.input.xml` 선언마다 Input System 액션을 만들고, 프레임마다 `PressedThisFrame()`이 눌린 이름을 준다(데모는 이것을 커서 자리와 함께 `InputAsync`에 넘김). 패키지는 `com.unity.inputsystem` 1.18.0에 기대므로 프로젝트의 Active Input Handling이 Input System Package나 Both여야 한다. 핸들러가 선언에 없는 입력을 받으면 `mods.Inputs.CheckHandlers(await session.WorldInputs())`가 문제로 주고(데모는 경고로 찍음, G424), `Match.Board`는 표시의 `inputs=`를 같은 기준으로 `Stage.Problems`에 알린다. 플레이어 키 바꾸기는 `ModInputs.Actions`에 Input System의 다시 묶기와 `SaveBindingOverridesAsJson`을 쓴다. 키 누름 자체는 창 없는 확인에서 흉내 내지 못해(편집 모드에서 액션이 갱신되지 않음) `SmokeTest`는 바인딩이 키로 풀리는지만 본다.
-- 그림은 처음 보일 때 바로(동기) 읽는다. 비동기 읽기와 미리 읽기 목록(G392)은 아직 없다.
+- 그림은 처음 보일 때 다른 스레드에서 읽고(G392), 다 읽을 때까지 그 요소는 비어 있다(보이지 않고 눌리지 않음). 텍스처는 판 GameObject에 붙은 `LookPicturePump`가 프레임마다 주 스레드에서 만든다. 같은 파일은 한 번 읽어 나눠 쓴다. 로딩 화면은 `renderer.Preload(mods.Looks, 그림 이름들)`을 기다리면 그 그림이 처음부터 보인다. 프레임이 돌지 않는 편집 모드 확인에서는 `LoadingPictures`가 거짓이 될 때까지 `FinishPictures()`를 부른다.
 
 ## 스타일시트 (USS)
 

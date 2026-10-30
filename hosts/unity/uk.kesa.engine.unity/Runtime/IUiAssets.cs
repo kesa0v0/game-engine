@@ -15,6 +15,9 @@ namespace Kesa.Engine.Unity
 
         /// <summary>이미지를 찾는다. 없으면 null.</summary>
         Texture2D? LoadImage(string path);
+
+        /// <summary>파일의 바이트. 없으면 null. 판 위 그림을 읽을 때 다른 스레드에서 불린다 (G392).</summary>
+        byte[]? ReadBytes(string path);
     }
 
     /// <summary>
@@ -64,15 +67,21 @@ namespace Kesa.Engine.Unity
         public Texture2D? LoadImage(string path)
         {
             if (_images.TryGetValue(path, out var cached)) return cached;
-            string? file = Find(path);
+            byte[]? bytes = ReadBytes(path);
             Texture2D? texture = null;
-            if (file != null)
+            if (bytes != null)
             {
                 var loaded = new Texture2D(2, 2);
-                if (loaded.LoadImage(File.ReadAllBytes(file))) texture = loaded;
+                if (loaded.LoadImage(bytes)) texture = loaded;
             }
             _images[path] = texture;
             return texture;
+        }
+
+        public byte[]? ReadBytes(string path)
+        {
+            string? file = Find(path);
+            return file == null ? null : File.ReadAllBytes(file);
         }
     }
 }
