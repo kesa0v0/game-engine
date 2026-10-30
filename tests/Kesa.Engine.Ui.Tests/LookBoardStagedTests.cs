@@ -17,14 +17,18 @@ namespace Kesa.Engine.Ui.Tests
             "<Look name=\"number\" solid=\"0.4\" fade-out=\"0.5\"><Sprite src=\"n.png\" /></Look>" +
             "</Looks>";
 
-        /// <summary><c>WorldFx</c>만 답하는 세션: 처음은 도장만, 다음은 <see cref="Next"/>.</summary>
+        /// <summary>효과만 있는 세션: <c>WorldFx</c>는 처음은 도장만, 다음은 <see cref="Next"/>. 물체와 표시는 늘 비어 있다.</summary>
         public class FxOnlySession : DispatchProxy
         {
             public BridgeWorldFx? Next;
 
             protected override object? Invoke(MethodInfo? method, object?[]? args)
             {
-                if (method!.Name != nameof(IHostSession.WorldFx)) throw new NotSupportedException(method.Name);
+                if (method!.Name == nameof(IHostSession.WorldObjects))
+                    return new ValueTask<BridgeWorldObjects>(new BridgeWorldObjects(1, new BridgeWorldObject[0], new long[0]));
+                if (method.Name == nameof(IHostSession.WorldMarks))
+                    return new ValueTask<BridgeWorldMarks>(new BridgeWorldMarks(1, new BridgeMark[0], new string[0]));
+                if (method.Name != nameof(IHostSession.WorldFx)) throw new NotSupportedException(method.Name);
                 var fx = (long)args![0]! <= 0 || Next == null ? new BridgeWorldFx(1, false, new BridgeFxBatch[0]) : Next;
                 Next = null;
                 return new ValueTask<BridgeWorldFx>(fx);
@@ -72,12 +76,12 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
-        public async Task MissedEffectsAndInstantDoNotHold()
+        public async Task MissedEffectsPlayAllAtOnceAndInstantDoesNotHold()
         {
             var (board, session) = Board();
             await board.HoldAsync();
             session.Next = new BridgeWorldFx(5, true, new[] { new BridgeFxBatch(1, new[] { Fx("ring", 2), Fx("ring", 3) }) });
-            Assert.That((await board.HoldAsync(), Shown(board)), Is.EqualTo((false, "fx:1 fx:2")), "missed: all at once");
+            Assert.That((await board.HoldAsync(), Shown(board)), Is.EqualTo((true, "fx:1 fx:2")), "missed: all at once, still waited on (G437)");
 
             var (instant, _) = Board(BridgePresentation.Instant);
             Assert.That(await instant.HoldAsync(), Is.False);

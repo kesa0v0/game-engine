@@ -194,6 +194,17 @@ public sealed class KesaDemo : MonoBehaviour
         await RefreshBoard();
     }
 
+    /// <summary>staged는 화면이 따라잡을 때까지 기다리므로(G437) 시간을 넘겨 다 따라잡게 한다 (확인용).</summary>
+    public async Task Finish()
+    {
+        while (_board?.Holding == true)
+        {
+            _board.Advance(1000);
+            if (_ui != null) await _ui.RefreshAsync();
+            await RefreshBoard();
+        }
+    }
+
     private void OnDestroy() => _inputs?.Dispose();
 
     private async void Update()

@@ -148,15 +148,20 @@ namespace Kesa.Engine.Ui
                 shown.Unit = unit;
                 if (move > 0)
                 {
+                    // 옮기던 중이면 그 재생이 새 길을 이어 받는다
+                    if (shown.MoveTotal == 0)
+                    {
+                        // 순간이동으로 끝난 옛 재생이 같은 물체로 되살아나지 않게
+                        _playbacks.RemoveAll(p => !p.Live);
+                        _playbacks.Add(new MovePlayback(this, shown));
+                    }
                     shown.MoveFrom = from!.Value;
                     shown.MoveElapsed = 0;
                     shown.MoveTotal = move;
-                    if (!_moving.Contains(shown)) _moving.Add(shown);
                 }
                 else
                 {
                     shown.MoveTotal = 0;
-                    _moving.Remove(shown);
                     _renderer.PlaceObject(shown.Handle, position, unit);
                 }
             }
@@ -166,7 +171,7 @@ namespace Kesa.Engine.Ui
         {
             if (!_shown.TryGetValue(key, out var shown)) return;
             _shown.Remove(key);
-            _moving.Remove(shown);
+            shown.Gone = true;
             _renderer.Remove(shown.Handle);
         }
 
@@ -194,49 +199,121 @@ namespace Kesa.Engine.Ui
             foreach (var pair in look.Keys) scope.Set(pair.Key, pair.Value);
         }
 
-        // ---- 효과 (G398·G425·G426) ----
+        // ---- 재생 (G425·G432·G437) ----
 
         /// <summary>효과 물체의 열쇠 앞머리. 뒤는 띄운 순번.</summary>
         public const string FxPrefix = "fx:";
 
-        private sealed class PlayingFx
+        /// <summary>끝이 있는 재생 하나. 무대와 판은 종류를 묻지 않고 이것만 본다.</summary>
+        private interface IPlayback
         {
-            public PlayingFx(string key, ShownObject shown, long fadeIn, long solid, long fadeOut, long driftX, long driftY, long grow)
-            {
-                Key = key;
-                Shown = shown;
-                FadeIn = fadeIn;
-                Solid = solid;
-                FadeOut = fadeOut;
-                DriftX = driftX;
-                DriftY = driftY;
-                Grow = grow;
-            }
+            /// <summary>아직 도는가. 끝난 것은 <see cref="Advance"/> 뒤에 목록에서 빠진다.</summary>
+            bool Live { get; }
 
-            public string Key { get; }
-            public ShownObject Shown { get; }
+            /// <summary>화면이 아직 따라잡는 중인가 (G437).</summary>
+            bool Holding { get; }
 
-            /// <summary>밀리초.</summary>
-            public long FadeIn { get; }
-            public long Solid { get; }
-            public long FadeOut { get; }
-            public long Life => FadeIn + Solid + FadeOut;
+            void Advance(long milliseconds);
 
-            /// <summary>초당 공간 단위(고정소수점). <c>rise</c>는 y만 있는 <c>drift</c>다.</summary>
-            public long DriftX { get; }
-            public long DriftY { get; }
-
-            /// <summary>초당 크기 배율 변화(고정소수점).</summary>
-            public long Grow { get; }
-
-            public long Elapsed;
+            /// <summary>끝 상태로 보낸다(건너뛰기).</summary>
+            void End();
         }
 
-        private readonly List<PlayingFx> _playing = new List<PlayingFx>();
+        /// <summary>효과: 나타나고 머물고 흐려진 뒤 지워진다. 흐려지기 시작할 때까지 붙잡는다 (G430).</summary>
+        private sealed class FxPlayback : IPlayback
+        {
+            private readonly LookStage _stage;
+            private readonly string _key;
+            private readonly ShownObject _shown;
+            private readonly long _fadeIn, _solid, _fadeOut;
+            // 초당 공간 단위(고정소수점), rise는 y만 있는 drift다. grow는 초당 크기 배율 변화
+            private readonly long _driftX, _driftY, _grow;
+            private long _elapsed;
+
+            public FxPlayback(LookStage stage, string key, ShownObject shown)
+            {
+                _stage = stage;
+                _key = key;
+                _shown = shown;
+                _fadeIn = Millis(stage.Number(shown, "fade-in"));
+                _solid = Millis(stage.Number(shown, "solid"));
+                _fadeOut = Millis(stage.Number(shown, "fade-out"));
+                var drift = stage.Field(shown, "drift");
+                _driftX = drift?.Numbers[0] ?? 0;
+                _driftY = (drift?.Numbers[1] ?? 0) + stage.Number(shown, "rise");
+                _grow = stage.Number(shown, "grow");
+            }
+
+            public long Life => _fadeIn + _solid + _fadeOut;
+            public bool Live => !_shown.Gone;
+            public bool Holding => Live && _elapsed < _fadeIn + _solid;
+
+            public void Advance(long milliseconds)
+            {
+                _elapsed += milliseconds;
+                if (_elapsed >= Life) _stage.Hide(_key);
+                else Animate();
+            }
+
+            public void End() => _stage.Hide(_key);
+
+            public void Animate()
+            {
+                long t = _elapsed;
+                long opacity = t < _fadeIn ? t * BridgeFixed.Scale / _fadeIn
+                    : t < _fadeIn + _solid ? BridgeFixed.Scale
+                    : _fadeOut == 0 ? 0
+                    : BridgeFixed.Scale - (t - _fadeIn - _solid) * BridgeFixed.Scale / _fadeOut;
+                _stage._renderer.SetOpacity(_shown.Handle, opacity);
+                if (_driftX == 0 && _driftY == 0 && _grow == 0) return;
+                long unit = _shown.Unit;
+                var at = _shown.Position ?? default;
+                var moved = new LookPosition(at.X + _driftX * unit / BridgeFixed.Scale * t / 1000, at.Y + _driftY * unit / BridgeFixed.Scale * t / 1000, at.Z);
+                // 크기는 물체의 단위에 곱한다: 1 + grow × 초, 0 아래로는 가지 않음
+                long scale = Math.Max(0, BridgeFixed.Scale + _grow * t / 1000);
+                _stage._renderer.PlaceObject(_shown.Handle, moved, unit * scale / BridgeFixed.Scale);
+            }
+        }
+
+        /// <summary>옮기기 (G432): 보이던 자리에서 놓일 자리로 직선으로. 도착할 때까지 붙잡는다.</summary>
+        private sealed class MovePlayback : IPlayback
+        {
+            private readonly LookStage _stage;
+            private readonly ShownObject _shown;
+
+            public MovePlayback(LookStage stage, ShownObject shown)
+            {
+                _stage = stage;
+                _shown = shown;
+            }
+
+            // 순간이동이 MoveTotal을 0으로 돌리면 여기서도 끝난다
+            public bool Live => !_shown.Gone && _shown.MoveTotal > 0;
+            public bool Holding => Live;
+
+            public void Advance(long milliseconds)
+            {
+                _shown.MoveElapsed += milliseconds;
+                if (_shown.MoveElapsed >= _shown.MoveTotal) _shown.MoveTotal = 0;
+                _stage._renderer.PlaceObject(_shown.Handle, _shown.Drawn!.Value, _shown.Unit);
+            }
+
+            public void End()
+            {
+                if (!Live) return;
+                _shown.MoveTotal = 0;
+                _stage._renderer.PlaceObject(_shown.Handle, _shown.Position!.Value, _shown.Unit);
+            }
+        }
+
+        private readonly List<IPlayback> _playbacks = new List<IPlayback>();
         private long _fxNext;
 
-        /// <summary>떠 있는 효과의 수.</summary>
-        public int PlayingCount => _playing.Count;
+        /// <summary>도는 재생(효과·옮기기)의 수.</summary>
+        public int PlayingCount => _playbacks.Count(p => p.Live);
+
+        /// <summary>화면이 아직 따라잡는 중인가: 붙잡을 때가 남은 재생이 있나 (G437). <c>staged</c> 판이 이것으로 기다린다.</summary>
+        public bool Busy => _playbacks.Any(p => p.Holding);
 
         /// <summary>
         /// 새 효과를 띄운다. 얼마 동안 어떻게 보이는지는 그림 정의의 시간 칸이고 그림 값이 덮는다(G425). 시간은 <see cref="Advance"/>가 흐르게 한다.
@@ -247,10 +324,9 @@ namespace Kesa.Engine.Ui
             foreach (var batch in fx.Batches) Play(batch.Effects);
         }
 
-        /// <summary>효과들을 함께 띄우고, 그중 가장 늦게 흐려지기 시작하는 때(밀리초, <c>fade-in</c>+<c>solid</c>)를 돌려준다 (G430의 한 단계).</summary>
-        public long Play(IEnumerable<BridgeFx> effects)
+        /// <summary>효과들을 함께 띄운다 (G430의 한 단계).</summary>
+        public void Play(IEnumerable<BridgeFx> effects)
         {
-            long lead = 0;
             foreach (var effect in effects)
             {
                 if (effect.Error != null)
@@ -260,80 +336,36 @@ namespace Kesa.Engine.Ui
                 }
                 string key = NextFxKey();
                 Show(key, effect.Look, effect.Where);
-                if (_shown.TryGetValue(key, out var shown)) lead = Math.Max(lead, StartFx(key, shown));
+                if (_shown.TryGetValue(key, out var shown)) StartFx(key, shown);
             }
-            return lead;
         }
 
         private string NextFxKey() => FxPrefix + (++_fxNext).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-        // 띄운 물체를 효과로 돌리기 시작하고 흐려지기 시작하는 때(밀리초)를 돌려준다
-        private long StartFx(string key, ShownObject shown)
+        private void StartFx(string key, ShownObject shown)
         {
-            var drift = Field(shown, "drift");
-            var playing = new PlayingFx(key, shown, Millis(Number(shown, "fade-in")), Millis(Number(shown, "solid")),
-                Millis(Number(shown, "fade-out")), drift?.Numbers[0] ?? 0, (drift?.Numbers[1] ?? 0) + Number(shown, "rise"), Number(shown, "grow"));
+            var playing = new FxPlayback(this, key, shown);
             if (playing.Life == 0 && shown.Definition != null)
                 Report(shown.Definition.Place, "look '" + shown.Definition.Name + "' is played as an effect but has no fade-in, solid or fade-out, " +
                                                "so it ends at once (spec-gaps G425)");
-            _playing.Add(playing);
-            Animate(playing);
-            return playing.FadeIn + playing.Solid;
+            _playbacks.Add(playing);
+            playing.Animate();
         }
 
-        /// <summary>떠 있는 효과를 모두 지운다 (재생 건너뛰기).</summary>
-        public void StopEffects()
+        /// <summary>모든 재생을 끝 상태로 보낸다(건너뛰기): 효과는 지우고 옮기던 것은 도착시킨다.</summary>
+        public void Settle()
         {
-            foreach (var playing in _playing) Hide(playing.Key);
-            _playing.Clear();
+            foreach (var playback in _playbacks.ToList()) playback.End();
+            _playbacks.Clear();
         }
 
-        private readonly List<ShownObject> _moving = new List<ShownObject>();
-
-        /// <summary>렌더러(G434), 떠 있는 효과와 옮기는 물체(G432)의 시간을 <paramref name="milliseconds"/>만큼 흐르게 하고, 수명이 끝난 효과를 지운다.</summary>
+        /// <summary>렌더러(G434)와 재생의 시간을 <paramref name="milliseconds"/>만큼 흐르게 하고 끝난 것을 뺀다.</summary>
         public void Advance(long milliseconds)
         {
             _renderer.Advance(milliseconds);
-            for (int i = _moving.Count - 1; i >= 0; i--)
-            {
-                var moving = _moving[i];
-                moving.MoveElapsed += milliseconds;
-                if (moving.MoveElapsed >= moving.MoveTotal)
-                {
-                    moving.MoveTotal = 0;
-                    _moving.RemoveAt(i);
-                }
-                _renderer.PlaceObject(moving.Handle, moving.Drawn!.Value, moving.Unit);
-            }
-            for (int i = _playing.Count - 1; i >= 0; i--)
-            {
-                var playing = _playing[i];
-                playing.Elapsed += milliseconds;
-                if (playing.Elapsed >= playing.Life)
-                {
-                    _playing.RemoveAt(i);
-                    Hide(playing.Key);
-                    continue;
-                }
-                Animate(playing);
-            }
-        }
-
-        private void Animate(PlayingFx p)
-        {
-            long t = p.Elapsed;
-            long opacity = t < p.FadeIn ? t * BridgeFixed.Scale / p.FadeIn
-                : t < p.FadeIn + p.Solid ? BridgeFixed.Scale
-                : p.FadeOut == 0 ? 0
-                : BridgeFixed.Scale - (t - p.FadeIn - p.Solid) * BridgeFixed.Scale / p.FadeOut;
-            _renderer.SetOpacity(p.Shown.Handle, opacity);
-            if (p.DriftX == 0 && p.DriftY == 0 && p.Grow == 0) return;
-            long unit = p.Shown.Unit;
-            var at = p.Shown.Position ?? default;
-            var moved = new LookPosition(at.X + p.DriftX * unit / BridgeFixed.Scale * t / 1000, at.Y + p.DriftY * unit / BridgeFixed.Scale * t / 1000, at.Z);
-            // 크기는 물체의 단위에 곱한다: 1 + grow × 초, 0 아래로는 가지 않음
-            long scale = Math.Max(0, BridgeFixed.Scale + p.Grow * t / 1000);
-            _renderer.PlaceObject(p.Shown.Handle, moved, unit * scale / BridgeFixed.Scale);
+            foreach (var playback in _playbacks.ToList())
+                if (playback.Live) playback.Advance(milliseconds);
+            _playbacks.RemoveAll(p => !p.Live);
         }
 
         private long Number(ShownObject shown, string name) => Field(shown, name)?.Numbers[0] ?? 0;

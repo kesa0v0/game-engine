@@ -6,8 +6,9 @@ namespace Kesa.Engine.Ui
 {
     /// <summary>
     /// 한 연결의 판 위 그림을 경계와 맞춘다 (G405·G408·G426): 프레임마다 <see cref="RefreshAsync"/>가 엔티티 물체와 표시의 바뀐 것, 새 효과를 받아
-    /// <see cref="LookStage"/>에 넣는다. 도장은 셋이 따로 센다. 효과가 시간에 따라 흐려지게 호스트가 <see cref="Advance"/>로 시간을 넘긴다.
-    /// <c>staged</c>(G429·G430)면 새 효과가 오는 동안 판을 붙잡고 신호마다 한 단계씩 띄운 뒤 놓는다.
+    /// <see cref="LookStage"/>에 넣는다. 도장은 셋이 따로 센다. 재생이 시간에 따라 흐르게 호스트가 <see cref="Advance"/>로 시간을 넘긴다.
+    /// <c>staged</c>(G429·G430·G437)면 화면이 세계를 따라잡는 동안 붙잡는다: 효과를 신호마다 한 단계씩 띄우고, 다 띄우면 판을 맞추고,
+    /// 무대의 재생(효과·옮기기)이 붙잡을 때를 넘길 때까지 기다린다. 붙잡기는 이 연결의 화면만의 일이다.
     /// </summary>
     public sealed class LookBoard : IPresentationHold
     {
@@ -17,7 +18,8 @@ namespace Kesa.Engine.Ui
         private long _objects;
         private long _marks;
         private long _fx;
-        private long _stepLeft;
+        // 건너뛴 뒤 처음 판을 맞출 때 생긴 재생(옮기기)도 끝 상태로 보낸다
+        private bool _skipped;
 
         /// <param name="presentation"><see cref="BridgeContent.Presentation"/>.</param>
         public LookBoard(IHostSession session, LookStage stage, string presentation = BridgePresentation.Instant)
@@ -29,81 +31,81 @@ namespace Kesa.Engine.Ui
 
         public LookStage Stage { get; }
 
-        public bool Holding { get; private set; }
+        public bool Holding => _staged && (_steps.Count > 0 || Stage.Busy);
 
         public async ValueTask RefreshAsync()
         {
-            if (await HoldAsync()) return;
-            var objects = await _session.WorldObjects(_objects);
-            Stage.Apply(objects);
-            _objects = objects.Stamp;
-            var marks = await _session.WorldMarks(_marks);
-            Stage.Apply(marks);
-            _marks = marks.Stamp;
-            if (_staged) return;
+            if (_staged)
+            {
+                await HoldAsync();
+                return;
+            }
+            await CatchUp();
             var fx = await _session.WorldFx(_fx);
             Stage.Play(fx);
             _fx = fx.Stamp;
         }
 
+        /// <summary>staged: 새 효과가 있으면 단계로 띄우고, 없으면 판을 세계에 맞춘다. 그 재생이 남아 있으면 참.</summary>
         public async ValueTask<bool> HoldAsync()
         {
             if (Holding) return true;
             if (!_staged) return false;
             var fx = await _session.WorldFx(_fx);
             _fx = fx.Stamp;
-            // 놓친 것이 있으면 단계가 맞지 않으므로 남은 것을 한꺼번에 띄우고 붙잡지 않는다
-            if (fx.Missed || fx.Batches.Count == 0)
-            {
-                Stage.Play(fx);
-                return false;
-            }
-            foreach (var batch in fx.Batches)
-            {
-                List<BridgeFx>? step = null;
-                foreach (var effect in batch.Effects)
+            // 놓친 것이 있으면 단계가 맞지 않으므로 남은 것을 한꺼번에 띄운다
+            if (fx.Missed) Stage.Play(fx);
+            else
+                foreach (var batch in fx.Batches)
                 {
-                    if (step == null || step[0].Signal != effect.Signal)
+                    List<BridgeFx>? step = null;
+                    foreach (var effect in batch.Effects)
                     {
-                        step = new List<BridgeFx>();
-                        _steps.Enqueue(step);
+                        if (step == null || step[0].Signal != effect.Signal)
+                        {
+                            step = new List<BridgeFx>();
+                            _steps.Enqueue(step);
+                        }
+                        step.Add(effect);
                     }
-                    step.Add(effect);
                 }
-            }
-            Holding = true;
-            _stepLeft = 0;
             NextSteps();
-            return true;
+            if (!Holding)
+            {
+                await CatchUp();
+                if (_skipped) Stage.Settle();
+                _skipped = false;
+            }
+            return Holding;
         }
 
-        /// <summary>효과의 시간을 흐르게 하고, 붙잡고 있으면 때가 된 다음 단계를 띄운다. 마지막 단계가 흐려지기 시작하면 놓는다.</summary>
+        private async ValueTask CatchUp()
+        {
+            var objects = await _session.WorldObjects(_objects);
+            Stage.Apply(objects);
+            _objects = objects.Stamp;
+            var marks = await _session.WorldMarks(_marks);
+            Stage.Apply(marks);
+            _marks = marks.Stamp;
+        }
+
+        /// <summary>재생의 시간을 흐르게 하고, 앞 단계가 붙잡을 때를 넘겼으면 다음 단계를 띄운다.</summary>
         public void Advance(long milliseconds)
         {
             Stage.Advance(milliseconds);
-            if (!Holding) return;
-            _stepLeft -= milliseconds;
             NextSteps();
         }
 
         public void Skip()
         {
             _steps.Clear();
-            Stage.StopEffects();
-            Holding = false;
+            Stage.Settle();
+            _skipped = true;
         }
 
         private void NextSteps()
         {
-            while (Holding && _stepLeft <= 0)
-            {
-                if (_steps.Count == 0)
-                {
-                    Holding = false;
-                    return;
-                }
-                _stepLeft += Stage.Play(_steps.Dequeue());
-            }
+            while (_steps.Count > 0 && !Stage.Busy) Stage.Play(_steps.Dequeue());
         }
 
         /// <summary>내장 입력: 주 누름(왼쪽 클릭·탭)과 보조 누름 (G416).</summary>

@@ -207,7 +207,8 @@ namespace Kesa.Engine.Ui.Tests
             if (hp != null) _world.Set(new EntityId(target), _world.Member("Life", "hp"), new IntValue(hp.Value));
             await alice.Ui.RefreshAsync();
             await board.RefreshAsync();
-            board.Advance(250); // 시험이 옮겨 둔 자리로 미끄러져 가는 시간 (G432)
+            board.Advance(250); // 시험이 옮겨 둔 자리로 미끄러져 가는 시간 (G432). 그동안 화면도 기다렸다 (G437)
+            await alice.Ui.RefreshAsync();
             Assert.That((board.Holding, Hit(alice)), Is.EqualTo((false, true)), "the question is open; nothing to play yet");
             string spot = board.Stage.Keys.Single(k => k.StartsWith("mark:"));
             Assert.That((await board.PressAsync(new[] { spot }))!.Succeeded, Is.True);
@@ -218,7 +219,10 @@ namespace Kesa.Engine.Ui.Tests
 
         private static bool Hit(Seat seat) => Cards(seat).Any(c => c.Classes.Contains("hit"));
 
-        /// <summary>staged (G430): 맞음의 고리·숫자를 보이는 동안 판(물러나기 전 자리, 물러날 칸)과 카드를 붙잡고, 숫자가 흐려지기 시작하면 놓는다.</summary>
+        /// <summary>
+        /// staged (G430·G437): 맞음의 고리·숫자를 보이는 동안 판(물러나기 전 자리, 물러날 칸)과 카드를 붙잡고, 숫자가 흐려지기 시작하면 판을 맞추고
+        /// 유닛이 물러난 자리에 닿을 때까지 더 붙잡는다. 카드는 그 뒤에 바뀐다.
+        /// </summary>
         [Test]
         public async Task StagedHoldsTheBoardAndTheScreenWhileTheHitPlays()
         {
@@ -236,11 +240,13 @@ namespace Kesa.Engine.Ui.Tests
             board.Advance(100);
             await alice.Ui.RefreshAsync();
             await board.RefreshAsync();
-            Assert.That((board.Holding, Effects(), Hit(alice), Marked()), Is.EqualTo((false, true, false, false)),
-                "let go as the number fades: the answered screen shows under its tail");
+            Assert.That((board.Holding, Effects(), Hit(alice), Marked()), Is.EqualTo((true, true, true, false)),
+                "as the number fades the board catches up, and the slide back still holds the cards");
             Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -2.0, 0.0) "), "it starts sliding back");
             board.Advance(250);
+            await alice.Ui.RefreshAsync();
             Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -3.0, 0.0) "), "it stepped back");
+            Assert.That((board.Holding, Hit(alice)), Is.EqualTo((false, false)), "arrived: let go, and the answered cards show");
             Assert.That(stage.Problems, Is.Empty, string.Join(", ", stage.Problems));
         }
 
@@ -260,6 +266,25 @@ namespace Kesa.Engine.Ui.Tests
             board.Advance(400);
             Assert.That(renderer.Dump(exit), Does.Contain(" x0.68 a0.5 "), "shrinking 0.8 a second and half faded");
             Assert.That(board.Stage.Problems, Is.Empty, string.Join(", ", board.Stage.Problems));
+        }
+
+        /// <summary>G437: 효과가 끝나도 물러나 미끄러지는 동안은 붙잡으므로, 그때의 누름도 행동이 아니라 건너뛰기다.</summary>
+        [Test]
+        public async Task APressWhileAUnitSlidesSkipsItInsteadOfActing()
+        {
+            var (alice, board, renderer, target) = await AnsweredStaged();
+            board.Advance(600);
+            await alice.Ui.RefreshAsync();
+            await board.RefreshAsync();
+            Assert.That((board.Holding, board.Stage.Busy), Is.EqualTo((true, true)), "sliding back");
+
+            var results = new List<BridgeResult>();
+            alice.Ui.ActionResult += (_, r) => results.Add(r);
+            await alice.Renderer.Named("endturn").Press();
+            Assert.That((results.Count, board.Holding), Is.EqualTo((0, false)), "the press only skipped");
+            Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -3.0, 0.0) "), "it arrived at once");
+            await alice.Ui.RefreshAsync();
+            Assert.That(Hit(alice), Is.False, "the answered screen shows");
         }
 
         [Test]

@@ -140,6 +140,7 @@ public static class KesaDemoSetup
         var ended = await demo.Session.Deliver("skirmish.EndTurn", new Dictionary<string, BridgeValue> { ["party"] = me });
         if (!ended.Succeeded) throw new InvalidOperationException("red could not end the turn: " + ended);
         await demo.Step();
+        await demo.Finish();
         turn = root.Q<Label>("turn");
         if (turn == null || turn.text != "3") throw new InvalidOperationException("the bot should play blue's turn so it is turn 3, got " + turn?.text);
         await VerifyBoard(demo);

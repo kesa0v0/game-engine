@@ -33,6 +33,9 @@ namespace Kesa.Engine.Ui
         public long MoveElapsed { get; set; }
         public long MoveTotal { get; set; }
 
+        /// <summary>무대에서 지워졌다. 그것을 돌리던 재생이 끝난다.</summary>
+        public bool Gone { get; set; }
+
         /// <summary>지금 보이는 자리.</summary>
         public LookPosition? Drawn
         {
