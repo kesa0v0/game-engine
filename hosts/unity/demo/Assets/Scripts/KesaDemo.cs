@@ -57,6 +57,7 @@ public sealed class KesaDemo : MonoBehaviour
     private int _boardProblems;
     private BotSeat? _bot;
     private float _botNext;
+    private bool _wasHolding;
     private bool _refreshing;
 
     /// <summary>이 연결의 세션 (확인용).</summary>
@@ -206,7 +207,10 @@ public sealed class KesaDemo : MonoBehaviour
             // 키 입력도 커서 아래로 간다 (G416: 가리킨 유닛에 F)
             if (_inputs != null && Pointer.current != null)
                 foreach (var input in _inputs.PressedThisFrame()) await PressBoard(input, Pointer.current.position.ReadValue());
-            // 연출을 붙잡는 동안 봇은 쉰다 (G399)
+            // 연출을 붙잡는 동안 봇은 쉬고, 놓은 뒤에도 한 박자 쉰다 (G399)
+            bool holding = _board?.Holding == true;
+            if (_wasHolding && !holding) _botNext = Time.time + botDelay;
+            _wasHolding = holding;
             if (_bot != null && _board?.Holding != true && Time.time >= _botNext && await _bot.Run() > 0) _botNext = Time.time + botDelay;
             await _ui.RefreshAsync();
             await RefreshBoard();
