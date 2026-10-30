@@ -23,6 +23,10 @@ namespace Kesa.Engine.Unity
         private readonly LookModels _models;
         private readonly List<StateView> _states = new List<StateView>();
         private readonly List<AttachView> _attaches = new List<AttachView>();
+        private readonly List<PaintView> _paints = new List<PaintView>();
+        private Color? _tint;
+        // 칠할 때만 만드는 복제본 재질과 원래 기본 색
+        private List<(Material Material, string Name, Color Base, int Property)>? _colored;
         private string? _src;
         private int _order;
         private GameObject? _shown;
@@ -58,6 +62,10 @@ namespace Kesa.Engine.Unity
                 case "fade":
                     _fade = GameObjectLookRenderer.Real(value.Numbers[0]);
                     break;
+                case "tint":
+                    _tint = GameObjectLookRenderer.ColorOf(value.Color);
+                    Recolor();
+                    break;
             }
         }
 
@@ -71,6 +79,13 @@ namespace Kesa.Engine.Unity
 
         public void Insert(ILookElementView child, int index)
         {
+            if (child is PaintView paint)
+            {
+                paint.Owner = this;
+                _paints.Add(paint);
+                Recolor();
+                return;
+            }
             if (child is AttachView attach)
             {
                 attach.Owner = this;
@@ -86,6 +101,12 @@ namespace Kesa.Engine.Unity
 
         public void Remove(ILookElementView child)
         {
+            if (child is PaintView paint && _paints.Remove(paint))
+            {
+                paint.Owner = null;
+                Recolor();
+                return;
+            }
             if (child is AttachView attach && _attaches.Remove(attach))
             {
                 attach.Owner = null;
@@ -106,6 +127,53 @@ namespace Kesa.Engine.Unity
                 if (bone == null) Warn("no part is named '" + attach.Bone + "' for <Attach bone>; attaching at the model's origin (spec-gaps G435)");
             }
             attach.GameObject.transform.SetParent(bone != null ? bone : GameObject.transform, false);
+        }
+
+        // ---- 색 (G436) ----
+
+        private static readonly int[] BaseColors =
+            { Shader.PropertyToID("baseColorFactor"), Shader.PropertyToID("_BaseColor"), Shader.PropertyToID("_Color") };
+
+        /// <summary>재질마다 원래 기본 색에 그 재질의 <c>Paint</c> 색, 없으면 <c>tint</c>를 곱한다.</summary>
+        public void Recolor()
+        {
+            if (_shown == null || _asset == null) return;
+            if (_colored == null)
+            {
+                if (_tint == null && _paints.Count == 0) return;
+                _colored = new List<(Material, string, Color, int)>();
+                foreach (var renderer in _shown.GetComponentsInChildren<Renderer>(true))
+                {
+                    if (IsAttached(renderer.transform)) continue;
+                    var materials = renderer.sharedMaterials;
+                    for (int i = 0; i < materials.Length; i++)
+                    {
+                        if (materials[i] == null) continue;
+                        int property = -1;
+                        foreach (int id in BaseColors)
+                            if (materials[i].HasProperty(id))
+                            {
+                                property = id;
+                                break;
+                            }
+                        if (property == -1) continue;
+                        var copy = new Material(materials[i]);
+                        _colored.Add((copy, materials[i].name, copy.GetColor(property), property));
+                        materials[i] = copy;
+                    }
+                    renderer.sharedMaterials = materials;
+                }
+            }
+            foreach (var paint in _paints)
+                if (paint.Material != null && !_colored.Any(c => c.Name == paint.Material))
+                    Warn("no material is named '" + paint.Material + "' for <Paint> (has: " +
+                         string.Join(", ", _colored.Select(c => c.Name).Distinct().OrderBy(n => n, StringComparer.Ordinal)) + ") (spec-gaps G436)");
+            foreach (var (material, name, original, property) in _colored)
+            {
+                var paint = _paints.FirstOrDefault(p => p.Material == name && p.Color != null);
+                var by = paint?.Color ?? _tint ?? Color.white;
+                material.SetColor(property, original * by);
+            }
         }
 
         // 넓이 우선이라 이름이 겹치면 뿌리에 가까운 것
@@ -146,6 +214,7 @@ namespace Kesa.Engine.Unity
                 _shown.SetActive(true);
                 foreach (var attach in _attaches) Place(attach);
                 SetSortingOrder(_order);
+                Recolor();
                 Changed();
                 Tick(0f);
             });
@@ -155,6 +224,9 @@ namespace Kesa.Engine.Unity
         {
             _animation = null;
             _current = null;
+            if (_colored != null)
+                foreach (var colored in _colored) UnityEngine.Object.DestroyImmediate(colored.Material);
+            _colored = null;
             _asset = null;
             if (_shown == null) return;
             // 복제본과 함께 지워지지 않게 붙은 것을 먼저 내린다
@@ -391,6 +463,29 @@ namespace Kesa.Engine.Unity
             if (attribute != "bone") return;
             Bone = value.Text;
             Owner?.Place(this);
+        }
+
+        public void SetSortingOrder(int order)
+        {
+        }
+    }
+
+    /// <summary><c>Paint</c>: 모델의 <c>material</c> 이름 재질에 <c>color</c>를 곱한다 (G436).</summary>
+    internal sealed class PaintView : ILookElementView
+    {
+        public PaintView() => GameObject = new GameObject("Paint");
+
+        public GameObject GameObject { get; }
+        public ModelView? Owner;
+        public string? Material;
+        public Color? Color;
+
+        public void Set(string attribute, LookAttributeValue value)
+        {
+            if (attribute == "material") Material = value.Text;
+            else if (attribute == "color") Color = GameObjectLookRenderer.ColorOf(value.Color);
+            else return;
+            Owner?.Recolor();
         }
 
         public void SetSortingOrder(int order)

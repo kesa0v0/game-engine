@@ -60,6 +60,7 @@ namespace Kesa.Engine.Unity
             AddKind("State", _ => new StateView());
             AddKind("Clip", _ => new ClipView());
             AddKind("Attach", _ => new AttachView());
+            AddKind("Paint", _ => new PaintView());
         }
 
         /// <summary>기본 요소 종류에 기본 모델 로더의 확장자(glTF)를 등록한 것. 게임이 제 종류를 더할 바탕 (G391).</summary>
@@ -294,6 +295,8 @@ namespace Kesa.Engine.Unity
             node.View?.SetSortingOrder(node.Order);
             foreach (var child in node.Children) Reorder(child);
         }
+
+        internal static Color ColorOf(uint c) => new Color32((byte)(c >> 24), (byte)(c >> 16), (byte)(c >> 8), (byte)c);
 
         internal static float Real(long raw) => raw / (float)Bridge.BridgeFixed.Scale;
 

@@ -315,6 +315,7 @@ namespace Kesa.Engine.Ui.Tests
                 "<State name=\"attack\" clip=\"attack\" once=\"true\" next=\"idle\" fade=\"0.1\" />" +
                 "<Attach bone=\"hand_R\"><Model bind-src=\"weapon\" /><Sprite src=\"x.png\" /></Attach>" +
                 "<Attach bind-bone=\"flag_at\"><Group /></Attach>" +
+                "<Paint material=\"Cloth\" bind-color=\"team\" /><Paint material=\"Metal\" color=\"#888888\" />" +
                 "</Model>"), Is.Empty);
             Assert.That(Problems(
                 "<Model src=\"s.glb\" state=\"idlee\" fade=\"-1\">" +
@@ -323,6 +324,7 @@ namespace Kesa.Engine.Ui.Tests
                 "<State clip=\"attack\" next=\"idlee\" />" +
                 "<Clip clip=\"x\" />" +
                 "<Sprite src=\"x.png\" /><Attach />" +
+                "<Paint material=\"Cloth\" color=\"#ff0000\" /><Paint material=\"Cloth\" color=\"#00ff00\" /><Paint color=\"#000000\" />" +
                 "</Model><State name=\"loose\" clip=\"x\" /><Attach bone=\"hand\" />"), Is.EquivalentTo(new[]
             {
                 "fade=\"-1\": a time is not negative",
@@ -335,7 +337,9 @@ namespace Kesa.Engine.Ui.Tests
                 "next=\"idlee\": no <State> in this <Model> is named 'idlee' (did you mean 'idle'?)",
                 "state=\"idlee\": no <State> in this <Model> is named 'idlee' (did you mean 'idle'?)",
                 "<State> goes directly inside <Model>, not at the top of a look",
-                "inside a <Model> go only <State>s and <Attach>es; put <Sprite> in an <Attach bone=\"…\"> or beside the <Model>",
+                "two <Paint>s color the material 'Cloth' (spec-gaps G436)",
+                "a <Paint> needs material=\"…\", the name of the model's material it colors",
+                "inside a <Model> go only <State>s, <Attach>es and <Paint>s; put <Sprite> in an <Attach bone=\"…\"> or beside the <Model>",
                 "an <Attach> needs bone=\"…\", the name of the part it follows (spec-gaps G435)",
                 "<Attach> goes directly inside <Model>, not at the top of a look",
             }));

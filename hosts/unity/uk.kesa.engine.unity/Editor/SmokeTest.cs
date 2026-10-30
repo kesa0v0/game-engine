@@ -195,7 +195,10 @@ namespace Kesa.Engine.Unity.Editor
                         "<State name=\"hop\" clip=\"lift\" once=\"true\" next=\"a\" fade=\"0\" />" +
                         "<State name=\"mix\" blend=\"0.5\"><Clip clip=\"slide\" at=\"0\" /><Clip clip=\"lift\" at=\"1\" /></State>" +
                         "<Attach bone=\"hand\"><Model src=\"models/tri.glb\" /></Attach><Attach bone=\"tail\" />" +
-                        "</Model></Look></Looks>"),
+                        "</Model></Look>" +
+                        "<Look name=\"tinted\"><Model src=\"models/tri.glb\" tint=\"#808080\" /></Look>" +
+                        "<Look name=\"painted\"><Model src=\"models/tri.glb\" tint=\"#808080\"><Paint material=\"Cloth\" bind-color=\"team\" />" +
+                        "<Paint material=\"Skin\" color=\"#000000\" /></Model></Look></Looks>"),
                     new LookSource("check", "check/board.space.xml", "<Spaces><Space name=\"square\" kind=\"grid\" /></Spaces>"),
                 }, kinds, path => assets.Find(path) != null);
                 Require(library.Problems.Count == 0, "the model look reads cleanly: " + string.Join("; ", library.Problems));
@@ -213,6 +216,7 @@ namespace Kesa.Engine.Unity.Editor
                 Require(missing != null, "a model that cannot be read shows the missing box");
                 Require(stage.Problems.Count == 0, "the models show cleanly: " + string.Join("; ", stage.Problems));
                 await CheckAnimation(stage, renderer, boardObject.transform, at);
+                CheckColors(stage, boardObject.transform, at);
             }
             finally
             {
@@ -277,6 +281,28 @@ namespace Kesa.Engine.Unity.Editor
             Require(stage.Problems.Count == 0, "the animated model shows cleanly: " + string.Join("; ", stage.Problems));
         }
 
+        /// <summary>모델 색 (G436): <c>tint</c>는 모든 재질에, <c>Paint</c>는 그 이름 재질에 tint 대신 곱한다. 원본 재질은 그대로다.</summary>
+        private static void CheckColors(LookStage stage, Transform board, BridgeWhere at)
+        {
+            Color Shown(string key)
+            {
+                var material = board.Find(key).GetComponentInChildren<MeshRenderer>().sharedMaterial;
+                foreach (var name in new[] { "baseColorFactor", "_BaseColor", "_Color" })
+                    if (material.HasProperty(name)) return material.GetColor(name);
+                throw new InvalidOperationException("the model's material has no base color");
+            }
+            bool Near(Color a, Color b) => Mathf.Abs(a.r - b.r) < 0.01f && Mathf.Abs(a.g - b.g) < 0.01f && Mathf.Abs(a.b - b.b) < 0.01f;
+            var plain = Shown("a");
+            stage.Show("t", new BridgeLook("tinted", new KeyValuePair<string, BridgeValue>[0]), at);
+            stage.Show("p", new BridgeLook("painted", new[] { new KeyValuePair<string, BridgeValue>("team", new BridgeStr("#ff0000")) }), at);
+            var half = new Color32(128, 128, 128, 255);
+            Require(Near(Shown("t"), plain * (Color)half), "tint multiplies the model's color, got " + Shown("t"));
+            Require(Near(Shown("p"), plain * Color.red), "a <Paint> colors its material instead of the tint, got " + Shown("p"));
+            Require(Near(Shown("a"), plain), "the loaded original keeps its color");
+            stage.Show("p", new BridgeLook("painted", new[] { new KeyValuePair<string, BridgeValue>("team", new BridgeStr("#0000ff")) }), at);
+            Require(Near(Shown("p"), plain * Color.blue), "a bound color repaints, got " + Shown("p"));
+        }
+
         // glTF 2.0 바이너리: 위치 세 개짜리 삼각형 하나, 노드 이름 "tri". 움직이면 노드 위치를 바꾸는 1초짜리 slide(x)·lift(y)
         private static byte[] Triangle(bool moving)
         {
@@ -294,7 +320,7 @@ namespace Kesa.Engine.Unity.Editor
                 ",{\"bufferView\":1,\"componentType\":5126,\"count\":2,\"type\":\"SCALAR\",\"min\":[0],\"max\":[1]}" +
                 ",{\"bufferView\":2,\"componentType\":5126,\"count\":2,\"type\":\"VEC3\"},{\"bufferView\":3,\"componentType\":5126,\"count\":2,\"type\":\"VEC3\"}";
             string json = "{\"asset\":{\"version\":\"2.0\"},\"scene\":0,\"scenes\":[{\"nodes\":[0]}],\"nodes\":[{\"mesh\":0,\"name\":\"tri\"" + (moving ? ",\"children\":[1]},{\"name\":\"hand\",\"translation\":[0,0,1]}" : "}") + "]," +
-                          "\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0}}]}],\"buffers\":[{\"byteLength\":" + bin.Length + "}]," +
+                          "\"materials\":[{\"name\":\"Cloth\"}],\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0},\"material\":0}]}],\"buffers\":[{\"byteLength\":" + bin.Length + "}]," +
                           "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":0,\"byteLength\":36}" + views + "]," +
                           "\"accessors\":[{\"bufferView\":0,\"componentType\":5126,\"count\":3,\"type\":\"VEC3\",\"min\":[0,0,0],\"max\":[1,1,0]}" + accessors + "]" +
                           animation + "}";

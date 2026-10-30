@@ -707,7 +707,8 @@ def hit_flash(x, y, damage):
 |---|---|
 | `Sprite` | `src`(그림 경로), `size`(`"1,0.5"`, 빼면 긴 변이 한 칸이고 그림 비율을 지킴), `tint`(`#rrggbb`·`#rrggbbaa`) |
 | `Text` | `text`(글), `size`(글자 높이, 칸 단위, 기본 0.5), `color`(`#rrggbb`·`#rrggbbaa`). 글꼴은 호스트 기본 |
-| `Model` | `src`(모델 파일, 확장자로 로더를 고름. Unity는 glTF `.glb`·`.gltf`). 모델 단위 1이 칸 하나다. 맡을 로더가 없는 확장자는 로드 문제. `state`(지금 상태 이름, 빼면 첫 `State`), `fade`(상태가 바뀔 때 섞는 초, 기본 0) |
+| `Model` | `src`(모델 파일, 확장자로 로더를 고름. Unity는 glTF `.glb`·`.gltf`). 모델 단위 1이 칸 하나다. 맡을 로더가 없는 확장자는 로드 문제. `state`(지금 상태 이름, 빼면 첫 `State`), `fade`(상태가 바뀔 때 섞는 초, 기본 0), `tint`(모든 재질의 색에 곱함) |
+| `Paint` | `Model` 바로 안. `material`(모델의 재질 이름), `color`. 그 재질에는 `tint` 대신 이 색을 곱한다. 칠할 부분은 모델러가 재질로 나누고 밝게 그려 둔다. 없는 재질 이름은 그릴 때 경고 |
 | `State` | `Model` 바로 안. `name`, `clip`(모델 파일 안의 애니메이션 이름), `once`(`true`면 한 번 틀고 끝 자세에 멈춤), `next`(한 번 튼 뒤 갈 상태), `fade`(이 상태로 올 때의 섞는 초, `Model`의 것보다 먼저), `blend`(안의 `Clip`을 섞는 수) |
 | `Attach` | `Model` 바로 안. `bone`(모델 안 부분의 이름, glTF는 노드 이름). 안의 요소가 그 부분의 자리·방향·크기를 따라간다(`offset`도 그 기준). 없는 이름은 그릴 때 경고하고 모델 원점 |
 | `Clip` | `State` 바로 안. `clip`, `at`(블렌드 축의 자리). `blend`가 두 `at` 사이면 그 둘을 거리 비율로 섞는다 |
@@ -733,10 +734,11 @@ def hit_flash(x, y, damage):
     </State>
     <State name="attack" clip="Swing" once="true" next="idle" fade="0.05" />
     <Attach bone="hand_R"><Model bind-src="weapon" /></Attach>
+    <Paint material="Cloth" bind-color="team" />
   </Model>
   ```
   `look("soldier", pose="walk", speed=2)`이면 걷기와 달리기를 반씩 섞는다. 같은 상태를 다시 주면 처음부터 다시 틀지 않는다.
-  모델 파일에 없는 상태·클립 이름은 그릴 때 경고하고 직전 상태로 둔다. `Model` 바로 안에는 `State`와 `Attach`만 온다.
+  모델 파일에 없는 상태·클립 이름은 그릴 때 경고하고 직전 상태로 둔다. `Model` 바로 안에는 `State`·`Attach`·`Paint`만 온다.
   손에 든 무기는 `weapon="models/axe.glb"`처럼 그림 값으로 바꾼다. 모델도 스프라이트처럼 누를 수 있다(메시를 감싸는 상자로 잼).
 - 판을 누르면 그 자리에 그린 표시 중 `click=`이 있는 것이, 없으면 엔티티의 `@world_input`이 받는다. 오른쪽 누름은 `secondary`다. 화면 UXML이 판 위를 덮고 있으면 그 요소는 누름을 가로채므로,
   자리만 잡는 요소에는 Unity UXML의 `picking-mode="Ignore"`를 적는다(skirmish `ui/screen.uxml`의 `screen`·`units`).

@@ -67,6 +67,7 @@ namespace Kesa.Engine.Ui
                 ["src"] = LookAttributeType.Path,
                 ["state"] = LookAttributeType.Name,
                 ["fade"] = LookAttributeType.Number,
+                ["tint"] = LookAttributeType.Color,
             }, acceptsChildren: true, check: (name, value) => name == "src" ? kinds.CheckModel(value.Text!) : NotNegative(name, value),
                 validate: model => ValidateModel(model, kinds)));
             kinds.Add(new LookElementKind("State", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
@@ -87,6 +88,11 @@ namespace Kesa.Engine.Ui
             {
                 ["bone"] = LookAttributeType.Name,
             }, acceptsChildren: true, parents: new[] { "Model" }, validate: ValidateAttach));
+            kinds.Add(new LookElementKind("Paint", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
+            {
+                ["material"] = LookAttributeType.Name,
+                ["color"] = LookAttributeType.Color,
+            }, acceptsChildren: false, parents: new[] { "Model" }, validate: ValidatePaint));
             kinds.Add(new LookElementKind("Group", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal), acceptsChildren: true));
             kinds.Add(new GridSpace());
             return kinds;
@@ -111,8 +117,16 @@ namespace Kesa.Engine.Ui
         {
             // 제 부모가 정해진 종류(Clip)는 읽을 때 이미 알렸다
             foreach (var child in model.Children)
-                if (child.Kind != "State" && child.Kind != "Attach" && !(kinds.TryGetElement(child.Kind, out var kind) && kind.Parents != null))
-                    yield return "inside a <Model> go only <State>s and <Attach>es; put <" + child.Kind + "> in an <Attach bone=\"…\"> or beside the <Model>";
+                if (!(kinds.TryGetElement(child.Kind, out var kind) && kind.Parents != null))
+                    yield return "inside a <Model> go only <State>s, <Attach>es and <Paint>s; put <" + child.Kind + "> in an <Attach bone=\"…\"> or beside the <Model>";
+            var painted = new List<string>();
+            foreach (var paint in model.Children.Where(c => c.Kind == "Paint"))
+            {
+                string? material = Written(paint, "material");
+                if (material == null) continue;
+                if (painted.Contains(material)) yield return "two <Paint>s color the material '" + material + "' (spec-gaps G436)";
+                else painted.Add(material);
+            }
             var states = model.Children.Where(c => c.Kind == "State").ToList();
             var names = new List<string>();
             foreach (var state in states)
@@ -147,6 +161,12 @@ namespace Kesa.Engine.Ui
         private static IEnumerable<string> ValidateAttach(LookElement attach)
         {
             if (!Has(attach, "bone")) yield return "an <Attach> needs bone=\"…\", the name of the part it follows (spec-gaps G435)";
+        }
+
+        private static IEnumerable<string> ValidatePaint(LookElement paint)
+        {
+            if (!Has(paint, "material")) yield return "a <Paint> needs material=\"…\", the name of the model's material it colors";
+            if (!Has(paint, "color")) yield return "a <Paint> needs color=\"…\"";
         }
 
         private static IEnumerable<string> ValidateClip(LookElement clip)
