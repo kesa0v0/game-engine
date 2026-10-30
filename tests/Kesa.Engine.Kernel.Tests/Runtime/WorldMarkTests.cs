@@ -31,7 +31,8 @@ namespace Kesa.Engine.Tests.Runtime
             "@world_marks\ndef moves():\n" +
             "    u = ui.Sel.unit\n" +
             "    if u is None:\n        return None\n" +
-            "    return [mark(\"spot\", at=at(\"hex\", u.Pos.x + 1), click=[\"core.go\", {\"to\": u.Pos.x + 1}]),\n" +
+            "    return [mark(\"spot\", at=at(\"hex\", u.Pos.x + 1), click=[\"core.go\", {\"to\": u.Pos.x + 1}],\n" +
+            "                 inputs={\"secondary\": [\"core.go\", {\"to\": 9}]}),\n" +
             "            mark(look(\"ring\", r=2), at=onto(u), key=\"ring\")]\n";
 
         private World _world = null!;
@@ -69,6 +70,9 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(marks.Count, Is.EqualTo(2));
             Assert.That((marks[0].Look.Name, marks[0].Look.Keys.Count, marks[0].Where.Name), Is.EqualTo(("spot", 0, "hex")));
             Assert.That((marks[0].Action, ((IntValue)marks[0].Arguments!["to"]).Value, marks[0].Key), Is.EqualTo(("core.go", 1L, (Value?)null)));
+            var secondary = marks[0].Inputs.Single();
+            Assert.That((secondary.Key, secondary.Value.Action, ((IntValue)secondary.Value.Arguments["to"]).Value), Is.EqualTo(("secondary", "core.go", 9L)));
+            Assert.That(marks[1].Inputs, Is.Empty);
             Assert.That((marks[1].Look.Name, marks[1].Where.Kind, marks[1].Action, ((StrValue)marks[1].Key!).Value),
                 Is.EqualTo(("ring", WhereKind.Onto, (string?)null, "ring")));
         }
@@ -88,6 +92,10 @@ namespace Kesa.Engine.Tests.Runtime
         [TestCase("[mark(\"a\", at=at(0), click=[\"core.og\", {}])]", "there is no @ui_action 'core.og'", "core.go")]
         [TestCase("[mark(\"a\", at=at(0), click=[\"core.Go\", {}])]", "there is no @ui_action 'core.Go'", "is a command")]
         [TestCase("[mark(\"a\", at=at(0), click=\"core.go\")]", "click= of mark() takes [the @ui_action, a dict of its arguments], not str", null)]
+        [TestCase("[mark(\"a\", at=at(0), inputs=[\"core.go\", {}])]", "inputs= of mark() takes a dict from input names", null)]
+        [TestCase("[mark(\"a\", at=at(0), inputs={1: [\"core.go\", {}]})]", "inputs= of mark() is keyed by input names (str), not int", null)]
+        [TestCase("[mark(\"a\", at=at(0), inputs={\"secondary\": [\"core.og\", {}]})]",
+            "there is no @ui_action 'core.og' for inputs[\"secondary\"]= of mark()", "core.go")]
         [TestCase("[mark(\"a\")]", "mark() needs at=", null)]
         [TestCase("[mark(\"a\", at=at(0), size=2)]", "mark() has no argument 'size'", null)]
         [TestCase("[look(\"a\")]", "'scouts.bad' returned a list holding look", null)]

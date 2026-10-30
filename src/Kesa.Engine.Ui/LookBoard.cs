@@ -39,15 +39,15 @@ namespace Kesa.Engine.Ui
 
         /// <summary>
         /// 커서 아래 물체들(위에 그린 것부터)과 자리(<see cref="LookStage.PlaceOnRay"/>)에 들어온 입력을 받을 것에 준다 (G395·G419·G422): 그 입력을
-        /// 받는 표시가 먼저, 없으면 엔티티들과 자리를 경계의 <c>WorldInput</c>에 넘긴다. 받을 것이 없으면 null.
+        /// 받는 표시(<c>click=</c>·<c>inputs=</c>)가 먼저, 없으면 엔티티들과 자리를 경계의 <c>WorldInput</c>에 넘긴다. 받을 것이 없으면 null.
         /// </summary>
         public async ValueTask<BridgeResult?> InputAsync(string input, IEnumerable<string> keysUnderPointer, BridgeWhere? place = null)
         {
             var entities = new List<long>();
             foreach (var key in keysUnderPointer)
             {
-                var click = input == Primary ? Stage.ClickOf(key) : null;
-                if (click != null) return await _session.Act(click.Action, click.Arguments);
+                var action = Stage.ActionOf(key, input);
+                if (action != null) return await _session.Act(action.Action, action.Arguments);
                 if (key.StartsWith(LookStage.EntityPrefix, System.StringComparison.Ordinal) &&
                     long.TryParse(key.Substring(LookStage.EntityPrefix.Length), System.Globalization.NumberStyles.None,
                         System.Globalization.CultureInfo.InvariantCulture, out var id))

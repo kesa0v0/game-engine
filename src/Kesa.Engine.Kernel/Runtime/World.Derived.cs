@@ -409,8 +409,15 @@ namespace Kesa.Engine.Runtime
                         arguments = new SortedDictionary<string, Value>(StringComparer.Ordinal);
                         foreach (var pair in mark.Arguments) arguments[pair.Key] = ToPlain(display, pair.Value);
                     }
+                    var inputs = new SortedDictionary<string, MarkInput>(StringComparer.Ordinal);
+                    foreach (var input in mark.Inputs)
+                    {
+                        var plain = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+                        foreach (var pair in input.Value.Arguments) plain[pair.Key] = ToPlain(display, pair.Value);
+                        inputs[input.Key] = new MarkInput(input.Value.Action, plain);
+                    }
                     return new MarkValue((LookValue)ToPlain(display, mark.Look), (WhereValue)ToPlain(display, mark.Where), mark.Action, arguments,
-                        mark.Key == null ? null : ToPlain(display, mark.Key));
+                        mark.Key == null ? null : ToPlain(display, mark.Key), inputs);
                 case QuestionValue _:
                 case ChoiceView _:
                     throw new ScriptRuntimeException(Codes.RunType,

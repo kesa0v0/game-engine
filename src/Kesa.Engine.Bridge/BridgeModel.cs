@@ -153,8 +153,10 @@ namespace Kesa.Engine.Bridge
     /// </summary>
     public sealed class BridgeMark
     {
-        public BridgeMark(string key, BridgeLook? look, BridgeWhere? where, BridgeMarkClick? click, string? error)
+        public BridgeMark(string key, BridgeLook? look, BridgeWhere? where, BridgeMarkClick? click, string? error,
+            IReadOnlyDictionary<string, BridgeMarkClick>? inputs = null)
         {
+            Inputs = inputs ?? new SortedDictionary<string, BridgeMarkClick>(StringComparer.Ordinal);
             Key = key;
             Look = look;
             Where = where;
@@ -169,10 +171,25 @@ namespace Kesa.Engine.Bridge
         /// <summary>누르면 낼 화면 동작. null이면 보이기만 한다(누름은 아래 엔티티나 자리로 넘어감).</summary>
         public BridgeMarkClick? Click { get; }
 
+        /// <summary>
+        /// 입력 이름마다 낼 화면 동작 (<c>inputs=</c>, G418, 이름 순). 주 누름은 <see cref="Click"/>이 먼저이고, 둘 다 있으면 호스트가 경고하고
+        /// <see cref="Click"/>을 쓴다.
+        /// </summary>
+        public IReadOnlyDictionary<string, BridgeMarkClick> Inputs { get; }
+
         public string? Error { get; }
 
         public override bool Equals(object? obj) =>
-            obj is BridgeMark o && o.Key == Key && Equals(o.Look, Look) && Equals(o.Where, Where) && Equals(o.Click, Click) && o.Error == Error;
+            obj is BridgeMark o && o.Key == Key && Equals(o.Look, Look) && Equals(o.Where, Where) && Equals(o.Click, Click) && o.Error == Error &&
+            SameInputs(o.Inputs, Inputs);
+
+        private static bool SameInputs(IReadOnlyDictionary<string, BridgeMarkClick> a, IReadOnlyDictionary<string, BridgeMarkClick> b)
+        {
+            if (a.Count != b.Count) return false;
+            foreach (var pair in a)
+                if (!b.TryGetValue(pair.Key, out var other) || !Equals(other, pair.Value)) return false;
+            return true;
+        }
 
         public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Key);
     }

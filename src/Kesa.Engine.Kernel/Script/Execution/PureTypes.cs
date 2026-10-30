@@ -449,8 +449,10 @@ namespace Kesa.Engine.Script
     /// </summary>
     public sealed class MarkValue : Value, IValueEquality
     {
-        public MarkValue(LookValue look, WhereValue where, string? action, IReadOnlyDictionary<string, Value>? arguments, Value? key)
+        public MarkValue(LookValue look, WhereValue where, string? action, IReadOnlyDictionary<string, Value>? arguments, Value? key,
+            IReadOnlyDictionary<string, MarkInput>? inputs = null)
         {
+            Inputs = inputs ?? new SortedDictionary<string, MarkInput>(StringComparer.Ordinal);
             Look = look;
             Where = where;
             Action = action;
@@ -470,18 +472,46 @@ namespace Kesa.Engine.Script
         /// <summary><c>key=</c>로 적은 열쇠. null이면 그림 이름과 자리가 열쇠다(G396).</summary>
         public Value? Key { get; }
 
+        /// <summary><c>inputs=</c>: 입력 이름마다 부를 동작 (G418, 이름 순). <c>click=</c>은 <see cref="Action"/>에 따로 있다.</summary>
+        public IReadOnlyDictionary<string, MarkInput> Inputs { get; }
+
         public bool ValueEquals(Value other)
         {
             if (!(other is MarkValue o) || !PureOps.ValuesEqual(o.Look, Look) || !PureOps.ValuesEqual(o.Where, Where) || o.Action != Action)
                 return false;
             if ((o.Key == null) != (Key == null) || Key != null && !PureOps.ValuesEqual(o.Key!, Key)) return false;
+            if (o.Inputs.Count != Inputs.Count) return false;
+            foreach (var pair in Inputs)
+                if (!o.Inputs.TryGetValue(pair.Key, out var input) || input.Action != pair.Value.Action ||
+                    !MarkInput.SameArguments(input.Arguments, pair.Value.Arguments))
+                    return false;
             if (Arguments == null || o.Arguments == null) return Arguments == o.Arguments;
-            if (o.Arguments.Count != Arguments.Count) return false;
-            foreach (var pair in Arguments)
-                if (!o.Arguments.TryGetValue(pair.Key, out var v) || !PureOps.ValuesEqual(v, pair.Value)) return false;
-            return true;
+            return MarkInput.SameArguments(o.Arguments, Arguments);
         }
 
         public override string KindName => "mark";
+    }
+
+    /// <summary>표시가 한 입력에 부를 화면 동작과 인자 (G418).</summary>
+    public sealed class MarkInput
+    {
+        public MarkInput(string action, IReadOnlyDictionary<string, Value> arguments)
+        {
+            Action = action;
+            Arguments = arguments;
+        }
+
+        public string Action { get; }
+
+        /// <summary>이름 순.</summary>
+        public IReadOnlyDictionary<string, Value> Arguments { get; }
+
+        internal static bool SameArguments(IReadOnlyDictionary<string, Value> a, IReadOnlyDictionary<string, Value> b)
+        {
+            if (a.Count != b.Count) return false;
+            foreach (var pair in a)
+                if (!b.TryGetValue(pair.Key, out var v) || !PureOps.ValuesEqual(v, pair.Value)) return false;
+            return true;
+        }
     }
 }

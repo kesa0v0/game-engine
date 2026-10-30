@@ -14,6 +14,8 @@ namespace Kesa.Engine.Ui
         private readonly ILookRenderer _renderer;
         private readonly SortedDictionary<string, ShownObject> _shown = new SortedDictionary<string, ShownObject>(StringComparer.Ordinal);
         private readonly Dictionary<string, BridgeMarkClick> _clicks = new Dictionary<string, BridgeMarkClick>(StringComparer.Ordinal);
+        private readonly Dictionary<string, IReadOnlyDictionary<string, BridgeMarkClick>> _inputs =
+            new Dictionary<string, IReadOnlyDictionary<string, BridgeMarkClick>>(StringComparer.Ordinal);
         private readonly List<UiProblem> _problems = new List<UiProblem>();
         private readonly SortedSet<string> _problemTexts = new SortedSet<string>(StringComparer.Ordinal);
 
@@ -35,6 +37,10 @@ namespace Kesa.Engine.Ui
             {
                 if (mark.Click != null) _clicks["mark:" + mark.Key] = mark.Click;
                 else _clicks.Remove("mark:" + mark.Key);
+                if (mark.Inputs.Count > 0) _inputs["mark:" + mark.Key] = mark.Inputs;
+                else _inputs.Remove("mark:" + mark.Key);
+                if (mark.Click != null && mark.Inputs.ContainsKey(LookBoard.Primary))
+                    Report(mark.Key, "click= and inputs[\"primary\"] both answer the primary press; click= is used (spec-gaps G418)");
                 if (mark.Error != null)
                 {
                     Report(mark.Key, mark.Error);
@@ -46,12 +52,21 @@ namespace Kesa.Engine.Ui
             foreach (var key in marks.Gone)
             {
                 _clicks.Remove("mark:" + key);
+                _inputs.Remove("mark:" + key);
                 Hide("mark:" + key);
             }
         }
 
         /// <summary>그 열쇠의 표시가 누르면 낼 화면 동작 (G395·G408). 엔티티와 누를 수 없는 표시는 null.</summary>
         public BridgeMarkClick? ClickOf(string key) => _shown.ContainsKey(key) && _clicks.TryGetValue(key, out var click) ? click : null;
+
+        /// <summary>그 열쇠의 표시가 그 입력에 낼 화면 동작 (G418): 주 누름은 <c>click=</c>이 먼저, 그다음 <c>inputs=</c>. 받지 않으면 null.</summary>
+        public BridgeMarkClick? ActionOf(string key, string input)
+        {
+            if (!_shown.ContainsKey(key)) return null;
+            if (input == LookBoard.Primary && _clicks.TryGetValue(key, out var click)) return click;
+            return _inputs.TryGetValue(key, out var inputs) && inputs.TryGetValue(input, out var action) ? action : null;
+        }
 
         /// <summary>
         /// 반직선이 닿는 자리 (G422): 선언된 공간을 이름 순으로 보아 처음 되돌린 <c>at("공간", 값)</c>. 위치는 그림 물체와 같은 좌표계(판의 바탕 기준)다.

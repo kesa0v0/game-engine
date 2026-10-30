@@ -204,6 +204,13 @@ namespace Kesa.Engine.Bridge.Local
         /// 한 표시 함수의 표시를 열쇠로 (G396): <c>함수id/</c> 뒤에 <c>key=</c>가 있으면 그 값, 없으면 그림 이름과 자리, 겹치면 <c>#순번</c>.
         /// 함수가 실패하면 영수증 없이 오류 표시 하나다.
         /// </summary>
+        private static BridgeMarkClick MarkClick(string action, IReadOnlyDictionary<string, Value> arguments, Func<EntityId, string?> defOf)
+        {
+            var converted = new SortedDictionary<string, BridgeValue>(StringComparer.Ordinal);
+            foreach (var pair in arguments) converted[pair.Key] = KernelValues.ToBridge(pair.Value, defOf);
+            return new BridgeMarkClick(action, converted);
+        }
+
         private SortedDictionary<string, BridgeMark> ComputeMarks(WorldView view, string function, out CallResult? receipt)
         {
             var marks = new SortedDictionary<string, BridgeMark>(StringComparer.Ordinal);
@@ -217,18 +224,15 @@ namespace Kesa.Engine.Bridge.Local
                     var look = KernelValues.ToBridge(mark.Look, defOf).AsLook;
                     var where = KernelValues.ToBridge(mark.Where, defOf).AsWhere;
                     BridgeMarkClick? click = null;
-                    if (mark.Action != null)
-                    {
-                        var arguments = new SortedDictionary<string, BridgeValue>(StringComparer.Ordinal);
-                        foreach (var pair in mark.Arguments!) arguments[pair.Key] = KernelValues.ToBridge(pair.Value, defOf);
-                        click = new BridgeMarkClick(mark.Action, arguments);
-                    }
+                    if (mark.Action != null) click = MarkClick(mark.Action, mark.Arguments!, defOf);
+                    var inputs = new SortedDictionary<string, BridgeMarkClick>(StringComparer.Ordinal);
+                    foreach (var pair in mark.Inputs) inputs[pair.Key] = MarkClick(pair.Value.Action, pair.Value.Arguments, defOf);
                     string key = function + "/" + (mark.Key != null
                         ? "key=" + BridgeJson.Write(KernelValues.ToBridge(mark.Key, defOf))
                         : look.Name + "@" + BridgeJson.Write(where));
                     string unique = key;
                     for (int n = 1; marks.ContainsKey(unique); n++) unique = key + "#" + n.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    marks.Add(unique, new BridgeMark(unique, look, where, click, null));
+                    marks.Add(unique, new BridgeMark(unique, look, where, click, null, inputs));
                 }
             }
             catch (Exception e) when (e is WorldException || e is BridgeValueException)

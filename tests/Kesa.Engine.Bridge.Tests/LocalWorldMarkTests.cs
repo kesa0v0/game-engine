@@ -26,7 +26,8 @@ namespace Kesa.Engine.Bridge.Tests
             "Unit(\"Foot\")\n" +
             "@ui_action\ndef go(u: Ref[Unit], to: int):\n    pass\n" +
             "@world_marks\ndef moves():\n" +
-            "    return [mark(\"spot\", at=at(\"hex\", u.Pos.x + 1), click=[\"arena.go\", {\"u\": u, \"to\": u.Pos.x + 1}]) for u in query(Unit)]\n" +
+            "    return [mark(\"spot\", at=at(\"hex\", u.Pos.x + 1), click=[\"arena.go\", {\"u\": u, \"to\": u.Pos.x + 1}],\n" +
+            "                 inputs={\"secondary\": [\"arena.go\", {\"u\": u, \"to\": 0}]}) for u in query(Unit)]\n" +
             "@world_marks\ndef rings():\n" +
             "    return [mark(look(\"ring\", r=u.Pos.r), at=at(\"hex\", u.Pos.x), key=\"ring\") for u in query(Unit)]\n" +
             "@world_marks\ndef twins():\n" +
@@ -88,6 +89,10 @@ namespace Kesa.Engine.Bridge.Tests
             Assert.That(spot.Click.Arguments["to"], Is.EqualTo(BridgeValue.Of(1)));
             Assert.That(spot.Click.Arguments["u"], Is.EqualTo(new BridgeEntity(_foot.Value, "arena:Foot")));
             Assert.That(Of(first, "arena.rings").Click, Is.Null);
+            var secondary = spot.Inputs.Single();
+            Assert.That((secondary.Key, secondary.Value.Action, secondary.Value.Arguments["to"]),
+                Is.EqualTo(("secondary", "arena.go", BridgeValue.Of(0))));
+            Assert.That(Of(first, "arena.rings").Inputs, Is.Empty);
 
             var same = await_(_alice.WorldMarks(first.Stamp));
             Assert.That((same.Changed.Count, same.Gone.Count, same.Stamp), Is.EqualTo((0, 0, first.Stamp)));

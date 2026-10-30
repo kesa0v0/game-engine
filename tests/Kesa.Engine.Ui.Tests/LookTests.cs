@@ -233,6 +233,24 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(stage.Keys, Is.Empty);
         }
 
+        [Test]
+        public void AMarkAnswersEachInputAndClickWinsThePrimaryPress()
+        {
+            var stage = Stage(Looks("<Looks><Look name=\"dot\"><Sprite src=\"art/dot.png\" /></Look></Looks>"));
+            BridgeMarkClick Act(string action) => new BridgeMarkClick(action, new Dictionary<string, BridgeValue>());
+            var inputs = new Dictionary<string, BridgeMarkClick> { ["primary"] = Act("core.also"), ["secondary"] = Act("core.move") };
+            stage.Apply(new BridgeWorldMarks(1, new[]
+            {
+                new BridgeMark("f/dot@1", Look("dot"), At(1, 0), Act("core.go"), null, inputs),
+                new BridgeMark("f/dot@2", Look("dot"), At(2, 0), null, null, new Dictionary<string, BridgeMarkClick> { ["primary"] = Act("core.only") }),
+            }, new string[0]));
+            Assert.That(stage.ActionOf("mark:f/dot@1", LookBoard.Primary)!.Action, Is.EqualTo("core.go"));
+            Assert.That(stage.ActionOf("mark:f/dot@1", LookBoard.Secondary)!.Action, Is.EqualTo("core.move"));
+            Assert.That(stage.ActionOf("mark:f/dot@1", "rotate"), Is.Null);
+            Assert.That(stage.ActionOf("mark:f/dot@2", LookBoard.Primary)!.Action, Is.EqualTo("core.only"));
+            Assert.That(stage.Problems.Select(p => p.ToString()).Single(), Does.Contain("click= and inputs[\"primary\"] both answer the primary press"));
+        }
+
         private static LookPosition P(double x, double y, double z) =>
             new LookPosition((long)(x * BridgeFixed.Scale), (long)(y * BridgeFixed.Scale), (long)(z * BridgeFixed.Scale));
 

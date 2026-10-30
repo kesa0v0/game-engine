@@ -86,6 +86,7 @@ namespace Kesa.Engine.Runtime
             string? action = null;
             SortedDictionary<string, Value>? arguments = null;
             Value? key = null;
+            var inputs = new SortedDictionary<string, MarkInput>(StringComparer.Ordinal);
             foreach (var pair in keywords)
             {
                 switch (pair.Key)
@@ -98,26 +99,40 @@ namespace Kesa.Engine.Runtime
                         if (pair.Value is NoneValue) break;
                         action = Click(pair.Value, out arguments);
                         break;
+                    case "inputs":
+                        if (pair.Value is NoneValue) break;
+                        if (!(pair.Value is DictValue table))
+                            throw LookError("inputs= of mark() takes a dict from input names to [the @ui_action, a dict of its arguments], not " +
+                                            pair.Value.KindName, "write inputs={\"secondary\": [\"mymod.go\", {\"to\": [3, 4]}]} (spec-gaps G418)");
+                        foreach (var item in table.Items)
+                        {
+                            if (!(item.Key is StrValue input) || input.Value.Length == 0)
+                                throw LookError("inputs= of mark() is keyed by input names (str), not " + item.Key.KindName,
+                                    "write inputs={\"secondary\": [...]} (spec-gaps G418)");
+                            string inputAction = Click(item.Value, out var inputArguments, "inputs[\"" + input.Value + "\"]=");
+                            inputs[input.Value] = new MarkInput(inputAction, inputArguments);
+                        }
+                        break;
                     case "key":
                         if (!(pair.Value is NoneValue))
                             key = Savable("key= of mark()", pair.Value, "a key holds " + PlainHint + " (spec-gaps G396)", hidden: true);
                         break;
                     default:
-                        throw LookError("mark() has no argument '" + pair.Key + "'", "mark() takes at=, click= and key= (spec-gaps G395, G396)");
+                        throw LookError("mark() has no argument '" + pair.Key + "'", "mark() takes at=, click=, inputs= and key= (spec-gaps G395, G396, G418)");
                 }
             }
             if (where == null) throw LookError("mark() needs at= to say where the mark goes", usage);
-            return new MarkValue(look, where, action, arguments, key);
+            return new MarkValue(look, where, action, arguments, key, inputs);
         }
 
         /// <summary><c>click=[동작, 인자]</c>: 있는 <c>@ui_action</c>과 평범한 값의 사전.</summary>
-        private string Click(Value value, out SortedDictionary<string, Value> arguments)
+        private string Click(Value value, out SortedDictionary<string, Value> arguments, string slot = "click=")
         {
             const string usage = "write click=[\"mymod.go\", {\"to\": [3, 4]}] with a @ui_action and its arguments (spec-gaps G395)";
             if (!(value is ListValue list) || list.Items.Count != 2 || !(list.Items[0] is StrValue name) || !(list.Items[1] is DictValue dict))
-                throw LookError("click= of mark() takes [the @ui_action, a dict of its arguments], not " + Describe(value), usage);
+                throw LookError(slot + " of mark() takes [the @ui_action, a dict of its arguments], not " + Describe(value), usage);
             if (!_uiActions.ContainsKey(name.Value))
-                throw LookError("there is no @ui_action '" + name.Value + "' for click= of mark()",
+                throw LookError("there is no @ui_action '" + name.Value + "' for " + slot + " of mark()",
                     _commands.ContainsKey(name.Value)
                         ? "'" + name.Value + "' is a command; point click= to a @ui_action that submits it (spec-gaps G395)"
                         : Suggest.Hint(name.Value, _uiActions.Keys));
@@ -125,8 +140,8 @@ namespace Kesa.Engine.Runtime
             foreach (var item in dict.Items)
             {
                 if (!(item.Key is StrValue k))
-                    throw LookError("the arguments in click= of mark() are named by str, not " + item.Key.KindName, usage);
-                arguments[k.Value] = Savable("an argument in click= of mark()", item.Value, "an argument holds " + PlainHint + " (spec-gaps G395)",
+                    throw LookError("the arguments in " + slot + " of mark() are named by str, not " + item.Key.KindName, usage);
+                arguments[k.Value] = Savable("an argument in " + slot + " of mark()", item.Value, "an argument holds " + PlainHint + " (spec-gaps G395)",
                     hidden: true);
             }
             return name.Value;
