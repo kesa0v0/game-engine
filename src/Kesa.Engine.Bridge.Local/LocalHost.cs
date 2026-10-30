@@ -43,7 +43,7 @@ namespace Kesa.Engine.Bridge.Local
         {
             var mods = new List<BridgeMod>(Loaded.Mods.Count);
             foreach (var mod in Loaded.Mods)
-                mods.Add(new BridgeMod(mod.Id, mod.Directory, Path.Combine(Loaded.ModsRoot, mod.Directory), mod.DefaultLanguage));
+                mods.Add(new BridgeMod(mod.Id, mod.Directory, Path.Combine(Loaded.ModsRoot, mod.Directory), mod.DefaultLanguage, mod.Presentation));
             var defs = new List<string>(Loaded.Frozen.Defs.Count);
             foreach (var def in Loaded.Frozen.Defs) defs.Add(def.Id);
             defs.Sort(StringComparer.Ordinal);

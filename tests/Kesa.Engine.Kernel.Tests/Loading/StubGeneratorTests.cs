@@ -156,7 +156,7 @@ namespace Kesa.Engine.Tests.Loading
                 "def defs(t: type[Any], /) -> list[str]: ...\n" +
                 "\n" +
                 "def Mod(*, id: str, version: str = ..., defaultLanguage: str = ..., dependencies: list[str] = ..., " +
-                "loadAfter: list[str] = ..., optional: list[str] = ...) -> None: ...\n" +
+                "loadAfter: list[str] = ..., optional: list[str] = ..., presentation: str = ...) -> None: ...\n" +
                 "def use(path: str, /) -> None: ...\n" +
                 "def use_all(path: str, /) -> None: ...\n";
             Assert.That(stub, Does.EndWith(lookups));

@@ -109,6 +109,19 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(diags.Select(d => d.Code + " " + d.Message), Is.EqualTo(new[] { "MOD002 defaultLanguage '" + tag + "' is not a language tag" }));
         }
 
+        // 연출 방식은 둘 중 하나, 뜻은 호스트가 안다 (G429)
+        [Test]
+        public void ThePresentationIsInstantOrStaged()
+        {
+            Assert.That(Read("Mod(id=\"a\", presentation=\"staged\")\n").Manifest!.Presentation, Is.EqualTo("staged"));
+            Assert.That(Read("Mod(id=\"a\")\n").Manifest!.Presentation, Is.Null);
+            var (_, diags) = Read("Mod(id=\"a\", presentation=\"stagged\")\n");
+            Assert.That(diags.Select(d => d.Code + " " + d.Message + " | " + d.Hint), Is.EqualTo(new[]
+            {
+                "MOD002 presentation 'stagged' is not instant or staged | did you mean 'staged'?",
+            }));
+        }
+
         [TestCase("x = 1\nMod(id=\"a\")\n")]
         [TestCase("Mod(id=\"a\")\nUnit(\"Scout\")\n")]
         [TestCase("Mod(id=\"a\")\nMod(id=\"b\")\n")]

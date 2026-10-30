@@ -60,6 +60,9 @@ namespace Kesa.Engine.Unity
 
         public bool HasErrors => Diagnostics.Any(d => d.Severity == Severity.Error);
 
+        /// <summary>연출 방식 (G429): 로드 순서가 뒤인 모드의 <c>Mod(presentation=…)</c>, 없으면 <see cref="BridgePresentation.Instant"/>.</summary>
+        public string Presentation => _content.Mods.LastOrDefault(m => m.Presentation != null)?.Presentation ?? BridgePresentation.Instant;
+
         /// <summary>글자 속성에 들어갈 값을 번역해 글자로 (UiInterpreter에 꽂는다, G345).</summary>
         public string Format(BridgeValue value) => Translator.Value(value);
 

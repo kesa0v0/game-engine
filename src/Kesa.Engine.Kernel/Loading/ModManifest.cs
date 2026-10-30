@@ -44,8 +44,9 @@ namespace Kesa.Engine.Loading
     {
         public ModManifest(string id, string directory, SourceSpan span, string? version, string? defaultLanguage,
             IReadOnlyList<ModRef> dependencies, IReadOnlyList<ModRef> loadAfter, IReadOnlyList<ModRef> optional,
-            IReadOnlyList<UseEntry> uses)
+            IReadOnlyList<UseEntry> uses, string? presentation = null)
         {
+            Presentation = presentation;
             Id = id;
             Directory = directory;
             Span = span;
@@ -67,6 +68,9 @@ namespace Kesa.Engine.Loading
 
         public string? Version { get; }
         public string? DefaultLanguage { get; }
+
+        /// <summary><c>instant</c>·<c>staged</c> 또는 적지 않음 (G429).</summary>
+        public string? Presentation { get; }
 
         /// <summary>필수 의존성: 없거나 로드에 실패하면 이 모드도 비활성화된다.</summary>
         public IReadOnlyList<ModRef> Dependencies { get; }

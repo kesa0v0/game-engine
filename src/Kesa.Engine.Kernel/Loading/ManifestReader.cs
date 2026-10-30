@@ -13,8 +13,11 @@ namespace Kesa.Engine.Loading
     {
         private static readonly string[] Fields =
         {
-            "id", "version", "dependencies", "loadAfter", "optional", "defaultLanguage",
+            "id", "version", "dependencies", "loadAfter", "optional", "defaultLanguage", "presentation",
         };
+
+        /// <summary>연출 방식 (G399·G429). 커널은 뜻을 모르고 호스트가 재생한다.</summary>
+        public static readonly string[] Presentations = { "instant", "staged" };
 
         /// <param name="text">mod.py 내용</param>
         /// <param name="directory">모드 루트 기준 모드 폴더 이름</param>
@@ -88,6 +91,7 @@ namespace Kesa.Engine.Loading
             string? id = null;
             string? version = null;
             string? defaultLanguage = null;
+            string? presentation = null;
             var dependencies = new List<ModRef>();
             var loadAfter = new List<ModRef>();
             var optional = new List<ModRef>();
@@ -130,6 +134,15 @@ namespace Kesa.Engine.Loading
                             defaultLanguage = null;
                         }
                         break;
+                    case "presentation":
+                        presentation = ReadString(arg, diags);
+                        if (presentation != null && Array.IndexOf(Presentations, presentation) < 0)
+                        {
+                            diags.Error(Codes.ModBadManifest, "presentation '" + presentation + "' is not instant or staged", arg.Value.Span,
+                                hint: Suggest.Hint(presentation, Presentations) ?? "instant shows the result at once; staged plays the command's effects in order first");
+                            presentation = null;
+                        }
+                        break;
                     case "dependencies":
                         ReadIdList(arg, dependencies, diags);
                         break;
@@ -159,7 +172,7 @@ namespace Kesa.Engine.Loading
             CheckSelfReference(id, loadAfter, "loadAfter", diags);
             CheckSelfReference(id, optional, "optional", diags);
 
-            return new ModManifest(id, directory, call.Span, version, defaultLanguage, dependencies, loadAfter, optional, uses);
+            return new ModManifest(id, directory, call.Span, version, defaultLanguage, dependencies, loadAfter, optional, uses, presentation);
         }
 
         private static bool HasArgument(CallExpr call, string name)

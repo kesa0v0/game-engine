@@ -487,11 +487,22 @@ namespace Kesa.Engine.Bridge
         public bool Blocked { get; }
     }
 
+    /// <summary>연출 방식 이름 (G429).</summary>
+    public static class BridgePresentation
+    {
+        /// <summary>결과를 바로 그리고 효과는 얹는다.</summary>
+        public const string Instant = "instant";
+
+        /// <summary>결과를 붙잡고 이번 커맨드 묶음의 효과를 순서대로 보여 준 뒤 적용한다.</summary>
+        public const string Staged = "staged";
+    }
+
     /// <summary>불린 모드 하나: 호스트가 번역 파일(<c>locale/</c>)과 UI 파일을 찾는 곳 (G256·G269).</summary>
     public sealed class BridgeMod
     {
-        public BridgeMod(string id, string directory, string folder, string? defaultLanguage)
+        public BridgeMod(string id, string directory, string folder, string? defaultLanguage, string? presentation = null)
         {
+            Presentation = presentation;
             Id = id;
             Directory = directory;
             Folder = folder;
@@ -504,6 +515,9 @@ namespace Kesa.Engine.Bridge
         /// <summary>모드 폴더의 실제 경로.</summary>
         public string Folder { get; }
         public string? DefaultLanguage { get; }
+
+        /// <summary><c>Mod(presentation=…)</c>: <c>instant</c>·<c>staged</c> 또는 적지 않음 (G429).</summary>
+        public string? Presentation { get; }
     }
 
     /// <summary>판의 내용 중 호스트가 알아야 하는 것: 로드 순서대로의 모드와 Def의 전체 이름(이름 순).</summary>
@@ -516,6 +530,18 @@ namespace Kesa.Engine.Bridge
         }
 
         public IReadOnlyList<BridgeMod> Mods { get; }
+
+        /// <summary>연출 방식 (G399·G429): 로드 순서가 뒤인 모드가 적은 것, 아무도 안 적으면 <see cref="BridgePresentation.Instant"/>.</summary>
+        public string Presentation
+        {
+            get
+            {
+                for (int i = Mods.Count - 1; i >= 0; i--)
+                    if (Mods[i].Presentation != null) return Mods[i].Presentation!;
+                return BridgePresentation.Instant;
+            }
+        }
+
         /// <summary>문자열 값이 이 중 하나와 같으면 번역기가 그 Def의 이름을 보인다 (G267·G270).</summary>
         public IReadOnlyList<string> Defs { get; }
     }
