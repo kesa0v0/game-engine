@@ -100,6 +100,32 @@ namespace Kesa.Engine.Ui.Tests
         private static string LookAttributesPlain(BridgeValue v) => v is BridgeInt i ? i.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "?";
 
         [Test]
+        public void DriftMovesAndGrowScalesAndTheLookValueCanAimIt()
+        {
+            var stage = Stage("<Looks><Look name=\"spark\" solid=\"1\" drift=\"0.5,-1\" bind-drift=\"dir\" grow=\"-2\">" +
+                              "<Sprite src=\"art/dot.png\" /></Look></Looks>");
+            stage.Play(Batch(Fx("spark"), Fx("spark", ("dir", new BridgeList(new BridgeValue[] { new BridgeInt(-1), new BridgeInt(0) })))));
+            stage.Advance(250);
+            Assert.That(_renderer.Dump("fx:1"), Is.EqualTo("@(1.125, 1.75, 0.0) x0.5 Sprite[src=art/dot.png]"), "moved 0.25 s × (0.5, -1), size 1 - 2 × 0.25");
+            Assert.That(_renderer.Dump("fx:2"), Is.EqualTo("@(0.75, 2.0, 0.0) x0.5 Sprite[src=art/dot.png]"), "the look value aims it left");
+            stage.Advance(500);
+            Assert.That(_renderer.Dump("fx:1"), Does.Contain(" x0.0 "), "the size stops at 0");
+            Assert.That(stage.Problems, Is.Empty);
+        }
+
+        [Test]
+        public void RiseAndDriftTogetherIsALoadProblem()
+        {
+            var problems = LookLibrary.Load(new[]
+            {
+                new LookSource("core", "core/fx.look.xml",
+                    "<Looks><Look name=\"a\" rise=\"1\" bind-drift=\"d\" grow=\"x\"><Sprite src=\"s.png\" /></Look></Looks>"),
+            }, LookKinds.Standard()).Problems.Select(p => p.ToString()).ToList();
+            Assert.That(problems, Has.Some.Contain("has both rise and drift"));
+            Assert.That(problems, Has.Some.Contain("grow=\"x\""));
+        }
+
+        [Test]
         public void WrongTimesAreLoadProblems()
         {
             var problems = LookLibrary.Load(new[]

@@ -33,7 +33,7 @@ namespace Kesa.Engine.Ui
                     continue;
                 }
                 string? name = Name(node, place, "Look", problems);
-                var timing = new SortedDictionary<string, long>(StringComparer.Ordinal);
+                var timing = new SortedDictionary<string, LookAttributeValue>(StringComparer.Ordinal);
                 var timingBindings = new List<LookBinding>();
                 foreach (var attribute in node.Attributes())
                 {
@@ -49,14 +49,17 @@ namespace Kesa.Engine.Ui
                     if (target != n)
                     {
                         var expr = reader.ParseVariable(place, n, attribute.Value);
-                        if (expr != null) timingBindings.Add(new LookBinding(target, LookAttributeType.Number, expr, attribute.Value));
+                        if (expr != null) timingBindings.Add(new LookBinding(target, LookDefinition.TimingType(target), expr, attribute.Value));
                         continue;
                     }
-                    var value = LookAttributes.FromText(LookAttributeType.Number, attribute.Value, out string error);
+                    var value = LookAttributes.FromText(LookDefinition.TimingType(n), attribute.Value, out string error);
                     if (value == null) problems.Add(new UiProblem(place, n + "=\"" + attribute.Value + "\": " + error));
-                    else if (value.Numbers[0] < 0 && n != "rise") problems.Add(new UiProblem(place, n + "=\"" + attribute.Value + "\": a time is not negative"));
-                    else timing[n] = value.Numbers[0];
+                    else if (LookDefinition.IsDuration(n) && value.Numbers[0] < 0) problems.Add(new UiProblem(place, n + "=\"" + attribute.Value + "\": a time is not negative"));
+                    else timing[n] = value;
                 }
+                bool Has(string field) => timing.ContainsKey(field) || timingBindings.Any(b => b.Attribute == field);
+                if (Has("rise") && Has("drift"))
+                    problems.Add(new UiProblem(place, "<Look> has both rise and drift; rise=\"r\" is drift=\"0,r\", so use one"));
                 var elements = node.Elements().Select(e => reader.Read(e)).ToList();
                 if (name != null) looks.Add(new LookDefinition(name, source.Mod, place, elements, timing, timingBindings));
             }

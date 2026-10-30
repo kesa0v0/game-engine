@@ -169,14 +169,16 @@ namespace Kesa.Engine.Ui
 
         private sealed class PlayingFx
         {
-            public PlayingFx(string key, ShownObject shown, long fadeIn, long solid, long fadeOut, long rise)
+            public PlayingFx(string key, ShownObject shown, long fadeIn, long solid, long fadeOut, long driftX, long driftY, long grow)
             {
                 Key = key;
                 Shown = shown;
                 FadeIn = fadeIn;
                 Solid = solid;
                 FadeOut = fadeOut;
-                Rise = rise;
+                DriftX = driftX;
+                DriftY = driftY;
+                Grow = grow;
             }
 
             public string Key { get; }
@@ -188,8 +190,12 @@ namespace Kesa.Engine.Ui
             public long FadeOut { get; }
             public long Life => FadeIn + Solid + FadeOut;
 
-            /// <summary>초당 공간 단위(고정소수점).</summary>
-            public long Rise { get; }
+            /// <summary>초당 공간 단위(고정소수점). <c>rise</c>는 y만 있는 <c>drift</c>다.</summary>
+            public long DriftX { get; }
+            public long DriftY { get; }
+
+            /// <summary>초당 크기 배율 변화(고정소수점).</summary>
+            public long Grow { get; }
 
             public long Elapsed;
         }
@@ -217,8 +223,9 @@ namespace Kesa.Engine.Ui
                     string key = FxPrefix + (++_fxNext).ToString(System.Globalization.CultureInfo.InvariantCulture);
                     Show(key, effect.Look, effect.Where);
                     if (!_shown.TryGetValue(key, out var shown)) continue;
-                    var playing = new PlayingFx(key, shown, Millis(Time(shown, "fade-in")), Millis(Time(shown, "solid")),
-                        Millis(Time(shown, "fade-out")), Time(shown, "rise"));
+                    var drift = Field(shown, "drift");
+                    var playing = new PlayingFx(key, shown, Millis(Number(shown, "fade-in")), Millis(Number(shown, "solid")),
+                        Millis(Number(shown, "fade-out")), drift?.Numbers[0] ?? 0, (drift?.Numbers[1] ?? 0) + Number(shown, "rise"), Number(shown, "grow"));
                     if (playing.Life == 0 && shown.Definition != null)
                         Report(shown.Definition.Place, "look '" + shown.Definition.Name + "' is played as an effect but has no fade-in, solid or fade-out, " +
                                                        "so it ends at once (spec-gaps G425)");
@@ -252,18 +259,23 @@ namespace Kesa.Engine.Ui
                 : p.FadeOut == 0 ? 0
                 : BridgeFixed.Scale - (t - p.FadeIn - p.Solid) * BridgeFixed.Scale / p.FadeOut;
             _renderer.SetOpacity(p.Shown.Handle, opacity);
-            if (p.Rise == 0) return;
-            long up = p.Rise * p.Shown.Unit / BridgeFixed.Scale * t / 1000;
+            if (p.DriftX == 0 && p.DriftY == 0 && p.Grow == 0) return;
+            long unit = p.Shown.Unit;
             var at = p.Shown.Position ?? default;
-            _renderer.PlaceObject(p.Shown.Handle, new LookPosition(at.X, at.Y + up, at.Z), p.Shown.Unit);
+            var moved = new LookPosition(at.X + p.DriftX * unit / BridgeFixed.Scale * t / 1000, at.Y + p.DriftY * unit / BridgeFixed.Scale * t / 1000, at.Z);
+            // 크기는 물체의 단위에 곱한다: 1 + grow × 초, 0 아래로는 가지 않음
+            long scale = Math.Max(0, BridgeFixed.Scale + p.Grow * t / 1000);
+            _renderer.PlaceObject(p.Shown.Handle, moved, unit * scale / BridgeFixed.Scale);
         }
 
-        // 그림 값이 덮으면 그 값, None이거나 못 읽으면 적힌 값 (G425)
-        private long Time(ShownObject shown, string name)
+        private long Number(ShownObject shown, string name) => Field(shown, name)?.Numbers[0] ?? 0;
+
+        // 그림 값이 덮으면 그 값, None이거나 못 읽으면 적힌 값, 둘 다 없으면 null (G425)
+        private LookAttributeValue? Field(ShownObject shown, string name)
         {
             var definition = shown.Definition;
-            if (definition == null) return 0;
-            definition.Timing.TryGetValue(name, out long written);
+            if (definition == null) return null;
+            definition.Timing.TryGetValue(name, out var written);
             foreach (var binding in definition.TimingBindings)
             {
                 if (binding.Attribute != name) continue;
@@ -273,14 +285,14 @@ namespace Kesa.Engine.Ui
                     continue;
                 }
                 if (raw is BridgeNone) continue;
-                var value = LookAttributes.FromValue(LookAttributeType.Number, raw, out error);
-                if (value == null || (value.Numbers[0] < 0 && name != "rise"))
+                var value = LookAttributes.FromValue(binding.Type, raw, out error);
+                if (value == null || (LookDefinition.IsDuration(name) && value.Numbers[0] < 0))
                 {
                     Report(definition.Place, "look '" + definition.Name + "', bind-" + name + "=\"" + binding.Source + "\": " +
                                              (value == null ? error : "a time is not negative"));
                     continue;
                 }
-                return value.Numbers[0];
+                return value;
             }
             return written;
         }

@@ -242,22 +242,31 @@ namespace Kesa.Engine.Ui
     /// <summary><c>&lt;Look name="…"&gt;</c> 하나 (G390).</summary>
     public sealed class LookDefinition
     {
-        /// <summary>효과로 띄울 때의 시간 칸 (G425): 초(<c>rise</c>는 초당 공간 단위), 고정소수점.</summary>
-        public static readonly IReadOnlyList<string> TimingNames = new[] { "fade-in", "solid", "fade-out", "rise" };
+        /// <summary>
+        /// 효과로 띄울 때의 시간 칸 (G425): <c>fade-in</c>·<c>solid</c>·<c>fade-out</c>은 초, <c>rise</c>·<c>drift</c>는 초당 공간 단위,
+        /// <c>grow</c>는 초당 크기 배율 변화.
+        /// </summary>
+        public static readonly IReadOnlyList<string> TimingNames = new[] { "fade-in", "solid", "fade-out", "rise", "drift", "grow" };
+
+        /// <summary>시간 칸의 값 종류.</summary>
+        public static LookAttributeType TimingType(string name) => name == "drift" ? LookAttributeType.Vector2 : LookAttributeType.Number;
+
+        /// <summary>음수가 되지 않는 시간 칸(시간들).</summary>
+        public static bool IsDuration(string name) => name == "fade-in" || name == "solid" || name == "fade-out";
 
         public LookDefinition(string name, string mod, string place, IReadOnlyList<LookElement> elements,
-            IReadOnlyDictionary<string, long>? timing = null, IReadOnlyList<LookBinding>? timingBindings = null)
+            IReadOnlyDictionary<string, LookAttributeValue>? timing = null, IReadOnlyList<LookBinding>? timingBindings = null)
         {
             Name = name;
             Mod = mod;
             Place = place;
             Elements = elements;
-            Timing = timing ?? new SortedDictionary<string, long>(StringComparer.Ordinal);
+            Timing = timing ?? new SortedDictionary<string, LookAttributeValue>(StringComparer.Ordinal);
             TimingBindings = timingBindings ?? Array.Empty<LookBinding>();
         }
 
-        /// <summary>적힌 시간 칸(고정소수점 원래 정수값). 없는 칸은 0이다.</summary>
-        public IReadOnlyDictionary<string, long> Timing { get; }
+        /// <summary>적힌 시간 칸. 없는 칸은 0이다.</summary>
+        public IReadOnlyDictionary<string, LookAttributeValue> Timing { get; }
 
         /// <summary><c>bind-fade-out="hold"</c>처럼 그림 값으로 덮는 시간 칸. 값이 <c>None</c>이면 적힌 값을 쓴다.</summary>
         public IReadOnlyList<LookBinding> TimingBindings { get; }
