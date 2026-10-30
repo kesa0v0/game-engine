@@ -185,6 +185,78 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(bob.Renderer.Named("endturn").Enabled, Is.True, "the world version moved, so bob's button woke up");
         }
 
+        private LookLibrary Looks()
+        {
+            var files = Directory.GetFiles(_modFolder, "*.xml", SearchOption.AllDirectories).OrderBy(f => f, System.StringComparer.Ordinal)
+                .Select(f => new LookSource("skirmish", Path.GetRelativePath(_modFolder, f).Replace(Path.DirectorySeparatorChar, '/'), File.ReadAllText(f)));
+            return LookLibrary.Load(files, LookKinds.Standard(), path => File.Exists(Path.Combine(_modFolder, path)));
+        }
+
+        /// <summary>
+        /// 맞음은 질문에 답해 커맨드가 끝난 뒤 신호 처리에서 효과가 된다. 물러날 칸을 눌러 답한 판과 화면을 skirmish의 staged로 연다.
+        /// </summary>
+        private async Task<(Seat Alice, LookBoard Board, MemoryLookRenderer Renderer, long Target)> AnsweredStaged()
+        {
+            var renderer = new MemoryLookRenderer();
+            var alice = await Open("alice", _red);
+            var bob = await Open("bob", _blue);
+            var board = new LookBoard(alice.Session, new LookStage(Looks(), renderer), BridgePresentation.Staged);
+            alice.Ui.Hold = board;
+            await board.RefreshAsync();
+            long target = await HitRed(alice, bob);
+            await alice.Ui.RefreshAsync();
+            await board.RefreshAsync();
+            Assert.That((board.Holding, Hit(alice)), Is.EqualTo((false, true)), "the question is open; nothing to play yet");
+            string spot = board.Stage.Keys.Single(k => k.StartsWith("mark:"));
+            Assert.That((await board.PressAsync(new[] { spot }))!.Succeeded, Is.True);
+            await alice.Ui.RefreshAsync();
+            await board.RefreshAsync();
+            return (alice, board, renderer, target);
+        }
+
+        private static bool Hit(Seat seat) => Cards(seat).Any(c => c.Classes.Contains("hit"));
+
+        /// <summary>staged (G430): 맞음의 고리·숫자를 보이는 동안 판(물러나기 전 자리, 물러날 칸)과 카드를 붙잡고, 숫자가 흐려지기 시작하면 놓는다.</summary>
+        [Test]
+        public async Task StagedHoldsTheBoardAndTheScreenWhileTheHitPlays()
+        {
+            var (alice, board, renderer, target) = await AnsweredStaged();
+            var stage = board.Stage;
+            bool Effects() => stage.Keys.Any(k => k.StartsWith(LookStage.FxPrefix));
+            bool Marked() => stage.Keys.Any(k => k.StartsWith("mark:"));
+            Assert.That((board.Holding, Effects(), Hit(alice), Marked()), Is.EqualTo((true, true, true, true)),
+                "the ring and the number play over the old board and screen");
+            Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -2.0, 0.0) "), "still where it was hit");
+            board.Advance(500);
+            await alice.Ui.RefreshAsync();
+            await board.RefreshAsync();
+            Assert.That((board.Holding, Hit(alice), Marked()), Is.EqualTo((true, true, true)), "the number holds until 0.55 s");
+            board.Advance(100);
+            await alice.Ui.RefreshAsync();
+            await board.RefreshAsync();
+            Assert.That((board.Holding, Effects(), Hit(alice), Marked()), Is.EqualTo((false, true, false, false)),
+                "let go as the number fades: the answered screen shows under its tail");
+            Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -3.0, 0.0) "), "it stepped back");
+            Assert.That(stage.Problems, Is.Empty, string.Join(", ", stage.Problems));
+        }
+
+        [Test]
+        public async Task APressWhileStagedSkipsThePlayInsteadOfActing()
+        {
+            var (alice, board, _, _) = await AnsweredStaged();
+            var stage = board.Stage;
+            Assert.That(board.Holding, Is.True);
+
+            var results = new List<BridgeResult>();
+            alice.Ui.ActionResult += (_, r) => results.Add(r);
+            await alice.Renderer.Named("endturn").Press();
+            Assert.That((results.Count, board.Holding, stage.PlayingCount), Is.EqualTo((0, false, 0)), "the press skipped the play and did nothing else");
+            await alice.Ui.RefreshAsync();
+            Assert.That(Hit(alice), Is.False, "the answered screen shows at once");
+            var inspect = await board.InputAsync(LookBoard.Secondary, new[] { "entity:" + UnitsOf(_red)[0] });
+            Assert.That(inspect!.Succeeded, Is.True, "let go, so presses act again");
+        }
+
         [Test]
         public async Task AHitUnitsCardLightsUpAndItsRetreatButtonAnswersTheQuestion()
         {

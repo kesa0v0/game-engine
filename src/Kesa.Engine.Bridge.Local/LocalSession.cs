@@ -217,17 +217,17 @@ namespace Kesa.Engine.Bridge.Local
                 {
                     if (item.Fx == null)
                     {
-                        effects.Add(new BridgeFx(item.Function, null, null, item.Error));
+                        effects.Add(new BridgeFx(item.Function, null, null, item.Error, item.Signal));
                         continue;
                     }
                     try
                     {
                         effects.Add(new BridgeFx(item.Function, KernelValues.ToBridge(item.Fx.Look, defOf).AsLook,
-                            KernelValues.ToBridge(item.Fx.Where, defOf).AsWhere, null));
+                            KernelValues.ToBridge(item.Fx.Where, defOf).AsWhere, null, item.Signal));
                     }
                     catch (BridgeValueException e)
                     {
-                        effects.Add(new BridgeFx(item.Function, null, null, e.Message));
+                        effects.Add(new BridgeFx(item.Function, null, null, e.Message, item.Signal));
                     }
                 }
                 batches.Add(new BridgeFxBatch(batch.Batch, effects));

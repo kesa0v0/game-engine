@@ -114,6 +114,7 @@ namespace Kesa.Engine.Ui
 
         private async ValueTask AnswerFallbackAsync(long request, BridgeMove move)
         {
+            if (SkippedByHold()) return;
             var result = await _session.Respond(request, move.Command, move.Arguments);
             ActionResult?.Invoke(move.Command, result);
             _recheck = true;

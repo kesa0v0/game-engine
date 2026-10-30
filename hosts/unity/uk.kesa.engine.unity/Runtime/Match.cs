@@ -19,6 +19,6 @@ namespace Kesa.Engine.Unity
         public LocalHost Host { get; }
 
         /// <summary>한 연결의 판 위 그림 (G412). 프레임마다 <see cref="LookBoard.RefreshAsync"/>를 부른다.</summary>
-        public LookBoard Board(IHostSession session, ILookRenderer renderer) => new LookBoard(session, new LookStage(Mods.Looks, renderer, Mods.Inputs, Mods.Format));
+        public LookBoard Board(IHostSession session, ILookRenderer renderer) => new LookBoard(session, new LookStage(Mods.Looks, renderer, Mods.Inputs, Mods.Format), Mods.Presentation);
     }
 }

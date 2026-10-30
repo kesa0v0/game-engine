@@ -372,7 +372,7 @@ namespace Kesa.Engine.Ui
 
         private async ValueTask EventAsync(UiNode node, UiEvent e)
         {
-            if (!node.Alive) return;
+            if (!node.Alive || SkippedByHold()) return;
             if (!TryEventCall(node, e, out string name, out var arguments)) return;
             var result = _uiActions.ContainsKey(name) ? await _session.Act(name, arguments) : await _session.Deliver(name, arguments);
             ActionResult?.Invoke(name, result);

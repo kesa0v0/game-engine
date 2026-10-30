@@ -94,6 +94,12 @@ namespace Kesa.Engine.Ui
         /// <summary>바인딩을 계산하다 난 오류. 같은 오류는 한 번만 담는다. 그 바인딩은 직전 값을 유지한다 (G341).</summary>
         public IReadOnlyList<UiProblem> Errors => _errors;
 
+        /// <summary>
+        /// <c>staged</c> 연출 (G430): 붙잡는 동안 <see cref="RefreshAsync"/>는 화면을 그대로 두고, 버튼 누름은 동작을 내지 않고 재생을 건너뛴다.
+        /// 보통 판(<see cref="LookBoard"/>)을 꽂는다.
+        /// </summary>
+        public IPresentationHold? Hold { get; set; }
+
         /// <summary>눌러서 낸 커맨드나 화면 동작의 결과(이름, 결과). 거절 이유를 보이는 것은 호스트 몫이다.</summary>
         public event Action<string, BridgeResult>? ActionResult;
 
@@ -135,6 +141,14 @@ namespace Kesa.Engine.Ui
             return result;
         }
 
+        // 붙잡는 동안의 누름은 동작 대신 건너뛰기다 (G430)
+        private bool SkippedByHold()
+        {
+            if (Hold == null || !Hold.Holding) return false;
+            Hold.Skip();
+            return true;
+        }
+
         /// <summary>쌓인 <see cref="Errors"/>를 비운다(같은 오류가 다시 나면 다시 담긴다).</summary>
         public void ClearErrors()
         {
@@ -153,7 +167,7 @@ namespace Kesa.Engine.Ui
 
         /// <summary>
         /// 세계가 바뀐 뒤 화면을 맞춘다: 영수증이 바뀌었거나 실패했던 연결만 다시 부르고, 세계 도장이나 UI 기록 도장이 움직였거나 낸 것이
-        /// 있으면 버튼을 다시 확인한다 (G342·G345).
+        /// 있으면 버튼을 다시 확인한다 (G342·G345). 연출을 붙잡고 있으면 아무것도 하지 않는다 (G430).
         /// </summary>
         public async ValueTask RefreshAsync()
         {
@@ -161,6 +175,7 @@ namespace Kesa.Engine.Ui
             _refreshing = true;
             try
             {
+                if (Hold != null && await Hold.HoldAsync()) return;
                 foreach (var key in await _session.Changed())
                 {
                     if (!_bindings.TryGetValue(key, out var binding) || !binding.Owner.Alive) continue;

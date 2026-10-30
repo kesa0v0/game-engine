@@ -40,8 +40,9 @@ namespace Kesa.Engine.Runtime
     /// <summary>효과 하나. 함수가 실패하면 <see cref="Fx"/>는 없고 <see cref="Error"/>가 그 함수 몫 하나로 실린다.</summary>
     public sealed class FxItem
     {
-        public FxItem(string function, FxValue? fx, string? error)
+        public FxItem(string function, long signal, FxValue? fx, string? error)
         {
+            Signal = signal;
             Function = function;
             Fx = fx;
             Error = error;
@@ -49,6 +50,9 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>낸 <c>@world_fx</c> 함수 (<c>모드.함수</c>).</summary>
         public string Function { get; }
+
+        /// <summary>효과가 난 신호의 번호. 같으면 같은 신호다 (G430).</summary>
+        public long Signal { get; }
 
         public FxValue? Fx { get; }
         public string? Error { get; }

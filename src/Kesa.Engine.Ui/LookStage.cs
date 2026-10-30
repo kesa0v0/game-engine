@@ -212,26 +212,41 @@ namespace Kesa.Engine.Ui
         /// </summary>
         public void Play(BridgeWorldFx fx)
         {
-            foreach (var batch in fx.Batches)
-                foreach (var effect in batch.Effects)
+            foreach (var batch in fx.Batches) Play(batch.Effects);
+        }
+
+        /// <summary>효과들을 함께 띄우고, 그중 가장 늦게 흐려지기 시작하는 때(밀리초, <c>fade-in</c>+<c>solid</c>)를 돌려준다 (G430의 한 단계).</summary>
+        public long Play(IEnumerable<BridgeFx> effects)
+        {
+            long lead = 0;
+            foreach (var effect in effects)
+            {
+                if (effect.Error != null)
                 {
-                    if (effect.Error != null)
-                    {
-                        Report(effect.Function, effect.Error);
-                        continue;
-                    }
-                    string key = FxPrefix + (++_fxNext).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    Show(key, effect.Look, effect.Where);
-                    if (!_shown.TryGetValue(key, out var shown)) continue;
-                    var drift = Field(shown, "drift");
-                    var playing = new PlayingFx(key, shown, Millis(Number(shown, "fade-in")), Millis(Number(shown, "solid")),
-                        Millis(Number(shown, "fade-out")), drift?.Numbers[0] ?? 0, (drift?.Numbers[1] ?? 0) + Number(shown, "rise"), Number(shown, "grow"));
-                    if (playing.Life == 0 && shown.Definition != null)
-                        Report(shown.Definition.Place, "look '" + shown.Definition.Name + "' is played as an effect but has no fade-in, solid or fade-out, " +
-                                                       "so it ends at once (spec-gaps G425)");
-                    _playing.Add(playing);
-                    Animate(playing);
+                    Report(effect.Function, effect.Error);
+                    continue;
                 }
+                string key = FxPrefix + (++_fxNext).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                Show(key, effect.Look, effect.Where);
+                if (!_shown.TryGetValue(key, out var shown)) continue;
+                var drift = Field(shown, "drift");
+                var playing = new PlayingFx(key, shown, Millis(Number(shown, "fade-in")), Millis(Number(shown, "solid")),
+                    Millis(Number(shown, "fade-out")), drift?.Numbers[0] ?? 0, (drift?.Numbers[1] ?? 0) + Number(shown, "rise"), Number(shown, "grow"));
+                if (playing.Life == 0 && shown.Definition != null)
+                    Report(shown.Definition.Place, "look '" + shown.Definition.Name + "' is played as an effect but has no fade-in, solid or fade-out, " +
+                                                   "so it ends at once (spec-gaps G425)");
+                _playing.Add(playing);
+                Animate(playing);
+                lead = Math.Max(lead, playing.FadeIn + playing.Solid);
+            }
+            return lead;
+        }
+
+        /// <summary>떠 있는 효과를 모두 지운다 (재생 건너뛰기).</summary>
+        public void StopEffects()
+        {
+            foreach (var playing in _playing) Hide(playing.Key);
+            _playing.Clear();
         }
 
         /// <summary>떠 있는 효과의 시간을 <paramref name="milliseconds"/>만큼 흐르게 하고, 수명이 끝난 것을 지운다.</summary>

@@ -98,6 +98,9 @@ namespace Kesa.Engine.Bridge.Tests
             {
                 "arena.number:number amount=2", "arena.flash:flash", "arena.number:number amount=2", "arena.flash:flash",
             }), "signal by signal, each signal's functions in load order");
+            var signals = next.Batches[0].Effects.Select(e => e.Signal).ToList();
+            Assert.That((signals[0] == signals[1], signals[1] == signals[2], signals[2] == signals[3]), Is.EqualTo((true, false, true)),
+                "the two effects of one signal share its number (G430)");
             Assert.That(next.Batches[1].Effects.Select(Show), Is.EqualTo(new[] { "arena.number:number amount=5", "arena.flash:flash" }));
             Assert.That(next.Batches[1].Batch, Is.GreaterThan(next.Batches[0].Batch));
             Assert.That(next.Batches[0].Effects[0].Where, Is.EqualTo(BridgeWhere.At("hex", BridgeValue.Of(0))));

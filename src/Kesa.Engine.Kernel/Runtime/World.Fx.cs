@@ -83,15 +83,16 @@ namespace Kesa.Engine.Runtime
                     batch = entry.Batch;
                 }
                 foreach (var decl in _worldFx)
-                    if (decl.Signal.Name == entry.Signal.Signal.Name) RunFx(viewer, ui, decl, entry.Signal, items);
+                    if (decl.Signal.Name == entry.Signal.Signal.Name) RunFx(viewer, ui, decl, entry, items);
             }
             if (items != null && items.Count > 0) batches.Add(new FxBatch(batch, items));
             return new FxResult(_fxStamp, since < _fxForgotten, batches);
         }
 
-        private void RunFx(WorldView viewer, UiState ui, WorldFxDecl decl, SignalValue signal, List<FxItem> into)
+        private void RunFx(WorldView viewer, UiState ui, WorldFxDecl decl, FxEntry entry, List<FxItem> into)
         {
             string id = decl.Id;
+            var signal = entry.Signal;
             try
             {
                 var result = ViewingWithUi(viewer, ui, () => Traced(id, _ =>
@@ -111,11 +112,11 @@ namespace Kesa.Engine.Runtime
                     throw new WorldException(Codes.RunType, "'" + id + "' returned " + value.KindName +
                                                             ", but a @world_fx function gives a list of fx(...) (spec-gaps G398)");
                 }));
-                foreach (var item in ((ListValue)result.Value).Items) into.Add(new FxItem(id, (FxValue)item, null));
+                foreach (var item in ((ListValue)result.Value).Items) into.Add(new FxItem(id, entry.Stamp, (FxValue)item, null));
             }
             catch (WorldException e)
             {
-                into.Add(new FxItem(id, null, e.Message));
+                into.Add(new FxItem(id, entry.Stamp, null, e.Message));
             }
         }
 

@@ -113,6 +113,7 @@ namespace Kesa.Engine.Unity.Editor
         /// <summary>효과 (G425): skirmish의 hit-flash가 투명하게 떠서 시간이 흐르면 보였다가 수명이 끝나면 지워진다.</summary>
         private static void CheckFx(Match game, IHostSession session)
         {
+            Require(game.Mods.Presentation == BridgePresentation.Staged, "skirmish asks for staged presentation, got " + game.Mods.Presentation);
             var boardObject = new GameObject("kesa-fx");
             try
             {

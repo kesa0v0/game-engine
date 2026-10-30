@@ -269,8 +269,9 @@ namespace Kesa.Engine.Bridge
     /// <summary><c>fx(그림, at=자리)</c> 하나. 효과 함수가 실패하면 그림·자리 없이 <see cref="Error"/>가 온다.</summary>
     public sealed class BridgeFx
     {
-        public BridgeFx(string function, BridgeLook? look, BridgeWhere? where, string? error)
+        public BridgeFx(string function, BridgeLook? look, BridgeWhere? where, string? error, long signal = 0)
         {
+            Signal = signal;
             Function = function;
             Look = look;
             Where = where;
@@ -283,6 +284,9 @@ namespace Kesa.Engine.Bridge
         public BridgeLook? Look { get; }
         public BridgeWhere? Where { get; }
         public string? Error { get; }
+
+        /// <summary>효과가 난 신호의 번호. 같으면 같은 신호이고 <c>staged</c>는 신호마다 한 단계다 (G430).</summary>
+        public long Signal { get; }
     }
 
     /// <summary>그 연결이 보는 열린 질문 하나 (G234: <see cref="Who"/>는 그 연결이 답할 수 있는 대상만).</summary>

@@ -130,6 +130,8 @@ public sealed class KesaDemo : MonoBehaviour
         board.transform.SetParent(transform, false);
         _boardRenderer = new GameObjectLookRenderer(board.transform, mods.Assets);
         _board = game.Board(session, _boardRenderer);
+        // staged면 효과를 보이는 동안 화면도 붙잡는다 (G430)
+        ui.Hold = _board;
         _inputs = new ModInputs(mods.Inputs);
         _root = root;
         var camera = Camera.main;
@@ -201,10 +203,11 @@ public sealed class KesaDemo : MonoBehaviour
             // 키 입력도 커서 아래로 간다 (G416: 가리킨 유닛에 F)
             if (_inputs != null && Pointer.current != null)
                 foreach (var input in _inputs.PressedThisFrame()) await PressBoard(input, Pointer.current.position.ReadValue());
-            if (_bot != null && Time.time >= _botNext && await _bot.Run() > 0) _botNext = Time.time + botDelay;
+            // 연출을 붙잡는 동안 봇은 쉰다 (G399)
+            if (_bot != null && _board?.Holding != true && Time.time >= _botNext && await _bot.Run() > 0) _botNext = Time.time + botDelay;
             await _ui.RefreshAsync();
             await RefreshBoard();
-            _board?.Stage.Advance((long)(Time.deltaTime * 1000f));
+            _board?.Advance((long)(Time.deltaTime * 1000f));
         }
         catch (Exception e)
         {
