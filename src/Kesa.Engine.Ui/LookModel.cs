@@ -244,15 +244,15 @@ namespace Kesa.Engine.Ui
     {
         /// <summary>
         /// 효과로 띄울 때의 시간 칸 (G425): <c>fade-in</c>·<c>solid</c>·<c>fade-out</c>은 초, <c>rise</c>·<c>drift</c>는 초당 공간 단위,
-        /// <c>grow</c>는 초당 크기 배율 변화.
+        /// <c>grow</c>는 초당 크기 배율 변화. <c>move</c>(초)는 효과가 아니라 자리가 바뀐 물체를 옮기는 시간이다 (G432).
         /// </summary>
-        public static readonly IReadOnlyList<string> TimingNames = new[] { "fade-in", "solid", "fade-out", "rise", "drift", "grow" };
+        public static readonly IReadOnlyList<string> TimingNames = new[] { "fade-in", "solid", "fade-out", "rise", "drift", "grow", "move" };
 
         /// <summary>시간 칸의 값 종류.</summary>
         public static LookAttributeType TimingType(string name) => name == "drift" ? LookAttributeType.Vector2 : LookAttributeType.Number;
 
         /// <summary>음수가 되지 않는 시간 칸(시간들).</summary>
-        public static bool IsDuration(string name) => name == "fade-in" || name == "solid" || name == "fade-out";
+        public static bool IsDuration(string name) => name == "fade-in" || name == "solid" || name == "fade-out" || name == "move";
 
         public LookDefinition(string name, string mod, string place, IReadOnlyList<LookElement> elements,
             IReadOnlyDictionary<string, LookAttributeValue>? timing = null, IReadOnlyList<LookBinding>? timingBindings = null, string? exit = null)

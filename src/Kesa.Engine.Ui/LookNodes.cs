@@ -24,8 +24,26 @@ namespace Kesa.Engine.Ui
         public UiScope Scope { get; }
 
         public List<LookNode> Roots { get; } = new List<LookNode>();
+        /// <summary>놓일 자리. 옮기는 중이면 도착할 자리다.</summary>
         public LookPosition? Position { get; set; }
         public long Unit { get; set; }
+
+        /// <summary>옮기기 (G432): 떠난 자리, 지난 밀리초, 전체 밀리초(0이면 옮기지 않는 중).</summary>
+        public LookPosition MoveFrom { get; set; }
+        public long MoveElapsed { get; set; }
+        public long MoveTotal { get; set; }
+
+        /// <summary>지금 보이는 자리.</summary>
+        public LookPosition? Drawn
+        {
+            get
+            {
+                if (MoveTotal == 0 || Position == null) return Position;
+                var to = Position.Value;
+                return new LookPosition(MoveFrom.X + (to.X - MoveFrom.X) * MoveElapsed / MoveTotal,
+                    MoveFrom.Y + (to.Y - MoveFrom.Y) * MoveElapsed / MoveTotal, MoveFrom.Z + (to.Z - MoveFrom.Z) * MoveElapsed / MoveTotal);
+            }
+        }
     }
 
     /// <summary>만든 요소 하나와 그 묶인 값의 직전 값.</summary>

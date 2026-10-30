@@ -103,10 +103,10 @@ namespace Kesa.Engine.Ui
         // 판에서 사라짐: 그림 정의의 exit=을 마지막 자리에 효과로 띄우고 지운다 (G431)
         private void Leave(string key)
         {
-            if (_shown.TryGetValue(key, out var shown) && shown.Definition?.Exit != null && shown.Position != null)
+            if (_shown.TryGetValue(key, out var shown) && shown.Definition?.Exit != null && shown.Drawn != null)
             {
                 string fx = NextFxKey();
-                ShowAt(fx, new BridgeLook(shown.Definition.Exit, shown.Look.Keys), shown.Position.Value, shown.Unit);
+                ShowAt(fx, new BridgeLook(shown.Definition.Exit, shown.Look.Keys), shown.Drawn.Value, shown.Unit);
                 if (_shown.TryGetValue(fx, out var exit)) StartFx(fx, exit);
             }
             Hide(key);
@@ -142,9 +142,23 @@ namespace Kesa.Engine.Ui
             }
             if (!shown.Position.Equals(position) || shown.Unit != unit)
             {
+                var from = shown.Drawn;
+                long move = from != null && shown.Unit == unit && !key.StartsWith(FxPrefix, StringComparison.Ordinal) ? Millis(Number(shown, "move")) : 0;
                 shown.Position = position;
                 shown.Unit = unit;
-                _renderer.PlaceObject(shown.Handle, position, unit);
+                if (move > 0)
+                {
+                    shown.MoveFrom = from!.Value;
+                    shown.MoveElapsed = 0;
+                    shown.MoveTotal = move;
+                    if (!_moving.Contains(shown)) _moving.Add(shown);
+                }
+                else
+                {
+                    shown.MoveTotal = 0;
+                    _moving.Remove(shown);
+                    _renderer.PlaceObject(shown.Handle, position, unit);
+                }
             }
         }
 
@@ -152,6 +166,7 @@ namespace Kesa.Engine.Ui
         {
             if (!_shown.TryGetValue(key, out var shown)) return;
             _shown.Remove(key);
+            _moving.Remove(shown);
             _renderer.Remove(shown.Handle);
         }
 
@@ -273,9 +288,22 @@ namespace Kesa.Engine.Ui
             _playing.Clear();
         }
 
-        /// <summary>떠 있는 효과의 시간을 <paramref name="milliseconds"/>만큼 흐르게 하고, 수명이 끝난 것을 지운다.</summary>
+        private readonly List<ShownObject> _moving = new List<ShownObject>();
+
+        /// <summary>떠 있는 효과와 옮기는 물체(G432)의 시간을 <paramref name="milliseconds"/>만큼 흐르게 하고, 수명이 끝난 효과를 지운다.</summary>
         public void Advance(long milliseconds)
         {
+            for (int i = _moving.Count - 1; i >= 0; i--)
+            {
+                var moving = _moving[i];
+                moving.MoveElapsed += milliseconds;
+                if (moving.MoveElapsed >= moving.MoveTotal)
+                {
+                    moving.MoveTotal = 0;
+                    _moving.RemoveAt(i);
+                }
+                _renderer.PlaceObject(moving.Handle, moving.Drawn!.Value, moving.Unit);
+            }
             for (int i = _playing.Count - 1; i >= 0; i--)
             {
                 var playing = _playing[i];

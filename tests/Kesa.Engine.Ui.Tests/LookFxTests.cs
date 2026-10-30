@@ -154,6 +154,55 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(stage.Problems, Is.Empty);
         }
 
+        private static BridgeWorldObjects Objects(long stamp, long x, BridgeValue? slide = null, long[]? gone = null)
+        {
+            var keys = slide == null ? new KeyValuePair<string, BridgeValue>[0] : new[] { new KeyValuePair<string, BridgeValue>("slide", slide) };
+            var changed = gone != null ? new BridgeWorldObject[0] : new[]
+            {
+                new BridgeWorldObject(new BridgeEntity(7, null), new BridgeLook("soldier", keys),
+                    BridgeWhere.At("square", new BridgeList(new BridgeValue[] { new BridgeInt(x), new BridgeInt(0) })), null),
+            };
+            return new BridgeWorldObjects(stamp, changed, gone ?? new long[0]);
+        }
+
+        private const string Walker = "<Looks>" +
+                                      "<Look name=\"soldier\" move=\"0.5\" bind-move=\"slide\" exit=\"down\"><Sprite src=\"s.png\" /></Look>" +
+                                      "<Look name=\"down\" fade-out=\"1\"><Sprite src=\"s.png\" /></Look>" +
+                                      "</Looks>";
+
+        /// <summary>옮기기 (G432): 처음은 바로 놓고, 자리가 바뀌면 보이던 자리에서 0.5초 동안 직선으로, 중간에 바뀌면 거기서 다시.</summary>
+        [Test]
+        public void AMovedObjectSlidesFromWhereItIsShown()
+        {
+            var stage = Stage(Walker);
+            stage.Apply(Objects(1, 0));
+            Assert.That(_renderer.Dump("entity:7"), Does.StartWith("@(0.0, 0.0, 0.0) "), "appears at once");
+            stage.Apply(Objects(2, 4));
+            Assert.That(_renderer.Dump("entity:7"), Does.StartWith("@(0.0, 0.0, 0.0) "));
+            stage.Advance(250);
+            Assert.That(_renderer.Dump("entity:7"), Does.StartWith("@(2.0, 0.0, 0.0) "), "halfway, whatever the distance");
+            stage.Apply(Objects(3, 0));
+            stage.Advance(250);
+            Assert.That(_renderer.Dump("entity:7"), Does.StartWith("@(1.0, 0.0, 0.0) "), "turned back from where it was shown");
+            stage.Advance(250);
+            Assert.That(_renderer.Dump("entity:7"), Does.StartWith("@(0.0, 0.0, 0.0) "));
+            stage.Apply(Objects(4, 3, slide: new BridgeInt(0)));
+            Assert.That(_renderer.Dump("entity:7"), Does.StartWith("@(3.0, 0.0, 0.0) "), "move 0 from the look value jumps");
+            Assert.That(stage.Problems, Is.Empty);
+        }
+
+        [Test]
+        public void AnObjectThatLeavesWhileMovingExitsWhereItIsShown()
+        {
+            var stage = Stage(Walker);
+            stage.Apply(Objects(1, 0));
+            stage.Apply(Objects(2, 2));
+            stage.Advance(125);
+            stage.Apply(Objects(3, 0, gone: new long[] { 7 }));
+            Assert.That(stage.Keys, Is.EqualTo(new[] { "fx:1" }));
+            Assert.That(_renderer.Dump("fx:1"), Does.StartWith("@(0.5, 0.0, 0.0) "));
+        }
+
         [Test]
         public void AnExitNamesAWrittenLook()
         {

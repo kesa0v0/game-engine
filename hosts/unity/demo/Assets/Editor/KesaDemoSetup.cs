@@ -174,6 +174,11 @@ public static class KesaDemoSetup
         await demo.PressBoard("primary", ScreenOf(from + Vector3.up));
         await demo.Step();
         demo.WaitPictures();
+        // skirmish 유닛은 move="0.25"로 미끄러져 간다 (G432)
+        demo.Pass(125);
+        if (Vector3.Distance(mover.localPosition, from + Vector3.up * 0.5f) > 0.01f)
+            throw new InvalidOperationException("the unit object should be halfway up from " + from + " after 0.125 s, is at " + mover.localPosition);
+        demo.Pass(200);
         if (Vector3.Distance(mover.localPosition, from + Vector3.up) > 0.01f)
             throw new InvalidOperationException("the unit object should step up one square from " + from + ", is at " + mover.localPosition);
     }

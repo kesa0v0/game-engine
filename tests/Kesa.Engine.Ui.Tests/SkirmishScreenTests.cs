@@ -207,6 +207,7 @@ namespace Kesa.Engine.Ui.Tests
             if (hp != null) _world.Set(new EntityId(target), _world.Member("Life", "hp"), new IntValue(hp.Value));
             await alice.Ui.RefreshAsync();
             await board.RefreshAsync();
+            board.Advance(250); // 시험이 옮겨 둔 자리로 미끄러져 가는 시간 (G432)
             Assert.That((board.Holding, Hit(alice)), Is.EqualTo((false, true)), "the question is open; nothing to play yet");
             string spot = board.Stage.Keys.Single(k => k.StartsWith("mark:"));
             Assert.That((await board.PressAsync(new[] { spot }))!.Succeeded, Is.True);
@@ -237,6 +238,8 @@ namespace Kesa.Engine.Ui.Tests
             await board.RefreshAsync();
             Assert.That((board.Holding, Effects(), Hit(alice), Marked()), Is.EqualTo((false, true, false, false)),
                 "let go as the number fades: the answered screen shows under its tail");
+            Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -2.0, 0.0) "), "it starts sliding back");
+            board.Advance(250);
             Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -3.0, 0.0) "), "it stepped back");
             Assert.That(stage.Problems, Is.Empty, string.Join(", ", stage.Problems));
         }
@@ -385,6 +388,7 @@ namespace Kesa.Engine.Ui.Tests
 
             long target = await HitRed(alice, bob);
             await board.RefreshAsync();
+            stage.Advance(250); // 시험이 옮겨 둔 자리로 미끄러져 가는 시간 (G432)
             Assert.That(stage.Problems, Is.Empty, string.Join(", ", stage.Problems));
             string spot = stage.Keys.Single(k => k.StartsWith("mark:"));
             Assert.That(renderer.Dump(spot), Is.EqualTo("@(2.0, -3.0, 0.0) Sprite[src=art/white.png,tint=#4080ff80]"));
@@ -392,7 +396,7 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(result!.Succeeded, Is.True, result.ToString());
             await board.RefreshAsync();
             Assert.That(stage.Keys.Any(k => k.StartsWith("mark:")), Is.False, "answered, so the mark is gone");
-            Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -3.0, 0.0) "), "the unit stepped back onto the marked square");
+            Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -2.0, 0.0) "), "it slides back over 0.25 s");
 
             // 맞음 신호의 효과(fx.py·fx.look.xml)가 물러난 칸에 뜬다: 고리는 0.6초, 피해 숫자는 떠오르며 0.95초
             var effects = stage.Keys.Where(k => k.StartsWith(LookStage.FxPrefix)).ToList();
@@ -406,6 +410,7 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(renderer.Dump(effects[1]), Does.StartWith("@(2.0, -2.52, 0.0) "), "the number rose 0.8 a second");
             stage.Advance(400);
             Assert.That(stage.Keys.Any(k => k.StartsWith(LookStage.FxPrefix)), Is.False);
+            Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -3.0, 0.0) "), "the unit stepped back onto the marked square");
         }
 
         [Test]

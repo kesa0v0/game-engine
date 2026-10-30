@@ -181,6 +181,9 @@ public sealed class KesaDemo : MonoBehaviour
         }
     }
 
+    /// <summary>판의 시간(효과·옮기기·연출 단계)을 넘긴다 (확인용: 편집 모드에서는 프레임이 돌지 않음).</summary>
+    public void Pass(long milliseconds) => _board?.Advance(milliseconds);
+
     /// <summary>봇이 할 일을 기다리지 않고 모두 하고 화면을 다시 그린다 (확인용).</summary>
     public async Task Step()
     {
