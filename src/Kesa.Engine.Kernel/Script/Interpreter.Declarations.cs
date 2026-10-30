@@ -13,6 +13,7 @@ namespace Kesa.Engine.Script
         public const string ActsForName = "acts_for";
         public const string UiActionName = "ui_action";
         public const string BotName = "bot";
+        public const string WorldMarksName = "world_marks";
 
         /// <summary>S5의 <c>on_stale=</c>. 이름만 예약했다: 지금은 기본 취소만 있다 (spec-gaps G166).</summary>
         public const string OnStaleName = "on_stale";
@@ -359,7 +360,7 @@ namespace Kesa.Engine.Script
 
             string? name = def.DecoratorName;
             if ((name == CommandName || name == SubmitPolicyName || name == ViewPolicyName || name == ViewRuleName || name == OnName || name == WhenName ||
-                 name == UiActionName || name == BotName || name == WrapName) && !IsBuiltin(name))
+                 name == UiActionName || name == BotName || name == WrapName || name == WorldMarksName) && !IsBuiltin(name))
             {
                 bool schema = _scope.IsSchemaName(name);
                 _context.Error(Codes.CmdBadDecorator,
@@ -416,10 +417,15 @@ namespace Kesa.Engine.Script
                 DeclareWrap(def, function, decorator);
                 return;
             }
+            if (name == WorldMarksName)
+            {
+                DeclareWorldMarks(def, function, decorator);
+                return;
+            }
             if (name != CommandName)
             {
                 _context.Error(Codes.CmdBadDecorator,
-                    "unknown decorator; only @command, @on, @when, @ui_action, @bot, @wrap and @view_rule are supported",
+                    "unknown decorator; only @command, @on, @when, @ui_action, @bot, @wrap, @view_rule and @world_marks are supported",
                     decorator.Span, hint: "write @command or @command(free=True, acts_for=...)");
                 return;
             }
@@ -526,6 +532,28 @@ namespace Kesa.Engine.Script
                 return;
             }
             _context.Functions.Bots.Add(new CommandDecl(_context.Mod, function, false, decorator.Span));
+        }
+
+        /// <summary>
+        /// <c>@world_marks</c> (G395): 인자 없는 데코레이터, 매개변수 없는 함수(G397: 보는 쪽은 연결 기준 읽기로 안다). 화면 함수 등급인지는
+        /// 효과 판정 뒤에 <c>FunctionEffects</c>가 본다.
+        /// </summary>
+        private void DeclareWorldMarks(FunctionDef def, FunctionValue function, Expr decorator)
+        {
+            if (decorator is CallExpr call)
+            {
+                _context.Error(Codes.CmdBadDecorator, "@world_marks takes no arguments",
+                    call.Arguments.Count > 0 ? call.Arguments[0].Span : call.Span,
+                    hint: "write @world_marks; the host calls it for every screen (spec-gaps G395)");
+                return;
+            }
+            if (def.Parameters.Count > 0)
+            {
+                _context.Error(Codes.CmdBadDecorator, "a @world_marks function takes no parameters", def.Parameters[0].Span,
+                    hint: "read what it needs on its own: questions(), ui.…, and the world as this screen sees it (spec-gaps G397)");
+                return;
+            }
+            _context.Functions.WorldMarks.Add(new CommandDecl(_context.Mod, function, false, decorator.Span));
         }
 
         /// <summary>

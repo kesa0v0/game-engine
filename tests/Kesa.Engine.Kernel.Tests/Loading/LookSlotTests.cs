@@ -63,7 +63,7 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         [TestCase("@command(free=True, acts_for=None)\ndef Go(u: Ref[Unit]):\n    p = spot(u)\n    u.Hp.v = 1\n",
-            "the @command 'Go' makes a look or a place (look(), at(), onto() or between()), so it cannot run as game code")]
+            "the @command 'Go' makes a look or a place (look(), at(), onto(), between() or mark()), so it cannot run as game code")]
         [TestCase("Goal(\"G\", ok=lambda g: spot(g) is not None)\n",
             "'ok': '<lambda>' makes a look or a place (at core/defs/defs.py:4:28), but Cond[\"Goal\"] holds functions that run as game code, " +
             "and looks and places only go to the screen")]

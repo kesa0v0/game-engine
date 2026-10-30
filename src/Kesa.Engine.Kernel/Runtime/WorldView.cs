@@ -79,6 +79,12 @@ namespace Kesa.Engine.Runtime
         public CallResult WorldObject(UiState ui, EntityId id) => _world.WorldObjectAs(this, ui, id);
 
         /// <summary>
+        /// 그 <c>@world_marks</c> 함수(<see cref="World.WorldMarkFunctions"/>)가 이 연결에 돌려주는 표시 목록(G395): <see cref="MarkValue"/>의 리스트.
+        /// 함수의 오류는 <see cref="WorldException"/>이다. 영수증은 <see cref="Call(UiState, string, Value[])"/>와 같다.
+        /// </summary>
+        public CallResult WorldMarks(UiState ui, string function) => _world.WorldMarksAs(this, ui, function);
+
+        /// <summary>
         /// 이 연결의 <c>@ui_action</c>을 부른다 (spec-gaps G278·G280): 인자 검사 → 사전 조건 → 본문. 본문의 읽기는 모두 이 연결로서의 거른
         /// 읽기이고, <c>ui.…</c> 쓰기는 성공했을 때만 <paramref name="ui"/>에 들어간다. 게임은 바뀌지 않는다. 적어 둔 <c>submit</c>은
         /// 결과의 <see cref="ActResult.Submissions"/>이고 호스트가 <see cref="World.Deliver"/>로 낸다. 없는 이름만 호출자 오류다.

@@ -402,6 +402,15 @@ namespace Kesa.Engine.Runtime
                         WhereKind.Onto => WhereValue.Onto(ToPlain(display, where.Target!), where.Name),
                         _ => WhereValue.Between((WhereValue)ToPlain(display, where.First!), (WhereValue)ToPlain(display, where.Second!)),
                     };
+                case MarkValue mark:
+                    SortedDictionary<string, Value>? arguments = null;
+                    if (mark.Arguments != null)
+                    {
+                        arguments = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+                        foreach (var pair in mark.Arguments) arguments[pair.Key] = ToPlain(display, pair.Value);
+                    }
+                    return new MarkValue((LookValue)ToPlain(display, mark.Look), (WhereValue)ToPlain(display, mark.Where), mark.Action, arguments,
+                        mark.Key == null ? null : ToPlain(display, mark.Key));
                 case QuestionValue _:
                 case ChoiceView _:
                     throw new ScriptRuntimeException(Codes.RunType,

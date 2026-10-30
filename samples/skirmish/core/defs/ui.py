@@ -98,3 +98,9 @@ def retreat(unit: Ref[Unit]):
     with preconditions:
         choose(unit, where=lambda u: is_hit(u))
     respond(hit_question(unit), "engine.pick", choice=1)
+
+# 판 위 표시 (G395): 맞은 유닛이 물러날 칸. 누르면 retreat로 답한다
+@world_marks
+def retreat_spots():
+    return [mark("retreat-spot", at=at("square", q.data["to"]), click=["skirmish.retreat", {"unit": q.data["unit"]}])
+            for q in questions("skirmish-hit")]

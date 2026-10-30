@@ -190,25 +190,7 @@ namespace Kesa.Engine.Ui.Tests
         {
             var alice = await Open("alice", _red);
             var bob = await Open("bob", _blue);
-            await alice.Renderer.Named("ask-end").Press();
-            await alice.Renderer.Named("endturn").Press();
-
-            // 파랑이 (2,1)에서 (2,2)의 빨강을 친다. 뒤 칸 (2,3)이 비어 있어 맞으면 버틸지 물러날지 묻는다. 빗나가면 다음 유닛으로
-            long target = UnitsOf(_red)[0];
-            Place(target, 2, 2);
-            foreach (long attacker in UnitsOf(_blue))
-            {
-                var at = (_world.Get(new EntityId(attacker), _world.Member("Pos", "x")), _world.Get(new EntityId(attacker), _world.Member("Pos", "y")));
-                Place(attacker, 2, 1);
-                var attack = await bob.Session.Deliver("skirmish.Attack", new Dictionary<string, BridgeValue>
-                {
-                    ["party"] = bob.Party, ["unit"] = new BridgeEntity(attacker, null), ["target"] = new BridgeEntity(target, null),
-                });
-                Assert.That(attack.Succeeded, Is.True, attack.ToString());
-                if (_world.OpenRequests.Any(q => q.Name == "skirmish-hit")) break;
-                Place(attacker, ((IntValue)at.Item1).Value, ((IntValue)at.Item2).Value);
-            }
-            Assert.That(_world.OpenRequests.Count(q => q.Name == "skirmish-hit"), Is.EqualTo(1), "one of the three attacks hit");
+            long target = await HitRed(alice, bob);
 
             await alice.Ui.RefreshAsync();
             await bob.Ui.RefreshAsync();
@@ -232,6 +214,48 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(((IntValue)_world.Get(new EntityId(target), _world.Member("Pos", "y"))).Value, Is.EqualTo(3), "it stepped back");
             Assert.That(Card(alice, target).Classes.Contains("hit"), Is.False, "the question closed, so the card was read again");
             Assert.That(Button(alice, target, "retreat").Enabled, Is.False);
+        }
+
+        /// <summary>파랑이 (2,1)에서 (2,2)의 빨강을 친다. 뒤 칸 (2,3)이 비어 있어 맞으면 버틸지 물러날지 묻는다. 빗나가면 다음 유닛으로.</summary>
+        private async Task<long> HitRed(Seat alice, Seat bob)
+        {
+            await alice.Renderer.Named("ask-end").Press();
+            await alice.Renderer.Named("endturn").Press();
+            long target = UnitsOf(_red)[0];
+            Place(target, 2, 2);
+            foreach (long attacker in UnitsOf(_blue))
+            {
+                var at = (_world.Get(new EntityId(attacker), _world.Member("Pos", "x")), _world.Get(new EntityId(attacker), _world.Member("Pos", "y")));
+                Place(attacker, 2, 1);
+                var attack = await bob.Session.Deliver("skirmish.Attack", new Dictionary<string, BridgeValue>
+                {
+                    ["party"] = bob.Party, ["unit"] = new BridgeEntity(attacker, null), ["target"] = new BridgeEntity(target, null),
+                });
+                Assert.That(attack.Succeeded, Is.True, attack.ToString());
+                if (_world.OpenRequests.Any(q => q.Name == "skirmish-hit")) break;
+                Place(attacker, ((IntValue)at.Item1).Value, ((IntValue)at.Item2).Value);
+            }
+            Assert.That(_world.OpenRequests.Count(q => q.Name == "skirmish-hit"), Is.EqualTo(1), "one of the three attacks hit");
+            return target;
+        }
+
+        [Test]
+        public async Task AHitUnitsRetreatSquareIsMarkedAndClickingItAnswers()
+        {
+            var alice = await Open("alice", _red);
+            var bob = await Open("bob", _blue);
+            Assert.That((await alice.Session.WorldMarks(0)).Changed, Is.Empty);
+            long target = await HitRed(alice, bob);
+
+            var spot = (await alice.Session.WorldMarks(0)).Changed.Single();
+            Assert.That((spot.Look!.Name, spot.Where), Is.EqualTo(("retreat-spot",
+                BridgeWhere.At("square", new BridgeList(new BridgeValue[] { BridgeValue.Of(2), BridgeValue.Of(3) })))));
+            Assert.That((await bob.Session.WorldMarks(0)).Changed, Is.Empty, "the question is red's to answer");
+
+            var result = await alice.Session.Act(spot.Click!.Action, spot.Click.Arguments);
+            Assert.That(result.Succeeded, Is.True, result.ToString());
+            Assert.That(((IntValue)_world.Get(new EntityId(target), _world.Member("Pos", "y"))).Value, Is.EqualTo(3), "it stepped back");
+            Assert.That((await alice.Session.WorldMarks(0)).Changed, Is.Empty, "the question closed, so the mark is gone");
         }
 
         [Test]

@@ -27,6 +27,16 @@ namespace Kesa.Engine.Bridge.Local
 
         private long _objectStamp;
 
+        /// <summary>표시 함수마다 지난 영수증과 낸 열쇠(G395). 영수증이 null이면 다시 부른다.</summary>
+        private readonly SortedDictionary<string, MarkSet> _markSets = new SortedDictionary<string, MarkSet>(StringComparer.Ordinal);
+
+        private readonly SortedDictionary<string, ShownMark> _marks = new SortedDictionary<string, ShownMark>(StringComparer.Ordinal);
+
+        /// <summary>없어진 표시의 열쇠와 없어진 때의 도장.</summary>
+        private readonly SortedDictionary<string, long> _marksGone = new SortedDictionary<string, long>(StringComparer.Ordinal);
+
+        private long _markStamp;
+
         internal LocalSession(LocalHost host, string connection)
         {
             _host = host;
@@ -156,6 +166,102 @@ namespace Kesa.Engine.Bridge.Local
                 receipt = null;
                 return new BridgeWorldObject(new BridgeEntity(id, World.IsAlive(entity) ? World.DefOf(entity) : null), null, null, e.Message);
             }
+        }
+
+        public ValueTask<BridgeWorldMarks> WorldMarks(long since)
+        {
+            var view = View;
+            foreach (var function in World.WorldMarkFunctions)
+            {
+                _markSets.TryGetValue(function, out var old);
+                if (old != null && old.Receipt != null && !old.Receipt.Changed(World)) continue;
+                var marks = ComputeMarks(view, function, out var receipt);
+                if (old != null)
+                    foreach (var key in old.Keys)
+                        if (!marks.ContainsKey(key))
+                        {
+                            _marks.Remove(key);
+                            _marksGone[key] = ++_markStamp;
+                        }
+                foreach (var pair in marks)
+                {
+                    if (_marks.TryGetValue(pair.Key, out var was) && Equals(was.Mark, pair.Value)) continue;
+                    _marks[pair.Key] = new ShownMark(pair.Value, ++_markStamp);
+                    _marksGone.Remove(pair.Key);
+                }
+                _markSets[function] = new MarkSet(receipt, new List<string>(marks.Keys));
+            }
+            var changed = new List<BridgeMark>();
+            foreach (var pair in _marks)
+                if (pair.Value.Stamp > since) changed.Add(pair.Value.Mark);
+            var gone = new List<string>();
+            foreach (var pair in _marksGone)
+                if (pair.Value > since) gone.Add(pair.Key);
+            return Done(new BridgeWorldMarks(_markStamp, changed, gone));
+        }
+
+        /// <summary>
+        /// 한 표시 함수의 표시를 열쇠로 (G396): <c>함수id/</c> 뒤에 <c>key=</c>가 있으면 그 값, 없으면 그림 이름과 자리, 겹치면 <c>#순번</c>.
+        /// 함수가 실패하면 영수증 없이 오류 표시 하나다.
+        /// </summary>
+        private SortedDictionary<string, BridgeMark> ComputeMarks(WorldView view, string function, out CallResult? receipt)
+        {
+            var marks = new SortedDictionary<string, BridgeMark>(StringComparer.Ordinal);
+            try
+            {
+                receipt = view.WorldMarks(_ui, function);
+                var defOf = DefOf(view);
+                foreach (var item in ((ListValue)receipt.Value).Items)
+                {
+                    var mark = (MarkValue)item;
+                    var look = KernelValues.ToBridge(mark.Look, defOf).AsLook;
+                    var where = KernelValues.ToBridge(mark.Where, defOf).AsWhere;
+                    BridgeMarkClick? click = null;
+                    if (mark.Action != null)
+                    {
+                        var arguments = new SortedDictionary<string, BridgeValue>(StringComparer.Ordinal);
+                        foreach (var pair in mark.Arguments!) arguments[pair.Key] = KernelValues.ToBridge(pair.Value, defOf);
+                        click = new BridgeMarkClick(mark.Action, arguments);
+                    }
+                    string key = function + "/" + (mark.Key != null
+                        ? "key=" + BridgeJson.Write(KernelValues.ToBridge(mark.Key, defOf))
+                        : look.Name + "@" + BridgeJson.Write(where));
+                    string unique = key;
+                    for (int n = 1; marks.ContainsKey(unique); n++) unique = key + "#" + n.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    marks.Add(unique, new BridgeMark(unique, look, where, click, null));
+                }
+            }
+            catch (Exception e) when (e is WorldException || e is BridgeValueException)
+            {
+                receipt = null;
+                marks.Clear();
+                marks.Add(function, new BridgeMark(function, null, null, null, e.Message));
+            }
+            return marks;
+        }
+
+        private sealed class MarkSet
+        {
+            public MarkSet(CallResult? receipt, IReadOnlyList<string> keys)
+            {
+                Receipt = receipt;
+                Keys = keys;
+            }
+
+            public CallResult? Receipt { get; }
+            public IReadOnlyList<string> Keys { get; }
+        }
+
+        private sealed class ShownMark
+        {
+            public ShownMark(BridgeMark mark, long stamp)
+            {
+                Mark = mark;
+                Stamp = stamp;
+            }
+
+            public BridgeMark Mark { get; }
+            public long Stamp { get; }
         }
 
         private sealed class Tracked

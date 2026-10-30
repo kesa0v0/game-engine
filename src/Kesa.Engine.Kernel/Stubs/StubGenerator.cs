@@ -81,6 +81,7 @@ namespace Kesa.Engine.Stubs
             "def at(space: str, value: Any, /) -> Any: ...\n" +
             "def onto(entity: Any, point: str = ..., /) -> Any: ...\n" +
             "def between(first: Any, second: Any, /) -> Any: ...\n" +
+            "def mark(look: Any, /, *, at: Any, click: list[Any] | None = ..., key: Any = ...) -> Any: ...\n" +
             "def floor(x: int | float, /) -> int: ...\n" +
             "def ceil(x: int | float, /) -> int: ...\n" +
             "def clamp(x: Any, low: Any, high: Any, /) -> Any: ...\n" +
@@ -108,6 +109,7 @@ namespace Kesa.Engine.Stubs
             "@overload\n" +
             "def command[F: Callable[..., Any]](*, free: bool = ..., acts_for: Any = ..., on_stale: Any = ...) -> Callable[[F], F]: ...\n" +
             "def ui_action[F: Callable[..., Any]](f: F, /) -> F: ...\n" +
+            "def world_marks[F: Callable[[], Any]](f: F, /) -> F: ...\n" +
             "def submit(command: str, /, **args: Any) -> None: ...\n" +
             "def view_rule[F: Callable[..., Any]](target: Any, /) -> Callable[[F], F]: ...\n" +
             "def on[F: Callable[..., Any]](signal: Any, /, *, stage: str = ..., now: bool = ...) -> Callable[[F], F]: ...\n" +

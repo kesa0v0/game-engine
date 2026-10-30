@@ -146,6 +146,77 @@ namespace Kesa.Engine.Bridge
         public IReadOnlyList<long> Gone { get; }
     }
 
+    /// <summary>
+    /// <c>@world_marks</c>가 낸 표시 하나 (G395·G396·G408). <see cref="Key"/>는 견주기용 열쇠로 호스트는 뜻을 읽지 않는다: 같은 열쇠면 같은 물체를
+    /// 고치고 없어지면 지운다. 표시 함수가 실패했으면 그 함수의 표시는 이것 하나이고 <see cref="Look"/>·<see cref="Where"/>가 null, <see cref="Error"/>가
+    /// 이유다(호스트는 경고만, 그릴 자리가 없다).
+    /// </summary>
+    public sealed class BridgeMark
+    {
+        public BridgeMark(string key, BridgeLook? look, BridgeWhere? where, BridgeMarkClick? click, string? error)
+        {
+            Key = key;
+            Look = look;
+            Where = where;
+            Click = click;
+            Error = error;
+        }
+
+        public string Key { get; }
+        public BridgeLook? Look { get; }
+        public BridgeWhere? Where { get; }
+
+        /// <summary>누르면 낼 화면 동작. null이면 보이기만 한다(누름은 아래 엔티티나 자리로 넘어감).</summary>
+        public BridgeMarkClick? Click { get; }
+
+        public string? Error { get; }
+
+        public override bool Equals(object? obj) =>
+            obj is BridgeMark o && o.Key == Key && Equals(o.Look, Look) && Equals(o.Where, Where) && Equals(o.Click, Click) && o.Error == Error;
+
+        public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Key);
+    }
+
+    /// <summary>표시를 누르면 낼 화면 동작: <see cref="IHostSession.Act"/>에 그대로 넘긴다.</summary>
+    public sealed class BridgeMarkClick
+    {
+        public BridgeMarkClick(string action, IReadOnlyDictionary<string, BridgeValue> arguments)
+        {
+            Action = action;
+            Arguments = arguments;
+        }
+
+        public string Action { get; }
+
+        /// <summary>이름 순.</summary>
+        public IReadOnlyDictionary<string, BridgeValue> Arguments { get; }
+
+        public override bool Equals(object? obj)
+        {
+            if (!(obj is BridgeMarkClick o) || o.Action != Action || o.Arguments.Count != Arguments.Count) return false;
+            foreach (var pair in Arguments)
+                if (!o.Arguments.TryGetValue(pair.Key, out var v) || !Equals(v, pair.Value)) return false;
+            return true;
+        }
+
+        public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Action);
+    }
+
+    /// <summary><see cref="IHostSession.WorldMarks"/>의 결과: 바뀐 표시(열쇠 순), 없어진 열쇠(순서대로), 다음에 넘길 도장.</summary>
+    public sealed class BridgeWorldMarks
+    {
+        public BridgeWorldMarks(long stamp, IReadOnlyList<BridgeMark> changed, IReadOnlyList<string> gone)
+        {
+            Stamp = stamp;
+            Changed = changed;
+            Gone = gone;
+        }
+
+        public long Stamp { get; }
+        public IReadOnlyList<BridgeMark> Changed { get; }
+        public IReadOnlyList<string> Gone { get; }
+    }
+
     /// <summary>그 연결이 보는 열린 질문 하나 (G234: <see cref="Who"/>는 그 연결이 답할 수 있는 대상만).</summary>
     public sealed class BridgeRequest
     {

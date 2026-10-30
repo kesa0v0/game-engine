@@ -496,10 +496,32 @@ Unit("Tree", ..., look="pine", where=lambda u: at("square", [u.Pos.x, u.Pos.y]))
 
 - 공간 이름과 값의 뜻(어느 칸이 화면의 어디인지, 한 칸에 여럿일 때 어떻게 늘어놓는지)은 호스트의 공간 종류가 정한다.
 
+### 표시: `@world_marks`와 `mark`
+
+엔티티가 아닌 것(물러날 칸, 사거리 원, 화살표)은 `@world_marks` 함수가 지금 보일 목록으로 돌려준다.
+`samples/skirmish/core/defs/ui.py`:
+
+```python
+# 맞은 유닛이 물러날 칸. 누르면 retreat로 답한다
+@world_marks
+def retreat_spots():
+    return [mark("retreat-spot", at=at("square", q.data["to"]), click=["skirmish.retreat", {"unit": q.data["unit"]}])
+            for q in questions("skirmish-hit")]
+```
+
+- 매개변수가 없다. 호스트가 화면마다 부르고, `questions()`·`ui.…`·엔티티 읽기가 그 화면의 것만 준다.
+  화면 함수와 같은 규칙이라 세계를 바꾸거나 난수를 쓰면 로드 오류다. 여러 모드에 여럿 있어도 된다.
+- `mark(그림, at=자리, click=[동작, 인자], key=열쇠)`: 그림은 `look(…)`이나 그림 이름 글자, `at=`는 꼭 적는다.
+  `click=`은 누르면 부를 `@ui_action`과 그 인자 사전이고, 없으면 보이기만 한다. `None`을 돌려주면 표시가 없다.
+- 지우기는 적지 않는다. 읽은 것이 바뀌면 다시 불러 지난 목록과 견주고 새것은 만들고 빠진 것은 지운다.
+  같은 표시는 그림 이름과 자리로 알아본다: 그림의 키=값만 바뀌면 같은 표시를 고친다(고리의 반지름).
+  자리가 바뀌어도 같은 표시로 이어 가려면(옮겨 가는 화살표) `key=`를 적는다.
+- 함수가 실패하면 그 함수의 표시만 사라지고 호스트가 경고한다.
+
 ### 어디서 쓰나
 
-`look`·`at`·`onto`·`between`이 만든 값은 화면으로만 나가고 담아 둘 수 없다. 그래서 화면 쪽 코드(칸 함수, 화면 함수,
-`@ui_action`)에서만 만든다.
+`look`·`at`·`onto`·`between`·`mark`가 만든 값은 화면으로만 나가고 담아 둘 수 없다. 그래서 화면 쪽 코드(칸 함수, 화면 함수,
+`@ui_action`, `@world_marks`)에서만 만든다.
 
 - 게임 쪽 코드에서 쓰면 로드 오류다(`CMD007`). `Cond`·`Action` 칸과 `@wrap`도 같다.
 - 칸을 변수에 담아 부르는 것처럼 이름으로 드러나지 않는 길은 실행 중에 오류가 난다(`at() can only be used on a screen`).

@@ -55,6 +55,7 @@ namespace Kesa.Engine.Loading
                 var commands = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var uiActions = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var bots = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
+                var worldMarks = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var handlers = new List<HandlerDecl>();
                 var whens = new List<WhenDecl>();
                 var wraps = new List<WrapDecl>();
@@ -81,6 +82,7 @@ namespace Kesa.Engine.Loading
                     foreach (var command in u.Functions.Commands) commands.Add(command.Id, command);
                     foreach (var action in u.Functions.UiActions) uiActions.Add(action.Id, action);
                     foreach (var bot in u.Functions.Bots) bots.Add(bot.Id, bot);
+                    foreach (var marks in u.Functions.WorldMarks) worldMarks.Add(marks.Id, marks);
                     handlers.AddRange(u.Functions.Handlers);
                     whens.AddRange(u.Functions.Whens);
                     viewRules.AddRange(u.Functions.ViewRules);
@@ -94,6 +96,7 @@ namespace Kesa.Engine.Loading
                     ViewRules = viewRules,
                     UiActions = uiActions,
                     Bots = bots,
+                    WorldMarks = worldMarks,
                     Order = order,
                     ModsRoot = modsRoot,
                     TextUses = textUses,

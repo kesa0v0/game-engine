@@ -443,4 +443,45 @@ namespace Kesa.Engine.Script
 
         public override string KindName => "location";
     }
+
+    /// <summary>
+    /// <c>@world_marks</c>가 돌려주는 표시 하나 <c>mark(그림, at=자리, click=[동작, 인자], key=열쇠)</c> (G395·G396). 화면으로만 나간다.
+    /// </summary>
+    public sealed class MarkValue : Value, IValueEquality
+    {
+        public MarkValue(LookValue look, WhereValue where, string? action, IReadOnlyDictionary<string, Value>? arguments, Value? key)
+        {
+            Look = look;
+            Where = where;
+            Action = action;
+            Arguments = arguments;
+            Key = key;
+        }
+
+        public LookValue Look { get; }
+        public WhereValue Where { get; }
+
+        /// <summary>누르면 부를 <c>@ui_action</c> id. null이면 보이기만 한다.</summary>
+        public string? Action { get; }
+
+        /// <summary>그 동작의 인자 (이름 순). <see cref="Action"/>이 있으면 비어 있어도 있다.</summary>
+        public IReadOnlyDictionary<string, Value>? Arguments { get; }
+
+        /// <summary><c>key=</c>로 적은 열쇠. null이면 그림 이름과 자리가 열쇠다(G396).</summary>
+        public Value? Key { get; }
+
+        public bool ValueEquals(Value other)
+        {
+            if (!(other is MarkValue o) || !PureOps.ValuesEqual(o.Look, Look) || !PureOps.ValuesEqual(o.Where, Where) || o.Action != Action)
+                return false;
+            if ((o.Key == null) != (Key == null) || Key != null && !PureOps.ValuesEqual(o.Key!, Key)) return false;
+            if (Arguments == null || o.Arguments == null) return Arguments == o.Arguments;
+            if (o.Arguments.Count != Arguments.Count) return false;
+            foreach (var pair in Arguments)
+                if (!o.Arguments.TryGetValue(pair.Key, out var v) || !PureOps.ValuesEqual(v, pair.Value)) return false;
+            return true;
+        }
+
+        public override string KindName => "mark";
+    }
 }

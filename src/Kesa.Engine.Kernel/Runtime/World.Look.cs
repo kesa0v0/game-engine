@@ -17,6 +17,7 @@ namespace Kesa.Engine.Runtime
             table.Add(PureBuiltins.AtName, new PureBuiltin(PureBuiltins.AtName, AtBuiltin));
             table.Add(PureBuiltins.OntoName, new PureBuiltin(PureBuiltins.OntoName, OntoBuiltin));
             table.Add(PureBuiltins.BetweenName, new PureBuiltin(PureBuiltins.BetweenName, BetweenBuiltin));
+            table.Add(PureBuiltins.MarkName, new PureBuiltin(PureBuiltins.MarkName, MarkBuiltin));
         }
 
         private Value LookBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
@@ -69,6 +70,69 @@ namespace Kesa.Engine.Runtime
                     "write between(at(\"hex\", a), onto(ship)) (spec-gaps G394)");
             return WhereValue.Between(first, second);
         }
+
+        private Value MarkBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
+            ScreenOnly("mark()");
+            const string usage = "write mark(look(\"spot\"), at=at(\"hex\", [3, 4]), click=[\"mymod.go\", {\"to\": [3, 4]}]) (spec-gaps G395)";
+            if (positional.Count != 1) throw LookError("mark() takes a look, got " + positional.Count + " arguments", usage);
+            var look = positional[0] switch
+            {
+                LookValue l => l,
+                StrValue s when s.Value.Length > 0 => new LookValue(s.Value, new SortedDictionary<string, Value>(StringComparer.Ordinal)),
+                _ => throw LookError("mark() takes look(...) or the name of a look, not " + positional[0].KindName, usage),
+            };
+            WhereValue? where = null;
+            string? action = null;
+            SortedDictionary<string, Value>? arguments = null;
+            Value? key = null;
+            foreach (var pair in keywords)
+            {
+                switch (pair.Key)
+                {
+                    case "at":
+                        where = pair.Value as WhereValue ??
+                                throw LookError("at= of mark() takes at(...), onto(...) or between(...), not " + pair.Value.KindName, usage);
+                        break;
+                    case "click":
+                        if (pair.Value is NoneValue) break;
+                        action = Click(pair.Value, out arguments);
+                        break;
+                    case "key":
+                        if (!(pair.Value is NoneValue))
+                            key = Savable("key= of mark()", pair.Value, "a key holds " + PlainHint + " (spec-gaps G396)", hidden: true);
+                        break;
+                    default:
+                        throw LookError("mark() has no argument '" + pair.Key + "'", "mark() takes at=, click= and key= (spec-gaps G395, G396)");
+                }
+            }
+            if (where == null) throw LookError("mark() needs at= to say where the mark goes", usage);
+            return new MarkValue(look, where, action, arguments, key);
+        }
+
+        /// <summary><c>click=[동작, 인자]</c>: 있는 <c>@ui_action</c>과 평범한 값의 사전.</summary>
+        private string Click(Value value, out SortedDictionary<string, Value> arguments)
+        {
+            const string usage = "write click=[\"mymod.go\", {\"to\": [3, 4]}] with a @ui_action and its arguments (spec-gaps G395)";
+            if (!(value is ListValue list) || list.Items.Count != 2 || !(list.Items[0] is StrValue name) || !(list.Items[1] is DictValue dict))
+                throw LookError("click= of mark() takes [the @ui_action, a dict of its arguments], not " + Describe(value), usage);
+            if (!_uiActions.ContainsKey(name.Value))
+                throw LookError("there is no @ui_action '" + name.Value + "' for click= of mark()",
+                    _commands.ContainsKey(name.Value)
+                        ? "'" + name.Value + "' is a command; point click= to a @ui_action that submits it (spec-gaps G395)"
+                        : Suggest.Hint(name.Value, _uiActions.Keys));
+            arguments = new SortedDictionary<string, Value>(StringComparer.Ordinal);
+            foreach (var item in dict.Items)
+            {
+                if (!(item.Key is StrValue k))
+                    throw LookError("the arguments in click= of mark() are named by str, not " + item.Key.KindName, usage);
+                arguments[k.Value] = Savable("an argument in click= of mark()", item.Value, "an argument holds " + PlainHint + " (spec-gaps G395)",
+                    hidden: true);
+            }
+            return name.Value;
+        }
+
+        private static string Describe(Value value) => value is ListValue list ? "a list of " + list.Items.Count : value.KindName;
 
         /// <summary>이름으로 보이지 않는 길(칸 값을 변수에 담아 부름)로 게임 코드가 만들면 실행 중에 막는다: 멈춘 흐름에 남으면 저장할 수 없다.</summary>
         private void ScreenOnly(string function)
@@ -172,6 +236,37 @@ namespace Kesa.Engine.Runtime
             throw new WorldException(Codes.RunType, "'" + label + "' returned " + value.KindName + ", but a " + slot + " slot gives " +
                                                     (slot == LookSlot ? "look(...) or the name of a look" : "at(...), onto(...) or between(...)") +
                                                     ", or None to leave it off the screen (spec-gaps G405)");
+        }
+
+        // ---- 표시 (G395·G396·G397) ----
+
+        private readonly IReadOnlyDictionary<string, CommandDecl> _worldMarks =
+            new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
+
+        /// <summary><c>@world_marks</c> 함수의 id (<c>모드id.함수이름</c>, 서수 순).</summary>
+        public IEnumerable<string> WorldMarkFunctions => _worldMarks.Keys;
+
+        /// <summary>그 표시 함수를 연결의 UI 기록과 함께 부른다. 값은 <see cref="MarkValue"/>의 리스트이고 <c>None</c>은 빈 리스트로 본다.</summary>
+        internal CallResult WorldMarksAs(WorldView viewer, UiState ui, string function)
+        {
+            NoHostWrites("WorldMarks");
+            if (!_worldMarks.TryGetValue(function, out var decl))
+                throw new WorldException(Codes.RunUnknownName, "there is no @world_marks '" + function + "'", Suggest.Hint(function, _worldMarks.Keys));
+            return ViewingWithUi(viewer, ui, () => Traced(function, _ =>
+            {
+                var value = RunGateFunction(decl.Function, Array.Empty<Value>(), function);
+                if (value is NoneValue) return new ListValue(new List<Value>());
+                if (value is ListValue list)
+                {
+                    foreach (var item in list.Items)
+                        if (!(item is MarkValue))
+                            throw new WorldException(Codes.RunType, "'" + function + "' returned a list holding " + item.KindName +
+                                                                    ", but a @world_marks function gives a list of mark(...) (spec-gaps G395)");
+                    return list;
+                }
+                throw new WorldException(Codes.RunType, "'" + function + "' returned " + value.KindName +
+                                                        ", but a @world_marks function gives a list of mark(...) (spec-gaps G395)");
+            }));
         }
     }
 }

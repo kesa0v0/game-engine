@@ -44,7 +44,7 @@ def resolve(a, t):
     bx = t.Pos.x + sign(t.Pos.x - a.Pos.x)
     by = t.Pos.y + sign(t.Pos.y - a.Pos.y)
     if free(bx, by):
-        r = ask(t.Owner.party, "skirmish-hit", name="skirmish-hit", choices=["skirmish-hit-hold", "skirmish-hit-retreat"], data={"unit": t, "roll": roll, "damage": damage})
+        r = ask(t.Owner.party, "skirmish-hit", name="skirmish-hit", choices=["skirmish-hit-hold", "skirmish-hit-retreat"], data={"unit": t, "roll": roll, "damage": damage, "to": [bx, by]})
         if r.index == 1:
             damage = damage // 2
             t.Pos.x = bx

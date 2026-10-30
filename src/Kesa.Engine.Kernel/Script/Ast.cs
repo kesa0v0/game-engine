@@ -418,7 +418,10 @@ namespace Kesa.Engine.Script
         /// </summary>
         public bool IsCommand => Decorators.Count > 0 && DecoratorName != Interpreter.SubmitPolicyName &&
                                  DecoratorName != Interpreter.ViewPolicyName && DecoratorName != Interpreter.ViewRuleName &&
-                                 !IsHandler && !IsWhen && !IsUiAction && !IsBot && !IsWrap;
+                                 !IsHandler && !IsWhen && !IsUiAction && !IsBot && !IsWrap && !IsWorldMarks;
+
+        /// <summary><c>@world_marks</c>인가 (G395). 입구가 아니라 호스트가 연결마다 부르는 화면 함수다.</summary>
+        public bool IsWorldMarks => Decorators.Count > 0 && DecoratorName == Interpreter.WorldMarksName;
 
         /// <summary><c>@wrap(대상)</c>인가 (spec-gaps G311·G312). 대상 함수를 부르는 자리마다 대신 불린다.</summary>
         public bool IsWrap => Decorators.Count > 0 && DecoratorName == Interpreter.WrapName;
