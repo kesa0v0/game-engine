@@ -2,7 +2,8 @@
     "name": "Kesa.Engine.Unity.Editor",
     "rootNamespace": "Kesa.Engine.Unity.Editor",
     "references": [
-        "Kesa.Engine.Unity"
+        "Kesa.Engine.Unity",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [
         "Editor"

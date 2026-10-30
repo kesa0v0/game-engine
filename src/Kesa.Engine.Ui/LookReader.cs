@@ -91,7 +91,7 @@ namespace Kesa.Engine.Ui
             }
         }
 
-        private static XElement? Parse(LookSource source, string rootName, List<UiProblem> problems)
+        public static XElement? Parse(LookSource source, string rootName, List<UiProblem> problems)
         {
             XDocument xml;
             try
@@ -112,7 +112,7 @@ namespace Kesa.Engine.Ui
             return root;
         }
 
-        private static string? Name(XElement node, string place, string element, List<UiProblem> problems)
+        public static string? Name(XElement node, string place, string element, List<UiProblem> problems)
         {
             string? name = node.Attribute("name")?.Value.Trim();
             if (string.IsNullOrEmpty(name))
@@ -123,7 +123,7 @@ namespace Kesa.Engine.Ui
             return name;
         }
 
-        private static string Place(string path, XObject node) =>
+        public static string Place(string path, XObject node) =>
             path + ":" + (node is IXmlLineInfo info && info.HasLineInfo() ? info.LineNumber : 0);
 
         private sealed class ElementReader

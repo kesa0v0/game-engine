@@ -11,6 +11,7 @@ using Kesa.Engine.Script;
 using Kesa.Engine.Ui;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
 namespace Kesa.Engine.Unity.Editor
@@ -91,7 +92,44 @@ namespace Kesa.Engine.Unity.Editor
             Require(host.Q("screen").styleSheets.count == 1, "the mod's ui/screen.uss is on the screen element");
             CheckWindows(mods.Assets);
             await CheckBoard(game, session);
+            CheckInputs(game.Mods);
             UssCheck.Run();
+        }
+
+        /// <summary>
+        /// 입력 선언 (G417·G423): skirmish의 <c>keys.input.xml</c>을 읽고, 모든 <c>Key</c> 이름이 키보드 컨트롤로 이어지며, 눌린 키가 입력 이름이 된다.
+        /// </summary>
+        private static void CheckInputs(LoadedMods mods)
+        {
+            Require(mods.Inputs.Problems.Count == 0, "input files read cleanly: " + string.Join("; ", mods.Inputs.Problems));
+            Require(mods.Inputs.Inputs.TryGetValue("inspect", out var inspect) && inspect.Key.ToString() == "I", "skirmish declares inspect on I");
+            var keyboard = InputSystem.AddDevice<Keyboard>();
+            var mouse = InputSystem.AddDevice<Mouse>();
+            try
+            {
+                var lost = ModInputs.KeyNames.Where(k => InputControlPath.TryFindControl(keyboard, ModInputs.PathOf(k)) == null).ToList();
+                Require(lost.Count == 0, "every Key name is a keyboard control, not: " + string.Join(", ", lost));
+                Require(InputControlPath.TryFindControl(mouse, ModInputs.PathOf(LookBoard.Secondary)) != null, "secondary is the right button");
+
+                var library = InputLibrary.Load(new[]
+                {
+                    new LookSource("t", "t/k.input.xml", "<Inputs><Input name=\"spin\" key=\"R\" /><Input name=\"spin-back\" key=\"SHIFT + R\" />" +
+                                                       "<Input name=\"save\" key=\"CTRL + Digit1\" /></Inputs>"),
+                }, ModInputs.KeyNames);
+                Require(library.Problems.Count == 0, "test inputs read: " + string.Join("; ", library.Problems));
+                // 편집 모드에서는 액션이 갱신되지 않아 누름은 흉내 내지 않고, 바인딩이 키로 풀리는지만 본다
+                using var inputs = new ModInputs(library);
+                string Controls(string action) => string.Join(",", inputs.Actions[action].controls.Select(c => c.name));
+                Require(Controls("spin") == "r", "spin is bound to R, got " + Controls("spin"));
+                Require(Controls("spin-back") == "shift,r", "spin-back is bound to SHIFT and R, got " + Controls("spin-back"));
+                Require(Controls("save") == "ctrl,1", "save is bound to CTRL and 1, got " + Controls("save"));
+                Require(Controls(LookBoard.Secondary) == "rightButton", "secondary is the right button, got " + Controls(LookBoard.Secondary));
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(keyboard);
+                InputSystem.RemoveDevice(mouse);
+            }
         }
 
         /// <summary>판 위 그림 (G412~G415): skirmish의 <c>looks/</c>로 표시가 SpriteRenderer로 칸 자리에 그려지고, 모르는 그림은 대체 그림이다.</summary>

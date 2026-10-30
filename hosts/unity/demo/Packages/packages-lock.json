@@ -1,12 +1,22 @@
 {
   "dependencies": {
+    "com.unity.inputsystem": {
+      "version": "1.18.0",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.uielements": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
+    },
     "uk.kesa.engine.unity": {
       "version": "file:../../uk.kesa.engine.unity",
       "depth": 0,
       "source": "local",
       "dependencies": {
         "com.unity.modules.uielements": "1.0.0",
-        "com.unity.modules.imageconversion": "1.0.0"
+        "com.unity.modules.imageconversion": "1.0.0",
+        "com.unity.inputsystem": "1.18.0"
       }
     },
     "com.unity.modules.hierarchycore": {

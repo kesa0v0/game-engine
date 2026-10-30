@@ -1,7 +1,9 @@
 {
     "name": "Kesa.Engine.Unity",
     "rootNamespace": "Kesa.Engine.Unity",
-    "references": [],
+    "references": [
+        "Unity.InputSystem"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

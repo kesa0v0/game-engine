@@ -22,9 +22,10 @@ namespace Kesa.Engine.Unity
         private readonly ContentLoadResult _content;
 
         private LoadedMods(ContentLoadResult content, Translator translator, ModFolderAssets assets, IReadOnlyList<string> modFolders,
-            IReadOnlyList<Diagnostic> diagnostics, LookLibrary looks)
+            IReadOnlyList<Diagnostic> diagnostics, LookLibrary looks, InputLibrary inputs)
         {
             Looks = looks;
+            Inputs = inputs;
             _content = content;
             Translator = translator;
             Assets = assets;
@@ -39,6 +40,12 @@ namespace Kesa.Engine.Unity
         /// 틀린 정의만 빠진다.
         /// </summary>
         public LookLibrary Looks { get; }
+
+        /// <summary>
+        /// 모드들의 입력 선언(<c>*.input.xml</c>, G417·G423). 키 이름은 Input System <c>Key</c>이고 읽다 난 문제는 <see cref="InputLibrary.Problems"/>에 있다.
+        /// 키를 누르면 이름을 내는 것은 <see cref="ModInputs"/>다.
+        /// </summary>
+        public InputLibrary Inputs { get; }
 
         public ModFolderAssets Assets { get; }
 
@@ -69,23 +76,27 @@ namespace Kesa.Engine.Unity
             var translator = translations.For(languages, message => Debug.LogWarning("Kesa translation: " + message));
             var folders = content.Mods.Select(m => Path.Combine(content.ModsRoot, m.Directory)).ToList();
             var assets = new ModFolderAssets(folders);
-            var looks = LookLibrary.Load(LookSources(content), lookKinds ?? LookKinds.Standard(), path => assets.Find(path) != null);
-            return new LoadedMods(content, translator, assets, folders, bag.ToSortedList(), looks);
+            var sources = HostSources(content).ToList();
+            var looks = LookLibrary.Load(sources, lookKinds ?? LookKinds.Standard(), path => assets.Find(path) != null);
+            var inputs = InputLibrary.Load(sources, ModInputs.KeyNames);
+            return new LoadedMods(content, translator, assets, folders, bag.ToSortedList(), looks, inputs);
         }
 
-        // 확장자로 알아보므로 모드 폴더 어디에 있어도 읽는다 (G409·G411). 한 모드 안은 경로 순
-        private static IEnumerable<LookSource> LookSources(ContentLoadResult content)
+        // 확장자로 알아보므로 모드 폴더 어디에 있어도 읽는다 (G409·G411·G417). 한 모드 안은 경로 순
+        private static IEnumerable<LookSource> HostSources(ContentLoadResult content)
         {
             foreach (var mod in content.Mods)
             {
                 string folder = Path.Combine(content.ModsRoot, mod.Directory);
                 var files = Directory.GetFiles(folder, "*.xml", SearchOption.AllDirectories)
                     .Select(f => Path.GetRelativePath(folder, f).Replace('\\', '/'))
-                    .Where(f => f.EndsWith(".look.xml", System.StringComparison.OrdinalIgnoreCase) || f.EndsWith(".space.xml", System.StringComparison.OrdinalIgnoreCase))
+                    .Where(f => HostExtensions.Any(e => f.EndsWith(e, System.StringComparison.OrdinalIgnoreCase)))
                     .OrderBy(f => f, System.StringComparer.Ordinal);
                 foreach (var file in files) yield return new LookSource(mod.Id, mod.Id + "/" + file, File.ReadAllText(Path.Combine(folder, file)));
             }
         }
+
+        private static readonly string[] HostExtensions = { ".look.xml", ".space.xml", InputLibrary.Extension };
 
         /// <summary>이 모드로 새 판을 연다. 모드를 다시 읽지 않는다.</summary>
         public Match NewMatch(int seed) => new Match(this, new LocalHost(_content, new World(_content, seed: seed)));

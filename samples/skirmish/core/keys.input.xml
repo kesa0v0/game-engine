@@ -1,0 +1,4 @@
+<Inputs>
+  <!-- 가리킨 유닛을 연다 (오른쪽 누름과 같음) -->
+  <Input name="inspect" key="I" />
+</Inputs>

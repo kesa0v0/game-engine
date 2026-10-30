@@ -284,6 +284,14 @@ namespace Kesa.Engine.Ui.Tests
             var inspected = await alice.Session.Call("inspected", "skirmish.inspected", new BridgeValue[0]);
             Assert.That(((BridgeEntity)inspected.Value!).Id, Is.EqualTo(archer), "the right press opened the unit's window");
 
+            var inputs = InputLibrary.Load(files, new[] { "I" });
+            Assert.That((inputs.Problems.Count, inputs.Inputs["inspect"].Key.ToString()), Is.EqualTo((0, "I")));
+            var other = UnitsOf(_red).First(u => u != archer);
+            var keyed = await board.InputAsync("inspect", new[] { "entity:" + other });
+            Assert.That(keyed!.Succeeded, Is.True, keyed.ToString());
+            inspected = await alice.Session.Call("inspected", "skirmish.inspected", new BridgeValue[0]);
+            Assert.That(((BridgeEntity)inspected.Value!).Id, Is.EqualTo(other), "the I key on a unit opens its window too");
+
             long target = await HitRed(alice, bob);
             await board.RefreshAsync();
             Assert.That(stage.Problems, Is.Empty, string.Join(", ", stage.Problems));

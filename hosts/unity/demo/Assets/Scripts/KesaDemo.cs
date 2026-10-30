@@ -11,6 +11,7 @@ using Kesa.Engine.Script;
 using Kesa.Engine.Ui;
 using Kesa.Engine.Unity;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
 /// <summary>
@@ -51,6 +52,7 @@ public sealed class KesaDemo : MonoBehaviour
     private UiInterpreter? _ui;
     private LookBoard? _board;
     private GameObjectLookRenderer? _boardRenderer;
+    private ModInputs? _inputs;
     private VisualElement? _root;
     private int _boardProblems;
     private BotSeat? _bot;
@@ -80,6 +82,7 @@ public sealed class KesaDemo : MonoBehaviour
         foreach (var d in mods.Diagnostics)
             if (d.Severity != Severity.Info) Debug.LogWarning("Kesa mods: " + d);
         foreach (var p in mods.Looks.Problems) Debug.LogWarning("Kesa looks: " + p);
+        foreach (var p in mods.Inputs.Problems) Debug.LogWarning("Kesa inputs: " + p);
         if (mods.Disabled.Count > 0) Debug.LogWarning("Kesa mods disabled by errors: " + string.Join(", ", mods.Disabled));
         var game = mods.NewMatch(1);
         var world = game.Host.World;
@@ -126,6 +129,7 @@ public sealed class KesaDemo : MonoBehaviour
         board.transform.SetParent(transform, false);
         _boardRenderer = new GameObjectLookRenderer(board.transform, mods.Assets);
         _board = game.Board(session, _boardRenderer);
+        _inputs = new ModInputs(mods.Inputs);
         _root = root;
         var camera = Camera.main;
         if (camera != null)
@@ -171,6 +175,8 @@ public sealed class KesaDemo : MonoBehaviour
         await RefreshBoard();
     }
 
+    private void OnDestroy() => _inputs?.Dispose();
+
     private async void Update()
     {
         if (_ui == null || _refreshing) return;
@@ -178,9 +184,10 @@ public sealed class KesaDemo : MonoBehaviour
         try
         {
             // 창이 ESC를 받지 않으면(거짓) 게임이 자기 메뉴를 열 자리다
-            if (Input.GetKeyDown(KeyCode.Escape)) await _ui.Windows.Escape();
-            if (Input.GetMouseButtonDown(0)) await PressBoard(LookBoard.Primary, Input.mousePosition);
-            if (Input.GetMouseButtonDown(1)) await PressBoard(LookBoard.Secondary, Input.mousePosition);
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) await _ui.Windows.Escape();
+            // 키 입력도 커서 아래로 간다 (G416: 가리킨 유닛에 F)
+            if (_inputs != null && Pointer.current != null)
+                foreach (var input in _inputs.PressedThisFrame()) await PressBoard(input, Pointer.current.position.ReadValue());
             if (_bot != null && Time.time >= _botNext && await _bot.Run() > 0) _botNext = Time.time + botDelay;
             await _ui.RefreshAsync();
             await RefreshBoard();

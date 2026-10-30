@@ -59,7 +59,7 @@ var board = match.Board(session, renderer);
 - 엔티티 물체(`WorldObjects`)와 표시(`WorldMarks`)를 받아 물체마다 GameObject 하나를 `boardTransform` 아래에 만든다. 물체는 공간 단위(`grid`의 `cell`)만큼 키우므로 그 안의 `size`·`offset`은 칸 단위다.
 - `Sprite`는 SpriteRenderer이고 그림의 긴 변이 1이다. `layer`는 조상 것을 더해 `sortingOrder`가 된다. 그림을 못 읽거나 그림 정의가 없으면 보라·검정 체크무늬다.
 - 게임의 요소 종류: `LookKinds.Standard()`에 `LookElementKind`를 더해 `LoadedMods.Load(…, lookKinds:)`로 넘기고, 같은 이름으로 `renderer.AddKind(이름, assets => new 내View())`(`ILookElementView`)를 더한다. 공간 종류는 `SpaceKind`를 `LookKinds`에 더한다.
-- 누름은 입력 이름(`LookBoard.Primary`·`Secondary`, G416)과 함께 넘긴다. 광선이 지나는 물체를 위에 그린 것부터 찾고(`KeysAt`), 광선이 닿는 공간의 자리를 판 기준으로 되돌린다(`PlaceAt`, `grid`의 역계산). `InputAsync`는 `click`이 있는 표시를 먼저 보고(주 누름만), 없으면 엔티티들과 자리를 경계의 `WorldInput`에 넘겨 모드의 `@world_input`이 받게 한다(G419·G422). 실제 단추와 입력 이름의 짝은 게임 코드가 정한다(데모는 왼쪽·오른쪽 단추). 모드 입력 선언 `.input.xml`(G417)은 아직 읽지 않는다.
+- 누름은 입력 이름(`LookBoard.Primary`·`Secondary`, G416)과 함께 넘긴다. 광선이 지나는 물체를 위에 그린 것부터 찾고(`KeysAt`), 광선이 닿는 공간의 자리를 판 기준으로 되돌린다(`PlaceAt`, `grid`의 역계산). `InputAsync`는 `click`이 있는 표시를 먼저 보고(주 누름만), 없으면 엔티티들과 자리를 경계의 `WorldInput`에 넘겨 모드의 `@world_input`이 받게 한다(G419·G422). 키·단추를 입력 이름으로 바꾸는 것은 `ModInputs`다(G417·G423): `new ModInputs(mods.Inputs)`가 `primary`·`secondary`와 모드의 `.input.xml` 선언마다 Input System 액션을 만들고, 프레임마다 `PressedThisFrame()`이 눌린 이름을 준다(데모는 이것을 커서 자리와 함께 `InputAsync`에 넘김). 패키지는 `com.unity.inputsystem` 1.18.0에 기대므로 프로젝트의 Active Input Handling이 Input System Package나 Both여야 한다. 플레이어 키 바꾸기는 `ModInputs.Actions`에 Input System의 다시 묶기와 `SaveBindingOverridesAsJson`을 쓴다. 키 누름 자체는 창 없는 확인에서 흉내 내지 못해(편집 모드에서 액션이 갱신되지 않음) `SmokeTest`는 바인딩이 키로 풀리는지만 본다.
 - 그림은 처음 보일 때 바로(동기) 읽는다. 비동기 읽기와 미리 읽기 목록(G392)은 아직 없다.
 
 ## 스타일시트 (USS)
