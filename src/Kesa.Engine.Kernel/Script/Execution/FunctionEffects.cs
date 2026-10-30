@@ -208,7 +208,7 @@ namespace Kesa.Engine.Script
         internal const string QuestionsHint = "the open questions and the seats differ for each player; read them in a screen function, " +
                                               "a @ui_action or a @bot (spec-gaps G383)";
 
-        internal const string LookNames = "look(), at(), onto(), between() or mark()";
+        internal const string LookNames = "look(), at(), onto(), between(), mark() or fx()";
 
         internal const string LookHint = "looks and places only go to the screen; make them in a Look or Where slot or a screen function (spec-gaps G389)";
 
@@ -315,6 +315,14 @@ namespace Kesa.Engine.Script
                             "the @bot '" + fn.Name + "' uses UI state (ui.…); a bot has no screen",
                             fn.Definition!.Span, "keep what the bot remembers in a bot_state and read it as bot.State.field (spec-gaps G374)",
                             new[] { fn.UiStateWitness!.Value });
+                }
+                else if (fn.IsWorldFx)
+                {
+                    // 호스트가 효과를 가져갈 때 연결마다 부르므로 화면 함수와 같은 규칙이다 (G398)
+                    string? refusal = Runtime.World.Refusal(fn, withUi: true);
+                    if (refusal != null)
+                        context.Error(Codes.CmdUiEffect, "the @world_fx '" + fn.Name + "' cannot run on a screen: " + refusal,
+                            fn.Definition!.Span, "a @world_fx function only reads and returns fx(...) (spec-gaps G398)");
                 }
                 else if (fn.IsWorldMarks)
                 {
@@ -627,7 +635,7 @@ namespace Kesa.Engine.Script
             private bool LookMaker(Expr expr, SortedSet<string> locals) =>
                 IsRuntime(expr, PureBuiltins.LookName, locals) || IsRuntime(expr, PureBuiltins.AtName, locals) ||
                 IsRuntime(expr, PureBuiltins.OntoName, locals) || IsRuntime(expr, PureBuiltins.BetweenName, locals) ||
-                IsRuntime(expr, PureBuiltins.MarkName, locals);
+                IsRuntime(expr, PureBuiltins.MarkName, locals) || IsRuntime(expr, PureBuiltins.FxName, locals);
 
             /// <summary><c>ui.기록.칸</c>(G279)이면 거짓, <c>bot.기록.칸</c>(G371)이면 참. 이름을 검사한다. 아니면 null.</summary>
             private bool? StateField(Expr expr, SortedSet<string> locals)

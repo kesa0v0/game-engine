@@ -109,6 +109,7 @@ namespace Kesa.Engine.Runtime
                 try
                 {
                     Drain(reactions);
+                    RecordFx();
                 }
                 finally
                 {

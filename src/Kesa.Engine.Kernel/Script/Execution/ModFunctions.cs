@@ -30,6 +30,7 @@ namespace Kesa.Engine.Script
 
         /// <summary><c>@world_marks</c>로 선언한 표시 함수, 정의된 순서대로 (G395). 매개변수가 없다(G397).</summary>
         public List<CommandDecl> WorldMarks { get; } = new List<CommandDecl>();
+        public List<WorldFxDecl> WorldFx { get; } = new List<WorldFxDecl>();
 
         /// <summary><c>@ui_action</c> 위의 <c>@world_input</c>, 정의된 순서대로 (G416·G419).</summary>
         public List<WorldInputDecl> WorldInputs { get; } = new List<WorldInputDecl>();

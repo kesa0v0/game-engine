@@ -217,6 +217,7 @@ namespace Kesa.Engine.Script
 
         /// <summary><c>@world_marks</c>인가 (G395).</summary>
         public bool IsWorldMarks => Definition != null && Definition.IsWorldMarks;
+        public bool IsWorldFx => Definition != null && Definition.IsWorldFx;
 
         /// <summary>메시지에 쓰는 입구 종류: <c>@command</c>, <c>@on handler</c>, <c>@when reaction</c> 또는 <c>@ui_action</c>.</summary>
         public string EntryKind => IsHandler ? "@on handler" : IsWhen ? "@when reaction" : IsUiAction ? "@ui_action" : IsBot ? "@bot" :

@@ -75,6 +75,7 @@ namespace Kesa.Engine.Runtime
             _bots = loaded.Bots;
             _worldMarks = loaded.WorldMarks;
             _worldInputs = loaded.WorldInputs;
+            SetWorldFx(loaded.WorldFx);
             _mods = loaded.Mods;
             _contents = loaded.Contents;
             _hostFunctions = loaded.HostFunctions;

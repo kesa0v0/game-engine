@@ -18,6 +18,7 @@ namespace Kesa.Engine.Runtime
             table.Add(PureBuiltins.OntoName, new PureBuiltin(PureBuiltins.OntoName, OntoBuiltin));
             table.Add(PureBuiltins.BetweenName, new PureBuiltin(PureBuiltins.BetweenName, BetweenBuiltin));
             table.Add(PureBuiltins.MarkName, new PureBuiltin(PureBuiltins.MarkName, MarkBuiltin));
+            table.Add(PureBuiltins.FxName, new PureBuiltin(PureBuiltins.FxName, FxBuiltin));
         }
 
         private Value LookBuiltin(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)

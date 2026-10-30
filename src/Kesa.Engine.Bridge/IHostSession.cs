@@ -57,6 +57,12 @@ namespace Kesa.Engine.Bridge
         ValueTask<BridgeWorldMarks> WorldMarks(long since);
 
         /// <summary>
+        /// 도장 <paramref name="since"/> 뒤에 난 신호마다 <c>@world_fx</c> 함수가 이 연결에 낸 효과 (G398·G426). 처음은 0을 넘겨 지금 도장을 받고,
+        /// 결과의 <see cref="BridgeWorldFx.Stamp"/>를 다음에 넘긴다. 늦어서 커널이 버린 효과가 있으면 <see cref="BridgeWorldFx.Missed"/>.
+        /// </summary>
+        ValueTask<BridgeWorldFx> WorldFx(long since);
+
+        /// <summary>
         /// 판 위 입력 (G416·G419·G420·G422): <paramref name="input"/>이 커서 아래 엔티티(<paramref name="entities"/>, 위에서부터)와 자리
         /// (<paramref name="place"/>, <c>at</c> 꼴이고 공간 이름이 있어야 쓰임)에 들어왔다. 커널이 엔티티 타입의, 그다음 그 공간의 <c>@world_input</c>
         /// 화면 동작 가운데 사전 조건을 통과한 첫 것을 하고 <see cref="Act"/>처럼 적힌 <c>submit</c>을 낸다. 모두 막혔으면 처음 막힌 결과, 받을 것이

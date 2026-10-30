@@ -84,6 +84,9 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public CallResult WorldMarks(UiState ui, string function) => _world.WorldMarksAs(this, ui, function);
 
+        /// <summary>도장 뒤에 난 효과를 이 연결의 눈으로 (G426).</summary>
+        public FxResult WorldFx(UiState ui, long since) => _world.WorldFxAs(this, ui, since);
+
         /// <summary>
         /// 판 위 입력 (G419·G420·G422): 커서 아래 엔티티(위에서부터)의 <c>@world_input</c> 화면 동작 가운데 사전 조건을 통과한 첫 것을 하고,
         /// 엔티티가 모두 받지 않으면 커서 아래 자리(<paramref name="space"/>의 <paramref name="place"/>, 없으면 null)의 공간 핸들러에 준다.

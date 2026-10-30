@@ -492,6 +492,24 @@ namespace Kesa.Engine.Script
         public override string KindName => "mark";
     }
 
+    /// <summary><c>@world_fx</c>가 돌려주는 효과 하나 <c>fx(그림, at=자리)</c> (G398). 화면으로만 나간다.</summary>
+    public sealed class FxValue : Value, IValueEquality
+    {
+        public FxValue(LookValue look, WhereValue where)
+        {
+            Look = look;
+            Where = where;
+        }
+
+        public LookValue Look { get; }
+        public WhereValue Where { get; }
+
+        public bool ValueEquals(Value other) =>
+            other is FxValue o && PureOps.ValuesEqual(o.Look, Look) && PureOps.ValuesEqual(o.Where, Where);
+
+        public override string KindName => "fx";
+    }
+
     /// <summary>표시가 한 입력에 부를 화면 동작과 인자 (G418).</summary>
     public sealed class MarkInput
     {

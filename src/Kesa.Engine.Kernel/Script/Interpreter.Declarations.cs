@@ -14,6 +14,7 @@ namespace Kesa.Engine.Script
         public const string UiActionName = "ui_action";
         public const string BotName = "bot";
         public const string WorldMarksName = "world_marks";
+        public const string WorldFxName = "world_fx";
         public const string WorldInputName = "world_input";
 
         /// <summary>S5의 <c>on_stale=</c>. 이름만 예약했다: 지금은 기본 취소만 있다 (spec-gaps G166).</summary>
@@ -379,7 +380,7 @@ namespace Kesa.Engine.Script
                 }
             }
             if ((name == CommandName || name == SubmitPolicyName || name == ViewPolicyName || name == ViewRuleName || name == OnName || name == WhenName ||
-                 name == UiActionName || name == BotName || name == WrapName || name == WorldMarksName) && !IsBuiltin(name))
+                 name == UiActionName || name == BotName || name == WrapName || name == WorldMarksName || name == WorldFxName) && !IsBuiltin(name))
             {
                 bool schema = _scope.IsSchemaName(name);
                 _context.Error(Codes.CmdBadDecorator,
@@ -443,10 +444,15 @@ namespace Kesa.Engine.Script
                 DeclareWorldMarks(def, function, decorator);
                 return;
             }
+            if (name == WorldFxName)
+            {
+                DeclareWorldFx(def, function, decorator);
+                return;
+            }
             if (name != CommandName)
             {
                 _context.Error(Codes.CmdBadDecorator,
-                    "unknown decorator; only @command, @on, @when, @ui_action, @bot, @wrap, @view_rule, @world_marks and @world_input are supported",
+                    "unknown decorator; only @command, @on, @when, @ui_action, @bot, @wrap, @view_rule, @world_marks, @world_input and @world_fx are supported",
                     decorator.Span, hint: "write @command or @command(free=True, acts_for=...)");
                 return;
             }
@@ -603,6 +609,47 @@ namespace Kesa.Engine.Script
                 return;
             }
             _context.Functions.WorldMarks.Add(new CommandDecl(_context.Mod, function, false, decorator.Span));
+        }
+
+        /// <summary>
+        /// <c>@world_fx(Damaged)</c> (G398): 신호 하나를 받고, 매개변수는 <c>@on</c>처럼 신호의 값을 이름으로 고른다. 화면 함수 등급인지는 효과 판정 뒤에
+        /// <c>FunctionEffects</c>가 본다.
+        /// </summary>
+        private void DeclareWorldFx(FunctionDef def, FunctionValue function, Expr decorator)
+        {
+            const string usage = "write @world_fx(SignalName) with a signal declared by signal(\"SignalName\", ...) in a schema file (spec-gaps G398)";
+            if (!(decorator is CallExpr call) || call.Arguments.Count != 1 || call.Arguments[0].Name != null)
+            {
+                _context.Error(Codes.CmdBadDecorator, "@world_fx takes one signal", decorator.Span, hint: usage);
+                return;
+            }
+            var value = Evaluate(call.Arguments[0].Value);
+            if (!(value is Loading.DefBuiltins.SignalName signal))
+            {
+                _context.Error(Codes.CmdBadDecorator, "@world_fx needs a signal, not " + value.KindName, call.Arguments[0].Span, hint: usage);
+                return;
+            }
+            bool ok = true;
+            foreach (var p in def.Parameters)
+            {
+                if (!signal.Signal.TryGetField(p.Name, out _))
+                {
+                    var names = new List<string>();
+                    foreach (var f in signal.Signal.Fields) names.Add(f.Name);
+                    _context.Error(Codes.CmdBadDecorator, "signal '" + signal.Signal.Name + "' has no value '" + p.Name + "'", p.Span,
+                        hint: Suggest.Hint(p.Name, names) ??
+                              "a @world_fx function's parameters pick values of the signal by name: " + string.Join(", ", names));
+                    ok = false;
+                }
+                else if (p.Default != null || p.Annotation != null)
+                {
+                    _context.Error(Codes.CmdBadDecorator,
+                        "a @world_fx parameter takes its type from the signal, so it has no " + (p.Default != null ? "default" : "type annotation"),
+                        p.Span, hint: "write just the name: def " + def.Name + "(" + p.Name + "): ... (spec-gaps G398)");
+                    ok = false;
+                }
+            }
+            if (ok) _context.Functions.WorldFx.Add(new WorldFxDecl(_context.Mod, function, signal.Signal, decorator.Span));
         }
 
         /// <summary>

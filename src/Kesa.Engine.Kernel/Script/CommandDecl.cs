@@ -117,6 +117,24 @@ namespace Kesa.Engine.Script
     /// <summary>
     /// <c>@on(Damaged)</c>로 신호에 붙인 핸들러 (spec S5, spec-gaps G145). 매개변수는 신호의 인자 중 필요한 것을 이름으로 고른다.
     /// </summary>
+    /// <summary><c>@world_fx(신호)</c> 함수 하나 (G398·G426).</summary>
+    public sealed class WorldFxDecl
+    {
+        public WorldFxDecl(string mod, FunctionValue function, SignalType signal, SourceSpan span)
+        {
+            Mod = mod;
+            Function = function;
+            Signal = signal;
+            Span = span;
+        }
+
+        public string Mod { get; }
+        public FunctionValue Function { get; }
+        public SignalType Signal { get; }
+        public SourceSpan Span { get; }
+        public string Id => Mod + "." + Function.Definition!.Name;
+    }
+
     public sealed class HandlerDecl
     {
         public HandlerDecl(string mod, FunctionValue function, SignalType signal, SourceSpan span)

@@ -204,6 +204,37 @@ namespace Kesa.Engine.Bridge.Local
             return Done(new BridgeWorldMarks(_markStamp, changed, gone));
         }
 
+        public ValueTask<BridgeWorldFx> WorldFx(long since)
+        {
+            var view = View;
+            var defOf = DefOf(view);
+            var fx = view.WorldFx(_ui, since);
+            var batches = new List<BridgeFxBatch>();
+            foreach (var batch in fx.Batches)
+            {
+                var effects = new List<BridgeFx>();
+                foreach (var item in batch.Effects)
+                {
+                    if (item.Fx == null)
+                    {
+                        effects.Add(new BridgeFx(item.Function, null, null, item.Error));
+                        continue;
+                    }
+                    try
+                    {
+                        effects.Add(new BridgeFx(item.Function, KernelValues.ToBridge(item.Fx.Look, defOf).AsLook,
+                            KernelValues.ToBridge(item.Fx.Where, defOf).AsWhere, null));
+                    }
+                    catch (BridgeValueException e)
+                    {
+                        effects.Add(new BridgeFx(item.Function, null, null, e.Message));
+                    }
+                }
+                batches.Add(new BridgeFxBatch(batch.Batch, effects));
+            }
+            return Done(new BridgeWorldFx(fx.Stamp, fx.Missed, batches));
+        }
+
         /// <summary>
         /// 한 표시 함수의 표시를 열쇠로 (G396): <c>함수id/</c> 뒤에 <c>key=</c>가 있으면 그 값, 없으면 그림 이름과 자리, 겹치면 <c>#순번</c>.
         /// 함수가 실패하면 영수증 없이 오류 표시 하나다.

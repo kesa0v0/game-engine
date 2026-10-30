@@ -116,7 +116,7 @@ namespace Kesa.Engine.Tests.Runtime
         [TestCase("@world_marks\ndef m():\n    for u in query(Scout):\n        u.Spot.x = 1\n    return []\n", "cannot run on a screen: it changes the world")]
         [TestCase("@world_marks\ndef m():\n    ui.Pick.unit = None\n    return []\n", "cannot run on a screen: it changes UI state")]
         [TestCase("@command(free=True, acts_for=None)\ndef Go():\n    m = mark(\"a\", at=at(0))\n",
-            "the @command 'Go' makes a look or a place (look(), at(), onto(), between() or mark())")]
+            "the @command 'Go' makes a look or a place (look(), at(), onto(), between(), mark() or fx())")]
         public void LoadingChecksTheShape(string defs, string message)
         {
             Mod("scouts", schema: ScoutSchema, defs: defs);

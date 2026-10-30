@@ -234,6 +234,57 @@ namespace Kesa.Engine.Bridge
         public IReadOnlyList<string> Gone { get; }
     }
 
+    /// <summary>
+    /// 도장 뒤에 난 효과 (G426). <see cref="Missed"/>면 커널이 더 들고 있지 않은 효과를 건너뛰었다. 처음(도장 0)은 효과 없이 도장만 온다.
+    /// </summary>
+    public sealed class BridgeWorldFx
+    {
+        public BridgeWorldFx(long stamp, bool missed, IReadOnlyList<BridgeFxBatch> batches)
+        {
+            Stamp = stamp;
+            Missed = missed;
+            Batches = batches;
+        }
+
+        public long Stamp { get; }
+        public bool Missed { get; }
+
+        /// <summary>커맨드 묶음 순서대로 (G399).</summary>
+        public IReadOnlyList<BridgeFxBatch> Batches { get; }
+    }
+
+    /// <summary>한 커맨드 묶음에서 난 효과, 신호가 난 순서대로.</summary>
+    public sealed class BridgeFxBatch
+    {
+        public BridgeFxBatch(long batch, IReadOnlyList<BridgeFx> effects)
+        {
+            Batch = batch;
+            Effects = effects;
+        }
+
+        public long Batch { get; }
+        public IReadOnlyList<BridgeFx> Effects { get; }
+    }
+
+    /// <summary><c>fx(그림, at=자리)</c> 하나. 효과 함수가 실패하면 그림·자리 없이 <see cref="Error"/>가 온다.</summary>
+    public sealed class BridgeFx
+    {
+        public BridgeFx(string function, BridgeLook? look, BridgeWhere? where, string? error)
+        {
+            Function = function;
+            Look = look;
+            Where = where;
+            Error = error;
+        }
+
+        /// <summary>낸 <c>@world_fx</c> 함수 (<c>모드.함수</c>).</summary>
+        public string Function { get; }
+
+        public BridgeLook? Look { get; }
+        public BridgeWhere? Where { get; }
+        public string? Error { get; }
+    }
+
     /// <summary>그 연결이 보는 열린 질문 하나 (G234: <see cref="Who"/>는 그 연결이 답할 수 있는 대상만).</summary>
     public sealed class BridgeRequest
     {

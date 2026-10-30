@@ -57,6 +57,7 @@ namespace Kesa.Engine.Loading
                 var bots = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var worldMarks = new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
                 var worldInputs = new List<WorldInputDecl>();
+                var worldFx = new List<WorldFxDecl>();
                 var handlers = new List<HandlerDecl>();
                 var whens = new List<WhenDecl>();
                 var wraps = new List<WrapDecl>();
@@ -85,6 +86,7 @@ namespace Kesa.Engine.Loading
                     foreach (var bot in u.Functions.Bots) bots.Add(bot.Id, bot);
                     foreach (var marks in u.Functions.WorldMarks) worldMarks.Add(marks.Id, marks);
                     worldInputs.AddRange(u.Functions.WorldInputs);
+                    worldFx.AddRange(u.Functions.WorldFx);
                     handlers.AddRange(u.Functions.Handlers);
                     whens.AddRange(u.Functions.Whens);
                     viewRules.AddRange(u.Functions.ViewRules);
@@ -100,6 +102,7 @@ namespace Kesa.Engine.Loading
                     Bots = bots,
                     WorldMarks = worldMarks,
                     WorldInputs = worldInputs,
+                    WorldFx = worldFx,
                     Order = order,
                     ModsRoot = modsRoot,
                     TextUses = textUses,
