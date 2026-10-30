@@ -1,4 +1,5 @@
 using System.Linq;
+using Kesa.Engine.Bridge;
 using NUnit.Framework;
 
 namespace Kesa.Engine.Ui.Tests
@@ -56,6 +57,22 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(Of("back").IsCoveredBy(Of("spin")), Is.False);
             Assert.That(Of("alt").IsCoveredBy(Of("far")), Is.False, "different modifiers");
             Assert.That(Of("spin").IsCoveredBy(Of("save")), Is.False, "different keys");
+        }
+
+        [Test]
+        public void AHandlerOfAnUndeclaredInputIsAProblem()
+        {
+            var library = Load(Source("tanks", "<Input name=\"rotate\" key=\"R\" />"));
+            var problems = library.CheckHandlers(new[]
+            {
+                new BridgeWorldInput("rotate", "Unit", "tanks.turn", "tanks"),
+                new BridgeWorldInput("secondary", "square", "tanks.go", "tanks"),
+                new BridgeWorldInput("rotat", "Unit", "planes.turn", "planes"),
+            });
+            Assert.That(problems.Select(p => p.ToString()), Is.EqualTo(new[]
+            {
+                "planes.turn: no .input.xml declares the input 'rotat' (did you mean 'rotate'?), so no key reaches it (@world_input(\"rotat\", \"Unit\"))",
+            }));
         }
 
         [Test]

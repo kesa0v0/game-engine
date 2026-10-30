@@ -64,6 +64,9 @@ namespace Kesa.Engine.Bridge
         /// </summary>
         ValueTask<BridgeResult?> WorldInput(string input, IReadOnlyList<long> entities, BridgeWhere? place = null);
 
+        /// <summary>판 위 입력 핸들러(<c>@world_input</c>), 로드 순서대로 (G424). 선언에 없는 입력 이름을 알리거나 키 도움말에 쓴다.</summary>
+        ValueTask<IReadOnlyList<BridgeWorldInput>> WorldInputs();
+
         /// <summary>이 연결에게 보이는 엔티티를 (스키마의 종류 순, id 순)으로, 도장과 함께 (G329).</summary>
         ValueTask<IReadOnlyList<BridgeListed>> Entities();
 

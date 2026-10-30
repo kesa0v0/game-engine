@@ -251,6 +251,25 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(stage.Problems.Select(p => p.ToString()).Single(), Does.Contain("click= and inputs[\"primary\"] both answer the primary press"));
         }
 
+        [Test]
+        public void AMarkInputNoFileDeclaresIsReportedOncePerFunction()
+        {
+            var declared = InputLibrary.Load(new[] { new LookSource("core", "core/k.input.xml", "<Inputs><Input name=\"rotate\" key=\"R\" /></Inputs>") },
+                new[] { "R" });
+            var stage = new LookStage(Looks("<Looks><Look name=\"dot\"><Sprite src=\"art/dot.png\" /></Look></Looks>"), new MemoryLookRenderer(), declared);
+            BridgeMarkClick Act(string action) => new BridgeMarkClick(action, new Dictionary<string, BridgeValue>());
+            var inputs = new Dictionary<string, BridgeMarkClick> { ["rotate"] = Act("core.turn"), ["rotat"] = Act("core.turn"), ["secondary"] = Act("core.move") };
+            stage.Apply(new BridgeWorldMarks(1, new[]
+            {
+                new BridgeMark("core.f/dot@1", Look("dot"), At(1, 0), null, null, inputs),
+                new BridgeMark("core.f/dot@2", Look("dot"), At(2, 0), null, null, inputs),
+            }, new string[0]));
+            Assert.That(stage.Problems.Select(p => p.ToString()), Is.EqualTo(new[]
+            {
+                "core.f: no .input.xml declares the input 'rotat' (did you mean 'rotate'?), so no key reaches it (inputs= of a mark)",
+            }));
+        }
+
         private static LookPosition P(double x, double y, double z) =>
             new LookPosition((long)(x * BridgeFixed.Scale), (long)(y * BridgeFixed.Scale), (long)(z * BridgeFixed.Scale));
 

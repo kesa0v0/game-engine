@@ -92,16 +92,19 @@ namespace Kesa.Engine.Unity.Editor
             Require(host.Q("screen").styleSheets.count == 1, "the mod's ui/screen.uss is on the screen element");
             CheckWindows(mods.Assets);
             await CheckBoard(game, session);
-            CheckInputs(game.Mods);
+            await CheckInputs(game.Mods, session);
             UssCheck.Run();
         }
 
         /// <summary>
         /// 입력 선언 (G417·G423): skirmish의 <c>keys.input.xml</c>을 읽고, 모든 <c>Key</c> 이름이 키보드 컨트롤로 이어지며, 눌린 키가 입력 이름이 된다.
         /// </summary>
-        private static void CheckInputs(LoadedMods mods)
+        private static async Task CheckInputs(LoadedMods mods, IHostSession session)
         {
             Require(mods.Inputs.Problems.Count == 0, "input files read cleanly: " + string.Join("; ", mods.Inputs.Problems));
+            var handlers = await session.WorldInputs();
+            var unknown = mods.Inputs.CheckHandlers(handlers);
+            Require(handlers.Any(h => h.Input == "inspect") && unknown.Count == 0, "every skirmish handler has a key: " + string.Join("; ", unknown));
             Require(mods.Inputs.Inputs.TryGetValue("inspect", out var inspect) && inspect.Key.ToString() == "I", "skirmish declares inspect on I");
             var keyboard = InputSystem.AddDevice<Keyboard>();
             var mouse = InputSystem.AddDevice<Mouse>();

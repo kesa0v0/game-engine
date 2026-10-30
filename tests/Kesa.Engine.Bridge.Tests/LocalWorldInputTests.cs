@@ -78,6 +78,16 @@ namespace Kesa.Engine.Bridge.Tests
         private async Task<long> By() => ((BridgeInt)(await _alice.Call("by", "arena.by", new BridgeValue[0])).Value!).Value;
 
         [Test]
+        public async Task TheHandlersAreListedInLoadOrder()
+        {
+            var handlers = await _alice.WorldInputs();
+            Assert.That(handlers.Select(h => (h.Input, h.Target, h.Action, h.Mod)), Is.EqualTo(new[]
+            {
+                ("primary", "Unit", "arena.pick", "arena"), ("primary", "Unit", "scouts.spot", "scouts"), ("primary", "Tower", "scouts.climb", "scouts"),
+            }));
+        }
+
+        [Test]
         public async Task TheLaterModTakesItWhenItsPreconditionsPass()
         {
             _world.Set(_foot, _world.Member("Pos", "x"), new IntValue(3));

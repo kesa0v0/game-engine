@@ -328,6 +328,24 @@ namespace Kesa.Engine.Bridge
         public IReadOnlyList<BridgeParameter> Parameters { get; }
     }
 
+    /// <summary><c>@world_input</c> 핸들러 하나 (G424). <see cref="Target"/>은 Def 타입이나 공간 이름(G422)이다.</summary>
+    public sealed class BridgeWorldInput
+    {
+        public BridgeWorldInput(string input, string target, string action, string mod)
+        {
+            Input = input;
+            Target = target;
+            Action = action;
+            Mod = mod;
+        }
+
+        public string Input { get; }
+        public string Target { get; }
+        /// <summary>받는 화면 동작(<c>모드.동작</c>).</summary>
+        public string Action { get; }
+        public string Mod { get; }
+    }
+
     public sealed class BridgeParameter
     {
         public BridgeParameter(string name, string type, BridgeValue? @default = null)

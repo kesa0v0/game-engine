@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Kesa.Engine.Bridge;
 
 namespace Kesa.Engine.Ui
 {
@@ -24,6 +25,23 @@ namespace Kesa.Engine.Ui
 
         /// <summary>읽다 난 문제. 틀린 선언만 빠지고 나머지는 쓴다.</summary>
         public IReadOnlyList<UiProblem> Problems { get; }
+
+        /// <summary>내장 입력이거나 선언된 입력인가.</summary>
+        public bool Knows(string input) => input == LookBoard.Primary || input == LookBoard.Secondary || Inputs.ContainsKey(input);
+
+        /// <summary>선언에 없는 입력을 받는 핸들러 (G417·G424). 키가 없어 그 핸들러는 눌릴 수 없다.</summary>
+        public IReadOnlyList<UiProblem> CheckHandlers(IEnumerable<BridgeWorldInput> handlers)
+        {
+            var problems = new List<UiProblem>();
+            foreach (var handler in handlers)
+                if (!Knows(handler.Input))
+                    problems.Add(new UiProblem(handler.Action, Unknown(handler.Input) + " (@world_input(\"" + handler.Input + "\", \"" + handler.Target + "\"))"));
+            return problems;
+        }
+
+        internal string Unknown(string input) =>
+            "no " + Extension + " declares the input '" + input + "'" +
+            UiSuggest.Hint(input, Inputs.Keys.Append(LookBoard.Primary).Append(LookBoard.Secondary)) + ", so no key reaches it";
 
         /// <summary>
         /// <paramref name="sources"/>는 모드의 로드 순서대로다. 확장자가 <c>.input.xml</c>이 아닌 파일은 건너뛴다.

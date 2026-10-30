@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Kesa.Engine.Runtime;
 using Kesa.Engine.Schema;
@@ -64,6 +65,9 @@ namespace Kesa.Engine.Bridge.Local
         public ValueTask<IReadOnlyList<BridgeCommand>> Commands() => Done(KernelResults.Commands(_host.Loaded.Commands));
 
         public ValueTask<IReadOnlyList<BridgeCommand>> UiActions() => Done(KernelResults.Commands(_host.Loaded.UiActions));
+
+        public ValueTask<IReadOnlyList<BridgeWorldInput>> WorldInputs() =>
+            Done<IReadOnlyList<BridgeWorldInput>>(_host.Loaded.WorldInputs.Select(w => new BridgeWorldInput(w.Input, w.Target, w.Action.Id, w.Mod)).ToList());
 
         public ValueTask<string?> CheckCall(string function, int argumentCount) =>
             Done(View.CheckCall(function, argumentCount, withUi: true));

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Kesa.Engine.Bridge;
 
 namespace Kesa.Engine.Ui
@@ -19,10 +20,14 @@ namespace Kesa.Engine.Ui
         private readonly List<UiProblem> _problems = new List<UiProblem>();
         private readonly SortedSet<string> _problemTexts = new SortedSet<string>(StringComparer.Ordinal);
 
-        public LookStage(LookLibrary library, ILookRenderer renderer)
+        private readonly InputLibrary? _declared;
+
+        /// <param name="inputs">입력 선언. 주면 표시의 <c>inputs=</c>에 선언에 없는 이름이 오면 알린다 (G424).</param>
+        public LookStage(LookLibrary library, ILookRenderer renderer, InputLibrary? inputs = null)
         {
             _library = library;
             _renderer = renderer;
+            _declared = inputs;
         }
 
         /// <summary>그리다 난 문제(같은 것은 한 번). 판은 막지 않는다 (G364·G392).</summary>
@@ -39,6 +44,9 @@ namespace Kesa.Engine.Ui
                 else _clicks.Remove("mark:" + mark.Key);
                 if (mark.Inputs.Count > 0) _inputs["mark:" + mark.Key] = mark.Inputs;
                 else _inputs.Remove("mark:" + mark.Key);
+                if (_declared != null)
+                    foreach (var input in mark.Inputs.Keys.OrderBy(k => k, StringComparer.Ordinal))
+                        if (!_declared.Knows(input)) Report(FunctionOf(mark.Key), _declared.Unknown(input) + " (inputs= of a mark)");
                 if (mark.Click != null && mark.Inputs.ContainsKey(LookBoard.Primary))
                     Report(mark.Key, "click= and inputs[\"primary\"] both answer the primary press; click= is used (spec-gaps G418)");
                 if (mark.Error != null)
@@ -299,6 +307,13 @@ namespace Kesa.Engine.Ui
                 for (int r = 0; r < templateCount; r++)
                     created.Roots.Add(Build(owner.Definition.Children[r], owner.Handle, i * templateCount + r, created.Scope, look));
             }
+        }
+
+        // 같은 함수의 표시마다 같은 경고를 내지 않게
+        private static string FunctionOf(string markKey)
+        {
+            int slash = markKey.IndexOf('/');
+            return slash < 0 ? markKey : markKey.Substring(0, slash);
         }
 
         private void Report(string place, string message)

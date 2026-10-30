@@ -94,6 +94,7 @@ public sealed class KesaDemo : MonoBehaviour
         await game.Host.Seat(seat.Value, connection);
         var session = await game.Host.Open(connection);
         Session = session;
+        foreach (var p in mods.Inputs.CheckHandlers(await session.WorldInputs())) Debug.LogWarning("Kesa inputs: " + p);
 
         // 빈자리는 질문에 아무도 답하지 않아 판이 멈추므로 봇을 앉힌다 (G366)
         if (botSeatDef.Length > 0)
