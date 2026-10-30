@@ -148,6 +148,18 @@ namespace Kesa.Engine.Unity
             t.localScale = new Vector3(scale, scale, scale);
         }
 
+        public void SetOpacity(ElementId obj, long opacity)
+        {
+            float alpha = Real(opacity);
+            Fade(_nodes[obj.Value], alpha);
+        }
+
+        private static void Fade(Node node, float alpha)
+        {
+            node.View?.SetOpacity(alpha);
+            foreach (var child in node.Children) Fade(child, alpha);
+        }
+
         public void ShowMissing(ElementId obj)
         {
             var view = new SpriteView(_pictures);
@@ -256,6 +268,8 @@ namespace Kesa.Engine.Unity
             private readonly SpriteRenderer _renderer;
             private Vector2? _size;
             private string? _src;
+            private Color _tint = Color.white;
+            private float _opacity = 1f;
 
             public SpriteView(LookPictures pictures)
             {
@@ -279,12 +293,21 @@ namespace Kesa.Engine.Unity
                         break;
                     case "tint":
                         uint c = value.Color;
-                        _renderer.color = new Color32((byte)(c >> 24), (byte)(c >> 16), (byte)(c >> 8), (byte)c);
+                        _tint = new Color32((byte)(c >> 24), (byte)(c >> 16), (byte)(c >> 8), (byte)c);
+                        Paint();
                         break;
                 }
             }
 
             public void SetSortingOrder(int order) => _renderer.sortingOrder = order;
+
+            public void SetOpacity(float opacity)
+            {
+                _opacity = opacity;
+                Paint();
+            }
+
+            private void Paint() => _renderer.color = new Color(_tint.r, _tint.g, _tint.b, _tint.a * _opacity);
 
             public void ShowMissing()
             {

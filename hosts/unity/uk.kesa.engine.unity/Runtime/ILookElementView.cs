@@ -16,5 +16,10 @@ namespace Kesa.Engine.Unity
 
         /// <summary>조상의 <c>layer</c>를 더한 그리는 순서.</summary>
         void SetSortingOrder(int order);
+
+        /// <summary>물체 전체의 투명도(0~1)를 제 색에 곱한다 (G425: 효과가 흐려질 때). 투명도가 없는 종류는 그대로 둔다.</summary>
+        void SetOpacity(float opacity)
+        {
+        }
     }
 }

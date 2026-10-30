@@ -33,11 +33,32 @@ namespace Kesa.Engine.Ui
                     continue;
                 }
                 string? name = Name(node, place, "Look", problems);
+                var timing = new SortedDictionary<string, long>(StringComparer.Ordinal);
+                var timingBindings = new List<LookBinding>();
                 foreach (var attribute in node.Attributes())
-                    if (!attribute.IsNamespaceDeclaration && attribute.Name.LocalName != "name")
-                        problems.Add(new UiProblem(place, "<Look> takes only name; put '" + attribute.Name.LocalName + "' on an element inside it"));
+                {
+                    string n = attribute.Name.LocalName;
+                    if (attribute.IsNamespaceDeclaration || n == "name") continue;
+                    string target = n.StartsWith("bind-", StringComparison.Ordinal) ? n.Substring("bind-".Length) : n;
+                    if (!LookDefinition.TimingNames.Contains(target))
+                    {
+                        problems.Add(new UiProblem(place, "<Look> takes name and the effect times " + string.Join(", ", LookDefinition.TimingNames) +
+                            UiSuggest.Hint(target, LookDefinition.TimingNames) + "; put '" + n + "' on an element inside it"));
+                        continue;
+                    }
+                    if (target != n)
+                    {
+                        var expr = reader.ParseVariable(place, n, attribute.Value);
+                        if (expr != null) timingBindings.Add(new LookBinding(target, LookAttributeType.Number, expr, attribute.Value));
+                        continue;
+                    }
+                    var value = LookAttributes.FromText(LookAttributeType.Number, attribute.Value, out string error);
+                    if (value == null) problems.Add(new UiProblem(place, n + "=\"" + attribute.Value + "\": " + error));
+                    else if (value.Numbers[0] < 0 && n != "rise") problems.Add(new UiProblem(place, n + "=\"" + attribute.Value + "\": a time is not negative"));
+                    else timing[n] = value.Numbers[0];
+                }
                 var elements = node.Elements().Select(e => reader.Read(e)).ToList();
-                if (name != null) looks.Add(new LookDefinition(name, source.Mod, place, elements));
+                if (name != null) looks.Add(new LookDefinition(name, source.Mod, place, elements, timing, timingBindings));
             }
         }
 
@@ -216,7 +237,7 @@ namespace Kesa.Engine.Ui
                 return source == null ? null : new LookRepeat(match.Groups[1].Value, source, text);
             }
 
-            private VarExpr? ParseVariable(string place, string attribute, string text)
+            public VarExpr? ParseVariable(string place, string attribute, string text)
             {
                 UiExpr expr;
                 try

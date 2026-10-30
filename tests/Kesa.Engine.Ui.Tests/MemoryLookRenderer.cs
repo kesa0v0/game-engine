@@ -16,6 +16,7 @@ namespace Kesa.Engine.Ui.Tests
             public bool Visible = true;
             public bool Missing;
             public LookPosition? Position;
+            public long Opacity = Bridge.BridgeFixed.Scale;
             public long Unit;
         }
 
@@ -41,6 +42,8 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         public void ShowMissing(ElementId obj) => Nodes[obj.Value].Missing = true;
+
+        public void SetOpacity(ElementId obj, long opacity) => Nodes[obj.Value].Opacity = opacity;
 
         public ElementId Create(string kind, ElementId parent, int index)
         {
@@ -75,7 +78,8 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         /// <summary>
-        /// 물체 하나: <c>@위치 Kind[속성=값,…]{자식…}</c>, 공간 단위가 1이 아니면 위치 뒤에 <c>x단위</c>, 숨긴 요소는 앞에 <c>-</c>, 대체 그림은 <c>MISSING</c>.
+        /// 물체 하나: <c>@위치 Kind[속성=값,…]{자식…}</c>, 공간 단위가 1이 아니면 위치 뒤에 <c>x단위</c>, 투명도가 1이 아니면 <c>a투명도</c>, 숨긴 요소는 앞에 <c>-</c>,
+    /// 대체 그림은 <c>MISSING</c>.
         /// </summary>
         public string Dump(string key)
         {
@@ -83,6 +87,7 @@ namespace Kesa.Engine.Ui.Tests
             var sb = new StringBuilder();
             sb.Append('@').Append(node.Position?.ToString() ?? "-");
             if (node.Unit != Bridge.BridgeFixed.Scale) sb.Append(" x").Append(new Bridge.BridgeFixed(node.Unit).Decimal);
+            if (node.Opacity != Bridge.BridgeFixed.Scale) sb.Append(" a").Append(new Bridge.BridgeFixed(node.Opacity).Decimal);
             if (node.Missing) sb.Append(" MISSING");
             foreach (var child in node.Children) sb.Append(' ').Append(DumpNode(child));
             return sb.ToString();

@@ -50,6 +50,7 @@ def resolve(a, t):
             t.Pos.x = bx
             t.Pos.y = by
     t.Life.hp -= damage
+    emit(Hit(x=t.Pos.x, y=t.Pos.y, damage=damage))
     if t.Life.hp <= 0:
         destroy(t)
 

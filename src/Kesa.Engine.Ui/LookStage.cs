@@ -158,6 +158,131 @@ namespace Kesa.Engine.Ui
             foreach (var pair in look.Keys) scope.Set(pair.Key, pair.Value);
         }
 
+        // ---- 효과 (G398·G425·G426) ----
+
+        /// <summary>효과 물체의 열쇠 앞머리. 뒤는 띄운 순번.</summary>
+        public const string FxPrefix = "fx:";
+
+        private sealed class PlayingFx
+        {
+            public PlayingFx(string key, ShownObject shown, long fadeIn, long solid, long fadeOut, long rise)
+            {
+                Key = key;
+                Shown = shown;
+                FadeIn = fadeIn;
+                Solid = solid;
+                FadeOut = fadeOut;
+                Rise = rise;
+            }
+
+            public string Key { get; }
+            public ShownObject Shown { get; }
+
+            /// <summary>밀리초.</summary>
+            public long FadeIn { get; }
+            public long Solid { get; }
+            public long FadeOut { get; }
+            public long Life => FadeIn + Solid + FadeOut;
+
+            /// <summary>초당 공간 단위(고정소수점).</summary>
+            public long Rise { get; }
+
+            public long Elapsed;
+        }
+
+        private readonly List<PlayingFx> _playing = new List<PlayingFx>();
+        private long _fxNext;
+
+        /// <summary>떠 있는 효과의 수.</summary>
+        public int PlayingCount => _playing.Count;
+
+        /// <summary>
+        /// 새 효과를 띄운다. 얼마 동안 어떻게 보이는지는 그림 정의의 시간 칸이고 그림 값이 덮는다(G425). 시간은 <see cref="Advance"/>가 흐르게 한다.
+        /// 효과 함수의 실패는 문제로 남긴다.
+        /// </summary>
+        public void Play(BridgeWorldFx fx)
+        {
+            foreach (var batch in fx.Batches)
+                foreach (var effect in batch.Effects)
+                {
+                    if (effect.Error != null)
+                    {
+                        Report(effect.Function, effect.Error);
+                        continue;
+                    }
+                    string key = FxPrefix + (++_fxNext).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    Show(key, effect.Look, effect.Where);
+                    if (!_shown.TryGetValue(key, out var shown)) continue;
+                    var playing = new PlayingFx(key, shown, Millis(Time(shown, "fade-in")), Millis(Time(shown, "solid")),
+                        Millis(Time(shown, "fade-out")), Time(shown, "rise"));
+                    if (playing.Life == 0 && shown.Definition != null)
+                        Report(shown.Definition.Place, "look '" + shown.Definition.Name + "' is played as an effect but has no fade-in, solid or fade-out, " +
+                                                       "so it ends at once (spec-gaps G425)");
+                    _playing.Add(playing);
+                    Animate(playing);
+                }
+        }
+
+        /// <summary>떠 있는 효과의 시간을 <paramref name="milliseconds"/>만큼 흐르게 하고, 수명이 끝난 것을 지운다.</summary>
+        public void Advance(long milliseconds)
+        {
+            for (int i = _playing.Count - 1; i >= 0; i--)
+            {
+                var playing = _playing[i];
+                playing.Elapsed += milliseconds;
+                if (playing.Elapsed >= playing.Life)
+                {
+                    _playing.RemoveAt(i);
+                    Hide(playing.Key);
+                    continue;
+                }
+                Animate(playing);
+            }
+        }
+
+        private void Animate(PlayingFx p)
+        {
+            long t = p.Elapsed;
+            long opacity = t < p.FadeIn ? t * BridgeFixed.Scale / p.FadeIn
+                : t < p.FadeIn + p.Solid ? BridgeFixed.Scale
+                : p.FadeOut == 0 ? 0
+                : BridgeFixed.Scale - (t - p.FadeIn - p.Solid) * BridgeFixed.Scale / p.FadeOut;
+            _renderer.SetOpacity(p.Shown.Handle, opacity);
+            if (p.Rise == 0) return;
+            long up = p.Rise * p.Shown.Unit / BridgeFixed.Scale * t / 1000;
+            var at = p.Shown.Position ?? default;
+            _renderer.PlaceObject(p.Shown.Handle, new LookPosition(at.X, at.Y + up, at.Z), p.Shown.Unit);
+        }
+
+        // 그림 값이 덮으면 그 값, None이거나 못 읽으면 적힌 값 (G425)
+        private long Time(ShownObject shown, string name)
+        {
+            var definition = shown.Definition;
+            if (definition == null) return 0;
+            definition.Timing.TryGetValue(name, out long written);
+            foreach (var binding in definition.TimingBindings)
+            {
+                if (binding.Attribute != name) continue;
+                if (!TryRead(binding.Expression, shown.Scope, out var raw, out string error))
+                {
+                    Report(definition.Place, "look '" + definition.Name + "', bind-" + name + "=\"" + binding.Source + "\": " + error);
+                    continue;
+                }
+                if (raw is BridgeNone) continue;
+                var value = LookAttributes.FromValue(LookAttributeType.Number, raw, out error);
+                if (value == null || (value.Numbers[0] < 0 && name != "rise"))
+                {
+                    Report(definition.Place, "look '" + definition.Name + "', bind-" + name + "=\"" + binding.Source + "\": " +
+                                             (value == null ? error : "a time is not negative"));
+                    continue;
+                }
+                return value.Numbers[0];
+            }
+            return written;
+        }
+
+        private static long Millis(long seconds) => seconds * 1000 / BridgeFixed.Scale;
+
         // ---- 자리 (G394·G414) ----
 
         private bool TryPosition(string key, BridgeWhere where, out LookPosition position, out long unit)

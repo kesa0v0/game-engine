@@ -302,6 +302,14 @@ namespace Kesa.Engine.Ui.Tests
             await board.RefreshAsync();
             Assert.That(stage.Keys.Any(k => k.StartsWith("mark:")), Is.False, "answered, so the mark is gone");
             Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -3.0, 0.0) "), "the unit stepped back onto the marked square");
+
+            // 맞음 신호의 효과(fx.py·fx.look.xml)가 물러난 칸에 떠서 0.6초 뒤 사라진다
+            string flash = stage.Keys.Single(k => k.StartsWith(LookStage.FxPrefix));
+            Assert.That(renderer.Dump(flash), Is.EqualTo("@(2.0, -3.0, 0.0) a0.0 Sprite[layer=5,size=1.2,1.2,src=art/ring.png,tint=#ff4040ff]"));
+            stage.Advance(100);
+            Assert.That(renderer.Dump(flash), Does.StartWith("@(2.0, -3.0, 0.0) Sprite"), "fully shown");
+            stage.Advance(500);
+            Assert.That(stage.Keys.Any(k => k.StartsWith(LookStage.FxPrefix)), Is.False);
         }
 
         [Test]

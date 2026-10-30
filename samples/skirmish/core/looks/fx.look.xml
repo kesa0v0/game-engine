@@ -1,0 +1,6 @@
+<!-- 한 번 일어나는 효과의 그림 (G425): 시간 칸은 초 -->
+<Looks>
+  <Look name="hit-flash" fade-in="0.05" solid="0.15" fade-out="0.4">
+    <Sprite src="art/ring.png" tint="#ff4040ff" size="1.2,1.2" layer="5" />
+  </Look>
+</Looks>

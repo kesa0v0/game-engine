@@ -5,14 +5,15 @@ using Kesa.Engine.Bridge;
 namespace Kesa.Engine.Ui
 {
     /// <summary>
-    /// 한 연결의 판 위 그림을 경계와 맞춘다 (G405·G408): 프레임마다 <see cref="RefreshAsync"/>가 엔티티 물체와 표시의 바뀐 것만 받아
-    /// <see cref="LookStage"/>에 넣는다. 도장은 둘이 따로 센다.
+    /// 한 연결의 판 위 그림을 경계와 맞춘다 (G405·G408·G426): 프레임마다 <see cref="RefreshAsync"/>가 엔티티 물체와 표시의 바뀐 것, 새 효과를 받아
+    /// <see cref="LookStage"/>에 넣는다. 도장은 셋이 따로 센다. 효과가 시간에 따라 흐려지게 호스트가 <see cref="LookStage.Advance"/>로 시간을 넘긴다.
     /// </summary>
     public sealed class LookBoard
     {
         private readonly IHostSession _session;
         private long _objects;
         private long _marks;
+        private long _fx;
 
         public LookBoard(IHostSession session, LookStage stage)
         {
@@ -30,6 +31,9 @@ namespace Kesa.Engine.Ui
             var marks = await _session.WorldMarks(_marks);
             Stage.Apply(marks);
             _marks = marks.Stamp;
+            var fx = await _session.WorldFx(_fx);
+            Stage.Play(fx);
+            _fx = fx.Stamp;
         }
 
         /// <summary>내장 입력: 주 누름(왼쪽 클릭·탭)과 보조 누름 (G416).</summary>

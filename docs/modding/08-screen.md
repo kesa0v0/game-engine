@@ -625,7 +625,18 @@ def damage_number(target, amount):
 - 효과 함수는 신호가 난 뒤의 판에서 돈다. 맞고 바로 죽어 사라진 유닛처럼 그때 없을 수 있는 값(자리 등)은 신호에 싣는다.
 - 같은 신호에 여러 모드가 각자 함수를 더할 수 있고, 로드 순서대로 모두 돈다. 함수가 실패하면 그 함수 몫만 빠지고 호스트가 경고한다.
 - 화면 없이 돌면(봇끼리, 콘솔) 부르지 않는다. 판은 효과를 기다리지 않는다.
-- 효과가 얼마 동안 어떻게 보이는지는 그림 정의가 정한다(G425, 호스트 쪽은 아직 만드는 중).
+- 효과가 얼마 동안 어떻게 보이는지는 그림 정의의 `<Look>` 칸이 정한다. `samples/skirmish/core/looks/fx.look.xml`:
+
+```xml
+<Look name="hit-flash" fade-in="0.05" solid="0.15" fade-out="0.4">
+  <Sprite src="art/ring.png" tint="#ff4040ff" size="1.2,1.2" layer="5" />
+</Look>
+```
+
+- `fade-in`·`solid`·`fade-out`은 초이고 투명도가 0 → 1 → 0으로 간다. 수명은 셋의 합이고, 셋 다 없으면 바로 끝나므로 호스트가 경고한다.
+  `rise`는 초당 위로 떠오르는 칸 수다(음수면 가라앉음).
+- 이 칸들은 `bind-solid="hold"`처럼 그림 값에 묶을 수 있다. `fx(look("hit-flash", hold=1.2), …)`이면 그 효과만 1.2초 머물고, 값이 `None`이면 적힌 값을 쓴다.
+- 이 칸들은 `mark`·엔티티 그림에는 쓰이지 않는다.
 
 ### Unity: 그림 정의 `.look.xml`과 공간 `.space.xml`
 

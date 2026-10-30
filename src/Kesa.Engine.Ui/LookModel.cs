@@ -236,13 +236,25 @@ namespace Kesa.Engine.Ui
     /// <summary><c>&lt;Look name="…"&gt;</c> 하나 (G390).</summary>
     public sealed class LookDefinition
     {
-        public LookDefinition(string name, string mod, string place, IReadOnlyList<LookElement> elements)
+        /// <summary>효과로 띄울 때의 시간 칸 (G425): 초(<c>rise</c>는 초당 공간 단위), 고정소수점.</summary>
+        public static readonly IReadOnlyList<string> TimingNames = new[] { "fade-in", "solid", "fade-out", "rise" };
+
+        public LookDefinition(string name, string mod, string place, IReadOnlyList<LookElement> elements,
+            IReadOnlyDictionary<string, long>? timing = null, IReadOnlyList<LookBinding>? timingBindings = null)
         {
             Name = name;
             Mod = mod;
             Place = place;
             Elements = elements;
+            Timing = timing ?? new SortedDictionary<string, long>(StringComparer.Ordinal);
+            TimingBindings = timingBindings ?? Array.Empty<LookBinding>();
         }
+
+        /// <summary>적힌 시간 칸(고정소수점 원래 정수값). 없는 칸은 0이다.</summary>
+        public IReadOnlyDictionary<string, long> Timing { get; }
+
+        /// <summary><c>bind-fade-out="hold"</c>처럼 그림 값으로 덮는 시간 칸. 값이 <c>None</c>이면 적힌 값을 쓴다.</summary>
+        public IReadOnlyList<LookBinding> TimingBindings { get; }
 
         public string Name { get; }
 

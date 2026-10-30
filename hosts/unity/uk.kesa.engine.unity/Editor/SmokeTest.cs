@@ -93,6 +93,7 @@ namespace Kesa.Engine.Unity.Editor
             CheckWindows(mods.Assets);
             await CheckBoard(game, session);
             await CheckPreload(game, session);
+            CheckFx(game, session);
             await CheckInputs(game.Mods, session);
             UssCheck.Run();
         }
@@ -106,6 +107,34 @@ namespace Kesa.Engine.Unity.Editor
                 Require(DateTime.UtcNow < until, "pictures finish loading");
                 System.Threading.Thread.Sleep(5);
                 renderer.FinishPictures();
+            }
+        }
+
+        /// <summary>효과 (G425): skirmish의 hit-flash가 투명하게 떠서 시간이 흐르면 보였다가 수명이 끝나면 지워진다.</summary>
+        private static void CheckFx(Match game, IHostSession session)
+        {
+            var boardObject = new GameObject("kesa-fx");
+            try
+            {
+                var renderer = new GameObjectLookRenderer(boardObject.transform, game.Mods.Assets);
+                var stage = game.Board(session, renderer).Stage;
+                var where = BridgeWhere.At("square", new BridgeList(new BridgeValue[] { new BridgeInt(1), new BridgeInt(1) }));
+                stage.Play(new BridgeWorldFx(2, false, new[]
+                {
+                    new BridgeFxBatch(1, new[] { new BridgeFx("skirmish.hit_flash", new BridgeLook("hit-flash", new KeyValuePair<string, BridgeValue>[0]), where, null) }),
+                }));
+                WaitPictures(renderer);
+                var sprite = boardObject.GetComponentInChildren<SpriteRenderer>();
+                Require(sprite != null && sprite.color.a == 0f, "the flash starts see-through, got " + (sprite != null ? sprite.color.ToString() : "none"));
+                stage.Advance(100);
+                Require(Mathf.Approximately(sprite!.color.a, 1f) && sprite.color.r == 1f, "the flash is fully shown and keeps its tint, got " + sprite.color);
+                stage.Advance(600);
+                Require(boardObject.transform.childCount == 0, "the flash is gone when its life ends");
+                Require(stage.Problems.Count == 0, "the flash plays cleanly: " + string.Join("; ", stage.Problems));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(boardObject);
             }
         }
 

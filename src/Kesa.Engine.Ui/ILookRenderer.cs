@@ -15,6 +15,9 @@ namespace Kesa.Engine.Ui
         /// </summary>
         void PlaceObject(ElementId obj, LookPosition position, long unit);
 
+        /// <summary>물체 전체의 투명도 (G425): 고정소수점 원래 정수값으로 0(안 보임)부터 1(그대로)까지. 효과가 흐려질 때 쓴다.</summary>
+        void SetOpacity(ElementId obj, long opacity);
+
         /// <summary>그림 정의가 없는 물체에 눈에 띄는 대체 그림을 보인다 (G392).</summary>
         void ShowMissing(ElementId obj);
 

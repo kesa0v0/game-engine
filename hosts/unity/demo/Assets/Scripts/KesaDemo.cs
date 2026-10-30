@@ -204,6 +204,7 @@ public sealed class KesaDemo : MonoBehaviour
             if (_bot != null && Time.time >= _botNext && await _bot.Run() > 0) _botNext = Time.time + botDelay;
             await _ui.RefreshAsync();
             await RefreshBoard();
+            _board?.Stage.Advance((long)(Time.deltaTime * 1000f));
         }
         catch (Exception e)
         {
