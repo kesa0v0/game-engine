@@ -43,6 +43,11 @@ public sealed class KesaDemo : MonoBehaviour
     [Tooltip("봇이 한 수를 두고 다음 수까지 기다리는 초 (수를 눈으로 따라가게)")]
     [SerializeField] private float botDelay = 0.6f;
 
+    [Tooltip("판 연출(효과·옮기기·모델 애니메이션)의 재생 속도. 0.25면 4배 느리게 (눈으로 확인할 때)")]
+    [SerializeField, Range(0.05f, 2f)] private float playbackSpeed = 1f;
+
+    private float _playbackCarry;
+
     [SerializeField] private string[] languages = { "ko", "en" };
 
     [Tooltip("카메라가 비출 판의 가운데와 반 높이 (판 단위)")]
@@ -225,7 +230,11 @@ public sealed class KesaDemo : MonoBehaviour
             if (_bot != null && _board?.Holding != true && Time.time >= _botNext && await _bot.Run() > 0) _botNext = Time.time + botDelay;
             await _ui.RefreshAsync();
             await RefreshBoard();
-            _board?.Advance((long)(Time.deltaTime * 1000f));
+            // 느리게 돌리면 한 프레임이 1밀리초 밑일 수 있어 남은 것을 이어 센다
+            _playbackCarry += Time.deltaTime * 1000f * playbackSpeed;
+            long step = (long)_playbackCarry;
+            _playbackCarry -= step;
+            _board?.Advance(step);
         }
         catch (Exception e)
         {
