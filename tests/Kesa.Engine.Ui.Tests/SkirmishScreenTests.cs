@@ -303,12 +303,17 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(stage.Keys.Any(k => k.StartsWith("mark:")), Is.False, "answered, so the mark is gone");
             Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -3.0, 0.0) "), "the unit stepped back onto the marked square");
 
-            // 맞음 신호의 효과(fx.py·fx.look.xml)가 물러난 칸에 떠서 0.6초 뒤 사라진다
-            string flash = stage.Keys.Single(k => k.StartsWith(LookStage.FxPrefix));
-            Assert.That(renderer.Dump(flash), Is.EqualTo("@(2.0, -3.0, 0.0) a0.0 Sprite[layer=5,size=1.2,1.2,src=art/ring.png,tint=#ff4040ff]"));
+            // 맞음 신호의 효과(fx.py·fx.look.xml)가 물러난 칸에 뜬다: 고리는 0.6초, 피해 숫자는 떠오르며 0.95초
+            var effects = stage.Keys.Where(k => k.StartsWith(LookStage.FxPrefix)).ToList();
+            Assert.That(effects.Count, Is.EqualTo(2));
+            Assert.That(renderer.Dump(effects[0]), Is.EqualTo("@(2.0, -3.0, 0.0) a0.0 Sprite[layer=5,size=1.2,1.2,src=art/ring.png,tint=#ff4040ff]"));
+            Assert.That(renderer.Dump(effects[1]), Does.Match(@"^@\(2\.0, -3\.0, 0\.0\) a0\.0 Text\[color=#ffe070ff,layer=6,offset=0\.0,0\.3,size=0\.45,text=-\d\]$"));
             stage.Advance(100);
-            Assert.That(renderer.Dump(flash), Does.StartWith("@(2.0, -3.0, 0.0) Sprite"), "fully shown");
+            Assert.That(renderer.Dump(effects[0]), Does.StartWith("@(2.0, -3.0, 0.0) Sprite"), "fully shown");
             stage.Advance(500);
+            Assert.That(stage.Keys.Where(k => k.StartsWith(LookStage.FxPrefix)), Is.EqualTo(new[] { effects[1] }));
+            Assert.That(renderer.Dump(effects[1]), Does.StartWith("@(2.0, -2.52, 0.0) "), "the number rose 0.8 a second");
+            stage.Advance(400);
             Assert.That(stage.Keys.Any(k => k.StartsWith(LookStage.FxPrefix)), Is.False);
         }
 

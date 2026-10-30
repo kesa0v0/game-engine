@@ -79,6 +79,27 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public void TextShowsAnyValueThroughTheHostFormatter()
+        {
+            var library = LookLibrary.Load(new[]
+            {
+                new LookSource("core", "core/fx.look.xml",
+                    "<Looks><Look name=\"n\" solid=\"1\"><Text bind-text=\"amount\" size=\"0.5\" /><Text text=\"plain\" /></Look></Looks>"),
+                new LookSource("core", "core/board.space.xml", Board),
+            }, LookKinds.Standard());
+            Assert.That(library.Problems, Is.Empty, string.Join("\n", library.Problems));
+            _renderer = new MemoryLookRenderer();
+            var stage = new LookStage(library, _renderer, format: v => v is BridgeText t ? "[" + t.Key + "]" : LookAttributesPlain(v));
+            stage.Play(Batch(Fx("n", ("amount", new BridgeInt(-4))), Fx("n", ("amount", new BridgeText("core-miss", new KeyValuePair<string, BridgeValue>[0]))), Fx("n")));
+            Assert.That(_renderer.Dump("fx:1"), Is.EqualTo("@(1.0, 2.0, 0.0) Text[size=0.5,text=-4] Text[text=plain]"));
+            Assert.That(_renderer.Dump("fx:2"), Is.EqualTo("@(1.0, 2.0, 0.0) Text[size=0.5,text=[core-miss]] Text[text=plain]"));
+            Assert.That(_renderer.Dump("fx:3"), Is.EqualTo("@(1.0, 2.0, 0.0) Text[size=0.5,text=] Text[text=plain]"), "None is no text");
+            Assert.That(stage.Problems, Is.Empty);
+        }
+
+        private static string LookAttributesPlain(BridgeValue v) => v is BridgeInt i ? i.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "?";
+
+        [Test]
         public void WrongTimesAreLoadProblems()
         {
             var problems = LookLibrary.Load(new[]

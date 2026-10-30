@@ -615,8 +615,9 @@ def press_square(cell: list[int]):
 
 ```python
 @world_fx(Hit)
-def damage_number(target, amount):
-    return [fx(look("damage-number", amount=amount), at=at("square", [target.Pos.x, target.Pos.y]))]
+def hit_flash(x, y, damage):
+    place = at("square", [x, y])
+    return [fx("hit-flash", at=place), fx(look("damage-number", amount=-damage), at=place)]
 ```
 
 - 매개변수는 `@on`처럼 신호의 값을 이름으로 고른다(타입·기본값은 적지 않는다). 돌려주는 것은 `fx(그림, at=자리)`의 리스트이고 `None`은 빈 리스트다.
@@ -630,6 +631,9 @@ def damage_number(target, amount):
 ```xml
 <Look name="hit-flash" fade-in="0.05" solid="0.15" fade-out="0.4">
   <Sprite src="art/ring.png" tint="#ff4040ff" size="1.2,1.2" layer="5" />
+</Look>
+<Look name="damage-number" fade-in="0.05" solid="0.5" fade-out="0.4" rise="0.8">
+  <Text bind-text="amount" size="0.45" color="#ffe070ff" offset="0,0.3" layer="6" />
 </Look>
 ```
 
@@ -675,6 +679,7 @@ def damage_number(target, amount):
 | 요소 | 속성 |
 |---|---|
 | `Sprite` | `src`(그림 경로), `size`(`"1,0.5"`, 빼면 긴 변이 한 칸이고 그림 비율을 지킴), `tint`(`#rrggbb`·`#rrggbbaa`) |
+| `Text` | `text`(글), `size`(글자 높이, 칸 단위, 기본 0.5), `color`(`#rrggbb`·`#rrggbbaa`). 글꼴은 호스트 기본 |
 | `Group` | 자식을 함께 옮기고 함께 숨긴다 |
 | 모든 요소 | `layer`(정수, 큰 것이 위), `offset`(`"0,0.5"`, 묶음 안에서는 부모 기준), `bind-속성`, `bind-display`, `for` |
 
@@ -682,6 +687,7 @@ def damage_number(target, amount):
   사전 키는 점으로(`gear.flag`), `for="f in flags"`는 목록의 항목마다 자식을 만든다.
 - 식에서 모드 함수를 부를 수 없고 연산자도 없다. 경로를 이어 붙이거나 비교하는 일은 그림 값을 만드는 함수에서 한다.
 - 그림 값에 없는 키는 `None`으로 읽는다. 그래서 `bind-display="hurt"`는 다쳤을 때만 `hurt=True`를 넘기면 된다.
+  `bind-text`는 아무 값이나 받는다: 수는 그대로, `text("키")`는 화면 UXML처럼 번역되고, `None`은 빈 글이다.
   `src`·`tint`처럼 `None`을 받지 못하는 속성은 그 속성만 직전 값으로 두고 경고한다(`for`의 목록도 같다).
 - 로드 때 모르는 요소·속성·공간 종류·설정, 틀린 값, 없는 그림 파일을 알린다. 그릴 때 모르는 그림 이름은 눈에 띄는 대체 그림과 경고,
   모르는 공간 이름과 틀린 자리 값은 경고와 함께 그리지 않는다. 판은 멈추지 않는다.

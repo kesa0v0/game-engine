@@ -33,6 +33,12 @@ namespace Kesa.Engine.Ui
                 ["size"] = LookAttributeType.Vector2,
                 ["tint"] = LookAttributeType.Color,
             }, acceptsChildren: false));
+            kinds.Add(new LookElementKind("Text", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
+            {
+                ["text"] = LookAttributeType.Text,
+                ["size"] = LookAttributeType.Number,
+                ["color"] = LookAttributeType.Color,
+            }, acceptsChildren: false));
             kinds.Add(new LookElementKind("Group", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal), acceptsChildren: true));
             kinds.Add(new GridSpace());
             return kinds;

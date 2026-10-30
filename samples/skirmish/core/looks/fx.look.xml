@@ -3,4 +3,8 @@
   <Look name="hit-flash" fade-in="0.05" solid="0.15" fade-out="0.4">
     <Sprite src="art/ring.png" tint="#ff4040ff" size="1.2,1.2" layer="5" />
   </Look>
+  <!-- 맞은 피해: 떠오르며 흐려진다 -->
+  <Look name="damage-number" fade-in="0.05" solid="0.5" fade-out="0.4" rise="0.8">
+    <Text bind-text="amount" size="0.45" color="#ffe070ff" offset="0,0.3" layer="6" />
+  </Look>
 </Looks>

@@ -16,6 +16,8 @@ namespace Kesa.Engine.Ui
             {
                 case LookAttributeType.Path:
                     return Path(text, out error);
+                case LookAttributeType.Text:
+                    return LookAttributeValue.OfText(text);
                 case LookAttributeType.Flag:
                     if (text == "true") return LookAttributeValue.OfFlag(true);
                     if (text == "false") return LookAttributeValue.OfFlag(false);
@@ -54,6 +56,8 @@ namespace Kesa.Engine.Ui
             error = "";
             switch (type)
             {
+                case LookAttributeType.Text:
+                    return LookAttributeValue.OfText(Plain(value));
                 case LookAttributeType.Path:
                     if (value is BridgeStr path) return Path(path.Value, out error);
                     error = "a path is text, got a " + KindName(value);
@@ -82,6 +86,16 @@ namespace Kesa.Engine.Ui
                     return Numbers(type, raw, out error);
             }
         }
+
+        /// <summary>번역기가 없을 때의 글자: 수와 글은 그대로, 나머지는 경계 JSON.</summary>
+        public static string Plain(BridgeValue value) => value switch
+        {
+            BridgeNone _ => "",
+            BridgeStr s => s.Value,
+            BridgeInt i => i.Value.ToString(CultureInfo.InvariantCulture),
+            BridgeFixed f => f.Decimal,
+            _ => BridgeJson.Write(value),
+        };
 
         private static LookAttributeValue? Numbers(LookAttributeType type, long[] raw, out string error)
         {

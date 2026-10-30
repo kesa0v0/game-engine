@@ -22,12 +22,16 @@ namespace Kesa.Engine.Ui
 
         private readonly InputLibrary? _declared;
 
+        private readonly UiTextFormatter? _format;
+
         /// <param name="inputs">입력 선언. 주면 표시의 <c>inputs=</c>에 선언에 없는 이름이 오면 알린다 (G424).</param>
-        public LookStage(LookLibrary library, ILookRenderer renderer, InputLibrary? inputs = null)
+        /// <param name="format">묶인 글자 속성(<c>Text</c>의 <c>text</c>)의 값을 화면 글자로 (G427, 화면 UXML과 같은 번역기). 없으면 수와 글을 그대로.</param>
+        public LookStage(LookLibrary library, ILookRenderer renderer, InputLibrary? inputs = null, UiTextFormatter? format = null)
         {
             _library = library;
             _renderer = renderer;
             _declared = inputs;
+            _format = format;
         }
 
         /// <summary>그리다 난 문제(같은 것은 한 번). 판은 막지 않는다 (G364·G392).</summary>
@@ -352,7 +356,9 @@ namespace Kesa.Engine.Ui
                     Report(node.Definition.Place, label + ": " + error);
                     continue;
                 }
-                var value = LookAttributes.FromValue(binding.Type, raw, out error);
+                var value = binding.Type == LookAttributeType.Text && _format != null && !(raw is BridgeNone)
+                    ? LookAttributeValue.OfText(_format(raw))
+                    : LookAttributes.FromValue(binding.Type, raw, out error);
                 if (value == null)
                 {
                     Report(node.Definition.Place, label + ": " + error);

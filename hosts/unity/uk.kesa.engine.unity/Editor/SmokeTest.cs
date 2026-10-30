@@ -130,7 +130,20 @@ namespace Kesa.Engine.Unity.Editor
                 Require(Mathf.Approximately(sprite!.color.a, 1f) && sprite.color.r == 1f, "the flash is fully shown and keeps its tint, got " + sprite.color);
                 stage.Advance(600);
                 Require(boardObject.transform.childCount == 0, "the flash is gone when its life ends");
-                Require(stage.Problems.Count == 0, "the flash plays cleanly: " + string.Join("; ", stage.Problems));
+                stage.Play(new BridgeWorldFx(3, false, new[]
+                {
+                    new BridgeFxBatch(2, new[]
+                    {
+                        new BridgeFx("skirmish.hit_flash", new BridgeLook("damage-number", new[] { new KeyValuePair<string, BridgeValue>("amount", new BridgeInt(-3)) }), where, null),
+                    }),
+                }));
+                var text = boardObject.GetComponentInChildren<TextMesh>();
+                Require(text != null && text.text == "-3" && text.color.a == 0f, "the damage number starts see-through, got " + (text != null ? text.text + " " + text.color : "none"));
+                stage.Advance(100);
+                Require(Mathf.Approximately(text!.color.a, 1f) && text.GetComponent<MeshRenderer>().sortingOrder > 0, "the damage number is shown above the board, got " + text.color);
+                stage.Advance(1000);
+                Require(boardObject.transform.childCount == 0, "the damage number is gone when its life ends");
+                Require(stage.Problems.Count == 0, "the effects play cleanly: " + string.Join("; ", stage.Problems));
             }
             finally
             {

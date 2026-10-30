@@ -9,7 +9,7 @@ namespace Kesa.Engine.Unity
 {
     /// <summary>
     /// 판 위 그림을 GameObject로 그린다 (G412·G413). 물체 하나는 GameObject 하나이고 공간 단위만큼 키워 그 안의 <c>size</c>·<c>offset</c>이 칸 단위가 된다.
-    /// 고정소수점은 여기서 처음 실수가 된다. 기본 종류는 <c>Sprite</c>(SpriteRenderer)와 <c>Group</c>이고 게임은 <see cref="AddKind"/>로 더한다.
+    /// 고정소수점은 여기서 처음 실수가 된다. 기본 종류는 <c>Sprite</c>(SpriteRenderer)·<c>Text</c>(TextMesh)·<c>Group</c>이고 게임은 <see cref="AddKind"/>로 더한다.
     /// </summary>
     public sealed class GameObjectLookRenderer : ILookRenderer
     {
@@ -53,6 +53,7 @@ namespace Kesa.Engine.Unity
             pump.Pictures = _pictures;
             AddKind("Sprite", _ => new SpriteView(_pictures));
             AddKind("Group", _ => new GroupView());
+            AddKind("Text", _ => new TextView());
         }
 
         /// <summary>읽고 있는 그림이 있는가 (G392).</summary>
@@ -351,6 +352,67 @@ namespace Kesa.Engine.Unity
                 _missing = LookPictures.FromTexture(texture);
                 return _missing;
             }
+        }
+
+        /// <summary><c>Text</c>: 내장 글꼴의 TextMesh, 가운데 맞춤. <c>size</c>는 글자 높이(공간 단위, 없으면 0.5) (G427).</summary>
+        private sealed class TextView : ILookElementView
+        {
+            // 큰 글꼴 크기로 그리고 characterSize로 줄여야 글자가 흐리지 않다
+            private const int FontSize = 64;
+
+            private static Font? _font;
+
+            private readonly TextMesh _mesh;
+            private readonly MeshRenderer _renderer;
+            private Color _color = Color.white;
+            private float _opacity = 1f;
+
+            public TextView()
+            {
+                GameObject = new GameObject("Text");
+                _mesh = GameObject.AddComponent<TextMesh>();
+                _renderer = GameObject.GetComponent<MeshRenderer>();
+                _font ??= Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                _mesh.font = _font;
+                _renderer.sharedMaterial = _font.material;
+                _mesh.fontSize = FontSize;
+                _mesh.anchor = TextAnchor.MiddleCenter;
+                _mesh.alignment = TextAlignment.Center;
+                Height(0.5f);
+            }
+
+            public GameObject GameObject { get; }
+
+            public void Set(string attribute, LookAttributeValue value)
+            {
+                switch (attribute)
+                {
+                    case "text":
+                        _mesh.text = value.Text!;
+                        break;
+                    case "size":
+                        Height(Real(value.Numbers[0]));
+                        break;
+                    case "color":
+                        uint c = value.Color;
+                        _color = new Color32((byte)(c >> 24), (byte)(c >> 16), (byte)(c >> 8), (byte)c);
+                        Paint();
+                        break;
+                }
+            }
+
+            public void SetSortingOrder(int order) => _renderer.sortingOrder = order;
+
+            public void SetOpacity(float opacity)
+            {
+                _opacity = opacity;
+                Paint();
+            }
+
+            private void Paint() => _mesh.color = new Color(_color.r, _color.g, _color.b, _color.a * _opacity);
+
+            // TextMesh의 한 줄 높이는 대략 characterSize × fontSize / 10
+            private void Height(float height) => _mesh.characterSize = height * 10f / FontSize;
         }
     }
 }

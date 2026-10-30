@@ -27,6 +27,9 @@ namespace Kesa.Engine.Ui
 
         /// <summary><c>true</c>·<c>false</c> (묶으면 모드 언어의 참거짓).</summary>
         Flag,
+
+        /// <summary>화면 글자 (G427). 적힌 글은 그대로, 묶인 값은 호스트가 글자로 바꾼다(<c>text("키")</c>는 번역).</summary>
+        Text,
     }
 
     /// <summary>렌더러에 넘기는 속성 값. 수는 고정소수점의 원래 정수값이고 실수로 바꾸는 것은 렌더러가 한다 (G345).</summary>
@@ -43,7 +46,7 @@ namespace Kesa.Engine.Ui
 
         public LookAttributeType Type { get; }
 
-        /// <summary><see cref="LookAttributeType.Path"/>의 경로.</summary>
+        /// <summary><see cref="LookAttributeType.Path"/>의 경로, <see cref="LookAttributeType.Text"/>의 글자.</summary>
         public string? Text { get; }
 
         /// <summary>
@@ -57,6 +60,8 @@ namespace Kesa.Engine.Ui
         public uint Color { get; }
 
         public static LookAttributeValue OfPath(string path) => new LookAttributeValue(LookAttributeType.Path, path, Array.Empty<long>(), false, 0);
+
+        public static LookAttributeValue OfText(string text) => new LookAttributeValue(LookAttributeType.Text, text, Array.Empty<long>(), false, 0);
 
         public static LookAttributeValue OfInteger(long value) => new LookAttributeValue(LookAttributeType.Integer, null, new[] { value }, false, 0);
 
@@ -82,6 +87,7 @@ namespace Kesa.Engine.Ui
         public override string ToString() => Type switch
         {
             LookAttributeType.Path => Text!,
+            LookAttributeType.Text => Text!,
             LookAttributeType.Flag => Flag ? "true" : "false",
             LookAttributeType.Color => "#" + Color.ToString("x8", System.Globalization.CultureInfo.InvariantCulture),
             LookAttributeType.Integer => Numbers[0].ToString(System.Globalization.CultureInfo.InvariantCulture),
