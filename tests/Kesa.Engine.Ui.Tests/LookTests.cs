@@ -70,6 +70,15 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public void SizesAndOffsetsStayInCellsBecauseTheObjectIsScaledByTheCell()
+        {
+            var stage = Stage(Looks("<Looks><Look name=\"dot\"><Sprite src=\"a.png\" offset=\"0,0.5\" /></Look></Looks>",
+                "<Spaces><Space name=\"square\" kind=\"grid\" cell=\"2\" /></Spaces>"));
+            stage.Show("m", Look("dot"), At(2, 3));
+            Assert.That(_renderer.Dump("m"), Is.EqualTo("@(4.0, 6.0, 0.0) x2.0 Sprite[offset=0.0,0.5,src=a.png]"));
+        }
+
+        [Test]
         public void BadDefinitionsAreFoundWhenLoading()
         {
             Assert.That(Problems("<Looks><Look name=\"a\"><Sprit src=\"a.png\" /></Look></Looks>"),

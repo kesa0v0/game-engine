@@ -25,6 +25,7 @@ namespace Kesa.Engine.Ui
 
         public List<LookNode> Roots { get; } = new List<LookNode>();
         public LookPosition? Position { get; set; }
+        public long Unit { get; set; }
     }
 
     /// <summary>만든 요소 하나와 그 묶인 값의 직전 값.</summary>

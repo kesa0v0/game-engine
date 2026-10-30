@@ -146,6 +146,9 @@ namespace Kesa.Engine.Ui
     {
         /// <summary>바꾸지 못하면 모더가 읽을 이유와 함께 false.</summary>
         public abstract bool TryPlace(BridgeValue place, out LookPosition position, out string error);
+
+        /// <summary>공간 한 단위의 길이(고정소수점 원래 정수값). 물체 안의 <c>size</c>·<c>offset</c>과 기본 크기가 이 단위다 (G413).</summary>
+        public abstract long Unit { get; }
     }
 
     /// <summary>공간 종류 하나 (G394·G410): 이름, 받는 설정, 설정으로 공간을 만드는 일. 기본 종류도 게임의 종류도 이것으로 등록한다.</summary>

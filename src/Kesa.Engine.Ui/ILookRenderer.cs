@@ -9,8 +9,11 @@ namespace Kesa.Engine.Ui
         /// <summary>판 위 물체 하나(표시나 엔티티)를 만든다. <paramref name="key"/>는 알아보기용이다.</summary>
         ElementId CreateObject(string key);
 
-        /// <summary>물체를 놓는다. 위치는 공간 종류가 계산한 Unity 축의 고정소수점 원래 정수값이다.</summary>
-        void PlaceObject(ElementId obj, LookPosition position);
+        /// <summary>
+        /// 물체를 놓는다. 위치는 공간 종류가 계산한 Unity 축의 고정소수점 원래 정수값이다. 물체를 <paramref name="unit"/>(공간 한 단위, 같은 눈금)만큼
+        /// 키워 그 안의 <c>size</c>·<c>offset</c>과 기본 크기가 공간 단위가 되게 한다.
+        /// </summary>
+        void PlaceObject(ElementId obj, LookPosition position, long unit);
 
         /// <summary>그림 정의가 없는 물체에 눈에 띄는 대체 그림을 보인다 (G392).</summary>
         void ShowMissing(ElementId obj);

@@ -1,6 +1,6 @@
 # 인계 메모
 
-마지막 갱신: 2026-10-30. 브랜치 `spec-v0.5-scaffold`, 테스트 2814개 통과(커널 2421, CLI 42, 콘솔 호스트 101, 번역 65, 경계 59, UI 119, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
+마지막 갱신: 2026-10-30. 브랜치 `spec-v0.5-scaffold`, 테스트 2815개 통과(커널 2421, CLI 42, 콘솔 호스트 101, 번역 65, 경계 59, UI 120, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
 
 ## 상태
 
@@ -33,7 +33,7 @@
    - 경계 값 `BridgeLook`·`BridgeWhere`(At·Onto·Between)와 JSON(G402).
    - 지도에 올리는 칸은 이름이 정확히 `look`·`where`(G403). 둘 중 하나가 `None`이면 지금은 안 올림(G405).
    - 경계 `WorldObjects(since)`(전부 또는 도장 뒤 바뀐 것·빠진 것)와 `WorldObject(key, entity)`(G401·G407). 칸 함수 오류는 `BridgeWorldObject.Error`로 실림(호스트가 대체 그림, G392). 커널은 `WorldView.WorldEntities()`·`WorldObject(ui, id)`.
-   - ①에서 skirmish가 쓰는 만큼은 끝났다. `@world_click("타입")`·`@world_click_space`(G393)는 ③에서 필요하면 더한다. 입력 상태 읽기 내장(G397, 이름 정해야 함)은 쓸 곳이 생길 때. `@world_fx`(G398)·`presentation=`(G399)은 ④. ②의 그리지 않는 해석은 `Kesa.Engine.Ui`의 `LookLibrary`(읽기)·`LookStage`(펼치기, `ILookRenderer`)·`LookKinds`(등록)에 있고 skirmish의 `looks/`가 시험에 쓰인다. **다음 첫 걸음:** Unity 쪽. `LoadedMods`가 모드 폴더의 `*.look.xml`·`*.space.xml`을 로드 순서대로 모으고, `ILookRenderer`의 Unity 구현(물체는 GameObject, `Sprite`는 SpriteRenderer, 고정소수점 → 실수는 여기서)과 `Match`가 `WorldMarks`·`WorldObjects`를 `LookStage`에 넣는 갱신을 만든다. 창 없는 확인은 패키지 README의 방식. 쓸 곳이 생길 때 물을 계약: 기본 공간(`at(값)`)을 선언하는 법, 그림 파일 안의 `Include` 모양, `onto`·`between` 그리기, 2D에서 z, 없는 키를 읽을 때(지금은 경고하고 직전 값). 모더 문서는 지금까지 만든 것만큼 고쳤다(8장 "월드 표시: 그림과 자리", 10장 표): 새로 만드는 것은 그 절과 10장 행에 더한다. 호스트 함수(C#)는 그림·자리를 돌려줄 수 없어 `Look`·`Where` 칸에 넣으면 로드 오류다. 별칭으로 칸을 부르는 게임 코드는 실행 중에 막힌다(`questions()`와 같은 안전망).
+   - ①에서 skirmish가 쓰는 만큼은 끝났다. `@world_click("타입")`·`@world_click_space`(G393)는 ③에서 필요하면 더한다. 입력 상태 읽기 내장(G397, 이름 정해야 함)은 쓸 곳이 생길 때. `@world_fx`(G398)·`presentation=`(G399)은 ④. ②의 그리지 않는 해석은 `Kesa.Engine.Ui`의 `LookLibrary`(읽기)·`LookStage`(펼치기, `ILookRenderer`)·`LookKinds`(등록)에 있고 skirmish의 `looks/`가 시험에 쓰인다. **다음 첫 걸음:** Unity 쪽. `LoadedMods`가 모드 폴더의 `*.look.xml`·`*.space.xml`을 로드 순서대로 모으고, `ILookRenderer`의 Unity 구현(물체는 GameObject, `Sprite`는 SpriteRenderer, 고정소수점 → 실수는 여기서)과 `Match`가 `WorldMarks`·`WorldObjects`를 `LookStage`에 넣는 갱신을 만든다. `PlaceObject`의 `unit`(공간 한 단위)만큼 물체 뿌리를 키워 `size`·`offset`이 칸 단위가 되게 한다. 로드 때 `fileExists`는 그릴 때와 같이 `ModFolderAssets`(모든 모드 폴더, 로드 순서)로 찾는다. 창 없는 확인은 패키지 README의 방식. 묻는 중: 그림 값에 없는 키를 읽을 때(지금은 경고하고 직전 값, 8장도 그렇게 적힘). 쓸 곳이 생길 때 물을 계약: 기본 공간(`at(값)`)을 선언하는 법, 그림 파일 안의 `Include` 모양, `onto`·`between` 그리기, 2D에서 z(지금은 경고하고 안 그림). 모더 문서는 지금까지 만든 것만큼 고쳤다(8장 "월드 표시: 그림과 자리", 10장 표): 새로 만드는 것은 그 절과 10장 행에 더한다. 호스트 함수(C#)는 그림·자리를 돌려줄 수 없어 `Look`·`Where` 칸에 넣으면 로드 오류다. 별칭으로 칸을 부르는 게임 코드는 실행 중에 막힌다(`questions()`와 같은 안전망).
    - 설계 요약: 뜻은 호스트가 읽는 XML 그래픽 정의(UXML 장치 재사용, 요소 종류는 호스트가 등록, G390), 모델은 확장자로 로더를 고르고 첫 로더는 glTFast(G391), 로드 때 검사만 하고 처음 보일 때 읽음(G392). 공간 종류는 호스트(G394). 표시는 그림 이름+놓을 곳(또는 `key=`)으로 알아봄(G396). 연출 방식(바로 그리기·붙잡고 재생)은 모드 선언이 고르고 커널은 모름(G399).
 3. 그 밖: UXML 컴포넌트 재사용, `hint`·선택지 `style`을 모양에 잇기, 데모 로그(봇 거절·열린 질문).
 4. 봇 점수 도우미: 함수 칸 `Score["T"]`·`BotAction["T"]`(G374)와 `std.ai` 모드(Wesnoth RCA식). 먼저 skirmish 봇을 이 꼴로 다시 써 보며 모양을 정한다.

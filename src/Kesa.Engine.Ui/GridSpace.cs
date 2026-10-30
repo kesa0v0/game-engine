@@ -69,6 +69,8 @@ namespace Kesa.Engine.Ui
                 _flip = flip;
             }
 
+            public override long Unit => _cell;
+
             public override bool TryPlace(BridgeValue place, out LookPosition position, out string error)
             {
                 position = default;

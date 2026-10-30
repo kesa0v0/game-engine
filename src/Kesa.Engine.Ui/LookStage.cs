@@ -52,7 +52,7 @@ namespace Kesa.Engine.Ui
         /// <summary>그림이나 자리가 없거나 자리를 못 놓으면 숨긴다.</summary>
         public void Show(string key, BridgeLook? look, BridgeWhere? where)
         {
-            if (look == null || where == null || !TryPosition(key, where, out var position))
+            if (look == null || where == null || !TryPosition(key, where, out var position, out long unit))
             {
                 Hide(key);
                 return;
@@ -72,10 +72,11 @@ namespace Kesa.Engine.Ui
                 Hide(key);
                 shown = Create(key, look, definition);
             }
-            if (!shown.Position.Equals(position))
+            if (!shown.Position.Equals(position) || shown.Unit != unit)
             {
                 shown.Position = position;
-                _renderer.PlaceObject(shown.Handle, position);
+                shown.Unit = unit;
+                _renderer.PlaceObject(shown.Handle, position, unit);
             }
         }
 
@@ -112,9 +113,10 @@ namespace Kesa.Engine.Ui
 
         // ---- 자리 (G394·G414) ----
 
-        private bool TryPosition(string key, BridgeWhere where, out LookPosition position)
+        private bool TryPosition(string key, BridgeWhere where, out LookPosition position, out long unit)
         {
             position = default;
+            unit = 0;
             if (where.Shape != BridgeWhereShape.At)
             {
                 Report(key, (where.Shape == BridgeWhereShape.Onto ? "onto(…)" : "between(…)") + " is not drawn yet");
@@ -130,6 +132,7 @@ namespace Kesa.Engine.Ui
                 Report(key, "no space is named '" + where.Name + "'" + UiSuggest.Hint(where.Name, _library.Spaces.Keys));
                 return false;
             }
+            unit = space.Layout.Unit;
             if (space.Layout.TryPlace(where.Target!, out position, out string error)) return true;
             Report(key, "space '" + where.Name + "': " + error);
             return false;
