@@ -90,7 +90,45 @@ namespace Kesa.Engine.Unity.Editor
             Require(ui.Errors.Count == 0, "no binding or style sheet errors: " + string.Join("; ", ui.Errors));
             Require(host.Q("screen").styleSheets.count == 1, "the mod's ui/screen.uss is on the screen element");
             CheckWindows(mods.Assets);
+            await CheckBoard(game, session);
             UssCheck.Run();
+        }
+
+        /// <summary>판 위 그림 (G412~G415): skirmish의 <c>looks/</c>로 표시가 SpriteRenderer로 칸 자리에 그려지고, 모르는 그림은 대체 그림이다.</summary>
+        private static async Task CheckBoard(Match game, IHostSession session)
+        {
+            Require(game.Mods.Looks.Problems.Count == 0, "look files read cleanly: " + string.Join("; ", game.Mods.Looks.Problems));
+            var boardObject = new GameObject("kesa-board");
+            try
+            {
+                var renderer = new GameObjectLookRenderer(boardObject.transform, game.Mods.Assets);
+                var board = game.Board(session, renderer);
+                await board.RefreshAsync();
+                Require(!board.Stage.Keys.Any(), "nothing is marked before a hit");
+
+                var spot = new BridgeLook("retreat-spot", new KeyValuePair<string, BridgeValue>[0]);
+                board.Stage.Show("test", spot, BridgeWhere.At("square", new BridgeList(new BridgeValue[] { new BridgeInt(2), new BridgeInt(3) })));
+                Require(boardObject.transform.childCount == 1, "one object on the board");
+                var obj = boardObject.transform.GetChild(0);
+                Require(obj.localPosition == new Vector3(2, 3, 0) && obj.localScale == Vector3.one, "placed on square (2, 3), got " + obj.localPosition);
+                var sprite = obj.GetComponentInChildren<SpriteRenderer>();
+                var picture = sprite != null ? sprite.sprite : null;
+                Require(picture != null && picture.texture.width == 1, "the white picture is loaded");
+                Require(picture!.bounds.size.x == 1f, "the long side is one cell, got " + picture.bounds.size);
+                Require(sprite!.color == (Color)new Color32(0x40, 0x80, 0xff, 0x80), "tinted, got " + sprite.color);
+
+                board.Stage.Show("test", new BridgeLook("no-such-look", new KeyValuePair<string, BridgeValue>[0]),
+                    BridgeWhere.At("square", new BridgeList(new BridgeValue[] { new BridgeInt(0), new BridgeInt(0) })));
+                var missing = boardObject.transform.GetChild(0).GetComponentInChildren<SpriteRenderer>();
+                Require(missing != null && missing.sprite != null && missing.sprite.texture.width == 8, "an unknown look shows the missing picture");
+                Require(board.Stage.Problems.Count == 1, "the unknown look is reported once: " + string.Join("; ", board.Stage.Problems));
+                board.Stage.Hide("test");
+                Require(boardObject.transform.childCount == 0, "hiding removes the object");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(boardObject);
+            }
         }
 
         /// <summary>창 배치 (G354): 창은 겹침 층으로 가고 원래 자리에는 자리표가 남아 형제 순서가 그대로이며, 모달 막이는 정한 자리에 선다.</summary>

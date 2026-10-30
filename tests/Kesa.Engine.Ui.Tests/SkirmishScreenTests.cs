@@ -270,15 +270,17 @@ namespace Kesa.Engine.Ui.Tests
 
             var alice = await Open("alice", _red);
             var bob = await Open("bob", _blue);
+            var board = new LookBoard(alice.Session, stage);
+            await board.RefreshAsync();
+            Assert.That(stage.Keys, Is.Empty);
             await HitRed(alice, bob);
-            var marks = await alice.Session.WorldMarks(0);
-            stage.Apply(marks);
+            await board.RefreshAsync();
             Assert.That(stage.Problems, Is.Empty, string.Join("\n", stage.Problems));
             Assert.That(renderer.Dump(stage.Keys.Single()), Is.EqualTo("@(2.0, 3.0, 0.0) Sprite[src=art/white.png,tint=#4080ff80]"));
 
-            var spot = marks.Changed.Single();
+            var spot = (await alice.Session.WorldMarks(0)).Changed.Single();
             Assert.That((await alice.Session.Act(spot.Click!.Action, spot.Click.Arguments)).Succeeded, Is.True);
-            stage.Apply(await alice.Session.WorldMarks(marks.Stamp));
+            await board.RefreshAsync();
             Assert.That(stage.Keys, Is.Empty);
             Assert.That(renderer.Nodes, Is.Empty);
         }

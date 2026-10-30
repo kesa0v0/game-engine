@@ -15,7 +15,7 @@ using UnityEngine.UIElements;
 
 /// <summary>
 /// 데모: 저장소의 <c>samples/skirmish</c>를 같은 프로세스에서 돌리고 그 UXML 화면을 UIDocument에 올린다 (spec-gaps G323·G347).
-/// 프레임마다 영수증이 바뀐 곳만 다시 그린다.
+/// 프레임마다 영수증이 바뀐 곳만 다시 그린다. 판 위 표시(<c>looks/</c>)는 이 GameObject 아래 <c>Board</c>에 그린다 (G412).
 /// </summary>
 public sealed class KesaDemo : MonoBehaviour
 {
@@ -45,6 +45,8 @@ public sealed class KesaDemo : MonoBehaviour
     [SerializeField] private string[] languages = { "ko", "en" };
 
     private UiInterpreter? _ui;
+    private LookBoard? _board;
+    private int _boardProblems;
     private BotSeat? _bot;
     private float _botNext;
     private bool _refreshing;
@@ -71,6 +73,7 @@ public sealed class KesaDemo : MonoBehaviour
         var mods = LoadedMods.Load(Path.GetFullPath(Path.Combine(Application.dataPath, "..", modsFolder)), languages);
         foreach (var d in mods.Diagnostics)
             if (d.Severity != Severity.Info) Debug.LogWarning("Kesa mods: " + d);
+        foreach (var p in mods.Looks.Problems) Debug.LogWarning("Kesa looks: " + p);
         if (mods.Disabled.Count > 0) Debug.LogWarning("Kesa mods disabled by errors: " + string.Join(", ", mods.Disabled));
         var game = mods.NewMatch(1);
         var world = game.Host.World;
@@ -112,6 +115,19 @@ public sealed class KesaDemo : MonoBehaviour
             if (!result.Succeeded) Debug.LogWarning("Kesa: " + name + " -> " + result);
         };
         _ui = ui;
+
+        var board = new GameObject("Board");
+        board.transform.SetParent(transform, false);
+        _board = game.Board(session, new GameObjectLookRenderer(board.transform, mods.Assets));
+        await RefreshBoard();
+    }
+
+    private async Task RefreshBoard()
+    {
+        if (_board == null) return;
+        await _board.RefreshAsync();
+        var problems = _board.Stage.Problems;
+        for (; _boardProblems < problems.Count; _boardProblems++) Debug.LogWarning("Kesa board: " + problems[_boardProblems]);
     }
 
     /// <summary>봇이 할 일을 기다리지 않고 모두 하고 화면을 다시 그린다 (확인용).</summary>
@@ -120,6 +136,7 @@ public sealed class KesaDemo : MonoBehaviour
         if (_bot != null)
             while (await _bot.Run() > 0) { }
         if (_ui != null) await _ui.RefreshAsync();
+        await RefreshBoard();
     }
 
     private async void Update()
@@ -132,6 +149,7 @@ public sealed class KesaDemo : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.Escape)) await _ui.Windows.Escape();
             if (_bot != null && Time.time >= _botNext && await _bot.Run() > 0) _botNext = Time.time + botDelay;
             await _ui.RefreshAsync();
+            await RefreshBoard();
         }
         catch (Exception e)
         {

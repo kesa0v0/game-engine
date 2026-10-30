@@ -8,6 +8,7 @@ using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Runtime;
 using Kesa.Engine.Text;
+using Kesa.Engine.Ui;
 using UnityEngine;
 
 namespace Kesa.Engine.Unity
@@ -21,8 +22,9 @@ namespace Kesa.Engine.Unity
         private readonly ContentLoadResult _content;
 
         private LoadedMods(ContentLoadResult content, Translator translator, ModFolderAssets assets, IReadOnlyList<string> modFolders,
-            IReadOnlyList<Diagnostic> diagnostics)
+            IReadOnlyList<Diagnostic> diagnostics, LookLibrary looks)
         {
+            Looks = looks;
             _content = content;
             Translator = translator;
             Assets = assets;
@@ -31,6 +33,12 @@ namespace Kesa.Engine.Unity
         }
 
         public Translator Translator { get; }
+
+        /// <summary>
+        /// 모드들의 그림 정의(<c>*.look.xml</c>)와 공간(<c>*.space.xml</c>) (G409~G411). 읽다 난 문제는 <see cref="LookLibrary.Problems"/>에 있고
+        /// 틀린 정의만 빠진다.
+        /// </summary>
+        public LookLibrary Looks { get; }
 
         public ModFolderAssets Assets { get; }
 
@@ -50,8 +58,9 @@ namespace Kesa.Engine.Unity
 
         /// <summary>
         /// <paramref name="modsRoot"/>의 모드를 불러온다. 오류가 난 모드는 빼고 남은 모드로 만들며 던지지 않는다 (G353).
+        /// <paramref name="lookKinds"/>는 그림 요소·공간 종류(G413). 없으면 기본 종류이고, 게임은 <see cref="LookKinds.Standard"/>에 제 종류를 더해 넘긴다.
         /// </summary>
-        public static LoadedMods Load(string modsRoot, IReadOnlyList<string> languages, string? hostLocaleFolder = null)
+        public static LoadedMods Load(string modsRoot, IReadOnlyList<string> languages, string? hostLocaleFolder = null, LookKinds? lookKinds = null)
         {
             var bag = new DiagnosticBag();
             var order = ModSorter.Sort(ModDiscovery.Discover(modsRoot, bag), bag);
@@ -59,7 +68,23 @@ namespace Kesa.Engine.Unity
             var translations = Translations.Load(content, bag, hostLocaleFolder);
             var translator = translations.For(languages, message => Debug.LogWarning("Kesa translation: " + message));
             var folders = content.Mods.Select(m => Path.Combine(content.ModsRoot, m.Directory)).ToList();
-            return new LoadedMods(content, translator, new ModFolderAssets(folders), folders, bag.ToSortedList());
+            var assets = new ModFolderAssets(folders);
+            var looks = LookLibrary.Load(LookSources(content), lookKinds ?? LookKinds.Standard(), path => assets.Find(path) != null);
+            return new LoadedMods(content, translator, assets, folders, bag.ToSortedList(), looks);
+        }
+
+        // 확장자로 알아보므로 모드 폴더 어디에 있어도 읽는다 (G409·G411). 한 모드 안은 경로 순
+        private static IEnumerable<LookSource> LookSources(ContentLoadResult content)
+        {
+            foreach (var mod in content.Mods)
+            {
+                string folder = Path.Combine(content.ModsRoot, mod.Directory);
+                var files = Directory.GetFiles(folder, "*.xml", SearchOption.AllDirectories)
+                    .Select(f => Path.GetRelativePath(folder, f).Replace('\\', '/'))
+                    .Where(f => f.EndsWith(".look.xml", System.StringComparison.OrdinalIgnoreCase) || f.EndsWith(".space.xml", System.StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(f => f, System.StringComparer.Ordinal);
+                foreach (var file in files) yield return new LookSource(mod.Id, mod.Id + "/" + file, File.ReadAllText(Path.Combine(folder, file)));
+            }
         }
 
         /// <summary>이 모드로 새 판을 연다. 모드를 다시 읽지 않는다.</summary>

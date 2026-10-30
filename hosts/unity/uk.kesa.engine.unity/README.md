@@ -43,6 +43,20 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
 - 화면 동작이 낸 `submit`이 거절돼도 `BridgeResult.Succeeded`는 참이다. 실패는 `Deliveries`에만 있으니 `ActionResult`에서 본다(G283).
 - 부르다 실패한 바인딩은 직전 값을 유지하고 `UiInterpreter.Errors`에 쌓인다(G341). 비우는 것은 `ClearErrors`뿐이다.
 
+## 판 위 그림
+
+모드의 `*.look.xml`(그림 정의)과 `*.space.xml`(공간)은 `LoadedMods.Load`가 함께 읽는다(`mods.Looks`, 읽다 난 문제는 `mods.Looks.Problems`). 그리는 것은 `GameObjectLookRenderer`다.
+
+```csharp
+var board = match.Board(session, new GameObjectLookRenderer(boardTransform, mods.Assets));
+// 프레임마다: await board.RefreshAsync();   그리다 난 문제는 board.Stage.Problems
+```
+
+- 엔티티 물체(`WorldObjects`)와 표시(`WorldMarks`)를 받아 물체마다 GameObject 하나를 `boardTransform` 아래에 만든다. 물체는 공간 단위(`grid`의 `cell`)만큼 키우므로 그 안의 `size`·`offset`은 칸 단위다.
+- `Sprite`는 SpriteRenderer이고 그림의 긴 변이 1이다. `layer`는 조상 것을 더해 `sortingOrder`가 된다. 그림을 못 읽거나 그림 정의가 없으면 보라·검정 체크무늬다.
+- 게임의 요소 종류: `LookKinds.Standard()`에 `LookElementKind`를 더해 `LoadedMods.Load(…, lookKinds:)`로 넘기고, 같은 이름으로 `renderer.AddKind(이름, assets => new 내View())`(`ILookElementView`)를 더한다. 공간 종류는 `SpaceKind`를 `LookKinds`에 더한다.
+- 그림은 처음 보일 때 바로(동기) 읽는다. 비동기 읽기와 미리 읽기 목록(G392)은 아직 없다. 표시 누르기(`Click`을 `Act`로)도 아직 이 렌더러에 없다.
+
 ## 스타일시트 (USS)
 
 - 모드의 `<Style src>`는 해석기가 `files`(`mods.Assets.LoadText`)로 모드 폴더에서 읽고 해석해 렌더러에 넘긴다. 렌더러는 Unity 내부 `StyleSheetBuilder`를 리플렉션으로 불러 진짜 `StyleSheet`을 만들어 붙인다(G359, `Runtime/UssBuilder.cs`·`UssStyleSheets.cs`, OneJS에서 고쳐 옮김, `THIRD_PARTY_NOTICES.md`). 캐스케이드·`:hover`·선택자·`var()`·`transition`은 Unity가 한다.
@@ -61,7 +75,7 @@ Unity.exe -batchmode -nographics -projectPath <패키지를 manifest에 적은 �
   -executeMethod Kesa.Engine.Unity.Editor.SmokeTest.Run -kesaMods <저장소>/samples/skirmish -logFile -
 ```
 
-로그에 `KESA SMOKE TEST: OK`가 나오면 skirmish 화면이 Unity의 요소 트리로 맞게 만들어졌고, 창 배치와 런타임 USS(`UssCheck`)도 맞는 것이다. 에디터가 그 프로젝트를 열고 있으면 잠금 때문에 바로 끝나므로, 프로젝트를 다른 폴더로 복사하고 `manifest.json`의 패키지 경로를 절대 경로로 바꿔 돌린다(USS 확인은 그 프로젝트의 `Assets/KesaUssCheck`에 시트를 잠시 만들었다 지운다).
+로그에 `KESA SMOKE TEST: OK`가 나오면 skirmish 화면이 Unity의 요소 트리로 맞게 만들어졌고, 창 배치와 런타임 USS(`UssCheck`), 판 위 그림(skirmish `looks/`의 표시가 SpriteRenderer로 칸 자리에, 모르는 그림은 대체 그림)도 맞는 것이다. 에디터가 그 프로젝트를 열고 있으면 잠금 때문에 바로 끝나므로, 프로젝트를 다른 폴더로 복사하고 `manifest.json`의 패키지 경로를 절대 경로로 바꿔 돌린다(USS 확인은 그 프로젝트의 `Assets/KesaUssCheck`에 시트를 잠시 만들었다 지운다).
 
 ## 데모 프로젝트
 
