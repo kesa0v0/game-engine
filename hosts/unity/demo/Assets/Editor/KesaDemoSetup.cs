@@ -141,6 +141,38 @@ public static class KesaDemoSetup
         await demo.Step();
         turn = root.Q<Label>("turn");
         if (turn == null || turn.text != "3") throw new InvalidOperationException("the bot should play blue's turn so it is turn 3, got " + turn?.text);
+        await VerifyBoard(demo);
+    }
+
+    /// <summary>
+    /// 판의 GameObject를 화면 좌표로 눌러 본다: 카메라 광선 → 물체 → 경계 → 커널. 실제 키 장치만 빠진다(입력 이름을 바로 넘김).
+    /// </summary>
+    private static async Task VerifyBoard(KesaDemo demo)
+    {
+        var board = demo.transform.Find("Board") ?? throw new InvalidOperationException("the demo has no Board object");
+        var units = Enumerable.Range(0, board.childCount).Select(board.GetChild).Where(t => t.name.StartsWith("entity:")).ToList();
+        if (units.Count != 6) throw new InvalidOperationException("six unit objects expected, got " + string.Join(", ", units.Select(u => u.name)));
+        var camera = Camera.main ?? throw new InvalidOperationException("no main camera");
+        Vector3 ScreenOf(Vector3 local) => camera.WorldToScreenPoint(board.TransformPoint(local));
+        long IdOf(Transform unit) => long.Parse(unit.name.Substring("entity:".Length));
+        async Task<long?> Inspected() => ((BridgeEntity?)(await demo.Session!.Call("inspected", "skirmish.inspected", new BridgeValue[0])).Value)?.Id;
+
+        // 빨강은 아래(y=4) 줄에서 시작한다 (skirmish board.space.xml의 flip-y)
+        var red = units.Where(u => Mathf.RoundToInt(u.localPosition.y) == -4).OrderBy(u => u.localPosition.x).ToList();
+        if (red.Count < 2) throw new InvalidOperationException("two red units on the bottom row expected");
+        await demo.PressBoard("secondary", ScreenOf(red[0].localPosition));
+        if (await Inspected() != IdOf(red[0])) throw new InvalidOperationException("the right press on a unit object should open its window");
+        await demo.PressBoard("inspect", ScreenOf(red[1].localPosition));
+        if (await Inspected() != IdOf(red[1])) throw new InvalidOperationException("the inspect key (keys.input.xml) on a unit object should open its window");
+
+        // 고르고 바로 위 빈 칸을 누르면 옮겨 가고 물체도 따라간다
+        var mover = red.First(u => !units.Any(o => o != u && Vector3.Distance(o.localPosition, u.localPosition + Vector3.up) < 0.1f));
+        var from = mover.localPosition;
+        await demo.PressBoard("primary", ScreenOf(from));
+        await demo.PressBoard("primary", ScreenOf(from + Vector3.up));
+        await demo.Step();
+        if (Vector3.Distance(mover.localPosition, from + Vector3.up) > 0.01f)
+            throw new InvalidOperationException("the unit object should step up one square from " + from + ", is at " + mover.localPosition);
     }
 
     private static void Dump(VisualElement element, int depth, StringBuilder text)

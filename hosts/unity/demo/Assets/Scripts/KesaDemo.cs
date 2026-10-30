@@ -142,8 +142,8 @@ public sealed class KesaDemo : MonoBehaviour
         await RefreshBoard();
     }
 
-    /// <summary>패널 요소가 받지 않은 누름을 판에 넘긴다 (G395·G419·G422: 표시가 먼저, 다음 엔티티, 다음 빈 자리).</summary>
-    private async Task PressBoard(string input, Vector3 screenPoint)
+    /// <summary>패널 요소가 받지 않은 누름을 판에 넘긴다 (G395·G419·G422: 표시가 먼저, 다음 엔티티, 다음 빈 자리). 공개는 확인용.</summary>
+    public async Task PressBoard(string input, Vector3 screenPoint)
     {
         var camera = Camera.main;
         if (_board == null || _boardRenderer == null || camera == null) return;
