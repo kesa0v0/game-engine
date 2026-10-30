@@ -44,8 +44,14 @@ public sealed class KesaDemo : MonoBehaviour
 
     [SerializeField] private string[] languages = { "ko", "en" };
 
+    [Tooltip("카메라가 비출 판의 가운데와 반 높이 (판 단위)")]
+    [SerializeField] private Vector2 boardCenter = new Vector2(2f, -1.5f);
+    [SerializeField] private float boardHalfHeight = 4f;
+
     private UiInterpreter? _ui;
     private LookBoard? _board;
+    private GameObjectLookRenderer? _boardRenderer;
+    private VisualElement? _root;
     private int _boardProblems;
     private BotSeat? _bot;
     private float _botNext;
@@ -118,8 +124,33 @@ public sealed class KesaDemo : MonoBehaviour
 
         var board = new GameObject("Board");
         board.transform.SetParent(transform, false);
-        _board = game.Board(session, new GameObjectLookRenderer(board.transform, mods.Assets));
+        _boardRenderer = new GameObjectLookRenderer(board.transform, mods.Assets);
+        _board = game.Board(session, _boardRenderer);
+        _root = root;
+        var camera = Camera.main;
+        if (camera != null)
+        {
+            camera.orthographic = true;
+            camera.orthographicSize = boardHalfHeight;
+            camera.transform.SetPositionAndRotation(new Vector3(boardCenter.x, boardCenter.y, -10f), Quaternion.identity);
+        }
         await RefreshBoard();
+    }
+
+    /// <summary>패널 요소가 받지 않은 누름을 판에 넘긴다 (G395: 표시의 click이 먼저).</summary>
+    private async Task PressBoard(Vector3 screenPoint)
+    {
+        var camera = Camera.main;
+        if (_board == null || _boardRenderer == null || camera == null) return;
+        var panel = _root?.panel;
+        if (panel != null)
+        {
+            var picked = panel.Pick(RuntimePanelUtils.ScreenToPanel(panel, new Vector2(screenPoint.x, Screen.height - screenPoint.y)));
+            if (picked != null && picked != _root && picked != panel.visualTree) return;
+        }
+        var result = await _board.PressAsync(_boardRenderer.KeysAt(camera.ScreenPointToRay(screenPoint)));
+        if (result != null && !result.Succeeded) Debug.LogWarning("Kesa board press -> " + result);
+        if (_ui != null) await _ui.RefreshAsync();
     }
 
     private async Task RefreshBoard()
@@ -147,6 +178,7 @@ public sealed class KesaDemo : MonoBehaviour
         {
             // 창이 ESC를 받지 않으면(거짓) 게임이 자기 메뉴를 열 자리다
             if (Input.GetKeyDown(KeyCode.Escape)) await _ui.Windows.Escape();
+            if (Input.GetMouseButtonDown(0)) await PressBoard(Input.mousePosition);
             if (_bot != null && Time.time >= _botNext && await _bot.Run() > 0) _botNext = Time.time + botDelay;
             await _ui.RefreshAsync();
             await RefreshBoard();

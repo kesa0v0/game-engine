@@ -25,6 +25,9 @@ namespace Kesa.Engine.Unity
             public ILookElementView? View { get; }
             public Node? Parent { get; set; }
             public long Id;
+
+            /// <summary>물체면 그 열쇠.</summary>
+            public string? Key;
             public int Layer;
             public readonly List<Node> Children = new List<Node>();
 
@@ -56,7 +59,34 @@ namespace Kesa.Engine.Unity
         {
             var go = new GameObject(key);
             go.transform.SetParent(_board, false);
-            return Add(new Node(go, null, null));
+            return Add(new Node(go, null, null) { Key = key });
+        }
+
+        /// <summary>
+        /// 광선이 지나는 물체의 열쇠, 위에 그린 것부터(그리는 순서가 같으면 가까운 것부터). 보이는 SpriteRenderer의 경계로 잰다.
+        /// 누름은 이것을 <c>LookBoard.PressAsync</c>에 넘긴다.
+        /// </summary>
+        public IReadOnlyList<string> KeysAt(Ray ray)
+        {
+            var hits = new List<(string Key, int Order, float Distance)>();
+            foreach (var node in _nodes.Values)
+            {
+                if (node.Key == null || !node.GameObject.activeInHierarchy) continue;
+                int best = int.MinValue;
+                float near = float.MaxValue;
+                foreach (var sprite in node.GameObject.GetComponentsInChildren<SpriteRenderer>())
+                {
+                    if (!sprite.enabled || sprite.sprite == null || !sprite.bounds.IntersectRay(ray, out float distance)) continue;
+                    if (sprite.sortingOrder > best || (sprite.sortingOrder == best && distance < near))
+                    {
+                        best = sprite.sortingOrder;
+                        near = distance;
+                    }
+                }
+                if (best != int.MinValue) hits.Add((node.Key, best, near));
+            }
+            hits.Sort((a, b) => a.Order != b.Order ? b.Order.CompareTo(a.Order) : a.Distance.CompareTo(b.Distance));
+            return hits.ConvertAll(h => h.Key);
         }
 
         public void PlaceObject(ElementId obj, LookPosition position, long unit)

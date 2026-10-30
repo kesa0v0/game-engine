@@ -104,18 +104,25 @@ namespace Kesa.Engine.Unity.Editor
                 var renderer = new GameObjectLookRenderer(boardObject.transform, game.Mods.Assets);
                 var board = game.Board(session, renderer);
                 await board.RefreshAsync();
-                Require(!board.Stage.Keys.Any(), "nothing is marked before a hit");
+                Require(board.Stage.Keys.Count(k => k.StartsWith("entity:")) == 6 && !board.Stage.Keys.Any(k => k.StartsWith("mark:")),
+                    "six units and no marks before a hit: " + string.Join(", ", board.Stage.Keys));
+                Require(board.Stage.Problems.Count == 0, "the units draw cleanly: " + string.Join("; ", board.Stage.Problems));
+                for (int i = boardObject.transform.childCount - 1; i >= 0; i--)
+                    if (boardObject.transform.GetChild(i).name.StartsWith("entity:")) board.Stage.Hide(boardObject.transform.GetChild(i).name);
 
                 var spot = new BridgeLook("retreat-spot", new KeyValuePair<string, BridgeValue>[0]);
                 board.Stage.Show("test", spot, BridgeWhere.At("square", new BridgeList(new BridgeValue[] { new BridgeInt(2), new BridgeInt(3) })));
                 Require(boardObject.transform.childCount == 1, "one object on the board");
                 var obj = boardObject.transform.GetChild(0);
-                Require(obj.localPosition == new Vector3(2, 3, 0) && obj.localScale == Vector3.one, "placed on square (2, 3), got " + obj.localPosition);
+                Require(obj.localPosition == new Vector3(2, -3, 0) && obj.localScale == Vector3.one, "placed on square (2, 3) with y down, got " + obj.localPosition);
                 var sprite = obj.GetComponentInChildren<SpriteRenderer>();
                 var picture = sprite != null ? sprite.sprite : null;
                 Require(picture != null && picture.texture.width == 1, "the white picture is loaded");
                 Require(picture!.bounds.size.x == 1f, "the long side is one cell, got " + picture.bounds.size);
                 Require(sprite!.color == (Color)new Color32(0x40, 0x80, 0xff, 0x80), "tinted, got " + sprite.color);
+                var keys = renderer.KeysAt(new Ray(new Vector3(2.2f, -3.1f, -10f), Vector3.forward));
+                Require(keys.Count == 1 && keys[0] == "test", "a ray through the square finds the mark, got " + string.Join(", ", keys));
+                Require(renderer.KeysAt(new Ray(new Vector3(0f, 0f, -10f), Vector3.forward)).Count == 0, "an empty square finds nothing");
 
                 board.Stage.Show("test", new BridgeLook("no-such-look", new KeyValuePair<string, BridgeValue>[0]),
                     BridgeWhere.At("square", new BridgeList(new BridgeValue[] { new BridgeInt(0), new BridgeInt(0) })));

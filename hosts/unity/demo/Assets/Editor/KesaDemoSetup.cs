@@ -61,6 +61,42 @@ public static class KesaDemoSetup
         EditorApplication.Exit(0);
     }
 
+    /// <summary>
+    /// batch 모드용(그래픽 있이, <c>-nographics</c> 없이): 데모를 열고 카메라가 비춘 판을 <c>-kesaShot</c> 경로의 PNG로 남긴다.
+    /// 패널(UI Toolkit)은 카메라 그림에 들어가지 않는다.
+    /// </summary>
+    public static void Shot()
+    {
+        int code = 0;
+        try
+        {
+            var args = Environment.GetCommandLineArgs();
+            int at = Array.IndexOf(args, "-kesaShot");
+            if (at < 0 || at + 1 >= args.Length) throw new InvalidOperationException("missing -kesaShot <png path>");
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var demo = UnityEngine.Object.FindFirstObjectByType<KesaDemo>()!;
+            demo.Begin(new VisualElement()).GetAwaiter().GetResult();
+            var camera = Camera.main!;
+            var target = new RenderTexture(960, 540, 24);
+            camera.targetTexture = target;
+            camera.Render();
+            RenderTexture.active = target;
+            var image = new Texture2D(960, 540, TextureFormat.RGB24, false);
+            image.ReadPixels(new Rect(0, 0, 960, 540), 0, 0);
+            image.Apply();
+            File.WriteAllBytes(args[at + 1], image.EncodeToPNG());
+            camera.targetTexture = null;
+            RenderTexture.active = null;
+            Debug.Log("KESA DEMO SHOT: " + args[at + 1]);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("KESA DEMO SHOT FAILED: " + e);
+            code = 1;
+        }
+        EditorApplication.Exit(code);
+    }
+
     /// <summary>batch 모드용: 장면이 열리고(없는 스크립트 없이) 데모가 skirmish 화면을 올리는지 본다. 틀리면 종료 코드 1.</summary>
     public static void Check()
     {

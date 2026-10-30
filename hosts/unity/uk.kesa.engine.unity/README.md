@@ -48,14 +48,17 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
 모드의 `*.look.xml`(그림 정의)과 `*.space.xml`(공간)은 `LoadedMods.Load`가 함께 읽는다(`mods.Looks`, 읽다 난 문제는 `mods.Looks.Problems`). 그리는 것은 `GameObjectLookRenderer`다.
 
 ```csharp
-var board = match.Board(session, new GameObjectLookRenderer(boardTransform, mods.Assets));
+var renderer = new GameObjectLookRenderer(boardTransform, mods.Assets);
+var board = match.Board(session, renderer);
 // 프레임마다: await board.RefreshAsync();   그리다 난 문제는 board.Stage.Problems
+// 누를 때(패널이 받지 않았으면): await board.PressAsync(renderer.KeysAt(camera.ScreenPointToRay(mouse)));
 ```
 
 - 엔티티 물체(`WorldObjects`)와 표시(`WorldMarks`)를 받아 물체마다 GameObject 하나를 `boardTransform` 아래에 만든다. 물체는 공간 단위(`grid`의 `cell`)만큼 키우므로 그 안의 `size`·`offset`은 칸 단위다.
 - `Sprite`는 SpriteRenderer이고 그림의 긴 변이 1이다. `layer`는 조상 것을 더해 `sortingOrder`가 된다. 그림을 못 읽거나 그림 정의가 없으면 보라·검정 체크무늬다.
 - 게임의 요소 종류: `LookKinds.Standard()`에 `LookElementKind`를 더해 `LoadedMods.Load(…, lookKinds:)`로 넘기고, 같은 이름으로 `renderer.AddKind(이름, assets => new 내View())`(`ILookElementView`)를 더한다. 공간 종류는 `SpaceKind`를 `LookKinds`에 더한다.
-- 그림은 처음 보일 때 바로(동기) 읽는다. 비동기 읽기와 미리 읽기 목록(G392)은 아직 없다. 표시 누르기(`Click`을 `Act`로)도 아직 이 렌더러에 없다.
+- 누름은 광선이 지나는 물체를 위에 그린 것부터 찾고(`KeysAt`), `PressAsync`가 그중 `click`이 있는 표시의 화면 동작을 낸다(G395). 엔티티와 빈 자리 누르기(`@world_click`)는 아직 없다.
+- 그림은 처음 보일 때 바로(동기) 읽는다. 비동기 읽기와 미리 읽기 목록(G392)은 아직 없다.
 
 ## 스타일시트 (USS)
 
@@ -79,7 +82,7 @@ Unity.exe -batchmode -nographics -projectPath <패키지를 manifest에 적은 �
 
 ## 데모 프로젝트
 
-`hosts/unity/demo`는 이 패키지를 `file:`로 가져다 쓰는 Unity 프로젝트다(`.gitignore`는 Unity 프로젝트용 템플릿). 먼저 저장소 루트에서 `dotnet build`를 한 뒤 Unity 6000.3으로 열고 `Assets/Scenes/Demo.unity`를 재생하면 `samples/skirmish`가 같은 프로세스에서 돌며 UXML 화면이 뜬다(`KesaDemo`). 창 없이 확인: `-executeMethod KesaDemoSetup.Check`.
+`hosts/unity/demo`는 이 패키지를 `file:`로 가져다 쓰는 Unity 프로젝트다(`.gitignore`는 Unity 프로젝트용 템플릿). 먼저 저장소 루트에서 `dotnet build`를 한 뒤 Unity 6000.3으로 열고 `Assets/Scenes/Demo.unity`를 재생하면 `samples/skirmish`가 같은 프로세스에서 돌며 UXML 화면이 뜬다(`KesaDemo`). 창 없이 확인: `-executeMethod KesaDemoSetup.Check`. 카메라가 비춘 판을 PNG로 보려면 `-nographics` 없이 `-executeMethod KesaDemoSetup.Shot -kesaShot <png 경로>`(패널은 들어가지 않는다).
 
 ## 아직 없는 것
 

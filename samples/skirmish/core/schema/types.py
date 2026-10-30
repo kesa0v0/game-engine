@@ -7,9 +7,10 @@ component("Life", hp=field(int, default=1))
 component("Owner", party=ref("Party", optional=True))
 component("Ready", acted=field(bool, default=False))
 component("Match", turn=field(int, default=1), winner=ref("Party", optional=True))
-deftype("Party", components=["Order", "Seatable"])
+deftype("Party", components=["Order", "Seatable"], color=const(str))
 deftype("Unit", components=["Pos", "Life", "Owner", "Ready"],
-    max_hp=const(int), attack=const(int), reach=const(int))
+    max_hp=const(int), attack=const(int), reach=const(int),
+    look=const(Look["Unit"]), where=const(Where["Unit"]))
 deftype("Game", components=["Match"])
 # 화면에만 있는 기록: 연결마다 하나, 저장되지 않는다 (spec-gaps G277·G279). 고른 유닛
 ui_state("Selection", unit=ref("Unit", optional=True))

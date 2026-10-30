@@ -13,6 +13,7 @@ namespace Kesa.Engine.Ui
         private readonly LookLibrary _library;
         private readonly ILookRenderer _renderer;
         private readonly SortedDictionary<string, ShownObject> _shown = new SortedDictionary<string, ShownObject>(StringComparer.Ordinal);
+        private readonly Dictionary<string, BridgeMarkClick> _clicks = new Dictionary<string, BridgeMarkClick>(StringComparer.Ordinal);
         private readonly List<UiProblem> _problems = new List<UiProblem>();
         private readonly SortedSet<string> _problemTexts = new SortedSet<string>(StringComparer.Ordinal);
 
@@ -32,6 +33,8 @@ namespace Kesa.Engine.Ui
         {
             foreach (var mark in marks.Changed)
             {
+                if (mark.Click != null) _clicks["mark:" + mark.Key] = mark.Click;
+                else _clicks.Remove("mark:" + mark.Key);
                 if (mark.Error != null)
                 {
                     Report(mark.Key, mark.Error);
@@ -40,8 +43,15 @@ namespace Kesa.Engine.Ui
                 }
                 Show("mark:" + mark.Key, mark.Look, mark.Where);
             }
-            foreach (var key in marks.Gone) Hide("mark:" + key);
+            foreach (var key in marks.Gone)
+            {
+                _clicks.Remove("mark:" + key);
+                Hide("mark:" + key);
+            }
         }
+
+        /// <summary>그 열쇠의 표시가 누르면 낼 화면 동작 (G395·G408). 엔티티와 누를 수 없는 표시는 null.</summary>
+        public BridgeMarkClick? ClickOf(string key) => _shown.ContainsKey(key) && _clicks.TryGetValue(key, out var click) ? click : null;
 
         public void Apply(BridgeWorldObjects objects)
         {

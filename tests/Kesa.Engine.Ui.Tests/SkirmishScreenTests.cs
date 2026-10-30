@@ -259,12 +259,12 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
-        public async Task TheRetreatMarkIsDrawnFromTheSamplesLookFilesAndGoesAwayWhenAnswered()
+        public async Task TheBoardShowsTheUnitsAndPressingTheRetreatMarkAnswers()
         {
             var files = Directory.GetFiles(_modFolder, "*.xml", SearchOption.AllDirectories).OrderBy(f => f, System.StringComparer.Ordinal)
-                .Select(f => new LookSource("skirmish", Path.GetRelativePath(_modFolder, f).Replace('\\', '/'), File.ReadAllText(f)));
+                .Select(f => new LookSource("skirmish", Path.GetRelativePath(_modFolder, f).Replace(Path.DirectorySeparatorChar, '/'), File.ReadAllText(f)));
             var library = LookLibrary.Load(files, LookKinds.Standard(), path => File.Exists(Path.Combine(_modFolder, path)));
-            Assert.That(library.Problems, Is.Empty, string.Join("\n", library.Problems));
+            Assert.That(library.Problems, Is.Empty, string.Join(", ", library.Problems));
             var renderer = new MemoryLookRenderer();
             var stage = new LookStage(library, renderer);
 
@@ -272,17 +272,25 @@ namespace Kesa.Engine.Ui.Tests
             var bob = await Open("bob", _blue);
             var board = new LookBoard(alice.Session, stage);
             await board.RefreshAsync();
-            Assert.That(stage.Keys, Is.Empty);
-            await HitRed(alice, bob);
-            await board.RefreshAsync();
-            Assert.That(stage.Problems, Is.Empty, string.Join("\n", stage.Problems));
-            Assert.That(renderer.Dump(stage.Keys.Single()), Is.EqualTo("@(2.0, 3.0, 0.0) Sprite[src=art/white.png,tint=#4080ff80]"));
+            Assert.That(stage.Problems, Is.Empty, string.Join(", ", stage.Problems));
+            var archer = UnitsOf(_red).Single(u => ((IntValue)_world.Get(new EntityId(u), _world.Member("Pos", "x"))).Value == 2);
+            Assert.That(stage.Keys.Count(k => k.StartsWith("entity:")), Is.EqualTo(6), "six units, no marks yet");
+            Assert.That(renderer.Dump("entity:" + archer), Is.EqualTo(
+                "@(2.0, -4.0, 0.0) -Sprite[src=art/ring.png,tint=#fac846ff] Sprite[layer=1,size=0.7,0.7,src=art/archer.png,tint=#d04848ff] " +
+                "-Sprite[layer=2,size=0.7,0.7,src=art/white.png,tint=#00000070]"));
 
-            var spot = (await alice.Session.WorldMarks(0)).Changed.Single();
-            Assert.That((await alice.Session.Act(spot.Click!.Action, spot.Click.Arguments)).Succeeded, Is.True);
+            long target = await HitRed(alice, bob);
             await board.RefreshAsync();
-            Assert.That(stage.Keys, Is.Empty);
-            Assert.That(renderer.Nodes, Is.Empty);
+            Assert.That(stage.Problems, Is.Empty, string.Join(", ", stage.Problems));
+            string spot = stage.Keys.Single(k => k.StartsWith("mark:"));
+            Assert.That(renderer.Dump(spot), Is.EqualTo("@(2.0, -3.0, 0.0) Sprite[src=art/white.png,tint=#4080ff80]"));
+            Assert.That(await board.PressAsync(new[] { "entity:" + target }), Is.Null, "a unit takes no press yet");
+
+            var result = await board.PressAsync(new[] { spot });
+            Assert.That(result!.Succeeded, Is.True, result.ToString());
+            await board.RefreshAsync();
+            Assert.That(stage.Keys.Any(k => k.StartsWith("mark:")), Is.False, "answered, so the mark is gone");
+            Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -3.0, 0.0) "), "the unit stepped back onto the marked square");
         }
 
         [Test]

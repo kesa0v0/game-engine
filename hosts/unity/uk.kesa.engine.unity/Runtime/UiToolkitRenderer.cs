@@ -393,6 +393,11 @@ namespace Kesa.Engine.Unity
                     else if (element is ProgressBar bar) bar.title = value;
                     break;
                 case "tooltip": element.tooltip = value; break;
+                case "picking-mode":
+                    if (value == "Ignore") element.pickingMode = PickingMode.Ignore;
+                    else if (value == "Position") element.pickingMode = PickingMode.Position;
+                    else Debug.LogWarning("Kesa UI: picking-mode is Position or Ignore, got '" + value + "'");
+                    break;
                 case "low-value":
                     if (element is ProgressBar low && float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float lowValue)) low.lowValue = lowValue;
                     break;

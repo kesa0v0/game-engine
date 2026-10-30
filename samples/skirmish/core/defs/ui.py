@@ -99,6 +99,14 @@ def retreat(unit: Ref[Unit]):
         choose(unit, where=lambda u: is_hit(u))
     respond(hit_question(unit), "engine.pick", choice=1)
 
+# 판 위 유닛 (G389·G394): 그림의 뜻은 looks/units.look.xml. 고른 유닛에는 고리, 이번 차례에 움직인 유닛은 흐리게
+def unit_look(u):
+    art = "art/soldier.png" if u.Unit.reach == 1 else "art/archer.png"
+    return look("unit", art=art, color=u.Owner.party.Party.color, picked=ui.Selection.unit == u, acted=u.Ready.acted)
+
+def unit_where(u):
+    return at("square", [u.Pos.x, u.Pos.y])
+
 # 판 위 표시 (G395): 맞은 유닛이 물러날 칸. 누르면 retreat로 답한다
 @world_marks
 def retreat_spots():

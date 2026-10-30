@@ -1,4 +1,4 @@
-<!-- 판의 칸 (G414): at("square", [x, y]) -->
+<!-- 판의 칸 (G414): at("square", [x, y]). y가 커질수록 아래라 빨강(y=4)이 아래에 선다 -->
 <Spaces>
-  <Space name="square" kind="grid" cell="1" />
+  <Space name="square" kind="grid" cell="1" flip-y="true" />
 </Spaces>
