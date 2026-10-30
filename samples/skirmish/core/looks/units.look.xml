@@ -1,8 +1,12 @@
 <!-- 판 위 유닛의 그림 (G413): ui.py의 unit_look이 art·color·picked·acted를 넘긴다 -->
 <Looks>
-  <Look name="unit">
+  <Look name="unit" exit="unit-down">
     <Sprite src="art/ring.png" tint="#fac846" bind-display="picked" />
     <Sprite bind-src="art" bind-tint="color" size="0.7,0.7" layer="1" />
     <Sprite src="art/white.png" tint="#00000070" size="0.7,0.7" layer="2" bind-display="acted" />
+  </Look>
+  <!-- 쓰러진 유닛 (G431): 같은 그림이 줄어들며 흐려진다 -->
+  <Look name="unit-down" solid="0.1" fade-out="0.6" grow="-0.8">
+    <Sprite bind-src="art" bind-tint="color" size="0.7,0.7" layer="1" />
   </Look>
 </Looks>

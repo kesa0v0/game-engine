@@ -35,14 +35,26 @@ namespace Kesa.Engine.Ui
                 string? name = Name(node, place, "Look", problems);
                 var timing = new SortedDictionary<string, LookAttributeValue>(StringComparer.Ordinal);
                 var timingBindings = new List<LookBinding>();
+                string? exit = null;
                 foreach (var attribute in node.Attributes())
                 {
                     string n = attribute.Name.LocalName;
                     if (attribute.IsNamespaceDeclaration || n == "name") continue;
+                    if (n == "exit")
+                    {
+                        if (attribute.Value.Length == 0) problems.Add(new UiProblem(place, "exit=\"\" names no look"));
+                        else exit = attribute.Value;
+                        continue;
+                    }
+                    if (n == "bind-exit")
+                    {
+                        problems.Add(new UiProblem(place, "exit is written, not bound: exit=\"look-name\" (spec-gaps G431)"));
+                        continue;
+                    }
                     string target = n.StartsWith("bind-", StringComparison.Ordinal) ? n.Substring("bind-".Length) : n;
                     if (!LookDefinition.TimingNames.Contains(target))
                     {
-                        problems.Add(new UiProblem(place, "<Look> takes name and the effect times " + string.Join(", ", LookDefinition.TimingNames) +
+                        problems.Add(new UiProblem(place, "<Look> takes name, exit and the effect times " + string.Join(", ", LookDefinition.TimingNames) +
                             UiSuggest.Hint(target, LookDefinition.TimingNames) + "; put '" + n + "' on an element inside it"));
                         continue;
                     }
@@ -61,7 +73,7 @@ namespace Kesa.Engine.Ui
                 if (Has("rise") && Has("drift"))
                     problems.Add(new UiProblem(place, "<Look> has both rise and drift; rise=\"r\" is drift=\"0,r\", so use one"));
                 var elements = node.Elements().Select(e => reader.Read(e)).ToList();
-                if (name != null) looks.Add(new LookDefinition(name, source.Mod, place, elements, timing, timingBindings));
+                if (name != null) looks.Add(new LookDefinition(name, source.Mod, place, elements, timing, timingBindings, exit));
             }
         }
 

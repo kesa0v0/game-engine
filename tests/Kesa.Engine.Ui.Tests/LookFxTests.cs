@@ -125,6 +125,47 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(problems, Has.Some.Contain("grow=\"x\""));
         }
 
+        /// <summary>퇴장 (G431): 사라진 엔티티의 그림 값을 받아 그 자리에 exit 그림을 효과로 띄운다. 그림이 바뀌는 것은 사라짐이 아니다.</summary>
+        [Test]
+        public void AVanishedObjectPlaysItsExitLookWhereItWas()
+        {
+            var stage = Stage("<Looks>" +
+                              "<Look name=\"soldier\" exit=\"down\"><Sprite bind-src=\"art\" /></Look>" +
+                              "<Look name=\"down\" fade-out=\"0.5\" rise=\"-1\"><Sprite bind-src=\"art\" /></Look>" +
+                              "<Look name=\"flag\"><Sprite src=\"art/flag.png\" /></Look>" +
+                              "</Looks>");
+            var here = BridgeWhere.At("square", new BridgeList(new BridgeValue[] { new BridgeInt(1), new BridgeInt(2) }));
+            BridgeLook Soldier() => new BridgeLook("soldier", new[] { new KeyValuePair<string, BridgeValue>("art", new BridgeStr("art/red.png")) });
+            stage.Apply(new BridgeWorldObjects(1, new[]
+            {
+                new BridgeWorldObject(new BridgeEntity(7, null), Soldier(), here, null),
+                new BridgeWorldObject(new BridgeEntity(8, null), Soldier(), here, null),
+            }, new long[0]));
+            stage.Apply(new BridgeWorldObjects(2, new[]
+            {
+                new BridgeWorldObject(new BridgeEntity(8, null), new BridgeLook("flag", new KeyValuePair<string, BridgeValue>[0]), here, null),
+            }, new long[] { 7 }));
+            Assert.That(stage.Keys, Is.EquivalentTo(new[] { "entity:8", "fx:1" }), "7 left; 8 only changed its look");
+            Assert.That(_renderer.Dump("fx:1"), Is.EqualTo("@(1.0, 2.0, 0.0) Sprite[src=art/red.png]"));
+            stage.Advance(250);
+            Assert.That(_renderer.Dump("fx:1"), Is.EqualTo("@(1.0, 1.75, 0.0) a0.5 Sprite[src=art/red.png]"), "fading and sinking");
+            stage.Advance(250);
+            Assert.That(stage.Keys, Is.EqualTo(new[] { "entity:8" }));
+            Assert.That(stage.Problems, Is.Empty);
+        }
+
+        [Test]
+        public void AnExitNamesAWrittenLook()
+        {
+            var problems = LookLibrary.Load(new[]
+            {
+                new LookSource("core", "core/fx.look.xml",
+                    "<Looks><Look name=\"a\" exit=\"dwon\"><Sprite src=\"s.png\" /></Look><Look name=\"down\" bind-exit=\"x\"><Sprite src=\"s.png\" /></Look></Looks>"),
+            }, LookKinds.Standard()).Problems.Select(p => p.ToString()).ToList();
+            Assert.That(problems, Has.Some.Contain("exit=\"dwon\": no look is named 'dwon'"));
+            Assert.That(problems, Has.Some.Contain("exit is written, not bound"));
+        }
+
         [Test]
         public void WrongTimesAreLoadProblems()
         {
@@ -134,7 +175,7 @@ namespace Kesa.Engine.Ui.Tests
                     "<Looks><Look name=\"a\" solid=\"-1\" fade=\"1\" fade-out=\"x\"><Sprite src=\"s.png\" /></Look></Looks>"),
             }, LookKinds.Standard()).Problems.Select(p => p.ToString()).ToList();
             Assert.That(problems, Has.Some.Contain("solid=\"-1\": a time is not negative"));
-            Assert.That(problems, Has.Some.Contain("<Look> takes name and the effect times fade-in, solid, fade-out, rise"));
+            Assert.That(problems, Has.Some.Contain("<Look> takes name, exit and the effect times fade-in, solid, fade-out, rise"));
             Assert.That(problems, Has.Some.Contain("fade-out=\"x\""));
         }
     }

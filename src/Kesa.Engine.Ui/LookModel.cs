@@ -255,8 +255,9 @@ namespace Kesa.Engine.Ui
         public static bool IsDuration(string name) => name == "fade-in" || name == "solid" || name == "fade-out";
 
         public LookDefinition(string name, string mod, string place, IReadOnlyList<LookElement> elements,
-            IReadOnlyDictionary<string, LookAttributeValue>? timing = null, IReadOnlyList<LookBinding>? timingBindings = null)
+            IReadOnlyDictionary<string, LookAttributeValue>? timing = null, IReadOnlyList<LookBinding>? timingBindings = null, string? exit = null)
         {
+            Exit = exit;
             Name = name;
             Mod = mod;
             Place = place;
@@ -270,6 +271,9 @@ namespace Kesa.Engine.Ui
 
         /// <summary><c>bind-fade-out="hold"</c>처럼 그림 값으로 덮는 시간 칸. 값이 <c>None</c>이면 적힌 값을 쓴다.</summary>
         public IReadOnlyList<LookBinding> TimingBindings { get; }
+
+        /// <summary>이 그림의 물체가 판에서 사라지면 그 자리에 효과로 띄울 그림 (G431).</summary>
+        public string? Exit { get; }
 
         public string Name { get; }
 

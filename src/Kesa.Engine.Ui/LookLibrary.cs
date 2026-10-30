@@ -50,6 +50,10 @@ namespace Kesa.Engine.Ui
                     foreach (var space in read) Put(spaces, space.Name, space, s => s.Mod, s => s.Place, "space", problems);
                 }
             }
+            // 뒤 모드가 이길 수 있으므로 다 읽은 뒤에 본다
+            foreach (var look in looks.Values)
+                if (look.Exit != null && !looks.ContainsKey(look.Exit))
+                    problems.Add(new UiProblem(look.Place, "exit=\"" + look.Exit + "\": no look is named '" + look.Exit + "'" + UiSuggest.Hint(look.Exit, looks.Keys)));
             return new LookLibrary(looks, spaces, problems);
         }
 

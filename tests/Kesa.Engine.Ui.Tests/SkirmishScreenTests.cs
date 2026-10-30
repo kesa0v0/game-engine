@@ -195,7 +195,7 @@ namespace Kesa.Engine.Ui.Tests
         /// <summary>
         /// 맞음은 질문에 답해 커맨드가 끝난 뒤 신호 처리에서 효과가 된다. 물러날 칸을 눌러 답한 판과 화면을 skirmish의 staged로 연다.
         /// </summary>
-        private async Task<(Seat Alice, LookBoard Board, MemoryLookRenderer Renderer, long Target)> AnsweredStaged()
+        private async Task<(Seat Alice, LookBoard Board, MemoryLookRenderer Renderer, long Target)> AnsweredStaged(long? hp = null)
         {
             var renderer = new MemoryLookRenderer();
             var alice = await Open("alice", _red);
@@ -204,6 +204,7 @@ namespace Kesa.Engine.Ui.Tests
             alice.Ui.Hold = board;
             await board.RefreshAsync();
             long target = await HitRed(alice, bob);
+            if (hp != null) _world.Set(new EntityId(target), _world.Member("Life", "hp"), new IntValue(hp.Value));
             await alice.Ui.RefreshAsync();
             await board.RefreshAsync();
             Assert.That((board.Holding, Hit(alice)), Is.EqualTo((false, true)), "the question is open; nothing to play yet");
@@ -238,6 +239,24 @@ namespace Kesa.Engine.Ui.Tests
                 "let go as the number fades: the answered screen shows under its tail");
             Assert.That(renderer.Dump("entity:" + target), Does.StartWith("@(2.0, -3.0, 0.0) "), "it stepped back");
             Assert.That(stage.Problems, Is.Empty, string.Join(", ", stage.Problems));
+        }
+
+        /// <summary>퇴장 (G431): 쓰러진 유닛은 붙잡는 동안 맞은 자리에 남았다가, 놓을 때 unit-down이 그 그림으로 줄어들며 흐려진다.</summary>
+        [Test]
+        public async Task AFallenUnitShrinksAwayAfterTheStagedHit()
+        {
+            var (alice, board, renderer, target) = await AnsweredStaged(hp: 1);
+            Assert.That(_world.IsAlive(new EntityId(target)), Is.False, "it fell");
+            Assert.That(board.Stage.Keys, Does.Contain("entity:" + target), "held where it was hit");
+            board.Advance(600);
+            await board.RefreshAsync();
+            var exit = board.Stage.Keys.Where(k => k.StartsWith(LookStage.FxPrefix)).Last();
+            Assert.That(board.Stage.Keys, Does.Not.Contain("entity:" + target));
+            Assert.That(renderer.Dump(exit), Does.Match(@"^@\(2\.0, -2\.0, 0\.0\) Sprite\[layer=1,size=0\.7,0\.7,src=art/\w+\.png,tint=#d04848ff\]$"),
+                "the same picture where the board last showed it (it never saw the retreat)");
+            board.Advance(400);
+            Assert.That(renderer.Dump(exit), Does.Contain(" x0.68 a0.5 "), "shrinking 0.8 a second and half faded");
+            Assert.That(board.Stage.Problems, Is.Empty, string.Join(", ", board.Stage.Problems));
         }
 
         [Test]

@@ -65,7 +65,7 @@ namespace Kesa.Engine.Ui
             {
                 _clicks.Remove("mark:" + key);
                 _inputs.Remove("mark:" + key);
-                Hide("mark:" + key);
+                Leave("mark:" + key);
             }
         }
 
@@ -97,7 +97,19 @@ namespace Kesa.Engine.Ui
         public void Apply(BridgeWorldObjects objects)
         {
             foreach (var o in objects.Changed) Show(EntityPrefix + o.Entity.Id, o.Look, o.Where);
-            foreach (var id in objects.Gone) Hide(EntityPrefix + id);
+            foreach (var id in objects.Gone) Leave(EntityPrefix + id);
+        }
+
+        // 판에서 사라짐: 그림 정의의 exit=을 마지막 자리에 효과로 띄우고 지운다 (G431)
+        private void Leave(string key)
+        {
+            if (_shown.TryGetValue(key, out var shown) && shown.Definition?.Exit != null && shown.Position != null)
+            {
+                string fx = NextFxKey();
+                ShowAt(fx, new BridgeLook(shown.Definition.Exit, shown.Look.Keys), shown.Position.Value, shown.Unit);
+                if (_shown.TryGetValue(fx, out var exit)) StartFx(fx, exit);
+            }
+            Hide(key);
         }
 
         /// <summary>그림이나 자리가 없거나 자리를 못 놓으면 숨긴다.</summary>
@@ -108,6 +120,11 @@ namespace Kesa.Engine.Ui
                 Hide(key);
                 return;
             }
+            ShowAt(key, look, position, unit);
+        }
+
+        private void ShowAt(string key, BridgeLook look, LookPosition position, long unit)
+        {
             _library.Looks.TryGetValue(look.Name, out var definition);
             if (_shown.TryGetValue(key, out var shown) && shown.Look.Name == look.Name)
             {
@@ -226,20 +243,27 @@ namespace Kesa.Engine.Ui
                     Report(effect.Function, effect.Error);
                     continue;
                 }
-                string key = FxPrefix + (++_fxNext).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                string key = NextFxKey();
                 Show(key, effect.Look, effect.Where);
-                if (!_shown.TryGetValue(key, out var shown)) continue;
-                var drift = Field(shown, "drift");
-                var playing = new PlayingFx(key, shown, Millis(Number(shown, "fade-in")), Millis(Number(shown, "solid")),
-                    Millis(Number(shown, "fade-out")), drift?.Numbers[0] ?? 0, (drift?.Numbers[1] ?? 0) + Number(shown, "rise"), Number(shown, "grow"));
-                if (playing.Life == 0 && shown.Definition != null)
-                    Report(shown.Definition.Place, "look '" + shown.Definition.Name + "' is played as an effect but has no fade-in, solid or fade-out, " +
-                                                   "so it ends at once (spec-gaps G425)");
-                _playing.Add(playing);
-                Animate(playing);
-                lead = Math.Max(lead, playing.FadeIn + playing.Solid);
+                if (_shown.TryGetValue(key, out var shown)) lead = Math.Max(lead, StartFx(key, shown));
             }
             return lead;
+        }
+
+        private string NextFxKey() => FxPrefix + (++_fxNext).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        // 띄운 물체를 효과로 돌리기 시작하고 흐려지기 시작하는 때(밀리초)를 돌려준다
+        private long StartFx(string key, ShownObject shown)
+        {
+            var drift = Field(shown, "drift");
+            var playing = new PlayingFx(key, shown, Millis(Number(shown, "fade-in")), Millis(Number(shown, "solid")),
+                Millis(Number(shown, "fade-out")), drift?.Numbers[0] ?? 0, (drift?.Numbers[1] ?? 0) + Number(shown, "rise"), Number(shown, "grow"));
+            if (playing.Life == 0 && shown.Definition != null)
+                Report(shown.Definition.Place, "look '" + shown.Definition.Name + "' is played as an effect but has no fade-in, solid or fade-out, " +
+                                               "so it ends at once (spec-gaps G425)");
+            _playing.Add(playing);
+            Animate(playing);
+            return playing.FadeIn + playing.Solid;
         }
 
         /// <summary>떠 있는 효과를 모두 지운다 (재생 건너뛰기).</summary>

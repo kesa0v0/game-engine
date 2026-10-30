@@ -649,6 +649,19 @@ def hit_flash(x, y, damage):
   `bind-drift="dir"`에 `dir=[-0.5, 1]`을 넘기면 그 효과만 왼쪽 위로 날아간다.
 - 이 칸들은 `mark`·엔티티 그림에는 쓰이지 않는다.
 
+엔티티나 표시가 판에서 사라질 때(죽음, 질문이 닫힘)의 모습은 그 그림의 `exit`이 정한다. `samples/skirmish/core/looks/units.look.xml`:
+
+```xml
+<Look name="unit" exit="unit-down"> … </Look>
+<Look name="unit-down" solid="0.1" fade-out="0.6" grow="-0.8">
+  <Sprite bind-src="art" bind-tint="color" size="0.7,0.7" layer="1" />
+</Look>
+```
+
+- 사라지면 `exit`의 그림을 그 물체가 마지막으로 보이던 자리에 효과로 띄운다. 퇴장 그림은 사라진 물체의 그림 값(`art`·`color` …)을 그대로 받고 위의 시간 칸으로 보인다.
+- `exit`은 그림 이름을 적는다(묶지 않음). 없는 이름은 로드 문제다.
+- 그림 이름이 바뀌는 것, 효과가 끝나는 것은 사라짐이 아니다. `staged`에서는 효과 단계가 다 뜬 뒤 결과를 보일 때 사라진다.
+
 ### Unity: 그림 정의 `.look.xml`과 공간 `.space.xml`
 
 그림 이름과 공간 이름의 뜻은 Unity 패키지가 읽는 XML 파일에 적는다. 확장자로 알아보므로 모드 안 어디에 두어도 되고, 관례는
