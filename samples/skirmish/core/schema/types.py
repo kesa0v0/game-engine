@@ -14,6 +14,8 @@ deftype("Unit", components=["Pos", "Life", "Owner", "Ready"],
 deftype("Game", components=["Match"])
 # 맞음 (G398): 효과가 쓰는 자리를 싣는다. 맞고 죽으면 유닛이 없으므로
 signal("Hit", x=int, y=int, damage=int)
+# 빗나감: 아무 일도 없던 것처럼 보이지 않게 맞을 뻔한 자리에 알린다
+signal("Miss", x=int, y=int)
 # 화면에만 있는 기록: 연결마다 하나, 저장되지 않는다 (spec-gaps G277·G279). 고른 유닛
 ui_state("Selection", unit=ref("Unit", optional=True))
 # UXML 화면의 창 (G348~G355): 정보창이 보이는 유닛, 턴 끝내기 확인을 물은 턴(0이면 묻지 않음)

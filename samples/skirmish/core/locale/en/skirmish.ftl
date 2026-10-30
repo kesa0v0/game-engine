@@ -1,5 +1,6 @@
 skirmish-already-started = The skirmish has already started.
 skirmish-hit = Hit!
+skirmish-miss = Miss
 skirmish-hit-hold = Hold
 skirmish-hit-retreat = Retreat
 skirmish-turn = Your turn

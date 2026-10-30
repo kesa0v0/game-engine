@@ -310,6 +310,40 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(Button(alice, target, "retreat").Enabled, Is.False);
         }
 
+        /// <summary>빗나감도 보인다: 맞을 뻔한 칸에 Miss 신호의 글이 떠오른다. 뒤 칸을 막아 맞아도 묻지 않고, 쓰러지지 않게 체력을 늘린다.</summary>
+        [Test]
+        public async Task AMissShowsItsWordWhereTheTargetStands()
+        {
+            var renderer = new MemoryLookRenderer();
+            var alice = await Open("alice", _red);
+            var bob = await Open("bob", _blue);
+            var board = new LookBoard(alice.Session, new LookStage(Looks(), renderer));
+            await board.RefreshAsync();
+            await alice.Renderer.Named("ask-end").Press();
+            await alice.Renderer.Named("endturn").Press();
+            long target = UnitsOf(_red)[0];
+            Place(target, 2, 2);
+            Place(UnitsOf(_red)[1], 2, 3);
+            _world.Set(new EntityId(target), _world.Member("Life", "hp"), new IntValue(100));
+            foreach (long attacker in UnitsOf(_blue))
+            {
+                Place(attacker, 2, 1);
+                var attack = await bob.Session.Deliver("skirmish.Attack", new Dictionary<string, BridgeValue>
+                {
+                    ["party"] = bob.Party, ["unit"] = new BridgeEntity(attacker, null), ["target"] = new BridgeEntity(target, null),
+                });
+                Assert.That(attack.Succeeded, Is.True, attack.ToString());
+                Place(attacker, 0, 0);
+                await board.RefreshAsync();
+                var words = board.Stage.Keys.Where(k => k.StartsWith(LookStage.FxPrefix)).Select(renderer.Dump).Where(d => d.Contains("skirmish-miss")).ToList();
+                if (words.Count == 0) continue;
+                Assert.That(words.Single(), Does.Match(@"^@\(2\.0, -2\.0, 0\.0\) a0\.0 Text\["), "the word fades in where the target is");
+                Assert.That(board.Stage.Problems, Is.Empty, string.Join(", ", board.Stage.Problems));
+                return;
+            }
+            Assert.Fail("no attack missed with this seed; place more attackers");
+        }
+
         /// <summary>파랑이 (2,1)에서 (2,2)의 빨강을 친다. 뒤 칸 (2,3)이 비어 있어 맞으면 버틸지 물러날지 묻는다. 빗나가면 다음 유닛으로.</summary>
         private async Task<long> HitRed(Seat alice, Seat bob)
         {

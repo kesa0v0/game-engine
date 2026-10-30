@@ -7,4 +7,8 @@
   <Look name="damage-number" fade-in="0.05" solid="0.5" fade-out="0.4" rise="0.8">
     <Text bind-text="amount" size="0.45" color="#ffe070ff" offset="0,0.3" layer="6" />
   </Look>
+  <!-- 빗나감: 피해 숫자 자리에 회색 글이 떠오른다 -->
+  <Look name="miss-text" fade-in="0.05" solid="0.5" fade-out="0.4" rise="0.8">
+    <Text bind-text="word" size="0.35" color="#c8c8c8ff" offset="0,0.3" layer="6" />
+  </Look>
 </Looks>

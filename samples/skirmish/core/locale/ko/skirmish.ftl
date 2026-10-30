@@ -1,5 +1,6 @@
 skirmish-already-started = 교전은 이미 시작했습니다.
 skirmish-hit = 명중!
+skirmish-miss = 빗나감
 skirmish-hit-hold = 버틴다
 skirmish-hit-retreat = 물러난다
 skirmish-turn = 차례

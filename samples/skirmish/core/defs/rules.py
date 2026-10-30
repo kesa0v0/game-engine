@@ -39,6 +39,7 @@ def alive(party):
 def resolve(a, t):
     roll = random.randint(1, 6)
     if roll < 4:
+        emit(Miss(x=t.Pos.x, y=t.Pos.y))
         return
     damage = a.Unit.attack
     bx = t.Pos.x + sign(t.Pos.x - a.Pos.x)
