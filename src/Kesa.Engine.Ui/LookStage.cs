@@ -290,9 +290,10 @@ namespace Kesa.Engine.Ui
 
         private readonly List<ShownObject> _moving = new List<ShownObject>();
 
-        /// <summary>떠 있는 효과와 옮기는 물체(G432)의 시간을 <paramref name="milliseconds"/>만큼 흐르게 하고, 수명이 끝난 효과를 지운다.</summary>
+        /// <summary>렌더러(G434), 떠 있는 효과와 옮기는 물체(G432)의 시간을 <paramref name="milliseconds"/>만큼 흐르게 하고, 수명이 끝난 효과를 지운다.</summary>
         public void Advance(long milliseconds)
         {
+            _renderer.Advance(milliseconds);
             for (int i = _moving.Count - 1; i >= 0; i--)
             {
                 var moving = _moving[i];

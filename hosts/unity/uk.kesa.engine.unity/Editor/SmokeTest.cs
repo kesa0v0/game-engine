@@ -179,7 +179,8 @@ namespace Kesa.Engine.Unity.Editor
         {
             string folder = Path.Combine(Path.GetTempPath(), "kesa-model-check");
             Directory.CreateDirectory(Path.Combine(folder, "models"));
-            File.WriteAllBytes(Path.Combine(folder, "models", "tri.glb"), Triangle());
+            File.WriteAllBytes(Path.Combine(folder, "models", "tri.glb"), Triangle(false));
+            File.WriteAllBytes(Path.Combine(folder, "models", "moving.glb"), Triangle(true));
             var boardObject = new GameObject("kesa-models-check");
             try
             {
@@ -188,7 +189,12 @@ namespace Kesa.Engine.Unity.Editor
                 var library = LookLibrary.Load(new[]
                 {
                     new LookSource("check", "check/models.look.xml",
-                        "<Looks><Look name=\"tri\"><Model src=\"models/tri.glb\" /></Look><Look name=\"gone\"><Model bind-src=\"file\" /></Look></Looks>"),
+                        "<Looks><Look name=\"tri\"><Model src=\"models/tri.glb\" /></Look><Look name=\"gone\"><Model bind-src=\"file\" /></Look>" +
+                        "<Look name=\"moving\"><Model src=\"models/moving.glb\" bind-state=\"pose\" fade=\"0.5\">" +
+                        "<State name=\"a\" clip=\"slide\" /><State name=\"b\" clip=\"lift\" />" +
+                        "<State name=\"hop\" clip=\"lift\" once=\"true\" next=\"a\" fade=\"0\" />" +
+                        "<State name=\"mix\" blend=\"0.5\"><Clip clip=\"slide\" at=\"0\" /><Clip clip=\"lift\" at=\"1\" /></State>" +
+                        "</Model></Look></Looks>"),
                     new LookSource("check", "check/board.space.xml", "<Spaces><Space name=\"square\" kind=\"grid\" /></Spaces>"),
                 }, kinds, path => assets.Find(path) != null);
                 Require(library.Problems.Count == 0, "the model look reads cleanly: " + string.Join("; ", library.Problems));
@@ -205,6 +211,7 @@ namespace Kesa.Engine.Unity.Editor
                 var missing = boardObject.transform.Find("b/Model/missing-model");
                 Require(missing != null, "a model that cannot be read shows the missing box");
                 Require(stage.Problems.Count == 0, "the models show cleanly: " + string.Join("; ", stage.Problems));
+                await CheckAnimation(stage, renderer, boardObject.transform, at);
             }
             finally
             {
@@ -213,16 +220,65 @@ namespace Kesa.Engine.Unity.Editor
             }
         }
 
-        // glTF 2.0 바이너리: 위치 세 개짜리 삼각형 하나, 노드 이름 "tri"
-        private static byte[] Triangle()
+        /// <summary>
+        /// 모델 애니메이션 (G434): <c>slide</c>는 1초에 x 0→1, <c>lift</c>는 y 0→1. 상태가 바뀌면 <c>fade</c> 동안 섞고, <c>once</c>는 끝나면
+        /// <c>next</c>로, 블렌드 상태는 <c>at</c>이 가까운 두 클립을 섞는다. glTF의 x는 Unity에서 뒤집히므로 크기로 잰다.
+        /// </summary>
+        private static async Task CheckAnimation(LookStage stage, GameObjectLookRenderer renderer, Transform board, BridgeWhere at)
         {
-            var positions = new float[] { 0, 0, 0, 1, 0, 0, 0, 1, 0 };
-            var bin = new byte[positions.Length * 4];
-            Buffer.BlockCopy(positions, 0, bin, 0, bin.Length);
+            void Pose(string state) =>
+                stage.Show("c", new BridgeLook("moving", new[] { new KeyValuePair<string, BridgeValue>("pose", new BridgeStr(state)) }), at);
+            void Expect(float x, float y, string what)
+            {
+                var p = board.Find("c").GetComponentsInChildren<Transform>().First(t => t.name == "tri").localPosition;
+                Require(Mathf.Abs(Mathf.Abs(p.x) - x) < 0.02f && Mathf.Abs(p.y - y) < 0.02f, what + ": expected (" + x + ", " + y + "), got " + p);
+            }
+            Pose("a");
+            while (renderer.LoadingPictures) await Task.Yield();
+            Expect(0f, 0f, "a state starts at its first pose");
+            stage.Advance(250);
+            Expect(0.25f, 0f, "a looping state plays with the time given");
+            Pose("b");
+            stage.Advance(250);
+            Expect(0.25f, 0.125f, "halfway through the fade both states are mixed");
+            stage.Advance(250);
+            Expect(0f, 0.5f, "after the fade only the new state shows");
+            Pose("b");
+            stage.Advance(250);
+            Expect(0f, 0.75f, "setting the same state again does not restart it");
+            Pose("hop");
+            stage.Advance(500);
+            Expect(0f, 0.5f, "fade=0 on the state switches at once");
+            stage.Advance(1000);
+            stage.Advance(500);
+            Expect(0.5f, 0f, "a once state goes to its next when it ends");
+            Pose("mix");
+            stage.Advance(500);
+            Expect(0.25f, 0.25f, "blend=0.5 mixes the two clips around it evenly");
+            Require(stage.Problems.Count == 0, "the animated model shows cleanly: " + string.Join("; ", stage.Problems));
+        }
+
+        // glTF 2.0 바이너리: 위치 세 개짜리 삼각형 하나, 노드 이름 "tri". 움직이면 노드 위치를 바꾸는 1초짜리 slide(x)·lift(y)
+        private static byte[] Triangle(bool moving)
+        {
+            var floats = new List<float> { 0, 0, 0, 1, 0, 0, 0, 1, 0 };
+            if (moving) floats.AddRange(new float[] { 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0 });
+            var bin = new byte[floats.Count * 4];
+            Buffer.BlockCopy(floats.ToArray(), 0, bin, 0, bin.Length);
+            string animation = !moving ? "" :
+                ",\"animations\":[" +
+                "{\"name\":\"slide\",\"channels\":[{\"sampler\":0,\"target\":{\"node\":0,\"path\":\"translation\"}}],\"samplers\":[{\"input\":1,\"output\":2}]}," +
+                "{\"name\":\"lift\",\"channels\":[{\"sampler\":0,\"target\":{\"node\":0,\"path\":\"translation\"}}],\"samplers\":[{\"input\":1,\"output\":3}]}]";
+            string views = !moving ? "" :
+                ",{\"buffer\":0,\"byteOffset\":36,\"byteLength\":8},{\"buffer\":0,\"byteOffset\":44,\"byteLength\":24},{\"buffer\":0,\"byteOffset\":68,\"byteLength\":24}";
+            string accessors = !moving ? "" :
+                ",{\"bufferView\":1,\"componentType\":5126,\"count\":2,\"type\":\"SCALAR\",\"min\":[0],\"max\":[1]}" +
+                ",{\"bufferView\":2,\"componentType\":5126,\"count\":2,\"type\":\"VEC3\"},{\"bufferView\":3,\"componentType\":5126,\"count\":2,\"type\":\"VEC3\"}";
             string json = "{\"asset\":{\"version\":\"2.0\"},\"scene\":0,\"scenes\":[{\"nodes\":[0]}],\"nodes\":[{\"mesh\":0,\"name\":\"tri\"}]," +
-                          "\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0}}]}],\"buffers\":[{\"byteLength\":36}]," +
-                          "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":0,\"byteLength\":36}]," +
-                          "\"accessors\":[{\"bufferView\":0,\"componentType\":5126,\"count\":3,\"type\":\"VEC3\",\"min\":[0,0,0],\"max\":[1,1,0]}]}";
+                          "\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0}}]}],\"buffers\":[{\"byteLength\":" + bin.Length + "}]," +
+                          "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":0,\"byteLength\":36}" + views + "]," +
+                          "\"accessors\":[{\"bufferView\":0,\"componentType\":5126,\"count\":3,\"type\":\"VEC3\",\"min\":[0,0,0],\"max\":[1,1,0]}" + accessors + "]" +
+                          animation + "}";
             while (json.Length % 4 != 0) json += " ";
             var jsonBytes = Encoding.UTF8.GetBytes(json);
             using var stream = new MemoryStream();

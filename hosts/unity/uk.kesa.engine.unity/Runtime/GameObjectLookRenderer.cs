@@ -57,6 +57,8 @@ namespace Kesa.Engine.Unity
             AddKind("Group", _ => new GroupView());
             AddKind("Text", _ => new TextView());
             AddKind("Model", _ => new ModelView(Models()));
+            AddKind("State", _ => new StateView());
+            AddKind("Clip", _ => new ClipView());
         }
 
         /// <summary>기본 요소 종류에 기본 모델 로더의 확장자(glTF)를 등록한 것. 게임이 제 종류를 더할 바탕 (G391).</summary>
@@ -209,6 +211,7 @@ namespace Kesa.Engine.Unity
             view.GameObject.transform.SetSiblingIndex(index);
             var node = new Node(view.GameObject, view, owner);
             owner.Children.Insert(Math.Min(index, owner.Children.Count), node);
+            (owner.View as ILookParentView)?.Insert(view, index);
             view.SetSortingOrder(node.Order);
             return Add(node);
         }
@@ -238,9 +241,10 @@ namespace Kesa.Engine.Unity
         {
             var node = _nodes[element.Value];
             var owner = _nodes[parent.Value];
-            node.Parent?.Children.Remove(node);
+            Detach(node);
             node.Parent = owner;
             owner.Children.Insert(Math.Min(index, owner.Children.Count), node);
+            if (node.View != null) (owner.View as ILookParentView)?.Insert(node.View, index);
             node.GameObject.transform.SetParent(owner.GameObject.transform, false);
             node.GameObject.transform.SetSiblingIndex(index);
             Reorder(node);
@@ -249,10 +253,24 @@ namespace Kesa.Engine.Unity
         public void Remove(ElementId element)
         {
             var node = _nodes[element.Value];
-            node.Parent?.Children.Remove(node);
+            Detach(node);
             Forget(node);
             if (Application.isPlaying) UnityEngine.Object.Destroy(node.GameObject);
             else UnityEngine.Object.DestroyImmediate(node.GameObject);
+        }
+
+        private static void Detach(Node node)
+        {
+            node.Parent?.Children.Remove(node);
+            if (node.View != null) (node.Parent?.View as ILookParentView)?.Remove(node.View);
+        }
+
+        /// <summary>모델 애니메이션의 시간을 넘긴다 (G434). <see cref="LookStage.Advance"/>가 부른다.</summary>
+        public void Advance(long milliseconds)
+        {
+            float seconds = milliseconds / 1000f;
+            foreach (var node in _nodes.Values)
+                if (node.View is ModelView model) model.Tick(seconds);
         }
 
         private ElementId Add(Node node)
@@ -274,7 +292,7 @@ namespace Kesa.Engine.Unity
             foreach (var child in node.Children) Reorder(child);
         }
 
-        private static float Real(long raw) => raw / (float)Bridge.BridgeFixed.Scale;
+        internal static float Real(long raw) => raw / (float)Bridge.BridgeFixed.Scale;
 
         private sealed class GroupView : ILookElementView
         {
@@ -444,61 +462,6 @@ namespace Kesa.Engine.Unity
 
             // TextMesh의 한 줄 높이는 대략 characterSize × fontSize / 10
             private void Height(float height) => _mesh.characterSize = height * 10f / FontSize;
-        }
-
-        /// <summary><c>Model</c>: 로더가 읽은 원본을 복제해 단다. 모델 단위 1이 공간 단위 1이다. 다 읽을 때까지 비어 있고, 못 읽으면 보라색 상자 (G391).</summary>
-        private sealed class ModelView : ILookElementView
-        {
-            private readonly LookModels _models;
-            private string? _src;
-            private GameObject? _shown;
-
-            public ModelView(LookModels models)
-            {
-                _models = models;
-                GameObject = new GameObject("Model");
-            }
-
-            public GameObject GameObject { get; }
-
-            public void Set(string attribute, LookAttributeValue value)
-            {
-                if (attribute != "src") return;
-                string path = value.Text!;
-                _src = path;
-                Clear();
-                _models.Request(path, template =>
-                {
-                    if (GameObject == null || _src != path) return;
-                    Clear();
-                    _shown = template != null ? UnityEngine.Object.Instantiate(template, GameObject.transform, false) : Missing();
-                    _shown.SetActive(true);
-                });
-            }
-
-            public void SetSortingOrder(int order)
-            {
-            }
-
-            private void Clear()
-            {
-                if (_shown == null) return;
-                if (Application.isPlaying) UnityEngine.Object.Destroy(_shown);
-                else UnityEngine.Object.DestroyImmediate(_shown);
-                _shown = null;
-            }
-
-            private GameObject Missing()
-            {
-                var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                UnityEngine.Object.DestroyImmediate(cube.GetComponent<Collider>());
-                cube.name = "missing-model";
-                cube.transform.SetParent(GameObject.transform, false);
-                cube.transform.localScale = Vector3.one * 0.5f;
-                var renderer = cube.GetComponent<MeshRenderer>();
-                renderer.sharedMaterial = new Material(renderer.sharedMaterial) { color = new Color(1f, 0f, 1f) };
-                return cube;
-            }
         }
     }
 }

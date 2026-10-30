@@ -18,6 +18,10 @@ namespace Kesa.Engine.Ui
                     return Path(text, out error);
                 case LookAttributeType.Text:
                     return LookAttributeValue.OfText(text);
+                case LookAttributeType.Name:
+                    if (text.Length > 0) return LookAttributeValue.OfName(text);
+                    error = "a name is not empty";
+                    return null;
                 case LookAttributeType.Flag:
                     if (text == "true") return LookAttributeValue.OfFlag(true);
                     if (text == "false") return LookAttributeValue.OfFlag(false);
@@ -58,6 +62,10 @@ namespace Kesa.Engine.Ui
             {
                 case LookAttributeType.Text:
                     return LookAttributeValue.OfText(Plain(value));
+                case LookAttributeType.Name:
+                    if (value is BridgeStr name && name.Value.Length > 0) return LookAttributeValue.OfName(name.Value);
+                    error = "a name is non-empty text, got " + (value is BridgeStr ? "empty text" : "a " + KindName(value));
+                    return null;
                 case LookAttributeType.Path:
                     if (value is BridgeStr path) return Path(path.Value, out error);
                     error = "a path is text, got a " + KindName(value);

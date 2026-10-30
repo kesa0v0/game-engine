@@ -18,6 +18,11 @@ namespace Kesa.Engine.Ui
         /// <summary>물체 전체의 투명도 (G425): 고정소수점 원래 정수값으로 0(안 보임)부터 1(그대로)까지. 효과가 흐려질 때 쓴다.</summary>
         void SetOpacity(ElementId obj, long opacity);
 
+        /// <summary>시간이 흐른다 (G434: 모델 애니메이션). 시간에 따라 바뀌는 것이 없는 렌더러는 두지 않아도 된다.</summary>
+        void Advance(long milliseconds)
+        {
+        }
+
         /// <summary>그림 정의가 없는 물체에 눈에 띄는 대체 그림을 보인다 (G392).</summary>
         void ShowMissing(ElementId obj);
 

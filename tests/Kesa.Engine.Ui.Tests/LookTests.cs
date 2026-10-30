@@ -297,6 +297,44 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(stage.PlaceOnRay(P(0, 0, -10), P(0, 0, -1)), Is.Null, "pointing away from it");
         }
 
+        /// <summary>모델 애니메이션 (G434): 상태와 클립의 자리·이름·next를 로드 때 본다. 클립 이름은 모델을 읽어야 알므로 보지 않는다.</summary>
+        [Test]
+        public void AModelsStatesAreCheckedWhenLoaded()
+        {
+            var kinds = LookKinds.Standard();
+            kinds.AddModelFormat(".glb");
+            List<string> Problems(string body) => LookLibrary.Load(new[]
+            {
+                new LookSource("core", "core/units.look.xml", "<Looks><Look name=\"a\">" + body + "</Look></Looks>"),
+            }, kinds).Problems.Select(p => p.ToString().Substring("core/units.look.xml:1: ".Length)).ToList();
+
+            Assert.That(Problems(
+                "<Model src=\"s.glb\" bind-state=\"pose\" fade=\"0.2\">" +
+                "<State name=\"idle\" clip=\"idle\" />" +
+                "<State name=\"move\" bind-blend=\"speed\"><Clip clip=\"walk\" at=\"0\" /><Clip clip=\"run\" at=\"1\" /></State>" +
+                "<State name=\"attack\" clip=\"attack\" once=\"true\" next=\"idle\" fade=\"0.1\" />" +
+                "</Model>"), Is.Empty);
+            Assert.That(Problems(
+                "<Model src=\"s.glb\" state=\"idlee\" fade=\"-1\">" +
+                "<State name=\"idle\" clip=\"idle\" />" +
+                "<State name=\"idle\" clip=\"walk\"><Clip clip=\"run\" at=\"1\" /></State>" +
+                "<State clip=\"attack\" next=\"idlee\" />" +
+                "<Clip clip=\"x\" />" +
+                "</Model><State name=\"loose\" clip=\"x\" />"), Is.EquivalentTo(new[]
+            {
+                "fade=\"-1\": a time is not negative",
+                "a <State> plays clip= or blends the <Clip>s inside, not both",
+                "a <State> needs name=\"…\" written (spec-gaps G434)",
+                "next= is where a once=\"true\" state goes when it ends",
+                "<Clip> goes directly inside <State>, not inside <Model>",
+                "a <Clip> needs at=\"…\", its place on the blend",
+                "two <State>s are named 'idle'",
+                "next=\"idlee\": no <State> in this <Model> is named 'idlee' (did you mean 'idle'?)",
+                "state=\"idlee\": no <State> in this <Model> is named 'idlee' (did you mean 'idle'?)",
+                "<State> goes directly inside <Model>, not at the top of a look",
+            }));
+        }
+
         /// <summary>모델 (G391): 확장자로 로더를 고르고, 맡을 로더가 없으면 로드 때 등록된 확장자와 함께 알린다.</summary>
         [Test]
         public void AModelsFileNeedsARegisteredLoader()

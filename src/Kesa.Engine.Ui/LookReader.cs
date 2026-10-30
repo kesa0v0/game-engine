@@ -72,7 +72,7 @@ namespace Kesa.Engine.Ui
                 bool Has(string field) => timing.ContainsKey(field) || timingBindings.Any(b => b.Attribute == field);
                 if (Has("rise") && Has("drift"))
                     problems.Add(new UiProblem(place, "<Look> has both rise and drift; rise=\"r\" is drift=\"0,r\", so use one"));
-                var elements = node.Elements().Select(e => reader.Read(e)).ToList();
+                var elements = node.Elements().Select(e => reader.Read(e, null)).ToList();
                 if (name != null) looks.Add(new LookDefinition(name, source.Mod, place, elements, timing, timingBindings, exit));
             }
         }
@@ -175,7 +175,8 @@ namespace Kesa.Engine.Ui
                 _problems = problems;
             }
 
-            public LookElement Read(XElement node)
+            /// <param name="parent">부모 요소의 종류 이름, 그림 정의 바로 아래면 null.</param>
+            public LookElement Read(XElement node, string? parent)
             {
                 string place = Place(_path, node);
                 string kindName = node.Name.LocalName;
@@ -188,6 +189,9 @@ namespace Kesa.Engine.Ui
                 if (!known && kindName != "Include")
                     Problem(place, "<" + kindName + ">: no look element is registered with this name" + UiSuggest.Hint(kindName, _kinds.ElementNames) +
                         " (can be: " + string.Join(", ", _kinds.ElementNames) + ")");
+                if (known && kind.Parents != null && (parent == null || !kind.Parents.Contains(parent)))
+                    Problem(place, "<" + kindName + "> goes directly inside " + string.Join(" or ", kind.Parents.Select(p => "<" + p + ">")) +
+                        (parent == null ? ", not at the top of a look" : ", not inside <" + parent + ">"));
 
                 foreach (var attribute in node.Attributes())
                 {
@@ -224,10 +228,13 @@ namespace Kesa.Engine.Ui
                     else attributes.Add(new KeyValuePair<string, LookAttributeValue>(n, value!));
                 }
 
-                var children = node.Elements().Select(Read).ToList();
+                var children = node.Elements().Select(e => Read(e, kindName)).ToList();
                 if (known && children.Count > 0 && !kind.AcceptsChildren) Problem(place, "<" + kindName + "> has no children");
                 if (repeat != null && children.Count == 0) Problem(place, "for=\"" + repeat.Text + "\" repeats the children, but there are none");
-                return new LookElement(kindName, place, attributes, bindings, repeat, children);
+                var element = new LookElement(kindName, place, attributes, bindings, repeat, children);
+                if (known && kind.Validate != null)
+                    foreach (var wrong in kind.Validate(element)) Problem(place, wrong);
+                return element;
             }
 
             private static bool TryAttribute(LookElementKind kind, string name, out LookAttributeType type) =>

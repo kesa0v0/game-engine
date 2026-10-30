@@ -16,20 +16,22 @@ namespace Kesa.Engine.Unity
 
         public IReadOnlyList<string> Extensions { get; } = new[] { ".glb", ".gltf" };
 
-        public async Task<GameObject?> Load(string path, IUiAssets assets, Transform holder)
+        public async Task<ModelAsset?> Load(string path, IUiAssets assets, Transform holder)
         {
             // 에디터(확인)에서는 프레임 예산을 나눌 MonoBehaviour가 없으므로 끊지 않고 읽는다
             var gltf = new GltfImport(deferAgent: Application.isPlaying ? null : new UninterruptedDeferAgent());
+            // Mecanim 클립은 에디터에서만 만들어지므로 빌드에서도 되는 옛 Animation용으로 읽는다 (G434)
+            var settings = new ImportSettings { AnimationMethod = AnimationMethod.Legacy };
             bool loaded;
             if (assets is ModFolderAssets folders && folders.Find(path) is string file)
-                loaded = await gltf.Load(new Uri(file));
+                loaded = await gltf.Load(new Uri(file), settings);
             else
             {
                 byte[]? bytes = assets.ReadBytes(path);
                 if (bytes == null) return null;
                 loaded = path.EndsWith(".glb", StringComparison.OrdinalIgnoreCase)
-                    ? await gltf.LoadGltfBinary(bytes)
-                    : await gltf.LoadGltfJson(Encoding.UTF8.GetString(bytes));
+                    ? await gltf.LoadGltfBinary(bytes, null, settings)
+                    : await gltf.LoadGltfJson(Encoding.UTF8.GetString(bytes), null, settings);
             }
             if (!loaded)
             {
@@ -47,7 +49,10 @@ namespace Kesa.Engine.Unity
                 return null;
             }
             _imports.Add(gltf);
-            return root;
+            var clips = new Dictionary<string, AnimationClip>(StringComparer.Ordinal);
+            foreach (var clip in gltf.GetAnimationClips() ?? Array.Empty<AnimationClip>())
+                if (clip != null) clips[clip.name] = clip;
+            return new ModelAsset(root, clips);
         }
     }
 }

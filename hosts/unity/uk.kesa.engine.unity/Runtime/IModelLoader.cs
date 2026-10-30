@@ -18,6 +18,19 @@ namespace Kesa.Engine.Unity
         /// 파일을 읽어 꺼내 쓸 원본(꺼진 GameObject)을 <paramref name="holder"/> 아래에 만든다. 못 읽으면 null. 주 스레드에서 불리고 에디터·게임
         /// 프레임을 타고 끝나도 된다.
         /// </summary>
-        Task<GameObject?> Load(string path, IUiAssets assets, Transform holder);
+        Task<ModelAsset?> Load(string path, IUiAssets assets, Transform holder);
+    }
+
+    /// <summary>로더가 읽은 모델 (G391·G434): 복제할 원본과 이름 붙은 클립(옛 <c>Animation</c>용, <c>legacy</c>).</summary>
+    public sealed class ModelAsset
+    {
+        public ModelAsset(GameObject template, IReadOnlyDictionary<string, AnimationClip> clips)
+        {
+            Template = template;
+            Clips = clips;
+        }
+
+        public GameObject Template { get; }
+        public IReadOnlyDictionary<string, AnimationClip> Clips { get; }
     }
 }

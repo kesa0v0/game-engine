@@ -30,6 +30,9 @@ namespace Kesa.Engine.Ui
 
         /// <summary>화면 글자 (G427). 적힌 글은 그대로, 묶인 값은 호스트가 글자로 바꾼다(<c>text("키")</c>는 번역).</summary>
         Text,
+
+        /// <summary>이름 (G434: 상태·클립). 묶으면 글 값이고 번역하지 않는다.</summary>
+        Name,
     }
 
     /// <summary>렌더러에 넘기는 속성 값. 수는 고정소수점의 원래 정수값이고 실수로 바꾸는 것은 렌더러가 한다 (G345).</summary>
@@ -63,6 +66,8 @@ namespace Kesa.Engine.Ui
 
         public static LookAttributeValue OfText(string text) => new LookAttributeValue(LookAttributeType.Text, text, Array.Empty<long>(), false, 0);
 
+        public static LookAttributeValue OfName(string name) => new LookAttributeValue(LookAttributeType.Name, name, Array.Empty<long>(), false, 0);
+
         public static LookAttributeValue OfInteger(long value) => new LookAttributeValue(LookAttributeType.Integer, null, new[] { value }, false, 0);
 
         public static LookAttributeValue OfNumbers(LookAttributeType type, long[] raw) => new LookAttributeValue(type, null, raw, false, 0);
@@ -88,6 +93,7 @@ namespace Kesa.Engine.Ui
         {
             LookAttributeType.Path => Text!,
             LookAttributeType.Text => Text!,
+            LookAttributeType.Name => Text!,
             LookAttributeType.Flag => Flag ? "true" : "false",
             LookAttributeType.Color => "#" + Color.ToString("x8", System.Globalization.CultureInfo.InvariantCulture),
             LookAttributeType.Integer => Numbers[0].ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -109,15 +115,24 @@ namespace Kesa.Engine.Ui
     {
         /// <param name="check">적힌 속성 값(이름, 값)을 더 본다. 틀리면 이유, 맞으면 null. 묶인 값은 그릴 때 호스트가 본다.</param>
         public LookElementKind(string name, IReadOnlyDictionary<string, LookAttributeType> attributes, bool acceptsChildren,
-            Func<string, LookAttributeValue, string?>? check = null)
+            Func<string, LookAttributeValue, string?>? check = null, IReadOnlyList<string>? parents = null,
+            Func<LookElement, IEnumerable<string>>? validate = null)
         {
             Name = name;
             Attributes = attributes;
             AcceptsChildren = acceptsChildren;
             Check = check;
+            Parents = parents;
+            Validate = validate;
         }
 
         public Func<string, LookAttributeValue, string?>? Check { get; }
+
+        /// <summary>이 요소가 바로 안에 올 수 있는 요소 종류. null이면 어디든 (G434의 <c>State</c>는 <c>Model</c> 안에만).</summary>
+        public IReadOnlyList<string>? Parents { get; }
+
+        /// <summary>자식까지 다 읽은 요소를 보고 틀린 이유들 (G434: 상태 이름·<c>next</c>).</summary>
+        public Func<LookElement, IEnumerable<string>>? Validate { get; }
 
         public string Name { get; }
 

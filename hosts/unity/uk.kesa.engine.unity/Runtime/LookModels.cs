@@ -12,9 +12,9 @@ namespace Kesa.Engine.Unity
     {
         private sealed class Entry
         {
-            public readonly List<Action<GameObject?>> Waiting = new List<Action<GameObject?>>();
+            public readonly List<Action<ModelAsset?>> Waiting = new List<Action<ModelAsset?>>();
             public bool Done;
-            public GameObject? Template;
+            public ModelAsset? Model;
         }
 
         private readonly IUiAssets _assets;
@@ -37,7 +37,7 @@ namespace Kesa.Engine.Unity
         }
 
         /// <summary>읽혀 있으면 <paramref name="ready"/>를 바로 부르고, 아니면 다 읽은 뒤 부른다. 못 읽으면 null.</summary>
-        public void Request(string path, Action<GameObject?> ready)
+        public void Request(string path, Action<ModelAsset?> ready)
         {
             if (!_entries.TryGetValue(path, out var entry))
             {
@@ -45,7 +45,7 @@ namespace Kesa.Engine.Unity
                 _entries[path] = entry;
                 _ = Start(path, entry);
             }
-            if (entry.Done) ready(entry.Template);
+            if (entry.Done) ready(entry.Model);
             else entry.Waiting.Add(ready);
         }
 
@@ -55,17 +55,17 @@ namespace Kesa.Engine.Unity
             try
             {
                 if (_loaders.TryGetValue(Path.GetExtension(path).ToLowerInvariant(), out var loader))
-                    entry.Template = await loader.Load(path, _assets, _holder);
+                    entry.Model = await loader.Load(path, _assets, _holder);
                 else Debug.LogWarning("Kesa look: no model loader takes '" + path + "' (spec-gaps G391)");
             }
             catch (Exception e)
             {
                 Debug.LogWarning("Kesa look: the model '" + path + "' failed to load: " + e.Message);
             }
-            if (entry.Template == null) Debug.LogWarning("Kesa look: the model '" + path + "' cannot be read; showing the missing model");
+            if (entry.Model == null) Debug.LogWarning("Kesa look: the model '" + path + "' cannot be read; showing the missing model");
             entry.Done = true;
             _loading--;
-            foreach (var ready in entry.Waiting) ready(entry.Template);
+            foreach (var ready in entry.Waiting) ready(entry.Model);
             entry.Waiting.Clear();
         }
     }
