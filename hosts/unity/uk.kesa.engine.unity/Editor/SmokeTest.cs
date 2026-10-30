@@ -194,6 +194,7 @@ namespace Kesa.Engine.Unity.Editor
                         "<State name=\"a\" clip=\"slide\" /><State name=\"b\" clip=\"lift\" />" +
                         "<State name=\"hop\" clip=\"lift\" once=\"true\" next=\"a\" fade=\"0\" />" +
                         "<State name=\"mix\" blend=\"0.5\"><Clip clip=\"slide\" at=\"0\" /><Clip clip=\"lift\" at=\"1\" /></State>" +
+                        "<Attach bone=\"hand\"><Model src=\"models/tri.glb\" /></Attach><Attach bone=\"tail\" />" +
                         "</Model></Look></Looks>"),
                     new LookSource("check", "check/board.space.xml", "<Spaces><Space name=\"square\" kind=\"grid\" /></Spaces>"),
                 }, kinds, path => assets.Find(path) != null);
@@ -255,6 +256,24 @@ namespace Kesa.Engine.Unity.Editor
             Pose("mix");
             stage.Advance(500);
             Expect(0.25f, 0.25f, "blend=0.5 mixes the two clips around it evenly");
+
+            // 뼈에 붙이기 (G435): hand는 tri의 자식 노드라 애니메이션을 따라간다. 없는 뼈는 모델 원점
+            var c = board.Find("c");
+            var attaches = c.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Attach").ToList();
+            Require(attaches.Count == 2, "both <Attach>es are drawn");
+            Require(attaches.Any(t => t.parent.name == "hand"), "an <Attach bone=\"hand\"> hangs under the hand part");
+            Require(attaches.Any(t => t.parent.name == "Model"), "an unknown bone attaches at the model's origin");
+            var hand = attaches.First(t => t.parent.name == "hand");
+            Require(hand.GetComponentInChildren<MeshFilter>() != null, "the attached model is under the hand");
+            var tri = c.GetComponentsInChildren<Transform>().First(t => t.name == "tri" && t.Find("hand") != null);
+            var before = hand.position;
+            stage.Advance(250);
+            Require(Vector3.Distance(hand.position, before) > 0.05f, "the hand follows the animated part");
+
+            // 모델 누르기: 메시의 경계 상자로 잰다
+            var aim = tri.TransformPoint(-0.2f, 0.2f, 0f);
+            var keys = renderer.KeysAt(new Ray(aim - Vector3.forward * 10f, Vector3.forward));
+            Require(keys.Contains("c"), "a model can be pressed, got " + string.Join(", ", keys));
             Require(stage.Problems.Count == 0, "the animated model shows cleanly: " + string.Join("; ", stage.Problems));
         }
 
@@ -274,7 +293,7 @@ namespace Kesa.Engine.Unity.Editor
             string accessors = !moving ? "" :
                 ",{\"bufferView\":1,\"componentType\":5126,\"count\":2,\"type\":\"SCALAR\",\"min\":[0],\"max\":[1]}" +
                 ",{\"bufferView\":2,\"componentType\":5126,\"count\":2,\"type\":\"VEC3\"},{\"bufferView\":3,\"componentType\":5126,\"count\":2,\"type\":\"VEC3\"}";
-            string json = "{\"asset\":{\"version\":\"2.0\"},\"scene\":0,\"scenes\":[{\"nodes\":[0]}],\"nodes\":[{\"mesh\":0,\"name\":\"tri\"}]," +
+            string json = "{\"asset\":{\"version\":\"2.0\"},\"scene\":0,\"scenes\":[{\"nodes\":[0]}],\"nodes\":[{\"mesh\":0,\"name\":\"tri\"" + (moving ? ",\"children\":[1]},{\"name\":\"hand\",\"translation\":[0,0,1]}" : "}") + "]," +
                           "\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0}}]}],\"buffers\":[{\"byteLength\":" + bin.Length + "}]," +
                           "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":0,\"byteLength\":36}" + views + "]," +
                           "\"accessors\":[{\"bufferView\":0,\"componentType\":5126,\"count\":3,\"type\":\"VEC3\",\"min\":[0,0,0],\"max\":[1,1,0]}" + accessors + "]" +

@@ -68,7 +68,7 @@ namespace Kesa.Engine.Ui
                 ["state"] = LookAttributeType.Name,
                 ["fade"] = LookAttributeType.Number,
             }, acceptsChildren: true, check: (name, value) => name == "src" ? kinds.CheckModel(value.Text!) : NotNegative(name, value),
-                validate: ValidateModel));
+                validate: model => ValidateModel(model, kinds)));
             kinds.Add(new LookElementKind("State", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
             {
                 ["name"] = LookAttributeType.Name,
@@ -83,6 +83,10 @@ namespace Kesa.Engine.Ui
                 ["clip"] = LookAttributeType.Name,
                 ["at"] = LookAttributeType.Number,
             }, acceptsChildren: false, parents: new[] { "State" }, validate: ValidateClip));
+            kinds.Add(new LookElementKind("Attach", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
+            {
+                ["bone"] = LookAttributeType.Name,
+            }, acceptsChildren: true, parents: new[] { "Model" }, validate: ValidateAttach));
             kinds.Add(new LookElementKind("Group", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal), acceptsChildren: true));
             kinds.Add(new GridSpace());
             return kinds;
@@ -103,8 +107,12 @@ namespace Kesa.Engine.Ui
         private static bool Has(LookElement element, string name) =>
             element.Attributes.Any(a => a.Key == name) || element.Bindings.Any(b => b.Attribute == name);
 
-        private static IEnumerable<string> ValidateModel(LookElement model)
+        private static IEnumerable<string> ValidateModel(LookElement model, LookKinds kinds)
         {
+            // 제 부모가 정해진 종류(Clip)는 읽을 때 이미 알렸다
+            foreach (var child in model.Children)
+                if (child.Kind != "State" && child.Kind != "Attach" && !(kinds.TryGetElement(child.Kind, out var kind) && kind.Parents != null))
+                    yield return "inside a <Model> go only <State>s and <Attach>es; put <" + child.Kind + "> in an <Attach bone=\"…\"> or beside the <Model>";
             var states = model.Children.Where(c => c.Kind == "State").ToList();
             var names = new List<string>();
             foreach (var state in states)
@@ -134,6 +142,11 @@ namespace Kesa.Engine.Ui
             if (!Has(state, "clip") && !clips) yield return "a <State> needs clip=\"…\" or <Clip>s inside to blend";
             if (Has(state, "blend") && !clips) yield return "blend= mixes the <Clip>s inside, but there are none";
             if (Has(state, "next") && !Has(state, "once")) yield return "next= is where a once=\"true\" state goes when it ends";
+        }
+
+        private static IEnumerable<string> ValidateAttach(LookElement attach)
+        {
+            if (!Has(attach, "bone")) yield return "an <Attach> needs bone=\"…\", the name of the part it follows (spec-gaps G435)";
         }
 
         private static IEnumerable<string> ValidateClip(LookElement clip)

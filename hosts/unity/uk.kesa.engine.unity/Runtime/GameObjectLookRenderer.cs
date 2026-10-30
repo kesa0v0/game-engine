@@ -59,6 +59,7 @@ namespace Kesa.Engine.Unity
             AddKind("Model", _ => new ModelView(Models()));
             AddKind("State", _ => new StateView());
             AddKind("Clip", _ => new ClipView());
+            AddKind("Attach", _ => new AttachView());
         }
 
         /// <summary>기본 요소 종류에 기본 모델 로더의 확장자(glTF)를 등록한 것. 게임이 제 종류를 더할 바탕 (G391).</summary>
@@ -133,7 +134,7 @@ namespace Kesa.Engine.Unity
         }
 
         /// <summary>
-        /// 광선이 지나는 물체의 열쇠, 위에 그린 것부터(그리는 순서가 같으면 가까운 것부터). 보이는 SpriteRenderer의 경계로 잰다.
+        /// 광선이 지나는 물체의 열쇠, 위에 그린 것부터(그리는 순서가 같으면 가까운 것부터). 보이는 스프라이트와 모델 메시의 경계 상자로 잰다(글은 빼고).
         /// 누름은 이것을 <c>LookBoard.PressAsync</c>에 넘긴다.
         /// </summary>
         public IReadOnlyList<string> KeysAt(Ray ray)
@@ -144,12 +145,13 @@ namespace Kesa.Engine.Unity
                 if (node.Key == null || !node.GameObject.activeInHierarchy) continue;
                 int best = int.MinValue;
                 float near = float.MaxValue;
-                foreach (var sprite in node.GameObject.GetComponentsInChildren<SpriteRenderer>())
+                foreach (var drawn in node.GameObject.GetComponentsInChildren<Renderer>())
                 {
-                    if (!sprite.enabled || sprite.sprite == null || !sprite.bounds.IntersectRay(ray, out float distance)) continue;
-                    if (sprite.sortingOrder > best || (sprite.sortingOrder == best && distance < near))
+                    if (!drawn.enabled || (drawn is SpriteRenderer sprite && sprite.sprite == null) || drawn.GetComponent<TextMesh>() != null) continue;
+                    if (!drawn.bounds.IntersectRay(ray, out float distance)) continue;
+                    if (drawn.sortingOrder > best || (drawn.sortingOrder == best && distance < near))
                     {
-                        best = sprite.sortingOrder;
+                        best = drawn.sortingOrder;
                         near = distance;
                     }
                 }
@@ -244,9 +246,10 @@ namespace Kesa.Engine.Unity
             Detach(node);
             node.Parent = owner;
             owner.Children.Insert(Math.Min(index, owner.Children.Count), node);
-            if (node.View != null) (owner.View as ILookParentView)?.Insert(node.View, index);
             node.GameObject.transform.SetParent(owner.GameObject.transform, false);
             node.GameObject.transform.SetSiblingIndex(index);
+            // 부모 뷰가 제자리(뼈 아래)로 다시 옮길 수 있게 마지막에
+            if (node.View != null) (owner.View as ILookParentView)?.Insert(node.View, index);
             Reorder(node);
         }
 

@@ -22,7 +22,9 @@ namespace Kesa.Engine.Unity
     {
         private readonly LookModels _models;
         private readonly List<StateView> _states = new List<StateView>();
+        private readonly List<AttachView> _attaches = new List<AttachView>();
         private string? _src;
+        private int _order;
         private GameObject? _shown;
         private ModelAsset? _asset;
         private string? _wanted;
@@ -61,10 +63,21 @@ namespace Kesa.Engine.Unity
 
         public void SetSortingOrder(int order)
         {
+            _order = order;
+            if (_shown == null) return;
+            foreach (var renderer in _shown.GetComponentsInChildren<Renderer>(true))
+                if (!IsAttached(renderer.transform)) renderer.sortingOrder = order;
         }
 
         public void Insert(ILookElementView child, int index)
         {
+            if (child is AttachView attach)
+            {
+                attach.Owner = this;
+                _attaches.Add(attach);
+                Place(attach);
+                return;
+            }
             if (!(child is StateView state)) return;
             state.Owner = this;
             _states.Insert(Math.Min(index, _states.Count), state);
@@ -73,7 +86,48 @@ namespace Kesa.Engine.Unity
 
         public void Remove(ILookElementView child)
         {
+            if (child is AttachView attach && _attaches.Remove(attach))
+            {
+                attach.Owner = null;
+                return;
+            }
             if (child is StateView state && _states.Remove(state)) Changed();
+        }
+
+        // ---- 뼈에 붙이기 (G435) ----
+
+        /// <summary>붙는 것을 그 이름의 뼈 아래로 옮긴다. 모델을 읽는 동안이나 없는 뼈면 모델 원점.</summary>
+        public void Place(AttachView attach)
+        {
+            Transform? bone = null;
+            if (_shown != null && _asset != null && attach.Bone != null)
+            {
+                bone = Bone(_shown.transform, attach.Bone);
+                if (bone == null) Warn("no part is named '" + attach.Bone + "' for <Attach bone>; attaching at the model's origin (spec-gaps G435)");
+            }
+            attach.GameObject.transform.SetParent(bone != null ? bone : GameObject.transform, false);
+        }
+
+        // 넓이 우선이라 이름이 겹치면 뿌리에 가까운 것
+        private static Transform? Bone(Transform root, string name)
+        {
+            var queue = new Queue<Transform>();
+            queue.Enqueue(root);
+            while (queue.Count > 0)
+            {
+                var t = queue.Dequeue();
+                if (t != root && t.name == name) return t;
+                foreach (Transform child in t) queue.Enqueue(child);
+            }
+            return null;
+        }
+
+        private bool IsAttached(Transform t)
+        {
+            for (; t != null && t != GameObject.transform; t = t.parent)
+                foreach (var attach in _attaches)
+                    if (attach.GameObject.transform == t) return true;
+            return false;
         }
 
         /// <summary>상태나 클립이 바뀌어 다시 건다.</summary>
@@ -90,6 +144,8 @@ namespace Kesa.Engine.Unity
                 _asset = asset;
                 _shown = asset != null ? UnityEngine.Object.Instantiate(asset.Template, GameObject.transform, false) : Missing();
                 _shown.SetActive(true);
+                foreach (var attach in _attaches) Place(attach);
+                SetSortingOrder(_order);
                 Changed();
                 Tick(0f);
             });
@@ -101,6 +157,8 @@ namespace Kesa.Engine.Unity
             _current = null;
             _asset = null;
             if (_shown == null) return;
+            // 복제본과 함께 지워지지 않게 붙은 것을 먼저 내린다
+            foreach (var attach in _attaches) attach.GameObject.transform.SetParent(GameObject.transform, false);
             if (Application.isPlaying) UnityEngine.Object.Destroy(_shown);
             else UnityEngine.Object.DestroyImmediate(_shown);
             _shown = null;
@@ -189,7 +247,7 @@ namespace Kesa.Engine.Unity
 
         private void Warn(string message)
         {
-            if (_warned.Add(message)) Debug.LogWarning("Kesa look: model '" + _src + "': " + message + " (spec-gaps G434)");
+            if (_warned.Add(message)) Debug.LogWarning("Kesa look: model '" + _src + "': " + message + (message.Contains("spec-gaps") ? "" : " (spec-gaps G434)"));
         }
     }
 
@@ -316,6 +374,27 @@ namespace Kesa.Engine.Unity
                 return i == k ? 1f - t : i == k + 1 ? t : 0f;
             }
             return 0f;
+        }
+    }
+
+    /// <summary><c>Attach</c>: 안의 요소가 모델의 <c>bone</c> 이름 뼈를 따라간다 (G435). 옮기는 것은 <see cref="ModelView.Place"/>.</summary>
+    internal sealed class AttachView : ILookElementView
+    {
+        public AttachView() => GameObject = new GameObject("Attach");
+
+        public GameObject GameObject { get; }
+        public ModelView? Owner;
+        public string? Bone;
+
+        public void Set(string attribute, LookAttributeValue value)
+        {
+            if (attribute != "bone") return;
+            Bone = value.Text;
+            Owner?.Place(this);
+        }
+
+        public void SetSortingOrder(int order)
+        {
         }
     }
 

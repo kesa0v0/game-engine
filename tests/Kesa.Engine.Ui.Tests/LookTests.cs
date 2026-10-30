@@ -313,6 +313,8 @@ namespace Kesa.Engine.Ui.Tests
                 "<State name=\"idle\" clip=\"idle\" />" +
                 "<State name=\"move\" bind-blend=\"speed\"><Clip clip=\"walk\" at=\"0\" /><Clip clip=\"run\" at=\"1\" /></State>" +
                 "<State name=\"attack\" clip=\"attack\" once=\"true\" next=\"idle\" fade=\"0.1\" />" +
+                "<Attach bone=\"hand_R\"><Model bind-src=\"weapon\" /><Sprite src=\"x.png\" /></Attach>" +
+                "<Attach bind-bone=\"flag_at\"><Group /></Attach>" +
                 "</Model>"), Is.Empty);
             Assert.That(Problems(
                 "<Model src=\"s.glb\" state=\"idlee\" fade=\"-1\">" +
@@ -320,7 +322,8 @@ namespace Kesa.Engine.Ui.Tests
                 "<State name=\"idle\" clip=\"walk\"><Clip clip=\"run\" at=\"1\" /></State>" +
                 "<State clip=\"attack\" next=\"idlee\" />" +
                 "<Clip clip=\"x\" />" +
-                "</Model><State name=\"loose\" clip=\"x\" />"), Is.EquivalentTo(new[]
+                "<Sprite src=\"x.png\" /><Attach />" +
+                "</Model><State name=\"loose\" clip=\"x\" /><Attach bone=\"hand\" />"), Is.EquivalentTo(new[]
             {
                 "fade=\"-1\": a time is not negative",
                 "a <State> plays clip= or blends the <Clip>s inside, not both",
@@ -332,6 +335,9 @@ namespace Kesa.Engine.Ui.Tests
                 "next=\"idlee\": no <State> in this <Model> is named 'idlee' (did you mean 'idle'?)",
                 "state=\"idlee\": no <State> in this <Model> is named 'idlee' (did you mean 'idle'?)",
                 "<State> goes directly inside <Model>, not at the top of a look",
+                "inside a <Model> go only <State>s and <Attach>es; put <Sprite> in an <Attach bone=\"…\"> or beside the <Model>",
+                "an <Attach> needs bone=\"…\", the name of the part it follows (spec-gaps G435)",
+                "<Attach> goes directly inside <Model>, not at the top of a look",
             }));
         }
 
