@@ -1,0 +1,4 @@
+<!-- 판을 기울여 본다 (G442·G445): 남쪽에서 북을 보며, 가운데는 skirmish와 같다 -->
+<Views>
+  <View name="main" rig="tilted" space="square" look-at="2,1" offset="0,-0.5" tilt="50" distance="9" zoom="4,16" />
+</Views>

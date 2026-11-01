@@ -20,11 +20,11 @@ namespace Kesa.Engine.Ui.Tests
 
         private MemoryLookRenderer _renderer = null!;
 
-        private LookStage Stage(string looks)
+        private LookStage Stage(string looks, string board = Board)
         {
             var library = LookLibrary.Load(new[]
             {
-                new LookSource("core", "core/fx.look.xml", looks), new LookSource("core", "core/board.space.xml", Board),
+                new LookSource("core", "core/fx.look.xml", looks), new LookSource("core", "core/board.space.xml", board),
             }, LookKinds.Standard());
             Assert.That(library.Problems, Is.Empty, string.Join("\n", library.Problems));
             _renderer = new MemoryLookRenderer();
@@ -111,6 +111,25 @@ namespace Kesa.Engine.Ui.Tests
             stage.Advance(500);
             Assert.That(_renderer.Dump("fx:1"), Does.Contain(" x0.0 "), "the size stops at 0");
             Assert.That(stage.Problems, Is.Empty);
+        }
+
+        /// <summary>drift는 틀의 동·북·위, rise는 공간이 정한 떠오름 쪽 (G447): xy 판은 북(화면 위), xz 바닥은 높이.</summary>
+        [Test]
+        public void DriftFollowsTheFrameAndRiseGoesWhereTheSpaceSaysIsUp()
+        {
+            const string looks = "<Looks><Look name=\"up\" solid=\"1\" rise=\"2\"><Sprite src=\"art/dot.png\" /></Look>" +
+                                 "<Look name=\"spark\" solid=\"1\" drift=\"1,2,4\"><Sprite src=\"art/dot.png\" /></Look></Looks>";
+            var stage = Stage(looks);
+            stage.Play(Batch(Fx("up"), Fx("spark")));
+            stage.Advance(500);
+            Assert.That(_renderer.Dump("fx:1"), Does.StartWith("@(1.0, 3.0, 0.0)"), "xy: rise goes north, up the screen");
+            Assert.That(_renderer.Dump("fx:2"), Does.StartWith("@(1.5, 3.0, -2.0)"), "xy: east, north, and up toward the viewer");
+
+            stage = Stage(looks, "<Spaces><Space name=\"square\" kind=\"grid\" plane=\"xz\" /></Spaces>");
+            stage.Play(Batch(Fx("up"), Fx("spark")));
+            stage.Advance(500);
+            Assert.That(_renderer.Dump("fx:1"), Does.StartWith("@(1.0, 1.0, 2.0)"), "xz: rise goes up into the air");
+            Assert.That(_renderer.Dump("fx:2"), Does.StartWith("@(1.5, 2.0, 3.0)"), "xz: east, up, north");
         }
 
         [Test]

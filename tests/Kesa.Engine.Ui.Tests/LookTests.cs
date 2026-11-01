@@ -87,7 +87,7 @@ namespace Kesa.Engine.Ui.Tests
                 stage.Show("m", Look("dot"), At(2, 3));
                 Assert.That(_renderer.Nodes[_renderer.Objects["m"]].Frame, Is.EqualTo(c.frame), c.space);
             }
-            Assert.That(LookFrame.Screen.ToString(), Is.EqualTo("up (0.0, 0.0, -1.0), north (0.0, 1.0, 0.0), east (1.0, 0.0, 0.0)"));
+            Assert.That(LookFrame.Screen.ToString(), Is.EqualTo("up (0.0, 0.0, -1.0), north (0.0, 1.0, 0.0), east (1.0, 0.0, 0.0), rise (0.0, 1.0, 0.0)"));
         }
 
         /// <summary>turn은 Sprite·Text·Model·Group에, face는 Sprite·Text에 (G443·G444).</summary>

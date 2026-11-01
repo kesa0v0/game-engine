@@ -173,33 +173,37 @@ namespace Kesa.Engine.Ui
     /// </summary>
     public readonly struct LookFrame : IEquatable<LookFrame>
     {
-        public LookFrame(LookPosition up, LookPosition north, LookPosition east)
+        /// <param name="rise">효과의 <c>rise</c>가 떠오르는 쪽 (G447). 빼면 위.</param>
+        public LookFrame(LookPosition up, LookPosition north, LookPosition east, LookPosition? rise = null)
         {
             Up = up;
             North = north;
             East = east;
+            Rise = rise ?? up;
         }
 
         public LookPosition Up { get; }
         public LookPosition North { get; }
         public LookPosition East { get; }
+        public LookPosition Rise { get; }
 
-        /// <summary>바닥이 Unity의 xz 면: 위 = +Y, 북 = +Z, 동 = +X.</summary>
+        /// <summary>바닥이 Unity의 xz 면: 위 = +Y, 북 = +Z, 동 = +X. 떠오름은 위.</summary>
         public static LookFrame Floor => new LookFrame(Axis(0, 1, 0), Axis(0, 0, 1), Axis(1, 0, 0));
 
-        /// <summary>바닥이 Unity의 xy 면을 -Z에서 보는 것: 위 = -Z, 북 = +Y, 동 = +X.</summary>
-        public static LookFrame Screen => new LookFrame(Axis(0, 0, -1), Axis(0, 1, 0), Axis(1, 0, 0));
+        /// <summary>바닥이 Unity의 xy 면을 -Z에서 보는 것: 위 = -Z, 북 = +Y, 동 = +X. 위는 보는 사람 쪽이라 떠오름은 북(화면 위).</summary>
+        public static LookFrame Screen => new LookFrame(Axis(0, 0, -1), Axis(0, 1, 0), Axis(1, 0, 0), Axis(0, 1, 0));
 
         private static LookPosition Axis(long x, long y, long z) =>
             new LookPosition(x * BridgeFixed.Scale, y * BridgeFixed.Scale, z * BridgeFixed.Scale);
 
-        public bool Equals(LookFrame other) => Up.Equals(other.Up) && North.Equals(other.North) && East.Equals(other.East);
+        public bool Equals(LookFrame other) =>
+            Up.Equals(other.Up) && North.Equals(other.North) && East.Equals(other.East) && Rise.Equals(other.Rise);
 
         public override bool Equals(object? obj) => obj is LookFrame f && Equals(f);
 
-        public override int GetHashCode() => Up.GetHashCode() ^ (North.GetHashCode() * 7) ^ (East.GetHashCode() * 13);
+        public override int GetHashCode() => Up.GetHashCode() ^ (North.GetHashCode() * 7) ^ (East.GetHashCode() * 13) ^ (Rise.GetHashCode() * 17);
 
-        public override string ToString() => "up " + Up + ", north " + North + ", east " + East;
+        public override string ToString() => "up " + Up + ", north " + North + ", east " + East + ", rise " + Rise;
     }
 
     /// <summary>설정을 마친 공간 하나. 자리 값을 위치로 바꾼다.</summary>
@@ -307,7 +311,7 @@ namespace Kesa.Engine.Ui
         public static readonly IReadOnlyList<string> TimingNames = new[] { "fade-in", "solid", "fade-out", "rise", "drift", "grow", "move" };
 
         /// <summary>시간 칸의 값 종류.</summary>
-        public static LookAttributeType TimingType(string name) => name == "drift" ? LookAttributeType.Vector2 : LookAttributeType.Number;
+        public static LookAttributeType TimingType(string name) => name == "drift" ? LookAttributeType.Vector : LookAttributeType.Number;
 
         /// <summary>음수가 되지 않는 시간 칸(시간들).</summary>
         public static bool IsDuration(string name) => name == "fade-in" || name == "solid" || name == "fade-out" || name == "move";

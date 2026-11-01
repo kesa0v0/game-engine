@@ -145,6 +145,13 @@ public sealed class KesaDemo : MonoBehaviour
         ui.Hold = _board;
         _inputs = new ModInputs(mods.Inputs);
         _root = root;
+        // 모델(PBR 재질)은 빛이 없으면 거의 검다
+        if (FindFirstObjectByType<Light>() == null)
+        {
+            var sun = new GameObject("Kesa Sun").AddComponent<Light>();
+            sun.type = LightType.Directional;
+            sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+        }
         var camera = Camera.main;
         if (camera != null)
         {

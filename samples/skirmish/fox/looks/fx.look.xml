@@ -1,0 +1,9 @@
+<!-- skirmish의 글 효과를 덮는다: 3D 바닥에서는 바닥에 누운 글이 읽기 어려워 카메라를 보게 하고 여우 머리 위에서 띄운다 (G444·G447) -->
+<Looks>
+  <Look name="damage-number" fade-in="0.05" solid="0.5" fade-out="0.4" rise="0.8">
+    <Text bind-text="amount" size="0.45" color="#ffe070ff" offset="0,0,0.8" face="camera" layer="6" />
+  </Look>
+  <Look name="miss-text" fade-in="0.05" solid="0.5" fade-out="0.4" rise="0.8">
+    <Text bind-text="word" size="0.35" color="#c8c8c8ff" offset="0,0,0.8" face="camera" layer="6" />
+  </Look>
+</Looks>

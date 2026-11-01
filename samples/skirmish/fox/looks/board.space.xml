@@ -1,0 +1,4 @@
+<!-- skirmish의 판 square를 3D 바닥으로 덮는다 (G390·G443): 북이 앞(+z), flip-y라 빨강(y=4)이 카메라 쪽 -->
+<Spaces>
+  <Space name="square" kind="grid" plane="xz" flip-y="true" />
+</Spaces>

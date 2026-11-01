@@ -170,27 +170,30 @@ public static class KesaDemoSetup
         long IdOf(Transform unit) => long.Parse(unit.name.Substring("entity:".Length));
         async Task<long?> Inspected() => ((await demo.Session!.Call("inspected", "skirmish.inspected", new BridgeValue[0])).Value as BridgeEntity)?.Id;
 
-        // 빨강은 아래(y=4) 줄에서 시작한다 (skirmish board.space.xml의 flip-y)
-        var red = units.Where(u => Mathf.RoundToInt(u.localPosition.y) == -4).OrderBy(u => u.localPosition.x).ToList();
+        // 빨강은 남쪽(y=4) 줄에서 시작한다 (skirmish board.space.xml의 flip-y). fox가 켜지면 판이 3D 바닥이라 북이 +z다 (G443)
+        bool floor = units.All(u => Mathf.Abs(u.localPosition.y) < 0.01f);
+        var north = floor ? Vector3.forward : Vector3.up;
+        Debug.Log("KESA DEMO BOARD: " + (floor ? "3D floor (xz)" : "2D (xy)") + ", camera " + (camera.orthographic ? "top" : "tilted"));
+        var red = units.Where(u => Mathf.RoundToInt(Vector3.Dot(u.localPosition, north)) == -4).OrderBy(u => u.localPosition.x).ToList();
         if (red.Count < 2) throw new InvalidOperationException("two red units on the bottom row expected");
         await demo.PressBoard("secondary", ScreenOf(red[0].localPosition));
         if (await Inspected() != IdOf(red[0])) throw new InvalidOperationException("the right press on a unit object should open its window");
         await demo.PressBoard("inspect", ScreenOf(red[1].localPosition));
         if (await Inspected() != IdOf(red[1])) throw new InvalidOperationException("the inspect key (keys.input.xml) on a unit object should open its window");
 
-        // 고르고 바로 위 빈 칸을 누르면 옮겨 가고 물체도 따라간다
-        var mover = red.First(u => !units.Any(o => o != u && Vector3.Distance(o.localPosition, u.localPosition + Vector3.up) < 0.1f));
+        // 고르고 바로 북쪽 빈 칸을 누르면 옮겨 가고 물체도 따라간다
+        var mover = red.First(u => !units.Any(o => o != u && Vector3.Distance(o.localPosition, u.localPosition + north) < 0.1f));
         var from = mover.localPosition;
         await demo.PressBoard("primary", ScreenOf(from));
-        await demo.PressBoard("primary", ScreenOf(from + Vector3.up));
+        await demo.PressBoard("primary", ScreenOf(from + north));
         await demo.Step();
         await demo.WaitPictures();
         // skirmish 유닛은 move="0.25"로 미끄러져 간다 (G432)
         demo.Pass(125);
-        if (Vector3.Distance(mover.localPosition, from + Vector3.up * 0.5f) > 0.01f)
+        if (Vector3.Distance(mover.localPosition, from + north * 0.5f) > 0.01f)
             throw new InvalidOperationException("the unit object should be halfway up from " + from + " after 0.125 s, is at " + mover.localPosition);
         demo.Pass(200);
-        if (Vector3.Distance(mover.localPosition, from + Vector3.up) > 0.01f)
+        if (Vector3.Distance(mover.localPosition, from + north) > 0.01f)
             throw new InvalidOperationException("the unit object should step up one square from " + from + ", is at " + mover.localPosition);
     }
 

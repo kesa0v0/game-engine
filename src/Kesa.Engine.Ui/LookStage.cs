@@ -227,8 +227,8 @@ namespace Kesa.Engine.Ui
             private readonly string _key;
             private readonly ShownObject _shown;
             private readonly long _fadeIn, _solid, _fadeOut;
-            // 초당 공간 단위(고정소수점), rise는 y만 있는 drift다. grow는 초당 크기 배율 변화
-            private readonly long _driftX, _driftY, _grow;
+            // 초당 칸(고정소수점): drift는 틀의 동·북·위, rise는 틀의 떠오름 쪽 (G447). grow는 초당 크기 배율 변화
+            private readonly long _east, _north, _up, _rise, _grow;
             private long _elapsed;
 
             public FxPlayback(LookStage stage, string key, ShownObject shown)
@@ -240,8 +240,10 @@ namespace Kesa.Engine.Ui
                 _solid = Millis(stage.Number(shown, "solid"));
                 _fadeOut = Millis(stage.Number(shown, "fade-out"));
                 var drift = stage.Field(shown, "drift");
-                _driftX = drift?.Numbers[0] ?? 0;
-                _driftY = (drift?.Numbers[1] ?? 0) + stage.Number(shown, "rise");
+                _east = drift?.Numbers[0] ?? 0;
+                _north = drift?.Numbers[1] ?? 0;
+                _up = drift != null && drift.Numbers.Count > 2 ? drift.Numbers[2] : 0;
+                _rise = stage.Number(shown, "rise");
                 _grow = stage.Number(shown, "grow");
             }
 
@@ -266,10 +268,16 @@ namespace Kesa.Engine.Ui
                     : _fadeOut == 0 ? 0
                     : BridgeFixed.Scale - (t - _fadeIn - _solid) * BridgeFixed.Scale / _fadeOut;
                 _stage._renderer.SetOpacity(_shown.Handle, opacity);
-                if (_driftX == 0 && _driftY == 0 && _grow == 0) return;
+                if (_east == 0 && _north == 0 && _up == 0 && _rise == 0 && _grow == 0) return;
                 long unit = _shown.Unit;
                 var at = _shown.Position ?? default;
-                var moved = new LookPosition(at.X + _driftX * unit / BridgeFixed.Scale * t / 1000, at.Y + _driftY * unit / BridgeFixed.Scale * t / 1000, at.Z);
+                var f = _shown.Frame;
+                long Speed(long east, long north, long up, long rise) => (east * _east + north * _north + up * _up + rise * _rise) / BridgeFixed.Scale;
+                long Moved(long from, long speed) => from + speed * unit / BridgeFixed.Scale * t / 1000;
+                var moved = new LookPosition(
+                    Moved(at.X, Speed(f.East.X, f.North.X, f.Up.X, f.Rise.X)),
+                    Moved(at.Y, Speed(f.East.Y, f.North.Y, f.Up.Y, f.Rise.Y)),
+                    Moved(at.Z, Speed(f.East.Z, f.North.Z, f.Up.Z, f.Rise.Z)));
                 // 크기는 물체의 단위에 곱한다: 1 + grow × 초, 0 아래로는 가지 않음
                 long scale = Math.Max(0, BridgeFixed.Scale + _grow * t / 1000);
                 _stage._renderer.PlaceObject(_shown.Handle, moved, _shown.Frame, unit * scale / BridgeFixed.Scale);
