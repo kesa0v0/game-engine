@@ -49,9 +49,8 @@ namespace Kesa.Engine.Script
                     Tick();
                     again = PureOps.Truthy(Eval(block.While.Condition, frame));
                 }
-                catch (ScriptRuntimeException e)
+                catch (ScriptRuntimeException e) when (Annotate(e, block.While.Span))
                 {
-                    Attach(e, block.While.Span);
                     throw;
                 }
                 if (!again) return false;
@@ -67,9 +66,8 @@ namespace Kesa.Engine.Script
             {
                 Tick();
             }
-            catch (ScriptRuntimeException e)
+            catch (ScriptRuntimeException e) when (Annotate(e, block.Loop!.Span))
             {
-                Attach(e, block.Loop!.Span);
                 throw;
             }
             block.Index++;
@@ -104,9 +102,8 @@ namespace Kesa.Engine.Script
                 Tick();
                 node.Run(this, frame);
             }
-            catch (ScriptRuntimeException e)
+            catch (ScriptRuntimeException e) when (Annotate(e, node.Site.Span))
             {
-                Attach(e, node.Site.Span);
                 throw;
             }
         }
@@ -422,9 +419,8 @@ namespace Kesa.Engine.Script
                 Tick();
                 StatementCall(call, frame, target);
             }
-            catch (ScriptRuntimeException e)
+            catch (ScriptRuntimeException e) when (Annotate(e, call.Span))
             {
-                Attach(e, call.Span);
                 throw;
             }
         }

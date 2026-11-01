@@ -7,7 +7,7 @@ namespace Kesa.Engine.Script
     /// <summary>
     /// 순수 함수 실행기 (spec S2·S4, spec-gaps G95~G103). 함수 본문을 평가해 값을 돌려준다.
     /// 읽기만 하고(대입은 지역 변수뿐), 평가 노드마다 단계를 세어 한 번의 <see cref="Run"/>이
-    /// 예산을 넘으면 오류를 낸다(G101). 함수 호출 체인에 같은 함수가 다시 나오면 재귀 오류다(G102).
+    /// 예산을 넘으면 오류를 낸다(G101). 호출이 <see cref="MaxCallDepth"/>보다 깊어지면 오류다(G452).
     /// 오류는 <see cref="ScriptRuntimeException"/>이고 오류가 난 식의 위치와 호출 흔적이 붙는다.
     /// 호스트가 읽기 도중 다시 <see cref="Run"/>을 불러도 된다: 호출 체인은 새로 시작하고, 단계는 넘겨준
     /// <see cref="StepMeter"/>가 있으면 이어서 센다.
@@ -33,6 +33,17 @@ namespace Kesa.Engine.Script
 
         // 지금 도는 실행들 (바깥부터). derived 읽기처럼 실행 안에서 다른 실행이 열린다
         private readonly List<Session> _active = new List<Session>();
+
+        /// <summary>지금 도는 실행들의 프레임 합의 상한 (G452). derived 읽기로 열린 안쪽 실행의 프레임도 센다.</summary>
+        public int MaxCallDepth { get; }
+
+        /// <summary>지금 도는 실행들의 프레임 합.</summary>
+        internal int CallDepth()
+        {
+            int depth = 0;
+            foreach (var s in _active) depth += s.Depth;
+            return depth;
+        }
 
         /// <summary>
         /// 지금 도는 스크립트 함수(가장 안쪽 실행의 맨 위 프레임)의 모드 id. 스크립트 밖(호스트)이면 빈 문자열이다. 월드는 이것으로
@@ -61,11 +72,12 @@ namespace Kesa.Engine.Script
         private readonly Stack<Session> _spareSessions = new Stack<Session>();
 
         public PureEvaluator(IScriptGlobals globals, IReadOnlyDictionary<string, Value> builtins,
-            int stepBudget = DefaultStepBudget)
+            int stepBudget = DefaultStepBudget, int maxCallDepth = Schema.EngineRules.DefaultMaxCallDepth)
         {
             _globals = globals;
             _builtins = builtins;
             _budget = stepBudget;
+            MaxCallDepth = maxCallDepth;
         }
 
         /// <summary>

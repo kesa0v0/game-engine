@@ -29,7 +29,8 @@ namespace Kesa.Engine.Tests.Script
 
         private static (PureEvaluator Evaluator, Func<string, Value> Function) Build(
             string source, int budget = PureEvaluator.DefaultStepBudget,
-            Action<SortedDictionary<string, Value>, Func<PureEvaluator>>? extend = null)
+            Action<SortedDictionary<string, Value>, Func<PureEvaluator>>? extend = null,
+            int maxCallDepth = Kesa.Engine.Schema.EngineRules.DefaultMaxCallDepth)
         {
             var bag = new DiagnosticBag();
             var module = Parser.Parse(source, "t.py", bag);
@@ -41,7 +42,8 @@ namespace Kesa.Engine.Tests.Script
             var builtins = PureBuiltins.Create();
             PureEvaluator? evaluator = null;
             extend?.Invoke(builtins, () => evaluator!);
-            evaluator = new PureEvaluator(new ScopeGlobals(new Dictionary<string, ModScope> { ["t"] = scope }), builtins, budget);
+            evaluator = new PureEvaluator(new ScopeGlobals(new Dictionary<string, ModScope> { ["t"] = scope }), builtins, budget,
+                maxCallDepth);
             return (evaluator, name =>
             {
                 Assert.That(scope.TryGet(name, out var f, out _), Is.True);
@@ -484,22 +486,46 @@ namespace Kesa.Engine.Tests.Script
             Assert.That(e.Trace[1], Does.StartWith("f"));
         }
 
-        // ---- 재귀 (G102) ----
+        // ---- 재귀 (G452) ----
 
-        [Test]
-        public void DirectRecursionIsAnErrorWithTheChain()
+        [TestCase("def f(n):\n    if n == 0:\n        return 0\n    return n + f(n - 1)\n")]
+        [TestCase("def f(n):\n    if n == 0:\n        return 0\n    r = f(n - 1)\n    return n + r\n")]
+        public void RecursionThatStopsGivesItsValue(string source)
         {
-            var e = Fails("def f(n):\n    return f(n)\n", "f", new IntValue(1));
-            Assert.That(e.Code, Is.EqualTo(Codes.RunCycle));
-            Assert.That(e.Message, Does.Contain("f -> f"));
+            var (evaluator, find) = Build(source);
+            Assert.That(evaluator.Run(find("f"), new Value[] { new IntValue(10) }), Has.Property("Value").EqualTo(55L));
         }
 
         [Test]
-        public void MutualRecursionIsAnErrorWithTheChain()
+        public void MutualRecursionThatStopsGivesItsValue()
         {
-            var e = Fails("def a(n):\n    return b(n)\n\ndef b(n):\n    return a(n)\n", "a", new IntValue(1));
-            Assert.That(e.Code, Is.EqualTo(Codes.RunCycle));
-            Assert.That(e.Message, Does.Contain("a -> b -> a"));
+            var (evaluator, find) = Build("def even(n):\n    return True if n == 0 else odd(n - 1)\n\n" +
+                                          "def odd(n):\n    return False if n == 0 else even(n - 1)\n");
+            Assert.That(evaluator.Run(find("even"), new Value[] { new IntValue(7) }), Is.EqualTo(BoolValue.False));
+        }
+
+        [TestCase("def f(n):\n    return f(n)\n", "f -> f -> f")]
+        [TestCase("def f(n):\n    r = f(n)\n    return r\n", "f -> f -> f")]
+        [TestCase("def a(n):\n    return b(n)\n\ndef b(n):\n    return a(n)\n", "a -> b -> a")]
+        public void EndlessRecursionStopsAtTheDepthLimit(string source, string chain)
+        {
+            var (evaluator, find) = Build(source, maxCallDepth: 50);
+            var e = Assert.Throws<ScriptRuntimeException>(() => evaluator.Run(find(source.Substring(4, 1)), new Value[] { new IntValue(1) }))!;
+            Assert.That(e.Code, Is.EqualTo(Codes.RunDepth));
+            Assert.That(e.Message, Does.StartWith("calls went deeper than 50: … -> ").And.Contain(chain));
+            // 흔적은 안쪽 10단, 줄인 줄, 바깥 5단
+            Assert.That(e.Trace, Has.Count.EqualTo(16));
+            Assert.That(e.Trace[10], Is.EqualTo("... 35 more calls"));
+        }
+
+        [Test]
+        public void TheDepthLimitCountsExactly()
+        {
+            const string source = "def f(n):\n    if n == 0:\n        return 0\n    return 1 + f(n - 1)\n";
+            var (evaluator, find) = Build(source, maxCallDepth: 10);
+            Assert.That(evaluator.Run(find("f"), new Value[] { new IntValue(9) }), Has.Property("Value").EqualTo(9L), "f(9)..f(0) is ten calls");
+            var e = Assert.Throws<ScriptRuntimeException>(() => evaluator.Run(find("f"), new Value[] { new IntValue(10) }))!;
+            Assert.That(e.Code, Is.EqualTo(Codes.RunDepth));
         }
 
         // 호스트가 읽기 도중 같은 함수를 다른 엔티티에 대해 다시 부르는 것은 재귀가 아니다 (G100·G103)

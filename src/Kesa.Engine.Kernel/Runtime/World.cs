@@ -89,6 +89,7 @@ namespace Kesa.Engine.Runtime
             _maxSignalDepth = Rule(EngineRules.MaxSignalDepth, EngineRules.DefaultMaxSignalDepth);
             _maxAdvancePerCall = Rule(EngineRules.MaxAdvancePerCall, EngineRules.DefaultMaxAdvancePerCall);
             _maxSettleRounds = Rule(EngineRules.MaxSettleRounds, EngineRules.DefaultMaxSettleRounds);
+            _maxCallDepth = Rule(EngineRules.MaxCallDepth, EngineRules.DefaultMaxCallDepth);
         }
 
         // ---- 이름 풀기 ----

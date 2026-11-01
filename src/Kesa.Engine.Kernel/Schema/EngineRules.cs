@@ -36,17 +36,28 @@ namespace Kesa.Engine.Schema
         /// <summary>한 단계 약 45ns(규모 벤치)로 약 0.5초, 유닛 하나에 7단계면 약 140만 개.</summary>
         public const int DefaultActionStepBudget = 10_000_000;
 
+        /// <summary>지금 도는 실행들의 함수 호출 깊이(프레임 합) 상한 (G452).</summary>
+        public const string MaxCallDepth = "max_call_depth";
+
         public const int DefaultMaxSignalDepth = 64;
         public const int DefaultMaxAdvancePerCall = 10_000;
         public const int DefaultMaxSettleRounds = 64;
+        public const int DefaultMaxCallDepth = 200;
 
-        private static readonly (string Name, int Default)[] Fields =
+        /// <summary>
+        /// <see cref="MaxCallDepth"/>의 천장: 호출 한 단이 C# 스택을 쓰므로 모드가 이보다 높일 수 없다 (넘치면 잡을 수 없이 프로세스가 죽는다).
+        /// Debug 빌드에서 한 단 약 2.3KB라 1MB 스택의 약 70% (G452).
+        /// </summary>
+        public const int CallDepthCeiling = 300;
+
+        private static readonly (string Name, int Default, int Max)[] Fields =
         {
-            (StepBudget, DefaultStepBudget),
-            (ActionStepBudget, DefaultActionStepBudget),
-            (MaxSignalDepth, DefaultMaxSignalDepth),
-            (MaxAdvancePerCall, DefaultMaxAdvancePerCall),
-            (MaxSettleRounds, DefaultMaxSettleRounds),
+            (StepBudget, DefaultStepBudget, int.MaxValue),
+            (ActionStepBudget, DefaultActionStepBudget, int.MaxValue),
+            (MaxSignalDepth, DefaultMaxSignalDepth, int.MaxValue),
+            (MaxAdvancePerCall, DefaultMaxAdvancePerCall, int.MaxValue),
+            (MaxSettleRounds, DefaultMaxSettleRounds, int.MaxValue),
+            (MaxCallDepth, DefaultMaxCallDepth, CallDepthCeiling),
         };
 
         public static bool IsEngine(string name) => name == TypeName;
@@ -54,11 +65,11 @@ namespace Kesa.Engine.Schema
         internal static DefType Type()
         {
             var consts = new List<MemberDecl>();
-            foreach (var (name, value) in Fields)
+            foreach (var (name, value, max) in Fields)
             {
                 // C# 쪽이 int라 위도 막는다
                 var spec = new MemberSpec(MemberKind.Const, PrimitiveTypeRef.Int, SourceSpan.None)
-                    { Default = new IntValue(value), Min = new IntValue(1), Max = new IntValue(int.MaxValue) };
+                    { Default = new IntValue(value), Min = new IntValue(1), Max = new IntValue(max) };
                 consts.Add(new MemberDecl(name, SourceSpan.None, EngineSignals.Owner, spec));
             }
             return new DefType(new DefTypeDecl(TypeName, SourceSpan.None, EngineSignals.Owner, consts, new List<NameRef>()));

@@ -73,7 +73,7 @@ namespace Kesa.Engine.Script
                     return;
 
                 case FunctionDef def:
-                    FunctionChecker.Check(def, _context); // 쓸 수 없는 연산자·재귀는 정의할 때 알린다 (G96·G102)
+                    FunctionChecker.Check(def, _context); // 쓸 수 없는 연산자는 정의할 때 알린다 (G96)
                     var function = new FunctionValue(def, _context.Mod);
                     _context.Functions.Functions.Add(function); // 이름은 모드 평가가 끝난 뒤에 본다 (G108)
                     _context.Functions.TopLevelNames.Add(def.Name);

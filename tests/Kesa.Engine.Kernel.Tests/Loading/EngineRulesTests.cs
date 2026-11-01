@@ -29,6 +29,18 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(Limit(content, "max_signal_depth"), Is.EqualTo(64));
             Assert.That(Limit(content, "max_advance_per_call"), Is.EqualTo(10_000));
             Assert.That(Limit(content, "max_settle_rounds"), Is.EqualTo(64));
+            Assert.That(Limit(content, "max_call_depth"), Is.EqualTo(200));
+        }
+
+        // 호출 한 단이 C# 스택을 쓰므로 천장 위로는 못 올린다 (G452)
+        [Test]
+        public void TheCallDepthHasACeiling()
+        {
+            Mod("core", defs: Rule("max_call_depth", 300));
+            Assert.That(Limit(LoadClean(), "max_call_depth"), Is.EqualTo(300));
+            Mod("core", defs: Rule("max_call_depth", 301));
+            Load(out var diags);
+            Assert.That(Codes(diags), Has.Some.StartWith(Kesa.Engine.Diagnostics.Codes.ValRange));
         }
 
         [Test]

@@ -119,7 +119,7 @@ namespace Kesa.Engine.Tests.Loading
             Start(("scouts", "@wrap(banking.base)\ndef more(original, s):\n    return banking.base(s) + 1\n", Depends));
             var r = Submit("banking.Use");
             Assert.That(r.Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
-            Assert.That(r.Error!.Code, Is.EqualTo(Codes.RunCycle));
+            Assert.That(r.Error!.Code, Is.EqualTo(Codes.RunDepth), r.Error.ToString());
         }
 
         [Test]

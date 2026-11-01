@@ -5,10 +5,9 @@ namespace Kesa.Engine.Script
 {
     /// <summary>
     /// 함수 본문의 로드 시점 정적 검사 (spec-gaps G96·G102). 파서는 유효한 파이썬을 모두 읽으므로, 로직에서 허용하지 않는
-    /// 연산자(<c>**</c>, 비트 연산, <c>@</c>)와 지역 값을 고치는 것(항목 대입, G104), 직접 재귀를 여기서 막는다.
+    /// 연산자(<c>**</c>, 비트 연산, <c>@</c>)와 지역 값을 고치는 것(항목 대입, G104)을 여기서 막는다.
     /// 속성 대입(엔티티 쓰기)이 허용되는 자리는 <see cref="FunctionEffects"/>가 본다 (G117).
     /// 값 식만 본다: 매개변수·반환 어노테이션은 <c>X | None</c> 같은 표기를 쓰므로 검사하지 않는다.
-    /// 간접 재귀(a가 b를, b가 a를 부름)는 실행 중 호출 체인으로 잡는다.
     /// </summary>
     public static class FunctionChecker
     {
@@ -35,7 +34,7 @@ namespace Kesa.Engine.Script
         /// </summary>
         public static void Check(FunctionDef def, CallContext context)
         {
-            var walker = new Walker(context, def.Name) { UiAction = def.IsUiAction, Wrap = def.IsWrap };
+            var walker = new Walker(context) { UiAction = def.IsUiAction, Wrap = def.IsWrap };
             // UI 동작도 사전 조건을 연다 (G280). 감싸기는 커맨드를 감쌀 때만 열 수 있다(대상은 WrapCheck가 본다, G316)
             bool opens = def.IsCommand || def.IsUiAction || def.IsWrap;
             for (int i = 0; i < def.Body.Count; i++)
@@ -47,7 +46,7 @@ namespace Kesa.Engine.Script
 
         public static void Check(LambdaExpr lambda, CallContext context)
         {
-            new Walker(context, null).Expr(lambda.Body);
+            new Walker(context).Expr(lambda.Body);
         }
 
         /// <summary>
@@ -65,12 +64,10 @@ namespace Kesa.Engine.Script
         private sealed class Walker
         {
             private readonly CallContext _context;
-            private readonly string? _selfName;
 
-            public Walker(CallContext context, string? selfName)
+            public Walker(CallContext context)
             {
                 _context = context;
-                _selfName = selfName;
             }
 
             /// <summary><c>@ui_action</c>의 본문인가: 사전 조건에 <c>cost</c>가 없다 (G280).</summary>
@@ -369,11 +366,6 @@ namespace Kesa.Engine.Script
 
                     case CallExpr call:
                         // 블록 밖의 require 등은 모드가 그 이름을 덮어썼는지 알아야 하므로 FunctionNameChecker가 본다 (G112)
-                        if (_selfName != null && call.Callee is NameExpr callee && callee.Name == _selfName)
-                        {
-                            Report("function '" + _selfName + "' calls itself", call.Span,
-                                "recursion is not allowed in logic functions");
-                        }
                         Expr(call.Callee);
                         foreach (var arg in call.Arguments)
                         {

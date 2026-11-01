@@ -145,7 +145,7 @@ namespace Kesa.Engine.Loading
             private readonly Dictionary<string, ModCode> _mods = new Dictionary<string, ModCode>(StringComparer.Ordinal);
             private readonly Dictionary<string, ModNames> _globals = new Dictionary<string, ModNames>(StringComparer.Ordinal);
 
-            /// <summary>따라 들어가는 중인 함수들. 로직 함수의 재귀는 로드 오류지만(EVL002) 그 모드가 꺼지기 전에도 이 검사는 돈다.</summary>
+            /// <summary>따라 들어가는 중인 함수들. 로직 함수는 재귀할 수 있어(G452) 같은 함수를 두 번 따라가지 않는다.</summary>
             private readonly HashSet<object> _active = new HashSet<object>();
 
             private List<ReadEdge> _edges = new List<ReadEdge>();

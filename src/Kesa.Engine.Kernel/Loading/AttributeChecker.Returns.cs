@@ -21,7 +21,7 @@ namespace Kesa.Engine.Loading
             private readonly Dictionary<object, List<KeyValuePair<StaticType[], StaticType>>> _known =
                 new Dictionary<object, List<KeyValuePair<StaticType[], StaticType>>>();
 
-            /// <summary>훑는 중인 함수들. 로직 함수의 재귀는 로드 오류지만(EVL002) 그 모드가 꺼지기 전에도 이 검사는 돈다.</summary>
+            /// <summary>훑는 중인 함수들. 로직 함수는 재귀할 수 있어(G452) 같은 함수를 두 번 훑지 않는다.</summary>
             private readonly HashSet<object> _active = new HashSet<object>();
 
             public ReturnTypes(SchemaSet schema, DefRegistry defs, IReadOnlyList<ModCode> mods)

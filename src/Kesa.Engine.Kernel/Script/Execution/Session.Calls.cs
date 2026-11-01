@@ -4,7 +4,7 @@ using Kesa.Engine.Diagnostics;
 
 namespace Kesa.Engine.Script
 {
-    /// <summary>세션의 함수 호출: 인자 묶기, 재귀 검사, 프레임 만들기·다시 쓰기, 지역 변수 표 (G226 호출 규약).</summary>
+    /// <summary>세션의 함수 호출: 인자 묶기, 깊이 검사, 프레임 만들기·다시 쓰기, 지역 변수 표 (G226 호출 규약).</summary>
     internal sealed partial class Session
     {
         // ---- 호출 ----
@@ -70,6 +70,20 @@ namespace Kesa.Engine.Script
         private static bool SameFunction(FunctionValue a, FunctionValue b) =>
             ReferenceEquals(a.Definition, b.Definition) && ReferenceEquals(a.Lambda, b.Lambda);
 
+        private ScriptRuntimeException TooDeep(FunctionValue fn)
+        {
+            // 사슬은 끝의 몇 개만: 끝없는 재귀면 같은 이름이 되풀이된다
+            const int shown = 6;
+            var chain = new List<string>();
+            for (int i = Math.Max(0, _stack.Count - shown); i < _stack.Count; i++) chain.Add(_stack[i].Function.Name);
+            chain.Add(fn.Name);
+            string max = _owner.MaxCallDepth.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return Fail(Codes.RunDepth, "calls went deeper than " + max + ": " + (_stack.Count > shown ? "… -> " : "") +
+                                        string.Join(" -> ", chain),
+                "a recursion may not stop; a deep one can be a loop, or the game can raise the limit: " +
+                "patch.set(\"" + Schema.EngineRules.DefId + "\", \"" + Schema.EngineRules.MaxCallDepth + "\", …) (spec-gaps G452)");
+        }
+
         /// <summary>C# 쪽에서 끝까지 실행하는 호출 (호스트 실행, 식 안의 호출). 돌려준 값을 받는다.</summary>
         private Value CallFunction(FunctionValue fn, LocalTable? captured,
             IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
@@ -105,7 +119,7 @@ namespace Kesa.Engine.Script
             }
         }
 
-        /// <summary>재귀를 검사하고 인자를 묶은 프레임을 스택에 넣는다. <c>def</c>면 몸체 블록에서 시작한다.</summary>
+        /// <summary>깊이를 검사하고 인자를 묶은 프레임을 스택에 넣는다. <c>def</c>면 몸체 블록에서 시작한다.</summary>
         private Frame Push(FunctionValue fn, LocalTable? captured,
             IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords, SourceSpan site,
             bool writable, bool uiWritable = false, bool entry = false, bool direct = false)
@@ -191,23 +205,24 @@ namespace Kesa.Engine.Script
             while (_stack.Count > depth) _stack.RemoveAt(_stack.Count - 1);
         }
 
-        /// <summary>재귀를 검사하고 인자를 매개변수에 묶은 새 프레임을 만든다 (스택에는 아직 넣지 않는다).</summary>
+        /// <summary>깊이를 검사하고 인자를 매개변수에 묶은 새 프레임을 만든다 (스택에는 아직 넣지 않는다).</summary>
         private Frame Enter(FunctionValue fn, LocalTable? captured,
             IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
-            for (int k = 0; k < _stack.Count; k++)
+            // 식 안의 호출과 문장 호출을 똑같이 센다: 어디서 걸리는지가 쓴 모양에 달리지 않게 (G452)
+            if (_owner.CallDepth() >= _owner.MaxCallDepth) throw TooDeep(fn);
+            // 입구(즉시 핸들러 등)가 자기 안에서 다시 도는 것은 함수 재귀가 아니라 재진입이라 막는다 (G310). 감싸는 함수는 감싼 함수의 재귀를 따라 쌓인다
+            if (fn.IsEntry && !fn.IsWrap)
             {
-                if (!SameFunction(_stack[k].Function, fn)) continue;
-                var chain = new List<string>();
-                bool inChain = false;
-                foreach (var f in _stack)
+                for (int k = 0; k < _stack.Count; k++)
                 {
-                    if (SameFunction(f.Function, fn)) inChain = true;
-                    if (inChain) chain.Add(f.Function.Name);
+                    if (!SameFunction(_stack[k].Function, fn)) continue;
+                    var chain = new List<string>();
+                    for (int i = k; i < _stack.Count; i++) chain.Add(_stack[i].Function.Name);
+                    chain.Add(fn.Name);
+                    throw Fail(Codes.RunCycle, "function '" + fn.Name + "' calls itself: " + string.Join(" -> ", chain),
+                        "a " + fn.EntryKind + " cannot run again inside itself (spec-gaps G310)");
                 }
-                chain.Add(fn.Name);
-                throw Fail(Codes.RunCycle, "function '" + fn.Name + "' calls itself: " + string.Join(" -> ", chain),
-                    "recursion is not allowed in logic functions");
             }
 
             var parameters = fn.Parameters;

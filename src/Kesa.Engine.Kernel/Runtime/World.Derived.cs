@@ -26,6 +26,9 @@ namespace Kesa.Engine.Runtime
         /// <summary>행동 실행(커맨드 본문, 핸들러, Flow 이어 하기) 하나의 단계 예산 (G224).</summary>
         private readonly int _actionStepBudget;
 
+        /// <summary>함수 호출 깊이 상한 (G452).</summary>
+        private readonly int _maxCallDepth;
+
         /// <summary>
         /// 지금 만드는 결과(제출, 답, 핸들러 하나)에 붙일 경고 (G225). 결과 단위가 열려 있을 때만 null이 아니다: 결과가 없는 실행
         /// (사전 검사만, <c>choose</c> 나열)의 경고는 버린다.
@@ -142,7 +145,7 @@ namespace Kesa.Engine.Runtime
         private StepMeter _derivedMeter => _derivedMeterStore ??= new StepMeter(_stepBudget);
 
         private PureEvaluator Evaluator =>
-            _evaluator ??= new PureEvaluator(new WorldGlobals(this), RuntimeBuiltins(), _stepBudget)
+            _evaluator ??= new PureEvaluator(new WorldGlobals(this), RuntimeBuiltins(), _stepBudget, _maxCallDepth)
             {
                 ParameterType = CommandParameterType,
                 Wrappers = WrappersOf,
@@ -320,6 +323,8 @@ namespace Kesa.Engine.Runtime
             }
 
             var function = member.Spec.Function!;
+            // 목록 길이는 필터 때 아직 안쪽 것을 빼지 않았을 수 있다: 들어올 때 정한다
+            bool nested = _computing.Count > 0;
             _computing.Add(computing);
             try
             {
@@ -327,7 +332,7 @@ namespace Kesa.Engine.Runtime
                 var result = OutsideAct(() => RunFunction(function, self));
                 return CheckDerivedResult(member.Display, member, result);
             }
-            catch (ScriptRuntimeException e) when (_computing.Count > 1)
+            catch (ScriptRuntimeException e) when (nested)
             {
                 // 다른 계산 안에서 읽힌 값이면 흔적에 경계를 남긴다. 바깥 함수의 프레임은 바깥 실행이 덧붙인다
                 e.AddTrace(ReadingPrefix + computing.Label);

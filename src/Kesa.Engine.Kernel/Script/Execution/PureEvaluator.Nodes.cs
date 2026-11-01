@@ -210,9 +210,8 @@ namespace Kesa.Engine.Script
                 {
                     value = s.LookupFree(_name, f);
                 }
-                catch (ScriptRuntimeException e)
+                catch (ScriptRuntimeException e) when (s.Annotate(e, Span))
                 {
-                    s.Attach(e, Span);
                     throw;
                 }
                 _owner = s.Owner;
@@ -282,9 +281,8 @@ namespace Kesa.Engine.Script
                     }
                     return result;
                 }
-                catch (ScriptRuntimeException e)
+                catch (ScriptRuntimeException e) when (s.Annotate(e, Span))
                 {
-                    s.Attach(e, Span);
                     throw;
                 }
             }
@@ -313,9 +311,8 @@ namespace Kesa.Engine.Script
                     if (owner is IRuntimeAttributes source) return source.GetAttribute(_site.Name);
                     throw s.Fail(Codes.RunScript, "'" + owner.KindName + "' has no attribute '" + _site.Name + "'");
                 }
-                catch (ScriptRuntimeException e)
+                catch (ScriptRuntimeException e) when (s.Annotate(e, Span))
                 {
-                    s.Attach(e, Span);
                     throw;
                 }
             }
@@ -340,9 +337,8 @@ namespace Kesa.Engine.Script
                     if (_index == null) throw s.Fail(Codes.RunScript, "an index takes one value");
                     return s.Index(_target.Eval(s, f), _index.Eval(s, f));
                 }
-                catch (ScriptRuntimeException e)
+                catch (ScriptRuntimeException e) when (s.Annotate(e, Span))
                 {
-                    s.Attach(e, Span);
                     throw;
                 }
             }
@@ -375,9 +371,8 @@ namespace Kesa.Engine.Script
                     }
                     throw s.Fail(Codes.RunScript, "operator '" + _site.Op + "' is not supported in a logic function");
                 }
-                catch (ScriptRuntimeException e)
+                catch (ScriptRuntimeException e) when (s.Annotate(e, Span))
                 {
-                    s.Attach(e, Span);
                     throw;
                 }
             }
@@ -407,9 +402,8 @@ namespace Kesa.Engine.Script
                     var right = _right.Eval(s, f);
                     return s.Binary(_op, left, right, _site);
                 }
-                catch (ScriptRuntimeException e)
+                catch (ScriptRuntimeException e) when (s.Annotate(e, Span))
                 {
-                    s.Attach(e, Span);
                     throw;
                 }
             }
@@ -435,9 +429,8 @@ namespace Kesa.Engine.Script
                     var left = _left.Eval(s, f);
                     return PureOps.Truthy(left) ? _right.Eval(s, f) : left;
                 }
-                catch (ScriptRuntimeException e)
+                catch (ScriptRuntimeException e) when (s.Annotate(e, Span))
                 {
-                    s.Attach(e, Span);
                     throw;
                 }
             }
@@ -462,9 +455,8 @@ namespace Kesa.Engine.Script
                     var left = _left.Eval(s, f);
                     return PureOps.Truthy(left) ? left : _right.Eval(s, f);
                 }
-                catch (ScriptRuntimeException e)
+                catch (ScriptRuntimeException e) when (s.Annotate(e, Span))
                 {
-                    s.Attach(e, Span);
                     throw;
                 }
             }
@@ -490,9 +482,8 @@ namespace Kesa.Engine.Script
                     s.Tick();
                     return PureOps.Truthy(_condition.Eval(s, f)) ? _whenTrue.Eval(s, f) : _whenFalse.Eval(s, f);
                 }
-                catch (ScriptRuntimeException e)
+                catch (ScriptRuntimeException e) when (s.Annotate(e, Span))
                 {
-                    s.Attach(e, Span);
                     throw;
                 }
             }
@@ -549,9 +540,8 @@ namespace Kesa.Engine.Script
                     var callee = Parts(s, f, out var positional, out var keywords);
                     return s.Invoke(callee, positional, keywords, _site.Span);
                 }
-                catch (ScriptRuntimeException e)
+                catch (ScriptRuntimeException e) when (s.Annotate(e, Span))
                 {
-                    s.Attach(e, Span);
                     throw;
                 }
             }
@@ -664,9 +654,8 @@ namespace Kesa.Engine.Script
                     Walk(s, f, new Sink { Mode = Mode.List, Items = items });
                     return new ListValue(items);
                 }
-                catch (ScriptRuntimeException e)
+                catch (ScriptRuntimeException e) when (s.Annotate(e, Span))
                 {
-                    s.Attach(e, Span);
                     throw;
                 }
             }

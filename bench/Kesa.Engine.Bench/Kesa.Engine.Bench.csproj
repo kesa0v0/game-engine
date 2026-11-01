@@ -8,6 +8,8 @@
     <IsPackable>false</IsPackable>
     <!-- 처음부터 최적화된 코드로: 단계별 JIT가 장면마다 다른 단계에서 재지 않게 -->
     <TieredCompilation>false</TieredCompilation>
+    <!-- 스택 깊이 재기(StackProbe)가 지역 변수 주소를 본다 -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

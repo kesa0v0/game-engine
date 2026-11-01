@@ -76,8 +76,6 @@ namespace Kesa.Engine.Tests.Script
             "RUN013 @3:11 [f]")]
         [TestCase("def f():\n    return sum([i * 2 for i in range(5000)])\n",
             "RUN013 @2:19 [f]")]
-        [TestCase("def g():\n    return f()\ndef f():\n    return g()\n",
-            "RUN014 @2:13 [g (called at t.py:4:13) / f]")]
         [TestCase("def f():\n    k = lambda x: x // 0\n    return k(3)\n",
             "RUN012 @2:21 [<lambda> (called at t.py:3:13) / f]")]
         [TestCase("def f():\n    return [y for y in range(3) if y // 0]\n",

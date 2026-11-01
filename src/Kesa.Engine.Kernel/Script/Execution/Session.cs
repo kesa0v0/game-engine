@@ -25,6 +25,9 @@ namespace Kesa.Engine.Script
         /// <summary>본문 프레임 없이도 난수를 뽑을 수 있나: 봇의 난수열은 게임 난수와 따로라 된다 (G373).</summary>
         public bool AllowsRandom { get; set; }
 
+        /// <summary>이 실행의 프레임 수.</summary>
+        public int Depth => _stack.Count;
+
         /// <summary>맨 위 프레임의 함수가 속한 모드 id. 프레임이 없으면 빈 문자열.</summary>
         public string TopMod => _stack.Count == 0 ? "" : _stack[_stack.Count - 1].Function.Mod;
 
@@ -193,14 +196,25 @@ namespace Kesa.Engine.Script
         /// 이미 있으면 오류는 안쪽 실행(이 식이 읽은 다른 <c>derived</c>)에서 났으므로, 이 식의 위치는 가장 안쪽
         /// 프레임에 "at …"으로 붙여 어디서 읽었는지 남긴다.
         /// </summary>
+        private const int TraceInner = 10, TraceOuter = 5;
+
         public void Attach(ScriptRuntimeException e, SourceSpan span)
         {
             if (ReferenceEquals(e.TracedBy, this)) return;
             e.TracedBy = this;
             bool nested = HasSpan(e);
             if (!nested) e.Span = span;
+            // 깊은 재귀는 안쪽과 바깥 몇 단만 남긴다
+            int skipFrom = _stack.Count > TraceInner + TraceOuter + 1 ? _stack.Count - TraceInner : 0;
             for (int i = _stack.Count - 1; i >= 0; i--)
             {
+                if (i == skipFrom - 1)
+                {
+                    int skipped = skipFrom - TraceOuter;
+                    e.AddTrace("... " + skipped + " more calls");
+                    i = TraceOuter;
+                    continue;
+                }
                 var frame = _stack[i];
                 string line = frame.Function.Name;
                 if (nested && i == _stack.Count - 1) line += " at " + span;
@@ -210,6 +224,15 @@ namespace Kesa.Engine.Script
         }
 
         public PureEvaluator Owner => _owner;
+
+        /// <summary>
+        /// 예외 필터에서 위치를 붙이고 잡지 않는다(늘 false). catch에서 다시 던지면 깊은 재귀가 되돌아오며 단마다 스택을 더 써서 넘친다 (G452).
+        /// </summary>
+        public bool Annotate(ScriptRuntimeException e, SourceSpan span)
+        {
+            Attach(e, span);
+            return false;
+        }
 
         /// <summary>오류에 노드의 위치를 붙여 돌려준다 (감싸지 않는 노드가 스스로 낸 오류).</summary>
         public ScriptRuntimeException Placed(ScriptRuntimeException e, PureEvaluator.ExprNode node)

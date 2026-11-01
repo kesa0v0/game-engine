@@ -74,6 +74,7 @@ namespace Kesa.Engine.Tests.Loading
                 "    @property\n    def max_signal_depth(self) -> int: ...\n" +
                 "    @property\n    def max_advance_per_call(self) -> int: ...\n" +
                 "    @property\n    def max_settle_rounds(self) -> int: ...\n" +
+                "    @property\n    def max_call_depth(self) -> int: ...\n" +
                 "\n" +
                 "class _Resource_consts:\n" +
                 "    ...\n" +

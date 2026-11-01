@@ -147,6 +147,9 @@ namespace Kesa.Engine.Diagnostics
         // 호스트가 부르는 모드 함수 (spec-gaps G245·G247): 쓰기·난수 함수나 입구라 부르지 않음 / 인자 수가 다름
         public const string RunNotCallable = "RUN023";
 
+        // 호출 깊이 (spec-gaps G452): 지금 도는 실행들의 프레임 합이 engine:Rules의 max_call_depth를 넘음
+        public const string RunDepth = "RUN024";
+
         // 저장과 불러오기 (spec S8, spec-gaps G140): 깨졌거나 형식이 다른 저장 / 지금 내용과 어긋나는 저장 / 모드 목록이 달라짐(경고)
         public const string SaveCorrupt = "SAV001";
         public const string SaveMismatch = "SAV002";
