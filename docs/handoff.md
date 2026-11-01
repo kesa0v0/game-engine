@@ -16,11 +16,12 @@
 
 **방향과 카메라(G440~G447):** 공간 종류가 자리마다 틀(위·북·동·떠오름)을 주고 `offset`·`drift`는 동·북·위, `turn`은 위에서 본 시계 방향, `Sprite`·`Text`는 바닥에 눕고 `face="camera"`면 빌보드, `rise`는 공간이 푸는 지름길. 카메라는 `.view.xml`의 이름 있는 `<View rig>`이고(커널은 모름) 리그 속성 규칙은 `LookKinds`, 움직이는 것은 Unity `BoardCamera`(`top`·`tilted`, 가운데 단추 끌기·휠). 켤 모드 목록 `ModSorter.Sort(discovery, enabled, bag)`(G439). `samples/skirmish/fox`는 skirmish 위의 덧붙임 모드다(Khronos Fox 모델, 판을 3D 바닥 `xz`와 기울인 카메라로 덮음). 데모는 `enabledMods`가 비면 다 켜므로 여우가 보이고, `skirmish`만 켜면 전과 같은 2D다(바이트까지 같음을 Shot으로 확인).
 
-**사용자가 플레이 모드에서 확인함:** 화면 카드·창·모달·USS, 고르기·정보창·이동·공격, 옮기기, 맞는 효과(고리·피해 숫자), 빗나감 글, staged(봇이 기다림, 미끄러지는 중 클릭은 건너뛰기), 퇴장. 데모 `KesaDemo`의 Playback Speed로 연출을 느리게 볼 수 있다. **본 적 없는 것:** 여우(3D 바닥·기울인 카메라·끌기·휠·카메라를 보는 피해 숫자, 창 없는 Check와 Shot만 통과), 질문 기본 창의 모양(`kesa-question`), IL2CPP 빌드.
+**사용자가 플레이 모드에서 확인함:** 화면 카드·창·모달·USS, 고르기·정보창·이동·공격, 옮기기, 맞는 효과(고리·피해 숫자), 빗나감 글, staged(봇이 기다림, 미끄러지는 중 클릭은 건너뛰기), 퇴장, 여우(3D 바닥·기울인 카메라·끌기·휠·피해 숫자). 데모 `KesaDemo`의 Playback Speed로 연출을 느리게 볼 수 있다. **본 적 없는 것:** 질문 기본 창의 모양(`kesa-question`), IL2CPP 빌드.
 
 ## 다음 할 일
 
-1. 봇 점수 도우미: 함수 칸 `Score["T"]`·`BotAction["T"]`(G374)와 `std.ai` 모드(Wesnoth RCA식). 먼저 skirmish 봇을 이 꼴로 다시 써 보며 모양을 정한다. **사용자가 지금은 미룸.** 다시 시작할 때 먼저 물을 것: 첫 공식 모드를 어디에 무슨 id로 두나. 저장소에 `std.*` 모드가 아직 없고, 모드 id에는 점이 안 되므로(G2) `std.ai`는 쓸 수 없다. 낸 선택지는 셋이다: 루트 `mods/`에 id `std_ai`(추천, RimWorld `Data/Core`·Factorio `data/base`식), 엔진 어셈블리에 내장, 지금은 `samples/` 예시로만.
+1. 봇 틀의 약한 곳을 재현하고 보완한다(점수 도우미보다 먼저, 사용자 뜻). BT·FSM·효용·GOAP는 `@bot`·기억·`now()`·호스트 함수로 짤 수 있으나 기성품은 없고 길찾기 함수도 없다. 끝난 것: 시간만 흘러도 다시 부름(G450). 남은 것: (2) 큰 판에서 봇이 판을 읽는 속도(spec 9절, 매 틱 부를 때의 비용 포함), (3) 몇 수 앞을 시험하는 판 복사.
+2. 봇 점수 도우미: 함수 칸 `Score["T"]`·`BotAction["T"]`(G374)와 효용·RCA 모드. 편의 라이브러리라 미룸. 다시 시작할 때 먼저 물을 것: 첫 공식 모드의 자리와 id. 모드 id에 점이 안 되므로(G2) `std.ai`는 안 된다. 선택지: 모드 하나 id `std`(안에 ai·stats·stack, 사용자가 `std`를 쓰려 함), 모드 여럿 `std_ai`·`std_stats`, 엔진 어셈블리 내장.
 
 UXML 재사용은 skirmish 카드로 해 봤다: 요약 `ui/unit-summary.uxml`을 목록 카드 `ui/unit-card.uxml`과 정보창이 끼우고, 값이 없을 때는 `if="식"`(G449). `Include`의 고정값 인자·`params` 기본값은 플래그로 갈리는 변형이 여러 화면에 생길 때 묻는다(지금은 파일을 쪼개 조립). 데모 `KesaDemo`는 화면 오류(`ui.Errors`), 봇이 거절당한 이유(`LastProblems`), 열리고 닫힌 질문(`logQuestions`)을 콘솔에 적는다.
 

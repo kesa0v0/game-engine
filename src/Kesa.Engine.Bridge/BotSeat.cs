@@ -9,7 +9,7 @@ namespace Kesa.Engine.Bridge
     public sealed class BotSeat
     {
         private readonly int _maxActs;
-        private long? _idleAt;
+        private (long Version, long Tick)? _idleAt;
 
         /// <param name="maxActs">한 번의 <see cref="Run"/>에서 할 수 있는 일의 상한 (판단이 끝없이 내는 것을 막음).</param>
         public BotSeat(IHostSession session, IBotPolicy policy, int maxActs = 1000)
@@ -24,18 +24,17 @@ namespace Kesa.Engine.Bridge
         public IBotPolicy Policy { get; }
 
         /// <summary>
-        /// 할 일이 없을 때까지 판단을 부르고 한 일의 수를 준다. 세계가 지난번 "할 일 없음" 뒤로 그대로면 부르지 않는다.
+        /// 할 일이 없을 때까지 판단을 부르고 한 일의 수를 준다. 세계와 틱이 지난번 "할 일 없음" 뒤로 그대로면 부르지 않는다 (G450).
         /// </summary>
         public async ValueTask<int> Run()
         {
-            long version = await Session.Version();
-            if (_idleAt == version) return 0;
+            if (_idleAt == await Now()) return 0;
             int acts = 0;
             while (acts < _maxActs)
             {
                 if (!await Policy.Act(Session))
                 {
-                    _idleAt = await Session.Version();
+                    _idleAt = await Now();
                     return acts;
                 }
                 acts++;
@@ -43,5 +42,7 @@ namespace Kesa.Engine.Bridge
             _idleAt = null;
             return acts;
         }
+
+        private async ValueTask<(long Version, long Tick)> Now() => (await Session.Version(), await Session.Tick());
     }
 }

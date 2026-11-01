@@ -41,7 +41,9 @@ namespace Kesa.Engine.Bridge.Tests
             // 늘 첫 유닛을 때린다: 체력이 1이 되면 그 수는 거절된다
             "@bot\ndef striker(me: Ref[Hero], times: int = 1):\n    bot.Tally.n += 1\n" +
             "    first = [u for u in query(Unit)][0]\n" +
-            "    for i in range(times):\n        submit(\"Hit\", target=first)\n";
+            "    for i in range(times):\n        submit(\"Hit\", target=first)\n" +
+            // 2틱이 되기를 기다린다
+            "@bot\ndef waiter(me: Ref[Hero]):\n    if now() >= 2:\n        submit(\"Hit\", target=[u for u in query(Unit)][0])\n";
 
         private string _root = "";
         private LocalHost _host = null!;
@@ -93,8 +95,9 @@ namespace Kesa.Engine.Bridge.Tests
         [Test]
         public async Task TheSessionListsTheModsBots()
         {
-            var bot = (await _alice.Bots()).Single();
-            Assert.That(bot.Name, Is.EqualTo("arena.striker"));
+            var bots = await _alice.Bots();
+            Assert.That(bots.Select(b => b.Name), Is.EqualTo(new[] { "arena.striker", "arena.waiter" }));
+            var bot = bots[0];
             Assert.That(bot.Entity, Is.EqualTo("Ref[\"Hero\"]"));
             var times = bot.Settings.Single();
             Assert.That((times.Name, times.Type, ((BridgeInt)times.Default!).Value), Is.EqualTo(("times", "int", 1L)));
@@ -110,6 +113,19 @@ namespace Kesa.Engine.Bridge.Tests
             Assert.That(Hp(_a), Is.EqualTo(1));
             Assert.That(striker.LastProblems.Single().Kind, Is.EqualTo(BridgeReasonKind.Require));
             Assert.That(await seat.Run(), Is.EqualTo(0), "the world did not change, so the bot is not asked again");
+        }
+
+        [Test]
+        public async Task ABotThinksAgainWhenOnlyTimePasses()
+        {
+            var seat = new BotSeat(_alice, await _alice.Bot("arena.waiter", _red));
+            Assert.That(await seat.Run(), Is.EqualTo(0));
+            long version = await _alice.Version();
+            await _host.Advance(3);
+            Assert.That(await _alice.Version(), Is.EqualTo(version), "time alone does not change the world");
+            // 3 → 2 → 1, 그다음은 require가 막는다
+            Assert.That(await seat.Run(), Is.EqualTo(2));
+            Assert.That(await seat.Run(), Is.EqualTo(0), "nothing changed since the bot went idle");
         }
 
         [Test]
