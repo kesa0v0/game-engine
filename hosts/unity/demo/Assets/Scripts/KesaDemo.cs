@@ -46,6 +46,9 @@ public sealed class KesaDemo : MonoBehaviour
     [Tooltip("봇이 한 수를 두고 다음 수까지 기다리는 초 (수를 눈으로 따라가게)")]
     [SerializeField] private float botDelay = 0.6f;
 
+    [Tooltip("질문이 열리고 닫힐 때 콘솔에 적는다")]
+    [SerializeField] private bool logQuestions = true;
+
     [Tooltip("판 연출(효과·옮기기·모델 애니메이션)의 재생 속도. 0.25면 4배 느리게 (눈으로 확인할 때)")]
     [SerializeField, Range(0.05f, 2f)] private float playbackSpeed = 1f;
 
@@ -65,6 +68,10 @@ public sealed class KesaDemo : MonoBehaviour
     private VisualElement? _root;
     private int _boardProblems;
     private BotSeat? _bot;
+    private IScriptBot? _botScript;
+    private string _botProblems = "";
+    private long _questionsAt = -1;
+    private readonly SortedDictionary<long, string> _questions = new SortedDictionary<long, string>();
     private float _botNext;
     private bool _wasHolding;
     private bool _refreshing;
@@ -114,7 +121,8 @@ public sealed class KesaDemo : MonoBehaviour
             if (botSeat.Value == 0) throw new InvalidOperationException("no seat with the Def '" + botSeatDef + "' for the bot");
             await game.Host.Seat(botSeat.Value, "bot", ai: true);
             var botSession = await game.Host.Open("bot");
-            _bot = new BotSeat(botSession, await botSession.Bot(botName, botSeat.Value), maxActs: 1);
+            _botScript = await botSession.Bot(botName, botSeat.Value);
+            _bot = new BotSeat(botSession, _botScript, maxActs: 1);
         }
 
         // 게임이 주는 기본 테마(Assets/Resources/KesaDemo.uss)는 맨 바깥에, 화면의 모양은 모드의 USS가 준다 (G362)
@@ -197,6 +205,35 @@ public sealed class KesaDemo : MonoBehaviour
         _boardRenderer.FaceCamera();
     }
 
+    /// <summary>화면 오류, 봇이 거절당한 이유, 열리고 닫힌 질문을 콘솔에 적는다. 같은 것은 바뀔 때만.</summary>
+    private async Task LogChanges()
+    {
+        if (_ui != null && _ui.Errors.Count > 0)
+        {
+            foreach (var e in _ui.Errors) Debug.LogWarning("Kesa screen: " + e);
+            _ui.ClearErrors();
+        }
+        if (_botScript != null)
+        {
+            string problems = string.Join("\n", _botScript.LastProblems);
+            if (problems != _botProblems && problems.Length > 0) Debug.LogWarning("Kesa bot " + _botScript.Bot + ":\n" + problems);
+            _botProblems = problems;
+        }
+        if (!logQuestions || Session == null) return;
+        long version = await Session.Version();
+        if (version == _questionsAt) return;
+        _questionsAt = version;
+        var open = new SortedDictionary<long, string>();
+        foreach (var q in await Session.OpenRequests())
+            open[q.Id] = "'" + q.Name + "' #" + q.Id + " for " + string.Join(", ", q.Who.Select(w => w.Def ?? "#" + w.Id));
+        foreach (var pair in open)
+            if (!_questions.ContainsKey(pair.Key)) Debug.Log("Kesa question opened: " + pair.Value);
+        foreach (var pair in _questions)
+            if (!open.ContainsKey(pair.Key)) Debug.Log("Kesa question closed: " + pair.Value);
+        _questions.Clear();
+        foreach (var pair in open) _questions[pair.Key] = pair.Value;
+    }
+
     /// <summary>판의 시간(효과·옮기기·연출 단계)을 넘긴다 (확인용: 편집 모드에서는 프레임이 돌지 않음).</summary>
     public void Pass(long milliseconds) => _board?.Advance(milliseconds);
 
@@ -207,6 +244,7 @@ public sealed class KesaDemo : MonoBehaviour
             while (await _bot.Run() > 0) { }
         if (_ui != null) await _ui.RefreshAsync();
         await RefreshBoard();
+        await LogChanges();
     }
 
     /// <summary>staged는 화면이 따라잡을 때까지 기다리므로(G437) 시간을 넘겨 다 따라잡게 한다 (확인용).</summary>
@@ -267,6 +305,7 @@ public sealed class KesaDemo : MonoBehaviour
             if (_bot != null && _board?.Holding != true && Time.time >= _botNext && await _bot.Run() > 0) _botNext = Time.time + botDelay;
             await _ui.RefreshAsync();
             await RefreshBoard();
+            await LogChanges();
             // 느리게 돌리면 한 프레임이 1밀리초 밑일 수 있어 남은 것을 이어 센다
             _playbackCarry += Time.deltaTime * 1000f * playbackSpeed;
             long step = (long)_playbackCarry;
