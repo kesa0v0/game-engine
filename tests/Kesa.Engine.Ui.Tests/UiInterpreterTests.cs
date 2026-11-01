@@ -183,6 +183,33 @@ namespace Kesa.Engine.Ui.Tests
         }
 
         [Test]
+        public async Task AnIfBuildsItsChildrenOnlyWhileTrueSoTheyNeverSeeNone()
+        {
+            Files["UI/Row"] = "<ui:Label params=\"who\" name=\"row\" bind-text=\"arena.hp(who)\" />";
+            await Mount("<ui:VisualElement name=\"box\" if=\"arena.selected()\"><ui:Include src=\"UI/Row\" who=\"arena.selected()\" /></ui:VisualElement>");
+            Assert.That(Renderer.Walk(Renderer.Named("box")).Count(e => e.Kind == "Label"), Is.EqualTo(0));
+            await Ui.ActAsync("arena.select", new System.Collections.Generic.Dictionary<string, BridgeValue> { ["u"] = Entity(A) });
+            var row = Renderer.Named("row");
+            Assert.That(row.Text, Is.EqualTo("3"));
+            SetHp(A, 2);
+            await Ui.RefreshAsync();
+            Assert.That(Renderer.Named("row"), Is.SameAs(row), "stays built while the condition stays true");
+            Assert.That(row.Text, Is.EqualTo("2"));
+            await Ui.ActAsync("arena.clear", new System.Collections.Generic.Dictionary<string, BridgeValue>());
+            Assert.That(Renderer.Walk(Renderer.Named("box")).Count(e => e.Kind == "Label"), Is.EqualTo(0));
+            Assert.That(Ui.Errors, Is.Empty, string.Join("\n", Ui.Errors));
+        }
+
+        [Test]
+        public void AnIfCannotShareAnElementWithAForOrSitOnAnInclude()
+        {
+            var both = UxmlReader.Read("t.uxml", "<ui:VisualElement for=\"u in arena.unit_list()\" if=\"arena.selected()\"><ui:Label /></ui:VisualElement>");
+            Assert.That(string.Join("\n", both.Problems), Does.Contain("for and if cannot be on the same element"));
+            var include = UxmlReader.Read("t.uxml", "<ui:VisualElement><ui:Include src=\"UI/Row\" if=\"arena.selected()\" /></ui:VisualElement>");
+            Assert.That(string.Join("\n", include.Problems), Does.Contain("if cannot be on an Include"));
+        }
+
+        [Test]
         public async Task AnIncludeMissingAnArgumentOrAFileIsAMountProblem()
         {
             Files["UI/Row"] = "<ui:Label params=\"who\" />";

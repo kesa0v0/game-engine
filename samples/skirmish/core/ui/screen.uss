@@ -61,12 +61,12 @@
     background-color: rgb(72, 36, 36);
 }
 
-.card #kind {
+.summary #kind {
     font-size: 18px;
     -unity-font-style: bold;
 }
 
-.card #hp {
+.summary #hp {
     margin-bottom: 6px;
 }
 

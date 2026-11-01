@@ -110,7 +110,7 @@ namespace Kesa.Engine.Ui.Tests
             var alice = await Open("alice", _red);
             Assert.That(alice.Renderer.Named("turn").Text, Is.EqualTo("1"));
             Assert.That(Cards(alice).Count, Is.EqualTo(6));
-            var hp = Cards(alice).Select(c => c.Children.Single(e => e.Attributes.GetValueOrDefault("name") == "hp").Text).ToList();
+            var hp = Cards(alice).Select(c => alice.Renderer.Walk(c).Single(e => e.Attributes.GetValueOrDefault("name") == "hp").Text).ToList();
             Assert.That(hp.OrderBy(h => h, System.StringComparer.Ordinal), Is.EqualTo(new[] { "10", "10", "10", "10", "6", "6" }));
             Assert.That(Cards(alice).Count(c => c.Classes.Contains("mine")), Is.EqualTo(3), "the three of her side");
         }
@@ -579,7 +579,7 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(Shown(), Is.Empty);
             await info.Press();
             Assert.That(Shown(), Is.EqualTo(new[] { "unit-info" }));
-            Assert.That(alice.Renderer.Named("info-hp").Text, Is.EqualTo(((IntValue)_world.Get(new EntityId(enemy), _world.Member("Life", "hp"))).Value.ToString()));
+            Assert.That(alice.Renderer.Walk(alice.Renderer.Named("unit-info")).Single(e => e.Attributes.GetValueOrDefault("name") == "hp").Text, Is.EqualTo(((IntValue)_world.Get(new EntityId(enemy), _world.Member("Life", "hp"))).Value.ToString()));
             Assert.That(info.Enabled, Is.False, "already showing that unit");
             Assert.That(alice.Renderer.DragHandles, Does.Contain(alice.Renderer.Named("info-title").Id));
 

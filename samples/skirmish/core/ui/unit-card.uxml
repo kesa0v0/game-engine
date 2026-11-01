@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <!-- 목록의 유닛 카드: 요약에 고르기·공격·정보 버튼을 붙인다 -->
+  <ui:VisualElement class="card" params="unit, house" bind-class-mine="skirmish.mine(unit, house)" bind-class-selected="skirmish.is_chosen(unit)" bind-class-acted="skirmish.acted(unit)" bind-class-hit="skirmish.is_hit(unit)">
+    <ui:Include src="ui/unit-summary.uxml" unit="unit" />
+    <ui:Button name="select" text="select" on-click="skirmish.select(house, unit)" />
+    <ui:Button name="strike" text="strike" on-click="skirmish.strike(house, unit)" />
+    <ui:Button name="info" text="info" on-click="skirmish.inspect(unit)" />
+    <!-- 맞아서 답을 기다리는 내 유닛에만 보인다 (ui.py의 is_hit) -->
+    <ui:Button name="hold" text="hold" bind-display="skirmish.is_hit(unit)" on-click="skirmish.hold(unit)" />
+    <ui:Button name="retreat" text="retreat" bind-display="skirmish.is_hit(unit)" on-click="skirmish.retreat(unit)" />
+  </ui:VisualElement>
+</ui:UXML>

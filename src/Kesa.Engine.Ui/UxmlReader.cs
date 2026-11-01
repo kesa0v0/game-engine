@@ -17,6 +17,8 @@ namespace Kesa.Engine.Ui
         private static readonly Regex ForPattern = new Regex(@"^\s*([A-Za-z_][A-Za-z0-9_]*)\s+in\s+(.+?)\s*$", RegexOptions.CultureInvariant);
 
         private static readonly string[] Events = { "click", "close" };
+
+        private const string ForAndIf = "for and if cannot be on the same element (put the if on an element around or inside it)";
         private static readonly string[] WindowKinds = { "normal", "modal" };
 
         /// <summary>
@@ -166,7 +168,18 @@ namespace Kesa.Engine.Ui
                     if (n == "for")
                     {
                         if (isInclude) Problem(place, "for cannot be on an Include");
+                        else if (repeat != null) Problem(place, ForAndIf);
                         else repeat = ReadRepeat(place, v, scope);
+                    }
+                    else if (n == "if")
+                    {
+                        if (isInclude) Problem(place, "if cannot be on an Include (put it on an element around it)");
+                        else if (repeat != null) Problem(place, ForAndIf);
+                        else
+                        {
+                            var condition = ParseExpr(place, n, v, scope);
+                            if (condition != null) repeat = new UiRepeat(null, condition, v);
+                        }
                     }
                     else if (n == "params" || n == "seat")
                     {
@@ -259,9 +272,9 @@ namespace Kesa.Engine.Ui
                 }
 
                 var childScope = scope;
-                if (repeat != null)
+                if (repeat != null && !repeat.IsCondition)
                 {
-                    childScope = new SortedSet<string>(scope, StringComparer.Ordinal) { repeat.Variable };
+                    childScope = new SortedSet<string>(scope, StringComparer.Ordinal) { repeat.Variable! };
                 }
                 var children = new List<UiElement>();
                 foreach (var child in node.Elements())

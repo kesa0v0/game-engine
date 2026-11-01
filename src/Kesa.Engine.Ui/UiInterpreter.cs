@@ -253,7 +253,7 @@ namespace Kesa.Engine.Ui
         {
             foreach (var b in element.Bindings)
                 await CheckCallAsync(element.Place, b.Kind == UiBindKind.Property ? "bind-" + b.Name : "bind-class", b.Expression, problems);
-            if (element.Repeat != null) await CheckCallAsync(element.Place, "for", element.Repeat.Source, problems);
+            if (element.Repeat != null) await CheckCallAsync(element.Place, element.Repeat.Attribute, element.Repeat.Source, problems);
             foreach (var e in element.Events) ValidateEvent(element.Place, e, problems);
             // Include를 건너면 읽기만으로는 창 안인지 모르므로 올리기 전에 본다
             if (element.Window != null && insideWindow)

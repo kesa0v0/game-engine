@@ -52,7 +52,8 @@ namespace Kesa.Engine.Ui
             if (definition.Repeat != null)
             {
                 node.Groups = new List<ItemGroup>();
-                var source = Register(node, scope, RuntimeBindingKind.RepeatSource, "for", "", definition.Repeat.Source, "for=\"" + definition.Repeat.Text + "\"");
+                string attribute = definition.Repeat.Attribute;
+                var source = Register(node, scope, RuntimeBindingKind.RepeatSource, attribute, "", definition.Repeat.Source, attribute + "=\"" + definition.Repeat.Text + "\"");
                 await ApplyBindingAsync(source);
             }
             else
@@ -77,6 +78,9 @@ namespace Kesa.Engine.Ui
             AddStyleSheets(document, wrapper.Inner.Handle);
             return wrapper;
         }
+
+        /// <summary><c>if</c>가 참일 때의 항목 한 벌. 키가 늘 같아 참인 동안 아이들이 남는다.</summary>
+        private static readonly BridgeValue[] Present = { BridgeBool.True };
 
         private RuntimeBinding Register(UiNode owner, UiScope scope, RuntimeBindingKind kind, string attribute, string name, UiExpr expression, string label)
         {
@@ -106,6 +110,11 @@ namespace Kesa.Engine.Ui
                     break;
                 case RuntimeBindingKind.ClassNames:
                     ApplyClassNames(binding, value, place);
+                    break;
+                case RuntimeBindingKind.RepeatSource when binding.Owner.Definition.Repeat!.IsCondition:
+                    if (UiValues.TryTruthy(value, out bool present, out string notTruth))
+                        await ReconcileAsync(binding.Owner, present ? Present : Array.Empty<BridgeValue>());
+                    else Report(place, binding.Label + ": " + notTruth);
                     break;
                 case RuntimeBindingKind.RepeatSource:
                     if (value is BridgeList list) await ReconcileAsync(binding.Owner, list.Items);
@@ -286,14 +295,14 @@ namespace Kesa.Engine.Ui
                     if (!group.Item.Equals(items[i]))
                     {
                         group.Item = items[i];
-                        group.Scope.Set(repeat.Variable, items[i]);
+                        if (!repeat.IsCondition) group.Scope.Set(repeat.Variable!, items[i]);
                         changed.Add(group);
                     }
                     continue;
                 }
 
                 var created = new ItemGroup(keys[i], items[i], new UiScope(owner.Scope));
-                created.Scope.Set(repeat.Variable, items[i]);
+                if (!repeat.IsCondition) created.Scope.Set(repeat.Variable!, items[i]);
                 groups.Insert(i, created);
                 for (int r = 0; r < templateCount; r++)
                     created.Roots.Add(await BuildAsync(owner.Definition.Children[r], owner, container, i * templateCount + r, created.Scope,

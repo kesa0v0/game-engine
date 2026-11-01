@@ -1,6 +1,6 @@
 # 인계 메모
 
-마지막 갱신: 2026-11-01. 브랜치 `spec-v0.5-scaffold`, 테스트 2904개 통과(커널 2443, CLI 42, 콘솔 호스트 101, 번역 65, 경계 74, UI 172, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
+마지막 갱신: 2026-11-01. 브랜치 `spec-v0.5-scaffold`, 테스트 2907개 통과(커널 2444, CLI 42, 콘솔 호스트 101, 번역 65, 경계 74, UI 174, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
 
 ## 상태
 
@@ -24,7 +24,7 @@
 
 ## 다음 할 일
 
-1. UXML 컴포넌트 재사용(G380이 미룬 것: `Include`의 `params` 기본값·타입 등), 데모 로그(봇 거절·열린 질문). `hint`·`style`은 G448로 뺐다.
+1. 데모 로그(봇 거절·열린 질문). UXML 재사용은 skirmish 카드로 해 봤다: 요약 `ui/unit-summary.uxml`을 목록 카드 `ui/unit-card.uxml`과 정보창이 끼우고, 값이 없을 때는 `if="식"`(G449). `Include`의 고정값 인자·`params` 기본값은 플래그로 갈리는 변형이 여러 화면에 생길 때 묻는다(지금은 파일을 쪼개 조립).
 2. 봇 점수 도우미: 함수 칸 `Score["T"]`·`BotAction["T"]`(G374)와 `std.ai` 모드(Wesnoth RCA식). 먼저 skirmish 봇을 이 꼴로 다시 써 보며 모양을 정한다.
 
 **쓸 곳이 생길 때 물을 계약(월드 표시):** `onto`·`between` 그리기(`onto`의 붙는 곳은 G435의 뼈 찾기를 다시 씀), 기본 공간(`at(값)`) 선언, 그림 파일 안의 `Include`, 다른 공간 종류(육각·연속·구역), 2D에서 z(지금은 경고하고 안 그림), 모델 `once` 애니메이션을 끝이 있는 재생으로 기다리기, 모델 색 마스크 텍스처, 모더가 고르는 글꼴, 커서·끌기 같은 입력 상태 읽기(G397), 멀티플레이에서 staged 단계가 쌓일 때 빨리 감기, 플레이어가 덮는 연출 설정(빠른 이동 등).
@@ -38,7 +38,7 @@
 - 창 없는 확인: `SmokeTest.Run`(`-kesaMods samples/skirmish`)과 `KesaDemoSetup.Check`. 에디터가 데모를 열고 있으면 잠금 때문에 바로 끝나므로, 데모를 `hosts/unity/demo-check-tmp`처럼 같은 깊이로 복사하고 `manifest.json`의 패키지 경로를 절대 경로로 바꿔 돌린다(끝나면 치움). 플러그인 DLL이 낡으면 이상한 로드 오류가 나므로 먼저 `dotnet build`. 이 컴퓨터의 Unity: `C:\Program Files\Unity\Hub\Editor\6000.3.8f1`.
 - 잠정 결정 G2~G30(로딩·로직 언어 규칙)은 그 영역을 다시 건드리거나 실제 모드가 부딪힐 때 확인한다.
 - 작은 것: 화면 동작이 낸 `submit`이 거절돼도 `BridgeResult.Succeeded`는 참이고 실패는 `Deliveries`에만 있다(G283). `UiInterpreter.Errors`는 `ClearErrors`로만 비운다.
-- 정하지 않은 UI 세부(필요해지면): 껐다 켜도 창 위치 남기기(G352), 회색 버튼의 이유 보이기, `Include`의 `src` 찾기와 `params` 기본값·타입, 한 연결이 여러 곳에 앉았을 때 패널, 숨김 값의 참거짓, 반복이 빌 때의 보임, 이미지가 없을 때의 보임·스프라이트 시트, 인라인 `style`, 고정소수점·`None`·숨김·선택지 값의 반복 키.
+- 정하지 않은 UI 세부(필요해지면): 껐다 켜도 창 위치 남기기(G352), 회색 버튼의 이유 보이기, `Include`의 `src` 찾기와 고정값 인자·`params` 기본값·타입, 한 연결이 여러 곳에 앉았을 때 패널, 숨김 값의 참거짓, 반복이 빌 때의 보임, 이미지가 없을 때의 보임·스프라이트 시트, 인라인 `style`, 고정소수점·`None`·숨김·선택지 값의 반복 키.
 - 봇의 남은 물음: 큰 게임에서 판을 읽는 속도(spec 9절), 몇 수 앞을 시험하는 판 복사, 원격 멀티의 전송, 합법 수를 스크립트로 읽는 길.
 - 이전 엔진 UI는 `E:\Project\Game\SharedPackages\uk.kesa.engine\Scripts\View\UI\Core`(다른 컴퓨터에서는 `Projects\Unity\SharedPackages`), 이전 게임 UXML은 `Quarantined`·`TurbulentRepublic`·`wargame`의 `*.uxml`이다. 이전 엔진(WG·QU·TR)은 문법이 달라 AI 설계에 참고하지 않는다.
 

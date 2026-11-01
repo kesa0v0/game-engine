@@ -5,23 +5,16 @@
     <ui:Label name="turn" bind-text="skirmish.turn_number(house)" />
     <ui:Button name="ask-end" text="end turn" on-click="skirmish.ask_end_turn()" />
     <ui:VisualElement name="units" class="units" picking-mode="Ignore" for="row in skirmish.units(house)">
-      <ui:VisualElement class="card" bind-class-mine="skirmish.mine(row.unit, house)" bind-class-selected="skirmish.is_chosen(row.unit)" bind-class-acted="row.acted" bind-class-hit="skirmish.is_hit(row.unit)">
-        <ui:Label name="kind" bind-text="row.unit" />
-        <ui:Label name="hp" bind-text="row.hp" />
-        <ui:Button name="select" text="select" on-click="skirmish.select(house, row.unit)" />
-        <ui:Button name="strike" text="strike" on-click="skirmish.strike(house, row.unit)" />
-        <ui:Button name="info" text="info" on-click="skirmish.inspect(row.unit)" />
-        <!-- 맞아서 답을 기다리는 내 유닛에만 보인다 (ui.py의 is_hit) -->
-        <ui:Button name="hold" text="hold" bind-display="skirmish.is_hit(row.unit)" on-click="skirmish.hold(row.unit)" />
-        <ui:Button name="retreat" text="retreat" bind-display="skirmish.is_hit(row.unit)" on-click="skirmish.retreat(row.unit)" />
-      </ui:VisualElement>
+      <ui:Include src="ui/unit-card.uxml" unit="row.unit" house="house" />
     </ui:VisualElement>
 
     <!-- 보통 창: 제목줄로 끌고, ESC나 close로 닫는다 -->
     <ui:VisualElement name="unit-info" class="window" window="normal" bind-display="skirmish.inspected()" on-close="skirmish.close_inspect()">
       <ui:Label name="info-title" class="title" text="unit" window-drag="true" />
-      <ui:Label name="info-kind" bind-text="skirmish.inspected()" />
-      <ui:Label name="info-hp" bind-text="skirmish.inspected_hp()" />
+      <!-- 연 유닛이 있을 때만 요약을 만든다: 숨긴 창 안에서도 바인딩은 계산되므로 (G449) -->
+      <ui:VisualElement name="info-body" if="skirmish.inspected()">
+        <ui:Include src="ui/unit-summary.uxml" unit="skirmish.inspected()" />
+      </ui:VisualElement>
       <ui:Button name="info-close" text="close" on-click="skirmish.close_inspect()" />
     </ui:VisualElement>
 

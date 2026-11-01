@@ -97,10 +97,6 @@ def close_inspect():
 def inspected():
     return ui.Inspect.unit
 
-def inspected_hp():
-    u = ui.Inspect.unit
-    return 0 if u is None else u.Life.hp
-
 # 턴 끝내기 확인 (UXML의 모달): 물은 턴을 적어 두므로 턴이 넘어가면 저절로 닫힌다
 def turn_now():
     g = game()

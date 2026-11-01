@@ -81,17 +81,23 @@ namespace Kesa.Engine.Ui
         public string Source { get; }
     }
 
-    /// <summary><c>for="변수 in 식"</c> (G338): 이 요소가 항목들을 담고, 자식들이 항목 하나의 모양이다.</summary>
+    /// <summary><c>for="변수 in 식"</c> (G338): 이 요소가 항목들을 담고, 자식들이 항목 하나의 모양이다. <c>if="식"</c>(G449)은 항목이 없거나 하나인 반복이다.</summary>
     public sealed class UiRepeat
     {
-        public UiRepeat(string variable, UiExpr source, string text)
+        public UiRepeat(string? variable, UiExpr source, string text)
         {
             Variable = variable;
             Source = source;
             Text = text;
         }
 
-        public string Variable { get; }
+        /// <summary>null이면 <c>if="식"</c>: 식이 참일 때 아이들을 한 벌 만든다.</summary>
+        public string? Variable { get; }
+
+        public bool IsCondition => Variable == null;
+
+        /// <summary>오류에 보일 속성 이름.</summary>
+        public string Attribute => IsCondition ? "if" : "for";
 
         public UiExpr Source { get; }
 

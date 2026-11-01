@@ -1,0 +1,7 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <!-- 유닛의 종류와 체력. 카드(unit-card.uxml)와 정보창이 끼운다 -->
+  <ui:VisualElement class="summary" params="unit">
+    <ui:Label name="kind" bind-text="unit" />
+    <ui:Label name="hp" bind-text="skirmish.hp(unit)" />
+  </ui:VisualElement>
+</ui:UXML>

@@ -89,7 +89,8 @@ Unity 호스트는 UXML 파일(`samples/skirmish/core/ui/screen.uxml`)로 화면
 - 식은 `모드.함수(인자)` 하나나 변수 하나다. 인자는 변수나 고정값(숫자, 작은따옴표 글자, `True`·`False`·`None`)이고 호출 안의 호출과 연산자는 없다. 계산은 함수가 한다.
 - `bind-text`·`bind-display`·`bind-enabled`·`bind-value`·`bind-opacity`·`bind-image`, `bind-class-<이름>`(참이면 클래스를 붙임), `bind-class`(함수가 돌려준 글자나 글자 목록이 클래스).
 - 눌러도 되는지는 호스트가 `require`·`choose`와 입구를 미리 보아 버튼을 회색으로 한다.
-- 다른 파일을 `<Include src="…" 이름="식" />`로 끼우면 그 파일이 `params`로 선언한 이름의 값을 넘겨야 한다.
+- 다른 파일을 `<Include src="…" 이름="식" />`로 끼우면 그 파일이 `params`로 선언한 이름의 값을 넘겨야 한다. 끼운 파일의 맨 위 요소가 끼운 자리에 그대로 붙는다. 쓰임마다 모양이 다르면 플래그 대신 작은 파일로 쪼개 조립한다: skirmish의 요약 `ui/unit-summary.uxml`(`params="unit"`, 종류·체력)을 목록 카드 `ui/unit-card.uxml`(`params="unit, house"`, 요약 + 버튼)과 정보창이 끼운다.
+- `if="식"`을 단 요소는 식이 참인 동안만 자식들을 만들고, 거짓이 되면 없앤다(참거짓은 `bind-display`와 같은 판정). `bind-display`는 숨길 뿐이라 안쪽 바인딩이 계속 계산되므로, "열린 유닛이 없으면 `None`"처럼 값이 없을 수 있는 곳은 `if`로 감싼다. (아래 "창"의 정보창). `for`와 한 요소에 같이 달거나 `Include`에 달 수는 없다(둘레 요소에 단다).
 - 아직 없는 것: 인라인 `style`.
 
 #### 모양 (USS)
@@ -128,7 +129,9 @@ Unity 호스트는 UXML 파일(`samples/skirmish/core/ui/screen.uxml`)로 화면
 <ui:VisualElement name="unit-info" window="normal"
     bind-display="skirmish.inspected()" on-close="skirmish.close_inspect()">   <!-- 연 유닛이 있으면 열림 -->
   <ui:Label class="title" text="unit" window-drag="true" />                    <!-- 이것을 끌면 창이 움직인다 -->
-  <ui:Label bind-text="skirmish.inspected_hp()" />
+  <ui:VisualElement if="skirmish.inspected()">                                 <!-- 연 유닛이 있을 때만 만든다 -->
+    <ui:Include src="ui/unit-summary.uxml" unit="skirmish.inspected()" />
+  </ui:VisualElement>
 </ui:VisualElement>
 <ui:VisualElement name="confirm" window="modal"
     bind-display="skirmish.asking_end_turn()" on-close="skirmish.cancel_end_turn()">  <!-- 대답할 때까지 다른 것을 못 누른다 -->

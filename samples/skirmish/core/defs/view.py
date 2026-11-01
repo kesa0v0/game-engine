@@ -39,3 +39,9 @@ def turn_number(me):
 
 def mine(u, me):
     return u.Owner.party == me
+
+def hp(u):
+    return u.Life.hp
+
+def acted(u):
+    return u.Ready.acted
