@@ -14,9 +14,49 @@ namespace Kesa.Engine.Loading
         public static LoadOrder Sort(DiscoveryResult discovery, DiagnosticBag diagnostics) =>
             Sort(discovery.Mods, diagnostics, discovery.FailedIds);
 
+        /// <summary>
+        /// 켤 모드만 정렬한다 (G439). 나머지는 설치됐지만 꺼진 것이고, 동률이면 <paramref name="enabled"/>에서 앞선 것부터다.
+        /// </summary>
+        public static LoadOrder Sort(DiscoveryResult discovery, IReadOnlyList<string> enabled, DiagnosticBag diagnostics)
+        {
+            var rank = new Dictionary<string, int>(StringComparer.Ordinal);
+            var listed = new List<string>();
+            foreach (var id in enabled)
+            {
+                if (rank.ContainsKey(id)) continue;
+                rank[id] = rank.Count;
+                listed.Add(id);
+            }
+
+            var installed = new List<string>();
+            foreach (var m in discovery.Mods) installed.Add(m.Id);
+            installed.AddRange(discovery.FailedIds);
+            foreach (var id in listed)
+            {
+                if (installed.Contains(id)) continue;
+                diagnostics.Warning(Codes.ModNotInstalled, "mod '" + id + "' is turned on but not installed",
+                    new SourceSpan(id + "/" + ModDiscovery.ManifestFileName, 0, 0), mod: id, hint: Suggest.Hint(id, installed));
+            }
+
+            var chosen = new List<ModManifest>();
+            foreach (var m in discovery.Mods)
+                if (rank.ContainsKey(m.Id)) chosen.Add(m);
+            var failed = new List<string>();
+            foreach (var id in discovery.FailedIds)
+                if (rank.ContainsKey(id)) failed.Add(id);
+            var off = new SortedSet<string>(StringComparer.Ordinal);
+            foreach (var id in installed)
+                if (!rank.ContainsKey(id)) off.Add(id);
+            return Sort(chosen, diagnostics, failed, off, rank);
+        }
+
         /// <param name="failedIds">설치되어 있지만 매니페스트 오류로 로드할 수 없는 모드 id</param>
         public static LoadOrder Sort(IReadOnlyList<ModManifest> discovered, DiagnosticBag diagnostics,
-            IReadOnlyList<string>? failedIds = null)
+            IReadOnlyList<string>? failedIds = null) =>
+            Sort(discovered, diagnostics, failedIds, new SortedSet<string>(StringComparer.Ordinal), null);
+
+        private static LoadOrder Sort(IReadOnlyList<ModManifest> discovered, DiagnosticBag diagnostics,
+            IReadOnlyList<string>? failedIds, SortedSet<string> off, Dictionary<string, int>? rank)
         {
             var byId = new SortedDictionary<string, List<ModManifest>>(StringComparer.Ordinal);
             foreach (var m in discovered)
@@ -65,12 +105,18 @@ namespace Kesa.Engine.Loading
                 foreach (var dep in m.Dependencies)
                 {
                     if (installed.Contains(dep.Id)) continue;
-                    diagnostics.Error(Codes.ModMissingDependency,
-                        "mod '" + m.Id + "' requires '" + dep.Id + "', which is not installed",
-                        dep.Span, mod: m.Id, hint: Suggest.Hint(dep.Id, allIds));
+                    if (off.Contains(dep.Id))
+                        diagnostics.Error(Codes.ModMissingDependency,
+                            "mod '" + m.Id + "' requires '" + dep.Id + "', which is installed but not turned on", dep.Span, mod: m.Id);
+                    else
+                        diagnostics.Error(Codes.ModMissingDependency,
+                            "mod '" + m.Id + "' requires '" + dep.Id + "', which is not installed",
+                            dep.Span, mod: m.Id, hint: Suggest.Hint(dep.Id, allIds));
                 }
-                WarnIfLikelyTypo(m, m.LoadAfter, "loadAfter", installed, allIds, diagnostics);
-                WarnIfLikelyTypo(m, m.Optional, "optional", installed, allIds, diagnostics);
+                var known = new SortedSet<string>(installed, StringComparer.Ordinal);
+                known.UnionWith(off);
+                WarnIfLikelyTypo(m, m.LoadAfter, "loadAfter", known, allIds, diagnostics);
+                WarnIfLikelyTypo(m, m.Optional, "optional", known, allIds, diagnostics);
             }
 
             PropagateFailedDependencies(candidates, disabled, installed, diagnostics);
@@ -78,7 +124,7 @@ namespace Kesa.Engine.Loading
             // 3. 정렬. 사이클이 있으면 사이클 모드를 빼고 다시 정렬한다.
             while (true)
             {
-                var graph = Graph.Build(candidates);
+                var graph = Graph.Build(candidates, rank);
                 var order = graph.TopologicalOrder();
                 if (order.Count == graph.Ids.Count)
                 {
@@ -124,11 +170,14 @@ namespace Kesa.Engine.Loading
 
         private sealed class Graph
         {
-            private Graph(List<string> ids, List<SortedSet<int>> successors, List<SortedSet<int>> predecessors)
+            private readonly int[] _rank;
+
+            private Graph(List<string> ids, List<SortedSet<int>> successors, List<SortedSet<int>> predecessors, int[] rank)
             {
                 Ids = ids;
                 Successors = successors;
                 Predecessors = predecessors;
+                _rank = rank;
             }
 
             /// <summary>서수 정렬된 id. 인덱스 순서 = id 순서.</summary>
@@ -139,11 +188,13 @@ namespace Kesa.Engine.Loading
 
             public List<SortedSet<int>> Predecessors { get; }
 
-            public static Graph Build(SortedDictionary<string, ModManifest> candidates)
+            public static Graph Build(SortedDictionary<string, ModManifest> candidates, Dictionary<string, int>? rank)
             {
                 var ids = new List<string>(candidates.Keys);
                 var index = new Dictionary<string, int>(StringComparer.Ordinal);
                 for (int i = 0; i < ids.Count; i++) index[ids[i]] = i;
+                var ranks = new int[ids.Count];
+                for (int i = 0; i < ids.Count; i++) ranks[i] = rank == null ? 0 : rank[ids[i]];
 
                 var succ = new List<SortedSet<int>>();
                 var pred = new List<SortedSet<int>>();
@@ -162,16 +213,17 @@ namespace Kesa.Engine.Loading
                         pred[i].Add(before);
                     }
                 }
-                return new Graph(ids, succ, pred);
+                return new Graph(ids, succ, pred, ranks);
             }
 
-            /// <summary>Kahn: 준비된 모드 중 인덱스(= id)가 가장 작은 것부터. 사이클이 있으면 일부만 돌려준다.</summary>
+            /// <summary>Kahn: 준비된 모드 중 켜기 목록에서 앞선 것, 같으면 인덱스(= id)가 작은 것부터 (G439). 사이클이 있으면 일부만 돌려준다.</summary>
             public List<int> TopologicalOrder()
             {
                 var inDegree = new int[Ids.Count];
                 for (int i = 0; i < Ids.Count; i++) inDegree[i] = Predecessors[i].Count;
 
-                var ready = new SortedSet<int>();
+                var rank = _rank;
+                var ready = new SortedSet<int>(Comparer<int>.Create((a, b) => rank[a] != rank[b] ? rank[a].CompareTo(rank[b]) : a.CompareTo(b)));
                 for (int i = 0; i < Ids.Count; i++)
                     if (inDegree[i] == 0) ready.Add(i);
 

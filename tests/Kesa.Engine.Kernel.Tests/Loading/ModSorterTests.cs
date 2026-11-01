@@ -152,5 +152,46 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(order.IsOrdered("a", "x"), Is.False);
             Assert.That(order.IsOrdered("b", "x"), Is.False);
         }
+
+        // ---- 켜기 목록 (G439) ----
+
+        private static (LoadOrder Order, IReadOnlyList<Diagnostic> Diagnostics) Enable(string[] enabled, ModManifest[] mods,
+            params string[] failed)
+        {
+            var bag = new DiagnosticBag();
+            var order = ModSorter.Sort(new DiscoveryResult(mods, failed), enabled, bag);
+            return (order, bag.ToSortedList());
+        }
+
+        [Test]
+        public void OnlyEnabledModsLoadAndTiesFollowTheList()
+        {
+            var (order, diags) = Enable(new[] { "c", "a", "core" }, new[] { M("a: core"), M("b"), M("c"), M("core") });
+            Assert.That(diags, Is.Empty);
+            Assert.That(Ids(order), Is.EqualTo("c core a"), "the list orders ties; a dependency still goes first");
+            Assert.That(order.Disabled, Is.Empty, "a mod left off is not a failure");
+        }
+
+        [Test]
+        public void DependingOnAModLeftOffSaysItIsNotTurnedOn()
+        {
+            var (order, diags) = Enable(new[] { "a" }, new[] { M("a: core | later"), M("core"), M("later") });
+            Assert.That(Ids(order), Is.Empty);
+            var missing = diags.Single(d => d.Code == Codes.ModMissingDependency);
+            Assert.That(missing.Message, Is.EqualTo("mod 'a' requires 'core', which is installed but not turned on"));
+            Assert.That(diags, Has.Count.EqualTo(1), "a loadAfter on a mod left off is quiet");
+        }
+
+        [Test]
+        public void AnEnabledIdThatIsNotInstalledWarnsWithASuggestion()
+        {
+            var (order, diags) = Enable(new[] { "skirmsh", "broken" }, new[] { M("skirmish") }, "broken");
+            Assert.That(Ids(order), Is.Empty);
+            var warning = diags.Single(d => d.Code == Codes.ModNotInstalled);
+            Assert.That(warning.Severity, Is.EqualTo(Severity.Warning));
+            Assert.That(warning.Message, Is.EqualTo("mod 'skirmsh' is turned on but not installed"));
+            Assert.That(warning.Hint, Does.Contain("skirmish"));
+            Assert.That(order.Disabled, Is.EqualTo(new[] { "broken" }), "an enabled mod whose manifest failed is disabled as before");
+        }
     }
 }

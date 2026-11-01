@@ -309,7 +309,7 @@ namespace Kesa.Engine.Ui.Tests
             }, kinds).Problems.Select(p => p.ToString().Substring("core/units.look.xml:1: ".Length)).ToList();
 
             Assert.That(Problems(
-                "<Model src=\"s.glb\" bind-state=\"pose\" fade=\"0.2\">" +
+                "<Model src=\"s.glb\" bind-state=\"pose\" fade=\"0.2\" scale=\"0.006\">" +
                 "<State name=\"idle\" clip=\"idle\" />" +
                 "<State name=\"move\" bind-blend=\"speed\"><Clip clip=\"walk\" at=\"0\" /><Clip clip=\"run\" at=\"1\" /></State>" +
                 "<State name=\"attack\" clip=\"attack\" once=\"true\" next=\"idle\" fade=\"0.1\" />" +
@@ -318,7 +318,7 @@ namespace Kesa.Engine.Ui.Tests
                 "<Paint material=\"Cloth\" bind-color=\"team\" /><Paint material=\"Metal\" color=\"#888888\" />" +
                 "</Model>"), Is.Empty);
             Assert.That(Problems(
-                "<Model src=\"s.glb\" state=\"idlee\" fade=\"-1\">" +
+                "<Model src=\"s.glb\" state=\"idlee\" fade=\"-1\" scale=\"0\">" +
                 "<State name=\"idle\" clip=\"idle\" />" +
                 "<State name=\"idle\" clip=\"walk\"><Clip clip=\"run\" at=\"1\" /></State>" +
                 "<State clip=\"attack\" next=\"idlee\" />" +
@@ -328,6 +328,7 @@ namespace Kesa.Engine.Ui.Tests
                 "</Model><State name=\"loose\" clip=\"x\" /><Attach bone=\"hand\" />"), Is.EquivalentTo(new[]
             {
                 "fade=\"-1\": a time is not negative",
+                "scale=\"0\": a scale is more than 0",
                 "a <State> plays clip= or blends the <Clip>s inside, not both",
                 "a <State> needs name=\"…\" written (spec-gaps G434)",
                 "next= is where a once=\"true\" state goes when it ends",

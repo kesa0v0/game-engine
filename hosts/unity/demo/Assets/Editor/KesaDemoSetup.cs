@@ -65,54 +65,54 @@ public static class KesaDemoSetup
     /// batch 모드용(그래픽 있이, <c>-nographics</c> 없이): 데모를 열고 카메라가 비춘 판을 <c>-kesaShot</c> 경로의 PNG로 남긴다.
     /// 패널(UI Toolkit)은 카메라 그림에 들어가지 않는다.
     /// </summary>
-    public static void Shot()
+    public static void Shot() => RunInFrames("KESA DEMO SHOT", async () =>
     {
-        int code = 0;
-        try
-        {
-            var args = Environment.GetCommandLineArgs();
-            int at = Array.IndexOf(args, "-kesaShot");
-            if (at < 0 || at + 1 >= args.Length) throw new InvalidOperationException("missing -kesaShot <png path>");
-            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
-            var demo = UnityEngine.Object.FindFirstObjectByType<KesaDemo>()!;
-            demo.Begin(new VisualElement()).GetAwaiter().GetResult();
-            demo.WaitPictures();
-            var camera = Camera.main!;
-            var target = new RenderTexture(960, 540, 24);
-            camera.targetTexture = target;
-            camera.Render();
-            RenderTexture.active = target;
-            var image = new Texture2D(960, 540, TextureFormat.RGB24, false);
-            image.ReadPixels(new Rect(0, 0, 960, 540), 0, 0);
-            image.Apply();
-            File.WriteAllBytes(args[at + 1], image.EncodeToPNG());
-            camera.targetTexture = null;
-            RenderTexture.active = null;
-            Debug.Log("KESA DEMO SHOT: " + args[at + 1]);
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("KESA DEMO SHOT FAILED: " + e);
-            code = 1;
-        }
-        EditorApplication.Exit(code);
-    }
+        var args = Environment.GetCommandLineArgs();
+        int at = Array.IndexOf(args, "-kesaShot");
+        if (at < 0 || at + 1 >= args.Length) throw new InvalidOperationException("missing -kesaShot <png path>");
+        EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        var demo = UnityEngine.Object.FindFirstObjectByType<KesaDemo>()!;
+        await demo.Begin(new VisualElement());
+        await demo.WaitPictures();
+        var camera = Camera.main!;
+        var target = new RenderTexture(960, 540, 24);
+        camera.targetTexture = target;
+        camera.Render();
+        RenderTexture.active = target;
+        var image = new Texture2D(960, 540, TextureFormat.RGB24, false);
+        image.ReadPixels(new Rect(0, 0, 960, 540), 0, 0);
+        image.Apply();
+        File.WriteAllBytes(args[at + 1], image.EncodeToPNG());
+        camera.targetTexture = null;
+        RenderTexture.active = null;
+        Debug.Log("KESA DEMO SHOT: " + args[at + 1]);
+    });
 
     /// <summary>batch 모드용: 장면이 열리고(없는 스크립트 없이) 데모가 skirmish 화면을 올리는지 본다. 틀리면 종료 코드 1.</summary>
-    public static void Check()
+    public static void Check() => RunInFrames("KESA DEMO CHECK", async () =>
     {
-        int code = 0;
-        try
+        await Verify();
+        Debug.Log("KESA DEMO CHECK: OK");
+    });
+
+    // 모델(glTFast)은 에디터 프레임을 타고 읽으므로 막고 기다리지 않고 프레임마다 본다 (SmokeTest와 같음)
+    private static void RunInFrames(string name, Func<Task> work)
+    {
+        var task = work();
+        var until = DateTime.UtcNow.AddSeconds(120);
+        void Poll()
         {
-            Verify().GetAwaiter().GetResult();
-            Debug.Log("KESA DEMO CHECK: OK");
+            if (!task.IsCompleted && DateTime.UtcNow < until) return;
+            EditorApplication.update -= Poll;
+            if (task.IsCompleted && !task.IsFaulted)
+            {
+                EditorApplication.Exit(0);
+                return;
+            }
+            Debug.LogError(name + " FAILED: " + (task.IsCompleted ? task.Exception!.GetBaseException().ToString() : "did not finish in 120 s"));
+            EditorApplication.Exit(1);
         }
-        catch (Exception e)
-        {
-            Debug.LogError("KESA DEMO CHECK FAILED: " + e);
-            code = 1;
-        }
-        EditorApplication.Exit(code);
+        EditorApplication.update += Poll;
     }
 
     private static async Task Verify()
@@ -151,14 +151,14 @@ public static class KesaDemoSetup
     /// </summary>
     private static async Task VerifyBoard(KesaDemo demo)
     {
-        demo.WaitPictures();
+        await demo.WaitPictures();
         var board = demo.transform.Find("Board") ?? throw new InvalidOperationException("the demo has no Board object");
         var units = Enumerable.Range(0, board.childCount).Select(board.GetChild).Where(t => t.name.StartsWith("entity:")).ToList();
         if (units.Count != 6) throw new InvalidOperationException("six unit objects expected, got " + string.Join(", ", units.Select(u => u.name)));
         var camera = Camera.main ?? throw new InvalidOperationException("no main camera");
         Vector3 ScreenOf(Vector3 local) => camera.WorldToScreenPoint(board.TransformPoint(local));
         long IdOf(Transform unit) => long.Parse(unit.name.Substring("entity:".Length));
-        async Task<long?> Inspected() => ((BridgeEntity?)(await demo.Session!.Call("inspected", "skirmish.inspected", new BridgeValue[0])).Value)?.Id;
+        async Task<long?> Inspected() => ((await demo.Session!.Call("inspected", "skirmish.inspected", new BridgeValue[0])).Value as BridgeEntity)?.Id;
 
         // 빨강은 아래(y=4) 줄에서 시작한다 (skirmish board.space.xml의 flip-y)
         var red = units.Where(u => Mathf.RoundToInt(u.localPosition.y) == -4).OrderBy(u => u.localPosition.x).ToList();
@@ -174,7 +174,7 @@ public static class KesaDemoSetup
         await demo.PressBoard("primary", ScreenOf(from));
         await demo.PressBoard("primary", ScreenOf(from + Vector3.up));
         await demo.Step();
-        demo.WaitPictures();
+        await demo.WaitPictures();
         // skirmish 유닛은 move="0.25"로 미끄러져 간다 (G432)
         demo.Pass(125);
         if (Vector3.Distance(mover.localPosition, from + Vector3.up * 0.5f) > 0.01f)

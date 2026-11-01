@@ -35,6 +35,7 @@ namespace Kesa.Engine.Diagnostics
         public const string ModCycle = "MOD008";
         public const string ModDependencyFailed = "MOD009";
         public const string ModSelfReference = "MOD010";
+        public const string ModNotInstalled = "MOD011";
 
         // 콘텐츠 파일 실행 (spec S1 ②)
         public const string LodBadUse = "LOD001";

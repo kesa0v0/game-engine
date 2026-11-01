@@ -73,7 +73,8 @@ namespace Kesa.Engine.Unity.Editor
         private static async Task Check()
         {
             string root = Arg("-kesaMods");
-            var mods = LoadedMods.Load(root, new[] { "ko", "en" });
+            // skirmish의 2D 판을 본다: 그림을 바꾸는 fox는 켜지 않는다 (G439)
+            var mods = LoadedMods.Load(root, new[] { "ko", "en" }, enabled: new[] { "skirmish" });
             Require(!mods.HasErrors, "mods load without errors: " + string.Join("; ", mods.Diagnostics));
             var game = mods.NewMatch(1);
             var world = game.Host.World;
@@ -198,7 +199,8 @@ namespace Kesa.Engine.Unity.Editor
                         "</Model></Look>" +
                         "<Look name=\"tinted\"><Model src=\"models/tri.glb\" tint=\"#808080\" /></Look>" +
                         "<Look name=\"painted\"><Model src=\"models/tri.glb\" tint=\"#808080\"><Paint material=\"Cloth\" bind-color=\"team\" />" +
-                        "<Paint material=\"Skin\" color=\"#000000\" /></Model></Look></Looks>"),
+                        "<Paint material=\"Skin\" color=\"#000000\" /></Model></Look>" +
+                        "<Look name=\"half\"><Model src=\"models/tri.glb\" scale=\"0.5\" /></Look></Looks>"),
                     new LookSource("check", "check/board.space.xml", "<Spaces><Space name=\"square\" kind=\"grid\" /></Spaces>"),
                 }, kinds, path => assets.Find(path) != null);
                 Require(library.Problems.Count == 0, "the model look reads cleanly: " + string.Join("; ", library.Problems));
@@ -215,6 +217,11 @@ namespace Kesa.Engine.Unity.Editor
                 var missing = boardObject.transform.Find("b/Model/missing-model");
                 Require(missing != null, "a model that cannot be read shows the missing box");
                 Require(stage.Problems.Count == 0, "the models show cleanly: " + string.Join("; ", stage.Problems));
+                // 크기 (G438): 모델 뷰에 곱하고 물체 노드의 크기는 그대로
+                stage.Show("h", new BridgeLook("half", new KeyValuePair<string, BridgeValue>[0]), at);
+                var half = boardObject.transform.Find("h");
+                Require(half.Find("Model").localScale == Vector3.one * 0.5f && half.localScale == Vector3.one,
+                    "scale=\"0.5\" halves the model, got " + half.Find("Model").localScale);
                 await CheckAnimation(stage, renderer, boardObject.transform, at);
                 CheckColors(stage, boardObject.transform, at);
             }

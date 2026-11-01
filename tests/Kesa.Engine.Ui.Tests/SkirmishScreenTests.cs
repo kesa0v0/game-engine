@@ -49,7 +49,8 @@ namespace Kesa.Engine.Ui.Tests
         {
             string root = Samples();
             var bag = new DiagnosticBag();
-            var content = ContentLoader.Load(root, ModSorter.Sort(ModDiscovery.Discover(root, bag), bag), bag);
+            // 그림을 바꾸는 덧붙임 모드 fox는 켜지 않는다 (G439)
+            var content = ContentLoader.Load(root, ModSorter.Sort(ModDiscovery.Discover(root, bag), new[] { "skirmish" }, bag), bag);
             Assert.That(bag.ToSortedList().Where(d => d.Severity == Severity.Error), Is.Empty);
             _world = new World(content, seed: 1);
             _host = new LocalHost(content, _world);

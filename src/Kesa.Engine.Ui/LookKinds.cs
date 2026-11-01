@@ -68,7 +68,9 @@ namespace Kesa.Engine.Ui
                 ["state"] = LookAttributeType.Name,
                 ["fade"] = LookAttributeType.Number,
                 ["tint"] = LookAttributeType.Color,
-            }, acceptsChildren: true, check: (name, value) => name == "src" ? kinds.CheckModel(value.Text!) : NotNegative(name, value),
+                ["scale"] = LookAttributeType.Number,
+            }, acceptsChildren: true, check: (name, value) => name == "src" ? kinds.CheckModel(value.Text!)
+                : name == "scale" ? (value.Numbers[0] > 0 ? null : "a scale is more than 0") : NotNegative(name, value),
                 validate: model => ValidateModel(model, kinds)));
             kinds.Add(new LookElementKind("State", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
             {

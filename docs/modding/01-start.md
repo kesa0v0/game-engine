@@ -52,6 +52,9 @@ use_all("defs/")
 ### 로드 순서와 보이는 범위
 
 - 모드는 `dependencies`·`loadAfter`·(있는) `optional` 모드 뒤에 불린다. 순서가 정해지지 않은 모드끼리는 id 순이다.
+- 게임(호스트)이 켤 모드 목록을 주면 루트에 있어도 목록에 없는 모드는 읽지 않는다. 이때 순서가 정해지지 않은 모드끼리는 목록 순이다.
+  꺼 둔 모드에 `dependencies`로 기대면 `MOD007`("installed but not turned on"), 목록에 없는 모드 id는 경고 `MOD011`이다.
+  `engine check`와 `kesa-play`는 루트의 모드를 다 켠다.
 - 순환(`a → b → a`)은 `MOD008`이고 그 모드들은 꺼진다.
 - 한 모드가 **보는** 이름은 자기 것과 `dependencies`(그리고 그 의존성의 의존성)의 것뿐이다. `loadAfter`·`optional`은 순서만 정한다.
   남의 이름을 쓰면 `SCH003`과 "dependencies에 더하라"는 힌트가 나온다.

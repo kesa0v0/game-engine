@@ -1,0 +1,16 @@
+<!-- skirmish의 unit·unit-down을 덮는다 (G390). 그림 값은 skirmish ui.py의 unit_look 그대로: art·color·picked·acted -->
+<Looks>
+  <Look name="unit" exit="unit-down" move="0.25">
+    <Sprite src="art/ring.png" tint="#fac846" bind-display="picked" />
+    <!-- Fox는 길이 약 155단위라 0.8칸쯤으로 줄인다 (G438) -->
+    <Model src="models/fox.glb" scale="0.005" bind-tint="color" layer="1">
+      <State name="idle" clip="Survey" />
+    </Model>
+    <Sprite src="art/white.png" tint="#00000070" size="0.7,0.7" layer="2" bind-display="acted" />
+  </Look>
+  <Look name="unit-down" solid="0.1" fade-out="0.6" grow="-0.8">
+    <Model src="models/fox.glb" scale="0.005" bind-tint="color" layer="1">
+      <State name="idle" clip="Survey" />
+    </Model>
+  </Look>
+</Looks>

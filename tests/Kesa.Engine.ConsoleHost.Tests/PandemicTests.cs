@@ -32,9 +32,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
             if (mods.Length == 0) mods = new[] { "pandemic" };
             var bag = new DiagnosticBag();
             string root = Root();
-            var discovery = ModDiscovery.Discover(root, bag);
-            var chosen = discovery.Mods.Where(m => mods.Contains(m.Id)).ToList();
-            var content = ContentLoader.Load(root, ModSorter.Sort(chosen, bag, discovery.FailedIds), bag);
+            var content = ContentLoader.Load(root, ModSorter.Sort(ModDiscovery.Discover(root, bag), mods, bag), bag);
             diagnostics = bag.ToSortedList().ToList();
             return content;
         }

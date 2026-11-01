@@ -15,7 +15,7 @@ namespace Kesa.Engine.Unity
     }
 
     /// <summary>
-    /// <c>Model</c>: 로더가 읽은 원본을 복제해 단다. 모델 단위 1이 공간 단위 1이다. 다 읽을 때까지 비어 있고, 못 읽으면 보라색 상자 (G391).
+    /// <c>Model</c>: 로더가 읽은 원본을 복제해 단다. 모델 단위에 <c>scale</c>(기본 1)을 곱한 것이 공간 단위다 (G438). 다 읽을 때까지 비어 있고, 못 읽으면 보라색 상자 (G391).
     /// 자식 <c>State</c>가 있으면 그 클립을 옛 <c>Animation</c>에 걸어 시간·가중치를 손으로 넣고 <see cref="Tick"/>마다 그 자세로 둔다 (G434).
     /// </summary>
     internal sealed class ModelView : ILookElementView, ILookParentView
@@ -65,6 +65,9 @@ namespace Kesa.Engine.Unity
                 case "tint":
                     _tint = GameObjectLookRenderer.ColorOf(value.Color);
                     Recolor();
+                    break;
+                case "scale":
+                    GameObject.transform.localScale = Vector3.one * GameObjectLookRenderer.Real(value.Numbers[0]);
                     break;
             }
         }

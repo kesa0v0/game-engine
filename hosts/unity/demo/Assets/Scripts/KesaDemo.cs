@@ -23,6 +23,9 @@ public sealed class KesaDemo : MonoBehaviour
     [Tooltip("모드 폴더. 프로젝트 폴더 기준 상대 경로")]
     [SerializeField] private string modsFolder = "../../../samples/skirmish";
 
+    [Tooltip("켤 모드 id. 목록 순이 로드 순서다. 비우면 모드 폴더의 모드를 다 켠다 (2D만 보려면 skirmish 하나)")]
+    [SerializeField] private string[] enabledMods = new string[0];
+
     [Tooltip("판을 시작하는 커맨드 (없으면 비움)")]
     [SerializeField] private string startCommand = "skirmish.Start";
 
@@ -84,7 +87,8 @@ public sealed class KesaDemo : MonoBehaviour
     /// <summary>판을 열고 화면을 <paramref name="root"/>에 올린다.</summary>
     public async Task Begin(VisualElement root)
     {
-        var mods = LoadedMods.Load(Path.GetFullPath(Path.Combine(Application.dataPath, "..", modsFolder)), languages);
+        var mods = LoadedMods.Load(Path.GetFullPath(Path.Combine(Application.dataPath, "..", modsFolder)), languages,
+            enabled: enabledMods.Length == 0 ? null : enabledMods);
         foreach (var d in mods.Diagnostics)
             if (d.Severity != Severity.Info) Debug.LogWarning("Kesa mods: " + d);
         foreach (var p in mods.Looks.Problems) Debug.LogWarning("Kesa looks: " + p);
@@ -176,14 +180,15 @@ public sealed class KesaDemo : MonoBehaviour
     }
 
     /// <summary>판 그림을 다 읽을 때까지 기다린다 (확인용: 편집 모드에서는 프레임이 돌지 않음, G392).</summary>
-    public void WaitPictures()
+    public async Task WaitPictures()
     {
         if (_boardRenderer == null) return;
-        var until = DateTime.UtcNow.AddSeconds(10);
+        var until = DateTime.UtcNow.AddSeconds(30);
+        // 모델(glTFast)은 에디터 프레임을 타고 읽으므로 막지 않고 양보한다
         while (_boardRenderer.LoadingPictures && DateTime.UtcNow < until)
         {
-            System.Threading.Thread.Sleep(5);
             _boardRenderer.FinishPictures();
+            await Task.Yield();
         }
     }
 
