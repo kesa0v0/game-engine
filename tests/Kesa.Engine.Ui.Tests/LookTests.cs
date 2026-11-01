@@ -69,6 +69,44 @@ namespace Kesa.Engine.Ui.Tests
             }
         }
 
+        /// <summary>방향 틀 (G443): xy는 위가 판 밖(-Z)·북이 +Y, xz는 위가 +Y·북이 +Z. flip-y는 틀을 바꾸지 않는다.</summary>
+        [Test]
+        public void TheGridGivesEachPlaceAFrameThatFlipDoesNotMirror()
+        {
+            const string look = "<Looks><Look name=\"dot\"><Sprite src=\"a.png\" /></Look></Looks>";
+            var cases = new (string space, LookFrame frame)[]
+            {
+                ("", LookFrame.Screen),
+                ("flip-y=\"true\"", LookFrame.Screen),
+                ("plane=\"xz\"", LookFrame.Floor),
+                ("plane=\"xz\" flip-y=\"true\"", LookFrame.Floor),
+            };
+            foreach (var c in cases)
+            {
+                var stage = Stage(Looks(look, "<Spaces><Space name=\"square\" kind=\"grid\" " + c.space + " /></Spaces>"));
+                stage.Show("m", Look("dot"), At(2, 3));
+                Assert.That(_renderer.Nodes[_renderer.Objects["m"]].Frame, Is.EqualTo(c.frame), c.space);
+            }
+            Assert.That(LookFrame.Screen.ToString(), Is.EqualTo("up (0.0, 0.0, -1.0), north (0.0, 1.0, 0.0), east (1.0, 0.0, 0.0)"));
+        }
+
+        /// <summary>turn은 Sprite·Text·Model·Group에, face는 Sprite·Text에 (G443·G444).</summary>
+        [Test]
+        public void TurnAndFaceAreReadOnTheKindsThatTakeThem()
+        {
+            var kinds = LookKinds.Standard();
+            kinds.AddModelFormat(".glb");
+            string[] Problems(string body) => LookLibrary.Load(new[]
+            {
+                new LookSource("core", "core/units.look.xml", "<Looks><Look name=\"a\">" + body + "</Look></Looks>"),
+            }, kinds).Problems.Select(p => p.ToString().Substring("core/units.look.xml:1: ".Length)).ToArray();
+
+            Assert.That(Problems("<Sprite src=\"a.png\" turn=\"90\" face=\"floor\" /><Text text=\"x\" bind-turn=\"facing\" face=\"camera\" />" +
+                "<Group turn=\"-45\"><Model src=\"s.glb\" turn=\"180\" /></Group>"), Is.Empty);
+            Assert.That(Problems("<Sprite src=\"a.png\" face=\"camra\" />"), Is.EqualTo(new[] { "face=\"camra\": a face is floor or camera (did you mean 'camera'?)" }));
+            Assert.That(Problems("<Model src=\"s.glb\"><State name=\"i\" clip=\"i\" turn=\"1\" /></Model>"), Has.Some.Contains("turn"));
+        }
+
         [Test]
         public void SizesAndOffsetsStayInCellsBecauseTheObjectIsScaledByTheCell()
         {

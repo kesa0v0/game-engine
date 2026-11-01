@@ -190,6 +190,7 @@ public sealed class KesaDemo : MonoBehaviour
             _boardRenderer.FinishPictures();
             await Task.Yield();
         }
+        _boardRenderer.FaceCamera();
     }
 
     /// <summary>판의 시간(효과·옮기기·연출 단계)을 넘긴다 (확인용: 편집 모드에서는 프레임이 돌지 않음).</summary>

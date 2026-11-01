@@ -71,6 +71,9 @@ namespace Kesa.Engine.Ui
 
             public override long Unit => _cell;
 
+            // flip-y는 모드 y의 방향만 바꾸고 틀은 그대로다 (G443)
+            public override LookFrame FrameAt(LookPosition position) => _xz ? LookFrame.Floor : LookFrame.Screen;
+
             public override bool TryPlace(BridgeValue place, out LookPosition position, out string error)
             {
                 position = default;

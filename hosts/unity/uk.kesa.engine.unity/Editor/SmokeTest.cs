@@ -182,6 +182,7 @@ namespace Kesa.Engine.Unity.Editor
             Directory.CreateDirectory(Path.Combine(folder, "models"));
             File.WriteAllBytes(Path.Combine(folder, "models", "tri.glb"), Triangle(false));
             File.WriteAllBytes(Path.Combine(folder, "models", "moving.glb"), Triangle(true));
+            File.WriteAllBytes(Path.Combine(folder, "models", "dot.png"), new Texture2D(1, 1).EncodeToPNG());
             var boardObject = new GameObject("kesa-models-check");
             try
             {
@@ -200,8 +201,11 @@ namespace Kesa.Engine.Unity.Editor
                         "<Look name=\"tinted\"><Model src=\"models/tri.glb\" tint=\"#808080\" /></Look>" +
                         "<Look name=\"painted\"><Model src=\"models/tri.glb\" tint=\"#808080\"><Paint material=\"Cloth\" bind-color=\"team\" />" +
                         "<Paint material=\"Skin\" color=\"#000000\" /></Model></Look>" +
-                        "<Look name=\"half\"><Model src=\"models/tri.glb\" scale=\"0.5\" /></Look></Looks>"),
-                    new LookSource("check", "check/board.space.xml", "<Spaces><Space name=\"square\" kind=\"grid\" /></Spaces>"),
+                        "<Look name=\"half\"><Model src=\"models/tri.glb\" scale=\"0.5\" /></Look>" +
+                        "<Look name=\"facing\"><Model src=\"models/tri.glb\" bind-turn=\"turn\" /><Sprite src=\"models/dot.png\" offset=\"0,0.5\" />" +
+                        "<Text text=\"x\" face=\"camera\" /></Look></Looks>"),
+                    new LookSource("check", "check/board.space.xml",
+                        "<Spaces><Space name=\"square\" kind=\"grid\" /><Space name=\"floor\" kind=\"grid\" plane=\"xz\" /></Spaces>"),
                 }, kinds, path => assets.Find(path) != null);
                 Require(library.Problems.Count == 0, "the model look reads cleanly: " + string.Join("; ", library.Problems));
                 var renderer = new GameObjectLookRenderer(boardObject.transform, assets);
@@ -222,6 +226,7 @@ namespace Kesa.Engine.Unity.Editor
                 var half = boardObject.transform.Find("h");
                 Require(half.Find("Model").localScale == Vector3.one * 0.5f && half.localScale == Vector3.one,
                     "scale=\"0.5\" halves the model, got " + half.Find("Model").localScale);
+                await CheckFrames(stage, renderer, boardObject.transform);
                 await CheckAnimation(stage, renderer, boardObject.transform, at);
                 CheckColors(stage, boardObject.transform, at);
             }
@@ -230,6 +235,57 @@ namespace Kesa.Engine.Unity.Editor
                 UnityEngine.Object.DestroyImmediate(boardObject);
                 Directory.Delete(folder, true);
             }
+        }
+
+        /// <summary>
+        /// 방향 틀 (G443·G444): xy 판은 위가 -Z(보는 쪽)·북이 +Y, xz 판은 위가 +Y·북이 +Z. 모델의 위·앞(glTF +Y·+Z)이 틀의 위·북이고 turn 90이면 동(+X)을 본다.
+        /// 스프라이트는 바닥에 누워 그림의 위가 북이고 offset의 둘째 수는 북이다. face="camera"는 카메라의 방향을 따른다.
+        /// </summary>
+        private static async Task CheckFrames(LookStage stage, GameObjectLookRenderer renderer, Transform board)
+        {
+            bool Near(Vector3 a, Vector3 b) => Vector3.Distance(a, b) < 0.01f;
+            BridgeWhere Place(string space) => BridgeWhere.At(space, new BridgeList(new BridgeValue[] { new BridgeInt(0), new BridgeInt(0) }));
+            BridgeLook Facing(long turn) => new BridgeLook("facing", new[] { new KeyValuePair<string, BridgeValue>("turn", new BridgeInt(turn)) });
+            var cases = new (string Key, string Space, long Turn, Vector3 Up, Vector3 Front, Vector3 North)[]
+            {
+                ("f1", "square", 0, Vector3.back, Vector3.up, Vector3.up),
+                ("f2", "square", 90, Vector3.back, Vector3.right, Vector3.up),
+                ("f3", "floor", 0, Vector3.up, Vector3.forward, Vector3.forward),
+                ("f4", "floor", 90, Vector3.up, Vector3.right, Vector3.forward),
+            };
+            foreach (var c in cases) stage.Show(c.Key, Facing(c.Turn), Place(c.Space));
+            while (renderer.LoadingPictures)
+            {
+                renderer.FinishPictures();
+                await Task.Yield();
+            }
+            foreach (var c in cases)
+            {
+                var obj = board.Find(c.Key);
+                var tri = obj.GetComponentsInChildren<Transform>().First(t => t.name == "tri");
+                Require(Near(tri.up, c.Up) && Near(tri.forward, c.Front),
+                    c.Space + " turn " + c.Turn + ": the model's up and front should be " + c.Up + " " + c.Front + ", got " + tri.up + " " + tri.forward);
+                var sprite = obj.GetComponentInChildren<SpriteRenderer>().transform;
+                Require(Near(sprite.up, c.North) && Near(-sprite.forward, c.Up),
+                    c.Space + ": a sprite lies on the floor with its top to the north, got up " + sprite.up + " facing " + -sprite.forward);
+                Require(Near(sprite.position - obj.position, c.North * 0.5f), c.Space + ": offset \"0,0.5\" is half a cell north, got " + (sprite.position - obj.position));
+            }
+            var eye = new GameObject("kesa-check-camera").AddComponent<Camera>();
+            try
+            {
+                eye.transform.rotation = Quaternion.Euler(50f, 30f, 0f);
+                renderer.Camera = eye;
+                renderer.FaceCamera();
+                var text = board.Find("f3").GetComponentInChildren<TextMesh>().transform;
+                Require(Quaternion.Angle(text.rotation, eye.transform.rotation) < 0.5f, "face=\"camera\" turns the text to the camera");
+            }
+            finally
+            {
+                renderer.Camera = null;
+                UnityEngine.Object.DestroyImmediate(eye.gameObject);
+            }
+            foreach (var c in cases) stage.Hide(c.Key);
+            Require(stage.Problems.Count == 0, "the turned looks show cleanly: " + string.Join("; ", stage.Problems));
         }
 
         /// <summary>
@@ -281,9 +337,9 @@ namespace Kesa.Engine.Unity.Editor
             stage.Advance(250);
             Require(Vector3.Distance(hand.position, before) > 0.05f, "the hand follows the animated part");
 
-            // 모델 누르기: 메시의 경계 상자로 잰다
+            // 모델 누르기: 메시의 경계 상자로 잰다. 판에 누운 모델이라 삼각형의 면 쪽에서 쏜다
             var aim = tri.TransformPoint(-0.2f, 0.2f, 0f);
-            var keys = renderer.KeysAt(new Ray(aim - Vector3.forward * 10f, Vector3.forward));
+            var keys = renderer.KeysAt(new Ray(aim - tri.forward * 10f, tri.forward));
             Require(keys.Contains("c"), "a model can be pressed, got " + string.Join(", ", keys));
             Require(stage.Problems.Count == 0, "the animated model shows cleanly: " + string.Join("; ", stage.Problems));
         }

@@ -28,6 +28,9 @@ namespace Kesa.Engine.Ui
         public LookPosition? Position { get; set; }
         public long Unit { get; set; }
 
+        /// <summary>놓일 자리의 방향 틀 (G443). 옮기는 중에도 이것을 쓴다.</summary>
+        public LookFrame Frame { get; set; }
+
         /// <summary>옮기기 (G432): 떠난 자리, 지난 밀리초, 전체 밀리초(0이면 옮기지 않는 중).</summary>
         public LookPosition MoveFrom { get; set; }
         public long MoveElapsed { get; set; }

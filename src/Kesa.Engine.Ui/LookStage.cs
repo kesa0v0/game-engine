@@ -106,7 +106,7 @@ namespace Kesa.Engine.Ui
             if (_shown.TryGetValue(key, out var shown) && shown.Definition?.Exit != null && shown.Drawn != null)
             {
                 string fx = NextFxKey();
-                ShowAt(fx, new BridgeLook(shown.Definition.Exit, shown.Look.Keys), shown.Drawn.Value, shown.Unit);
+                ShowAt(fx, new BridgeLook(shown.Definition.Exit, shown.Look.Keys), shown.Drawn.Value, shown.Frame, shown.Unit);
                 if (_shown.TryGetValue(fx, out var exit)) StartFx(fx, exit);
             }
             Hide(key);
@@ -115,15 +115,15 @@ namespace Kesa.Engine.Ui
         /// <summary>그림이나 자리가 없거나 자리를 못 놓으면 숨긴다.</summary>
         public void Show(string key, BridgeLook? look, BridgeWhere? where)
         {
-            if (look == null || where == null || !TryPosition(key, where, out var position, out long unit))
+            if (look == null || where == null || !TryPosition(key, where, out var position, out var frame, out long unit))
             {
                 Hide(key);
                 return;
             }
-            ShowAt(key, look, position, unit);
+            ShowAt(key, look, position, frame, unit);
         }
 
-        private void ShowAt(string key, BridgeLook look, LookPosition position, long unit)
+        private void ShowAt(string key, BridgeLook look, LookPosition position, LookFrame frame, long unit)
         {
             _library.Looks.TryGetValue(look.Name, out var definition);
             if (_shown.TryGetValue(key, out var shown) && shown.Look.Name == look.Name)
@@ -140,12 +140,13 @@ namespace Kesa.Engine.Ui
                 Hide(key);
                 shown = Create(key, look, definition);
             }
-            if (!shown.Position.Equals(position) || shown.Unit != unit)
+            if (!shown.Position.Equals(position) || shown.Unit != unit || !shown.Frame.Equals(frame))
             {
                 var from = shown.Drawn;
                 long move = from != null && shown.Unit == unit && !key.StartsWith(FxPrefix, StringComparison.Ordinal) ? Millis(Number(shown, "move")) : 0;
                 shown.Position = position;
                 shown.Unit = unit;
+                shown.Frame = frame;
                 if (move > 0)
                 {
                     // 옮기던 중이면 그 재생이 새 길을 이어 받는다
@@ -162,7 +163,7 @@ namespace Kesa.Engine.Ui
                 else
                 {
                     shown.MoveTotal = 0;
-                    _renderer.PlaceObject(shown.Handle, position, unit);
+                    _renderer.PlaceObject(shown.Handle, position, frame, unit);
                 }
             }
         }
@@ -271,7 +272,7 @@ namespace Kesa.Engine.Ui
                 var moved = new LookPosition(at.X + _driftX * unit / BridgeFixed.Scale * t / 1000, at.Y + _driftY * unit / BridgeFixed.Scale * t / 1000, at.Z);
                 // 크기는 물체의 단위에 곱한다: 1 + grow × 초, 0 아래로는 가지 않음
                 long scale = Math.Max(0, BridgeFixed.Scale + _grow * t / 1000);
-                _stage._renderer.PlaceObject(_shown.Handle, moved, unit * scale / BridgeFixed.Scale);
+                _stage._renderer.PlaceObject(_shown.Handle, moved, _shown.Frame, unit * scale / BridgeFixed.Scale);
             }
         }
 
@@ -295,14 +296,14 @@ namespace Kesa.Engine.Ui
             {
                 _shown.MoveElapsed += milliseconds;
                 if (_shown.MoveElapsed >= _shown.MoveTotal) _shown.MoveTotal = 0;
-                _stage._renderer.PlaceObject(_shown.Handle, _shown.Drawn!.Value, _shown.Unit);
+                _stage._renderer.PlaceObject(_shown.Handle, _shown.Drawn!.Value, _shown.Frame, _shown.Unit);
             }
 
             public void End()
             {
                 if (!Live) return;
                 _shown.MoveTotal = 0;
-                _stage._renderer.PlaceObject(_shown.Handle, _shown.Position!.Value, _shown.Unit);
+                _stage._renderer.PlaceObject(_shown.Handle, _shown.Position!.Value, _shown.Frame, _shown.Unit);
             }
         }
 
@@ -401,9 +402,10 @@ namespace Kesa.Engine.Ui
 
         // ---- 자리 (G394·G414) ----
 
-        private bool TryPosition(string key, BridgeWhere where, out LookPosition position, out long unit)
+        private bool TryPosition(string key, BridgeWhere where, out LookPosition position, out LookFrame frame, out long unit)
         {
             position = default;
+            frame = default;
             unit = 0;
             if (where.Shape != BridgeWhereShape.At)
             {
@@ -421,7 +423,11 @@ namespace Kesa.Engine.Ui
                 return false;
             }
             unit = space.Layout.Unit;
-            if (space.Layout.TryPlace(where.Target!, out position, out string error)) return true;
+            if (space.Layout.TryPlace(where.Target!, out position, out string error))
+            {
+                frame = space.Layout.FrameAt(position);
+                return true;
+            }
             Report(key, "space '" + where.Name + "': " + error);
             return false;
         }

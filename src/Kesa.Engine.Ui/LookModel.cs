@@ -167,11 +167,49 @@ namespace Kesa.Engine.Ui
         public override string ToString() => "(" + new BridgeFixed(X).Decimal + ", " + new BridgeFixed(Y).Decimal + ", " + new BridgeFixed(Z).Decimal + ")";
     }
 
+    /// <summary>
+    /// 한 자리의 방향 틀 (G443): 위 축, 북(위에서 볼 때 위쪽, turn 0), 동(x가 커지는 쪽, turn 90). <see cref="LookPosition"/>처럼 Unity 축이고
+    /// 길이는 고정소수점 1이다. 위에서 볼 때 북이 위면 동이 오른쪽이다(거울상이 아님).
+    /// </summary>
+    public readonly struct LookFrame : IEquatable<LookFrame>
+    {
+        public LookFrame(LookPosition up, LookPosition north, LookPosition east)
+        {
+            Up = up;
+            North = north;
+            East = east;
+        }
+
+        public LookPosition Up { get; }
+        public LookPosition North { get; }
+        public LookPosition East { get; }
+
+        /// <summary>바닥이 Unity의 xz 면: 위 = +Y, 북 = +Z, 동 = +X.</summary>
+        public static LookFrame Floor => new LookFrame(Axis(0, 1, 0), Axis(0, 0, 1), Axis(1, 0, 0));
+
+        /// <summary>바닥이 Unity의 xy 면을 -Z에서 보는 것: 위 = -Z, 북 = +Y, 동 = +X.</summary>
+        public static LookFrame Screen => new LookFrame(Axis(0, 0, -1), Axis(0, 1, 0), Axis(1, 0, 0));
+
+        private static LookPosition Axis(long x, long y, long z) =>
+            new LookPosition(x * BridgeFixed.Scale, y * BridgeFixed.Scale, z * BridgeFixed.Scale);
+
+        public bool Equals(LookFrame other) => Up.Equals(other.Up) && North.Equals(other.North) && East.Equals(other.East);
+
+        public override bool Equals(object? obj) => obj is LookFrame f && Equals(f);
+
+        public override int GetHashCode() => Up.GetHashCode() ^ (North.GetHashCode() * 7) ^ (East.GetHashCode() * 13);
+
+        public override string ToString() => "up " + Up + ", north " + North + ", east " + East;
+    }
+
     /// <summary>설정을 마친 공간 하나. 자리 값을 위치로 바꾼다.</summary>
     public abstract class SpaceLayout
     {
         /// <summary>바꾸지 못하면 모더가 읽을 이유와 함께 false.</summary>
         public abstract bool TryPlace(BridgeValue place, out LookPosition position, out string error);
+
+        /// <summary>그 위치의 방향 틀 (G443). 기본은 바닥이 xz 면인 <see cref="LookFrame.Floor"/>.</summary>
+        public virtual LookFrame FrameAt(LookPosition position) => LookFrame.Floor;
 
         /// <summary>공간 한 단위의 길이(고정소수점 원래 정수값). 물체 안의 <c>size</c>·<c>offset</c>과 기본 크기가 이 단위다 (G413).</summary>
         public abstract long Unit { get; }

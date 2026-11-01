@@ -32,6 +32,12 @@ namespace Kesa.Engine.Unity
             public int Layer;
             public readonly List<Node> Children = new List<Node>();
 
+            // 방향 (G443·G444): 평면 그림인가, turn(도), 카메라를 보는가, 적힌 offset(동·북·위)
+            public bool Flat;
+            public float Turn;
+            public bool FacesCamera;
+            public Vector3 Offset;
+
             public int Order => (Parent?.Order ?? 0) + Layer;
         }
 
@@ -53,6 +59,7 @@ namespace Kesa.Engine.Unity
             var pump = board.gameObject.GetComponent<LookPicturePump>();
             if (pump == null) pump = board.gameObject.AddComponent<LookPicturePump>();
             pump.Pictures = _pictures;
+            pump.Renderer = this;
             AddKind("Sprite", _ => new SpriteView(_pictures));
             AddKind("Group", _ => new GroupView());
             AddKind("Text", _ => new TextView());
@@ -127,6 +134,18 @@ namespace Kesa.Engine.Unity
         /// <summary>핸들의 GameObject.</summary>
         public GameObject Object(ElementId id) => _nodes[id.Value].GameObject;
 
+        /// <summary><c>face="camera"</c> 요소가 볼 카메라 (G444). 없으면 <see cref="UnityEngine.Camera.main"/>.</summary>
+        public Camera? Camera { get; set; }
+
+        /// <summary><c>face="camera"</c> 요소를 카메라 쪽으로 돌린다. 플레이 중에는 판 GameObject가 프레임마다 부른다.</summary>
+        public void FaceCamera()
+        {
+            var camera = Camera != null ? Camera : UnityEngine.Camera.main;
+            if (camera == null) return;
+            foreach (var node in _nodes.Values)
+                if (node.FacesCamera) node.GameObject.transform.rotation = camera.transform.rotation;
+        }
+
         public ElementId CreateObject(string key)
         {
             var go = new GameObject(key);
@@ -177,13 +196,17 @@ namespace Kesa.Engine.Unity
 
         private static long Raw(float real) => (long)Math.Round(real * (double)Bridge.BridgeFixed.Scale);
 
-        public void PlaceObject(ElementId obj, LookPosition position, long unit)
+        public void PlaceObject(ElementId obj, LookPosition position, LookFrame frame, long unit)
         {
             var t = _nodes[obj.Value].GameObject.transform;
             t.localPosition = new Vector3(Real(position.X), Real(position.Y), Real(position.Z));
+            // 물체 안은 위 = +Y, 북 = +Z, 동 = +X (G443)
+            t.localRotation = Quaternion.LookRotation(Vector(frame.North), Vector(frame.Up));
             float scale = Real(unit);
             t.localScale = new Vector3(scale, scale, scale);
         }
+
+        private static Vector3 Vector(LookPosition p) => new Vector3(Real(p.X), Real(p.Y), Real(p.Z));
 
         public void SetOpacity(ElementId obj, long opacity)
         {
@@ -202,6 +225,7 @@ namespace Kesa.Engine.Unity
             var view = new SpriteView(_pictures);
             view.ShowMissing();
             view.GameObject.transform.SetParent(_nodes[obj.Value].GameObject.transform, false);
+            view.GameObject.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
         }
 
         public ElementId Create(string kind, ElementId parent, int index)
@@ -212,11 +236,36 @@ namespace Kesa.Engine.Unity
             var view = create(_assets);
             view.GameObject.transform.SetParent(owner.GameObject.transform, false);
             view.GameObject.transform.SetSiblingIndex(index);
-            var node = new Node(view.GameObject, view, owner);
+            var node = new Node(view.GameObject, view, owner) { Flat = kind == "Sprite" || kind == "Text" };
             owner.Children.Insert(Math.Min(index, owner.Children.Count), node);
             (owner.View as ILookParentView)?.Insert(view, index);
             view.SetSortingOrder(node.Order);
+            Orient(node);
             return Add(node);
+        }
+
+        // 뼈 아래(Attach)는 뼈의 축 그대로 (G435), 그 밖은 offset "x,y,z"가 동·북·위이고 평면 그림은 바닥에 눕는다 (G443·G444)
+        private static void Orient(Node node)
+        {
+            var t = node.GameObject.transform;
+            bool bone = InBone(node);
+            var o = node.Offset;
+            t.localPosition = bone ? o : new Vector3(o.x, o.z, o.y);
+            var lying = node.Flat && !bone ? Quaternion.Euler(90f, 0f, 0f) : Quaternion.identity;
+            t.localRotation = Quaternion.AngleAxis(node.Turn, Vector3.up) * lying;
+        }
+
+        private static bool InBone(Node node)
+        {
+            for (var p = node.Parent; p != null; p = p.Parent)
+                if (p.View is AttachView) return true;
+            return false;
+        }
+
+        private static void Reorient(Node node)
+        {
+            Orient(node);
+            foreach (var child in node.Children) Reorient(child);
         }
 
         public void Set(ElementId element, string attribute, LookAttributeValue value)
@@ -229,8 +278,16 @@ namespace Kesa.Engine.Unity
                     Reorder(node);
                     break;
                 case "offset":
-                    node.GameObject.transform.localPosition = new Vector3(Real(value.Numbers[0]), Real(value.Numbers[1]),
-                        value.Numbers.Count > 2 ? Real(value.Numbers[2]) : 0f);
+                    node.Offset = new Vector3(Real(value.Numbers[0]), Real(value.Numbers[1]), value.Numbers.Count > 2 ? Real(value.Numbers[2]) : 0f);
+                    Orient(node);
+                    break;
+                case "turn":
+                    node.Turn = Real(value.Numbers[0]);
+                    Orient(node);
+                    break;
+                case "face":
+                    node.FacesCamera = value.Text == "camera";
+                    Orient(node);
                     break;
                 default:
                     node.View?.Set(attribute, value);
@@ -249,6 +306,7 @@ namespace Kesa.Engine.Unity
             owner.Children.Insert(Math.Min(index, owner.Children.Count), node);
             node.GameObject.transform.SetParent(owner.GameObject.transform, false);
             node.GameObject.transform.SetSiblingIndex(index);
+            Reorient(node);
             // 부모 뷰가 제자리(뼈 아래)로 다시 옮길 수 있게 마지막에
             if (node.View != null) (owner.View as ILookParentView)?.Insert(node.View, index);
             Reorder(node);

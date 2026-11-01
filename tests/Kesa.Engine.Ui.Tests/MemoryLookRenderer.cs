@@ -16,6 +16,7 @@ namespace Kesa.Engine.Ui.Tests
             public bool Visible = true;
             public bool Missing;
             public LookPosition? Position;
+            public LookFrame Frame;
             public long Opacity = Bridge.BridgeFixed.Scale;
             public long Unit;
         }
@@ -35,9 +36,10 @@ namespace Kesa.Engine.Ui.Tests
             return new ElementId(id);
         }
 
-        public void PlaceObject(ElementId obj, LookPosition position, long unit)
+        public void PlaceObject(ElementId obj, LookPosition position, LookFrame frame, long unit)
         {
             Nodes[obj.Value].Position = position;
+            Nodes[obj.Value].Frame = frame;
             Nodes[obj.Value].Unit = unit;
         }
 

@@ -11,9 +11,10 @@ namespace Kesa.Engine.Ui
 
         /// <summary>
         /// 물체를 놓는다. 위치는 공간 종류가 계산한 Unity 축의 고정소수점 원래 정수값이다. 물체를 <paramref name="unit"/>(공간 한 단위, 같은 눈금)만큼
-        /// 키워 그 안의 <c>size</c>·<c>offset</c>과 기본 크기가 공간 단위가 되게 한다.
+        /// 키워 그 안의 <c>size</c>·<c>offset</c>과 기본 크기가 공간 단위가 되게 한다. 물체는 <paramref name="frame"/>에 맞춰 세운다 (G443): 물체 안의
+        /// 위가 틀의 위, 앞이 북, 오른쪽이 동이고 요소의 <c>offset</c> "x,y,z"는 동·북·위다.
         /// </summary>
-        void PlaceObject(ElementId obj, LookPosition position, long unit);
+        void PlaceObject(ElementId obj, LookPosition position, LookFrame frame, long unit);
 
         /// <summary>물체 전체의 투명도 (G425): 고정소수점 원래 정수값으로 0(안 보임)부터 1(그대로)까지. 효과가 흐려질 때 쓴다.</summary>
         void SetOpacity(ElementId obj, long opacity);

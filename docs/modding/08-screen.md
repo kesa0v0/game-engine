@@ -708,15 +708,22 @@ def hit_flash(x, y, damage):
 
 | 요소 | 속성 |
 |---|---|
-| `Sprite` | `src`(그림 경로), `size`(`"1,0.5"`, 빼면 긴 변이 한 칸이고 그림 비율을 지킴), `tint`(`#rrggbb`·`#rrggbbaa`) |
-| `Text` | `text`(글), `size`(글자 높이, 칸 단위, 기본 0.5), `color`(`#rrggbb`·`#rrggbbaa`). 글꼴은 호스트 기본 |
-| `Model` | `src`(모델 파일, 확장자로 로더를 고름. Unity는 glTF `.glb`·`.gltf`). 맡을 로더가 없는 확장자는 로드 문제. `scale`(모델 단위에 곱하는 수, 기본 1이면 모델 단위 1이 칸 하나, 0보다 커야 함. 붙인 요소도 함께 커짐). `state`(지금 상태 이름, 빼면 첫 `State`), `fade`(상태가 바뀔 때 섞는 초, 기본 0), `tint`(모든 재질의 색에 곱함) |
+| `Sprite` | `src`(그림 경로), `size`(`"1,0.5"`, 빼면 긴 변이 한 칸이고 그림 비율을 지킴), `tint`(`#rrggbb`·`#rrggbbaa`), `turn`, `face` |
+| `Text` | `text`(글), `size`(글자 높이, 칸 단위, 기본 0.5), `color`(`#rrggbb`·`#rrggbbaa`), `turn`, `face`. 글꼴은 호스트 기본 |
+| `Model` | `src`(모델 파일, 확장자로 로더를 고름. Unity는 glTF `.glb`·`.gltf`). 맡을 로더가 없는 확장자는 로드 문제. `scale`(모델 단위에 곱하는 수, 기본 1이면 모델 단위 1이 칸 하나, 0보다 커야 함. 붙인 요소도 함께 커짐). `state`(지금 상태 이름, 빼면 첫 `State`), `fade`(상태가 바뀔 때 섞는 초, 기본 0), `tint`(모든 재질의 색에 곱함), `turn` |
 | `Paint` | `Model` 바로 안. `material`(모델의 재질 이름), `color`. 그 재질에는 `tint` 대신 이 색을 곱한다. 칠할 부분은 모델러가 재질로 나누고 밝게 그려 둔다. 없는 재질 이름은 그릴 때 경고 |
 | `State` | `Model` 바로 안. `name`, `clip`(모델 파일 안의 애니메이션 이름), `once`(`true`면 한 번 틀고 끝 자세에 멈춤), `next`(한 번 튼 뒤 갈 상태), `fade`(이 상태로 올 때의 섞는 초, `Model`의 것보다 먼저), `blend`(안의 `Clip`을 섞는 수) |
 | `Attach` | `Model` 바로 안. `bone`(모델 안 부분의 이름, glTF는 노드 이름). 안의 요소가 그 부분의 자리·방향·크기를 따라간다(`offset`도 그 기준). 없는 이름은 그릴 때 경고하고 모델 원점 |
 | `Clip` | `State` 바로 안. `clip`, `at`(블렌드 축의 자리). `blend`가 두 `at` 사이면 그 둘을 거리 비율로 섞는다 |
-| `Group` | 자식을 함께 옮기고 함께 숨긴다 |
-| 모든 요소 | `layer`(정수, 큰 것이 위), `offset`(`"0,0.5"`, 묶음 안에서는 부모 기준), `bind-속성`, `bind-display`, `for` |
+| `Group` | 자식을 함께 옮기고 함께 숨긴다. `turn`은 자식을 함께 돌린다 |
+| 모든 요소 | `layer`(정수, 큰 것이 위), `offset`(`"동,북"` 또는 `"동,북,위"`, 칸 단위, 묶음 안에서는 부모 기준. `Attach` 안에서는 그 부분의 축 그대로), `bind-속성`, `bind-display`, `for` |
+
+방향: 공간 종류는 자리마다 위·북·동 방향(틀)을 준다. 격자 `plane="xy"`는 위가 보는 사람 쪽, 북이 화면 위, 동이 오른쪽이고,
+`plane="xz"`는 위가 높이, 북이 앞쪽(모드 +y), 동이 오른쪽이다. `flip-y`는 자리만 뒤집고 틀은 그대로라 그림이 거꾸로 서지 않는다.
+
+- `Model`은 모델의 위(glTF +Y)를 틀의 위로, 앞(+Z)을 북으로 둔다. 그래서 2D 판(`xy`)의 모델은 위에서 내려다본 모습이다.
+- `Sprite`·`Text`는 틀의 바닥에 눕고 그림의 위쪽이 북을 본다. `face="camera"`면 늘 카메라를 본다(빌보드). `face`는 `floor`(기본)·`camera`.
+- `turn`은 나침반 각도(도)다. 위에서 보아 시계 방향, 0이 북, 90이 동.
 
 - `bind-속성="키"`는 그림 값의 키를 읽는다: `look("soldier", art="art/red.png", hurt=True)`이면 `bind-src="art"`·`bind-display="hurt"`.
   사전 키는 점으로(`gear.flag`), `for="f in flags"`는 목록의 항목마다 자식을 만든다.

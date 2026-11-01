@@ -55,13 +55,17 @@ namespace Kesa.Engine.Ui
                 ["src"] = LookAttributeType.Path,
                 ["size"] = LookAttributeType.Vector2,
                 ["tint"] = LookAttributeType.Color,
-            }, acceptsChildren: false));
+                ["turn"] = LookAttributeType.Number,
+                ["face"] = LookAttributeType.Name,
+            }, acceptsChildren: false, check: CheckFace));
             kinds.Add(new LookElementKind("Text", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
             {
                 ["text"] = LookAttributeType.Text,
                 ["size"] = LookAttributeType.Number,
                 ["color"] = LookAttributeType.Color,
-            }, acceptsChildren: false));
+                ["turn"] = LookAttributeType.Number,
+                ["face"] = LookAttributeType.Name,
+            }, acceptsChildren: false, check: CheckFace));
             kinds.Add(new LookElementKind("Model", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
             {
                 ["src"] = LookAttributeType.Path,
@@ -69,6 +73,7 @@ namespace Kesa.Engine.Ui
                 ["fade"] = LookAttributeType.Number,
                 ["tint"] = LookAttributeType.Color,
                 ["scale"] = LookAttributeType.Number,
+                ["turn"] = LookAttributeType.Number,
             }, acceptsChildren: true, check: (name, value) => name == "src" ? kinds.CheckModel(value.Text!)
                 : name == "scale" ? (value.Numbers[0] > 0 ? null : "a scale is more than 0") : NotNegative(name, value),
                 validate: model => ValidateModel(model, kinds)));
@@ -95,10 +100,20 @@ namespace Kesa.Engine.Ui
                 ["material"] = LookAttributeType.Name,
                 ["color"] = LookAttributeType.Color,
             }, acceptsChildren: false, parents: new[] { "Model" }, validate: ValidatePaint));
-            kinds.Add(new LookElementKind("Group", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal), acceptsChildren: true));
+            kinds.Add(new LookElementKind("Group", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
+            {
+                ["turn"] = LookAttributeType.Number,
+            }, acceptsChildren: true));
             kinds.Add(new GridSpace());
             return kinds;
         }
+
+        private static readonly string[] Faces = { "floor", "camera" };
+
+        // 평면 그림은 틀의 바닥에 눕거나 카메라를 본다 (G444)
+        private static string? CheckFace(string name, LookAttributeValue value) =>
+            name == "face" && Array.IndexOf(Faces, value.Text) < 0
+                ? "a face is floor or camera" + UiSuggest.Hint(value.Text ?? "", Faces) : null;
 
         // ---- 모델 애니메이션 (G434) ----
 

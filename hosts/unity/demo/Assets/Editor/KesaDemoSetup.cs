@@ -72,6 +72,16 @@ public static class KesaDemoSetup
         if (at < 0 || at + 1 >= args.Length) throw new InvalidOperationException("missing -kesaShot <png path>");
         EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
         var demo = UnityEngine.Object.FindFirstObjectByType<KesaDemo>()!;
+        // -kesaEnable a,b: 켤 모드 (비교용, 장면의 enabledMods 대신)
+        int enable = Array.IndexOf(args, "-kesaEnable");
+        if (enable >= 0 && enable + 1 < args.Length)
+        {
+            var property = new SerializedObject(demo).FindProperty("enabledMods");
+            var ids = args[enable + 1].Split(',');
+            property.arraySize = ids.Length;
+            for (int i = 0; i < ids.Length; i++) property.GetArrayElementAtIndex(i).stringValue = ids[i];
+            property.serializedObject.ApplyModifiedPropertiesWithoutUndo();
+        }
         await demo.Begin(new VisualElement());
         await demo.WaitPictures();
         var camera = Camera.main!;
