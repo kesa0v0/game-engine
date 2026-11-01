@@ -1,17 +1,19 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Kesa.Engine.Bridge;
 
 namespace Kesa.Engine.Ui
 {
     /// <summary>
-    /// 그림 요소 종류와 공간 종류를 등록하는 자리 (G390·G394·G413). <see cref="Standard"/>가 기본 종류(<c>Sprite</c>·<c>Text</c>·<c>Model</c>·<c>Group</c>·<c>grid</c>)를
+    /// 그림 요소 종류, 공간 종류, 카메라 리그를 등록하는 자리 (G390·G394·G413·G442). <see cref="Standard"/>가 기본 종류(<c>Sprite</c>·<c>Text</c>·<c>Model</c>·<c>Group</c>·<c>grid</c>·<c>top</c>·<c>tilted</c>)를
     /// 넣은 것을 주고 게임은 여기에 제 종류를 더한다. 해석기는 기본 종류를 따로 알지 않는다.
     /// </summary>
     public sealed class LookKinds
     {
         private readonly SortedDictionary<string, LookElementKind> _elements = new SortedDictionary<string, LookElementKind>(StringComparer.Ordinal);
         private readonly SortedDictionary<string, SpaceKind> _spaces = new SortedDictionary<string, SpaceKind>(StringComparer.Ordinal);
+        private readonly SortedDictionary<string, ViewRig> _rigs = new SortedDictionary<string, ViewRig>(StringComparer.Ordinal);
         private readonly SortedSet<string> _modelFormats = new SortedSet<string>(StringComparer.Ordinal);
 
         /// <summary>모델 로더가 맡는 확장자(소문자, 점 포함) (G391). 호스트가 로더를 등록하며 더한다.</summary>
@@ -105,7 +107,41 @@ namespace Kesa.Engine.Ui
                 ["turn"] = LookAttributeType.Number,
             }, acceptsChildren: true));
             kinds.Add(new GridSpace());
+            kinds.Add(new ViewRig("top", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
+            {
+                ["size"] = LookAttributeType.Number,
+                ["zoom"] = LookAttributeType.Vector2,
+            }, new SortedDictionary<string, string>(StringComparer.Ordinal) { ["size"] = "4" }, CheckRig));
+            kinds.Add(new ViewRig("tilted", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
+            {
+                ["tilt"] = LookAttributeType.Number,
+                ["turn"] = LookAttributeType.Number,
+                ["distance"] = LookAttributeType.Number,
+                ["zoom"] = LookAttributeType.Vector2,
+                ["fov"] = LookAttributeType.Number,
+            }, new SortedDictionary<string, string>(StringComparer.Ordinal) { ["tilt"] = "50", ["distance"] = "10" }, CheckRig));
             return kinds;
+        }
+
+        // ---- 카메라 리그 (G442·G446) ----
+
+        private static string? CheckRig(string name, LookAttributeValue value)
+        {
+            long n = value.Numbers[0];
+            switch (name)
+            {
+                case "size":
+                case "distance":
+                    return n > 0 ? null : "a " + name + " is more than 0";
+                case "tilt":
+                    return n >= 0 && n <= 90 * BridgeFixed.Scale ? null : "a tilt is from 0 (straight down) to 90 (level)";
+                case "fov":
+                    return n > 0 && n < 180 * BridgeFixed.Scale ? null : "a fov is more than 0 and less than 180 degrees";
+                case "zoom":
+                    return n > 0 && value.Numbers[1] >= n ? null : "a zoom is \"least,most\", both more than 0 and least first";
+                default:
+                    return null;
+            }
         }
 
         private static readonly string[] Faces = { "floor", "camera" };
@@ -209,6 +245,26 @@ namespace Kesa.Engine.Ui
             if (_spaces.ContainsKey(kind.Name)) throw new ArgumentException("the space kind '" + kind.Name + "' is already registered");
             _spaces.Add(kind.Name, kind);
         }
+
+        /// <summary>이 리그는 모든 View가 받는 속성(<see cref="ViewCommon"/>)을 선언할 수 없다.</summary>
+        public void Add(ViewRig rig)
+        {
+            if (_rigs.ContainsKey(rig.Name)) throw new ArgumentException("the camera rig '" + rig.Name + "' is already registered");
+            foreach (var attribute in rig.Attributes.Keys)
+                if (Array.IndexOf(ViewCommon, attribute) >= 0)
+                    throw new ArgumentException("the camera rig '" + rig.Name + "' cannot declare '" + attribute + "' (every view takes it)");
+            foreach (var attribute in rig.Required.Keys)
+                if (!rig.Attributes.ContainsKey(attribute))
+                    throw new ArgumentException("the camera rig '" + rig.Name + "' requires '" + attribute + "' but does not take it");
+            _rigs.Add(rig.Name, rig);
+        }
+
+        /// <summary>모든 View가 받는 속성 (G441·G445).</summary>
+        public static readonly string[] ViewCommon = { "name", "rig", "space", "look-at", "offset" };
+
+        public IEnumerable<string> RigNames => _rigs.Keys;
+
+        public bool TryGetRig(string name, out ViewRig rig) => _rigs.TryGetValue(name, out rig!);
 
         public bool TryGetElement(string name, out LookElementKind kind) => _elements.TryGetValue(name, out kind!);
 

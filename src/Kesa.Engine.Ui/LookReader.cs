@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
+using Kesa.Engine.Bridge;
 
 namespace Kesa.Engine.Ui
 {
@@ -15,6 +16,7 @@ namespace Kesa.Engine.Ui
     {
         public const string LookExtension = ".look.xml";
         public const string SpaceExtension = ".space.xml";
+        public const string ViewExtension = ".view.xml";
 
         private static readonly Regex ForPattern = new Regex(@"^\s*([A-Za-z_][A-Za-z0-9_]*)\s+in\s+(.+)$", RegexOptions.CultureInvariant);
 
@@ -125,6 +127,121 @@ namespace Kesa.Engine.Ui
                 foreach (var message in messages) problems.Add(new UiProblem(place, message));
                 if (layout != null && name != null) spaces.Add(new SpaceDeclaration(name, kindName, source.Mod, place, layout));
             }
+        }
+
+        public static void ReadViews(LookSource source, LookKinds kinds, List<ViewDeclaration> views, List<UiProblem> problems)
+        {
+            var root = Parse(source, "Views", problems);
+            if (root == null) return;
+            foreach (var node in root.Elements())
+            {
+                string place = Place(source.Path, node);
+                if (node.Name.LocalName != "View")
+                {
+                    problems.Add(new UiProblem(place, "a view file holds <View name=\"…\" rig=\"…\"/> elements, got <" + node.Name.LocalName + ">"));
+                    continue;
+                }
+                if (node.HasElements) problems.Add(new UiProblem(place, "<View> has no children"));
+                string? name = Name(node, place, "View", problems);
+                string? rigName = node.Attribute("rig")?.Value;
+                if (rigName == null)
+                {
+                    problems.Add(new UiProblem(place, "<View> needs a rig (can be: " + string.Join(", ", kinds.RigNames) + ")"));
+                    continue;
+                }
+                if (!kinds.TryGetRig(rigName, out var rig))
+                {
+                    problems.Add(new UiProblem(place, "rig=\"" + rigName + "\": no camera rig is registered with this name" +
+                        UiSuggest.Hint(rigName, kinds.RigNames) + " (can be: " + string.Join(", ", kinds.RigNames) + ")"));
+                    continue;
+                }
+                bool ok = name != null;
+                var settings = new SortedDictionary<string, LookAttributeValue>(StringComparer.Ordinal);
+                IReadOnlyList<long> offset = new long[3];
+                foreach (var attribute in node.Attributes())
+                {
+                    string n = attribute.Name.LocalName;
+                    if (attribute.IsNamespaceDeclaration || n == "name" || n == "rig" || n == "space" || n == "look-at") continue;
+                    var type = n == "offset" ? LookAttributeType.Vector : rig.Attributes.TryGetValue(n, out var t) ? t : (LookAttributeType?)null;
+                    if (type == null)
+                    {
+                        var known = rig.Attributes.Keys.Concat(LookKinds.ViewCommon).ToList();
+                        problems.Add(new UiProblem(place, n + ": the rig '" + rigName + "' has no such setting" + UiSuggest.Hint(n, known) +
+                            " (can be: " + string.Join(", ", known) + ")"));
+                        ok = false;
+                        continue;
+                    }
+                    var value = LookAttributes.FromText(type.Value, attribute.Value, out string error);
+                    if (value != null && n != "offset" && rig.Check != null) error = rig.Check(n, value) ?? "";
+                    if (value == null || error.Length > 0)
+                    {
+                        problems.Add(new UiProblem(place, n + "=\"" + attribute.Value + "\": " + error));
+                        ok = false;
+                        continue;
+                    }
+                    if (n == "offset") offset = value.Numbers.Concat(new long[3 - value.Numbers.Count]).ToList();
+                    else settings[n] = value;
+                }
+                string? space = node.Attribute("space")?.Value;
+                string? lookAt = node.Attribute("look-at")?.Value;
+                foreach (var pair in new[] { ("space", space, "square"), ("look-at", lookAt, "2,2") })
+                    if (pair.Item2 == null)
+                    {
+                        problems.Add(new UiProblem(place, "<View> needs " + pair.Item1 + ", like " + pair.Item1 + "=\"" + pair.Item3 + "\""));
+                        ok = false;
+                    }
+                foreach (var required in rig.Required)
+                    if (!settings.ContainsKey(required.Key) && node.Attribute(required.Key) == null)
+                    {
+                        problems.Add(new UiProblem(place, "the rig '" + rigName + "' needs " + required.Key + ", like " + required.Key + "=\"" + required.Value + "\""));
+                        ok = false;
+                    }
+                BridgeValue? at = null;
+                if (lookAt != null)
+                {
+                    at = PlaceValue(lookAt, out string error);
+                    if (at == null)
+                    {
+                        problems.Add(new UiProblem(place, "look-at=\"" + lookAt + "\": " + error));
+                        ok = false;
+                    }
+                }
+                if (ok) views.Add(new ViewDeclaration(name!, rigName, source.Mod, place, space!, at!, offset, settings));
+            }
+        }
+
+        // at()의 값처럼 (G446): 쉼표면 목록, 수면 수, 그 밖은 이름 글
+        private static BridgeValue? PlaceValue(string text, out string error)
+        {
+            error = "";
+            var parts = text.Split(',');
+            var items = new List<BridgeValue>();
+            foreach (var part in parts)
+            {
+                string s = part.Trim();
+                if (s.Length == 0)
+                {
+                    error = "a place is a name or numbers joined by ',', like \"2,2\"";
+                    return null;
+                }
+                bool number = s[0] == '-' || s[0] == '.' || char.IsDigit(s[0]);
+                if (!number)
+                {
+                    if (parts.Length == 1) return new BridgeStr(s);
+                    error = "'" + s + "' is not a number; a list place is numbers like \"2,2\"";
+                    return null;
+                }
+                try
+                {
+                    items.Add(UiExprParser.ParseNumber(s));
+                }
+                catch (UiSyntaxException e)
+                {
+                    error = "'" + s + "': " + e.Message;
+                    return null;
+                }
+            }
+            return parts.Length == 1 ? items[0] : new BridgeList(items);
         }
 
         public static XElement? Parse(LookSource source, string rootName, List<UiProblem> problems)

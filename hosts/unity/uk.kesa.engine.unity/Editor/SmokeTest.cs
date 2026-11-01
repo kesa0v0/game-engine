@@ -115,7 +115,61 @@ namespace Kesa.Engine.Unity.Editor
             await CheckPreload(game, session);
             CheckFx(game, session);
             await CheckInputs(game.Mods, session);
+            CheckCameras(mods);
             UssCheck.Run();
+        }
+
+        /// <summary>카메라 리그 (G442·G443·G445): skirmish의 main은 옛 데모 카메라와 같은 곳에, tilted는 틀과 turn을 따른다.</summary>
+        private static void CheckCameras(LoadedMods mods)
+        {
+            var board = new GameObject("camera board").transform;
+            var camera = new GameObject("camera check", typeof(Camera)).GetComponent<Camera>();
+            // 창이 없어도 화면 크기가 있게
+            camera.targetTexture = new RenderTexture(400, 200, 16);
+            try
+            {
+                Require(mods.Looks.Views.TryGetValue("main", out var main), "skirmish declares the view main");
+                var top = BoardCameras.Standard().Start(camera, board, main!)!;
+                Require(camera.orthographic && Mathf.Approximately(camera.orthographicSize, 4f), "top is orthographic with size 4");
+                Require(Vector3.Distance(camera.transform.position, new Vector3(2f, -1.5f, -100f)) < 1e-3f, "top looks at (2, -1.5) from -z, is at " + camera.transform.position);
+                Require(Quaternion.Angle(camera.transform.rotation, Quaternion.identity) < 0.01f, "top on an xy board is not turned");
+                top.Zoom(-100f);
+                Require(Mathf.Approximately(camera.orthographicSize, 8f), "zoom stops at its most, 8, got " + camera.orthographicSize);
+                // 화면 가운데에 있던 곳을 오른쪽으로 끌면 카메라는 왼쪽(서)으로 간다
+                var middle = new Vector2(camera.pixelWidth / 2f, camera.pixelHeight / 2f);
+                top.Pan(middle, middle + new Vector2(camera.pixelWidth / 4f, 0));
+                Require(top.Target.x < 2f - 0.5f && Mathf.Approximately(top.Target.y, -1.5f), "a drag right moves the view west, at " + top.Target);
+
+                foreach (var plane in new[] { "xy", "xz" })
+                {
+                    var library = LookLibrary.Load(new[]
+                    {
+                        new LookSource("check", "check/a.space.xml", "<Spaces><Space name=\"s\" kind=\"grid\" plane=\"" + plane + "\" /></Spaces>"),
+                        new LookSource("check", "check/a.view.xml", "<Views>" +
+                            "<View name=\"flat\" rig=\"tilted\" space=\"s\" look-at=\"0,0\" tilt=\"0\" distance=\"10\" />" +
+                            "<View name=\"east\" rig=\"tilted\" space=\"s\" look-at=\"0,0\" tilt=\"60\" turn=\"90\" distance=\"10\" fov=\"30\" />" +
+                            "</Views>"),
+                    }, GameObjectLookRenderer.StandardKinds());
+                    Require(library.Problems.Count == 0, "the camera check views read: " + string.Join("; ", library.Problems));
+                    var frame = plane == "xz" ? (up: Vector3.up, east: Vector3.right) : (up: Vector3.back, east: Vector3.right);
+                    BoardCameras.Standard().Start(camera, board, library.Views["flat"]);
+                    Require(!camera.orthographic && Mathf.Approximately(camera.fieldOfView, 40f), plane + ": tilted is a perspective with fov 40 by default");
+                    Require(Vector3.Angle(camera.transform.forward, -frame.up) < 0.1f, plane + ": tilt 0 looks straight down like top");
+                    Require(Vector3.Distance(camera.transform.position, frame.up * 10f) < 1e-3f, plane + ": the camera is 10 above, at " + camera.transform.position);
+                    BoardCameras.Standard().Start(camera, board, library.Views["east"]);
+                    var level = Vector3.ProjectOnPlane(camera.transform.forward, frame.up);
+                    Require(Vector3.Angle(level, frame.east) < 0.1f, plane + ": turn 90 looks east, looks " + camera.transform.forward);
+                    Require(Mathf.Abs(Vector3.Angle(camera.transform.forward, -frame.up) - 60f) < 0.1f, plane + ": tilt 60 is 60 degrees from straight down");
+                    Require(Vector3.Dot(camera.transform.up, frame.up) > 0, plane + ": the camera stands upright");
+                    Require(Mathf.Approximately(camera.fieldOfView, 30f), plane + ": fov 30");
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(camera.targetTexture);
+                UnityEngine.Object.DestroyImmediate(camera.gameObject);
+                UnityEngine.Object.DestroyImmediate(board.gameObject);
+            }
         }
 
         /// <summary>편집 모드에서는 프레임이 돌지 않으므로 다 읽힌 그림을 손으로 건다 (G392).</summary>

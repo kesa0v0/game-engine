@@ -53,13 +53,14 @@ public sealed class KesaDemo : MonoBehaviour
 
     [SerializeField] private string[] languages = { "ko", "en" };
 
-    [Tooltip("카메라가 비출 판의 가운데와 반 높이 (판 단위)")]
-    [SerializeField] private Vector2 boardCenter = new Vector2(2f, -1.5f);
-    [SerializeField] private float boardHalfHeight = 4f;
+    [Tooltip("판을 볼 View 이름 (모드의 .view.xml)")]
+    [SerializeField] private string view = "main";
 
     private UiInterpreter? _ui;
     private LookBoard? _board;
     private GameObjectLookRenderer? _boardRenderer;
+    private BoardCamera? _camera;
+    private Vector2? _panFrom;
     private ModInputs? _inputs;
     private VisualElement? _root;
     private int _boardProblems;
@@ -147,9 +148,10 @@ public sealed class KesaDemo : MonoBehaviour
         var camera = Camera.main;
         if (camera != null)
         {
-            camera.orthographic = true;
-            camera.orthographicSize = boardHalfHeight;
-            camera.transform.SetPositionAndRotation(new Vector3(boardCenter.x, boardCenter.y, -10f), Quaternion.identity);
+            if (!mods.Looks.Views.TryGetValue(view, out var declared))
+                Debug.LogWarning("Kesa: no .view.xml declares the view '" + view + "' (views: " + string.Join(", ", mods.Looks.Views.Keys) + ")");
+            else if ((_camera = BoardCameras.Standard().Start(camera, board.transform, declared)) == null)
+                Debug.LogWarning("Kesa: the view '" + view + "' uses the rig '" + declared.Rig + "', which this demo does not drive");
         }
         await RefreshBoard();
     }
@@ -159,12 +161,7 @@ public sealed class KesaDemo : MonoBehaviour
     {
         var camera = Camera.main;
         if (_board == null || _boardRenderer == null || camera == null) return;
-        var panel = _root?.panel;
-        if (panel != null)
-        {
-            var picked = panel.Pick(RuntimePanelUtils.ScreenToPanel(panel, new Vector2(screenPoint.x, Screen.height - screenPoint.y)));
-            if (picked != null && picked != _root && picked != panel.visualTree) return;
-        }
+        if (OverPanel(screenPoint)) return;
         var ray = camera.ScreenPointToRay(screenPoint);
         var result = await _board.InputAsync(input, _boardRenderer.KeysAt(ray), _boardRenderer.PlaceAt(_board.Stage, ray));
         if (result != null && !result.Succeeded) Debug.LogWarning("Kesa board press -> " + result);
@@ -216,6 +213,32 @@ public sealed class KesaDemo : MonoBehaviour
         }
     }
 
+    // 가운데 버튼으로 끌어 옮기고 휠로 확대한다: 왼쪽은 고르기, 오른쪽은 살피기라 비켜 둔다
+    private void MoveCamera()
+    {
+        var mouse = Mouse.current;
+        if (_camera == null || mouse == null) return;
+        var at = mouse.position.ReadValue();
+        if (mouse.middleButton.wasPressedThisFrame && !OverPanel(at)) _panFrom = at;
+        if (!mouse.middleButton.isPressed) _panFrom = null;
+        if (_panFrom is Vector2 from && from != at)
+        {
+            _camera.Pan(from, at);
+            _panFrom = at;
+        }
+        float wheel = mouse.scroll.ReadValue().y;
+        // 휠 한 눈금의 값이 플랫폼·설정마다 달라(1 또는 120) 방향만 쓴다
+        if (wheel != 0 && !OverPanel(at)) _camera.Zoom(Mathf.Sign(wheel));
+    }
+
+    private bool OverPanel(Vector2 screenPoint)
+    {
+        var panel = _root?.panel;
+        if (panel == null) return false;
+        var picked = panel.Pick(RuntimePanelUtils.ScreenToPanel(panel, new Vector2(screenPoint.x, Screen.height - screenPoint.y)));
+        return picked != null && picked != _root && picked != panel.visualTree;
+    }
+
     private void OnDestroy() => _inputs?.Dispose();
 
     private async void Update()
@@ -226,6 +249,7 @@ public sealed class KesaDemo : MonoBehaviour
         {
             // 창이 ESC를 받지 않으면(거짓) 게임이 자기 메뉴를 열 자리다
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) await _ui.Windows.Escape();
+            MoveCamera();
             // 키 입력도 커서 아래로 간다 (G416: 가리킨 유닛에 F)
             if (_inputs != null && Pointer.current != null)
                 foreach (var input in _inputs.PressedThisFrame()) await PressBoard(input, Pointer.current.position.ReadValue());

@@ -36,7 +36,7 @@ namespace Kesa.Engine.Unity
         public Translator Translator { get; }
 
         /// <summary>
-        /// 모드들의 그림 정의(<c>*.look.xml</c>)와 공간(<c>*.space.xml</c>) (G409~G411). 읽다 난 문제는 <see cref="LookLibrary.Problems"/>에 있고
+        /// 모드들의 그림 정의(<c>*.look.xml</c>), 공간(<c>*.space.xml</c>), 보는 법(<c>*.view.xml</c>) (G409~G411·G441). 읽다 난 문제는 <see cref="LookLibrary.Problems"/>에 있고
         /// 틀린 정의만 빠진다.
         /// </summary>
         public LookLibrary Looks { get; }
@@ -88,7 +88,7 @@ namespace Kesa.Engine.Unity
             return new LoadedMods(content, translator, assets, folders, bag.ToSortedList(), looks, inputs);
         }
 
-        // 확장자로 알아보므로 모드 폴더 어디에 있어도 읽는다 (G409·G411·G417). 한 모드 안은 경로 순
+        // 확장자로 알아보므로 모드 폴더 어디에 있어도 읽는다 (G409·G411·G417·G441). 한 모드 안은 경로 순
         private static IEnumerable<LookSource> HostSources(ContentLoadResult content)
         {
             foreach (var mod in content.Mods)
@@ -102,7 +102,7 @@ namespace Kesa.Engine.Unity
             }
         }
 
-        private static readonly string[] HostExtensions = { ".look.xml", ".space.xml", InputLibrary.Extension };
+        private static readonly string[] HostExtensions = { ".look.xml", ".space.xml", ".view.xml", InputLibrary.Extension };
 
         /// <summary>이 모드로 새 판을 연다. 모드를 다시 읽지 않는다.</summary>
         public Match NewMatch(int seed) => new Match(this, new LocalHost(_content, new World(_content, seed: seed)));

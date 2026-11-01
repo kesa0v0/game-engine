@@ -1,0 +1,4 @@
+<!-- 판을 보는 법 (G441·G445): 판 가운데는 1번과 2번 줄 사이라 1번 줄에서 남쪽(flip-y라 화면 아래)으로 반 칸 민다 -->
+<Views>
+  <View name="main" rig="top" space="square" look-at="2,1" offset="0,-0.5" size="4" zoom="2,8" />
+</Views>
