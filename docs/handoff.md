@@ -24,7 +24,7 @@
 
 ## 다음 할 일
 
-1. 봇 점수 도우미: 함수 칸 `Score["T"]`·`BotAction["T"]`(G374)와 `std.ai` 모드(Wesnoth RCA식). 먼저 skirmish 봇을 이 꼴로 다시 써 보며 모양을 정한다.
+1. 봇 점수 도우미: 함수 칸 `Score["T"]`·`BotAction["T"]`(G374)와 `std.ai` 모드(Wesnoth RCA식). 먼저 skirmish 봇을 이 꼴로 다시 써 보며 모양을 정한다. **사용자가 지금은 미룸.** 다시 시작할 때 먼저 물을 것: 첫 공식 모드를 어디에 무슨 id로 두나. 저장소에 `std.*` 모드가 아직 없고, 모드 id에는 점이 안 되므로(G2) `std.ai`는 쓸 수 없다. 낸 선택지는 셋이다: 루트 `mods/`에 id `std_ai`(추천, RimWorld `Data/Core`·Factorio `data/base`식), 엔진 어셈블리에 내장, 지금은 `samples/` 예시로만.
 
 UXML 재사용은 skirmish 카드로 해 봤다: 요약 `ui/unit-summary.uxml`을 목록 카드 `ui/unit-card.uxml`과 정보창이 끼우고, 값이 없을 때는 `if="식"`(G449). `Include`의 고정값 인자·`params` 기본값은 플래그로 갈리는 변형이 여러 화면에 생길 때 묻는다(지금은 파일을 쪼개 조립). 데모 `KesaDemo`는 화면 오류(`ui.Errors`), 봇이 거절당한 이유(`LastProblems`), 열리고 닫힌 질문(`logQuestions`)을 콘솔에 적는다.
 
