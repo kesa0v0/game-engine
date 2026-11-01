@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using Kesa.Engine.Bridge;
+using Kesa.Engine.Bridge.Local;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Host;
 using Kesa.Engine.Loading;
@@ -44,7 +46,8 @@ namespace Kesa.Engine.Bench
             "    return t\n" +
             "def one(s) -> int:\n    return 1\n" +
             "component(\"Shape\", one=derived(int, one), formula=derived(int, formula), mood=derived(int, mood), crunch=derived(int, crunch))\n" +
-            "deftype(\"Unit\", components=[\"Health\", \"Food\", \"Shape\"])\n";
+            "deftype(\"Unit\", components=[\"Health\", \"Food\", \"Shape\"])\n" +
+            "deftype(\"Side\", components=[\"Seatable\"])\n";
 
         private const string Defs =
             "Unit(\"Soldier\")\n" +
@@ -61,7 +64,24 @@ namespace Kesa.Engine.Bench
             "        u = empty[0]\n" +
             "@command(free=True, acts_for=None)\n" +
             "def FeedHost():\n" +
-            "    core.feed.all()\n";
+            "    core.feed.all()\n" +
+            // 봇 장면: 판을 다 훑어 가장 배고픈 유닛 하나를 고르고 먹인다. 같은 일을 규칙 커맨드로도 해서 봇 경로의 몫을 본다
+            "Side(\"Blue\")\n" +
+            "def hungriest():\n" +
+            "    best = None\n" +
+            "    for u in query(Unit):\n" +
+            "        if best is None or u.Food.amount < best.Food.amount:\n" +
+            "            best = u\n" +
+            "    return best\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def Feed(target: Ref[Unit]):\n" +
+            "    target.Food.amount += 1\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def FeedHungriest():\n" +
+            "    hungriest().Food.amount += 1\n" +
+            "@bot\n" +
+            "def feeder(me: Ref[Side]):\n" +
+            "    submit(\"Feed\", target=hungriest())\n";
 
         private static readonly Dictionary<string, Value> NoArgs = new Dictionary<string, Value>();
 
@@ -142,7 +162,7 @@ namespace Kesa.Engine.Bench
 
             Report(print, "create", n, Once(() =>
             {
-                for (int i = 0; i < n; i++) world.Create("Soldier");
+                for (int i = 0; i < n; i++) world.Create("core:Soldier");
             }));
             var units = world.All("Unit");
             if (units.Count != n) throw new InvalidOperationException("expected " + n + " units");
@@ -187,6 +207,19 @@ namespace Kesa.Engine.Bench
                 Measure(reps, () => Submit(world, "core.FeedAll", fail, false)));
             Report(print, "host function command: update all", n,
                 Measure(reps, () => Submit(world, "core.FeedHost", NoArgs, true)));
+
+            var side = world.Create("core:Blue").Value;
+            var host = new LocalHost(content, world);
+            host.Seat(side, "bot", ai: true).GetAwaiter().GetResult();
+            var session = host.Open("bot").GetAwaiter().GetResult();
+            // 한 번에 한 수만: Run 한 번이 생각 한 번과 제출 한 번이다
+            var seat = new BotSeat(session, session.Bot("core.feeder", side).GetAwaiter().GetResult(), maxActs: 1);
+            Report(print, "script command: scan all, update one", n,
+                Measure(reps, () => Submit(world, "core.FeedHungriest", NoArgs, true)));
+            Report(print, "bot think: scan all, submit one", n, Measure(reps, () =>
+            {
+                if (seat.Run().GetAwaiter().GetResult() != 1) throw new InvalidOperationException("the bot did nothing");
+            }));
         }
 
         /// <summary>
@@ -199,7 +232,7 @@ namespace Kesa.Engine.Bench
             var max = world.Member("Health", "max");
             for (int i = 0; i < 1000; i++)
             {
-                var id = world.Create("Soldier");
+                var id = world.Create("core:Soldier");
                 world.AddContribution(id, max, "add", new IntValue(1));
                 world.AddContribution(id, max, "add", new IntValue(2));
             }
@@ -219,7 +252,7 @@ namespace Kesa.Engine.Bench
         private static void ProfileTick(ContentLoadResult content)
         {
             var world = new World(content);
-            for (int i = 0; i < 10000; i++) world.Create("Soldier");
+            for (int i = 0; i < 10000; i++) world.Create("core:Soldier");
             long ticks = 0;
             var sw = Stopwatch.StartNew();
             while (sw.ElapsedMilliseconds < 10000)
@@ -240,7 +273,7 @@ namespace Kesa.Engine.Bench
             const int n = 10000;
             const int reps = 9;
             var world = new World(content);
-            for (int i = 0; i < n; i++) world.Create("Soldier");
+            for (int i = 0; i < n; i++) world.Create("core:Soldier");
             var units = world.All("Unit");
             var baseMax = world.Member("Health", "base_max");
             var current = world.Member("Health", "current");
