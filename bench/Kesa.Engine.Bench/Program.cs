@@ -88,6 +88,7 @@ namespace Kesa.Engine.Bench
         public static int Main(string[] args)
         {
             if (StackProbe.Handles(args)) return 0;
+            if (MinimaxProbe.Handles(args)) return 0;
             var sizes = new List<int>();
             bool profileDerived = false, profileTick = false, shapes = false;
             foreach (var a in args)
