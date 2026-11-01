@@ -124,7 +124,7 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>
-        /// <c>ask(who, title, name=, choices=[...], responses=[...], hint=, data=)</c>의 인자를 검사해 질문의 내용을 만든다 (G138).
+        /// <c>ask(who, title, name=, choices=[...], responses=[...], data=)</c>의 인자를 검사해 질문의 내용을 만든다 (G138).
         /// 멈추는 것은 실행기가 한다. 응답 커맨드 이름은 부른 함수의 모드에서 찾고, 다른 모드의 것은 <c>"모드id.이름"</c>으로 적는다.
         /// </summary>
         private Value Ask(string mod, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
@@ -164,7 +164,6 @@ namespace Kesa.Engine.Runtime
             var choices = new List<OptionValue>();
             var responses = new List<string>();
             var responseNames = new List<string>();
-            string? hint = null;
             string? kind = null;
             Value data = NoneValue.Instance;
             bool hasChoices = false;
@@ -209,12 +208,6 @@ namespace Kesa.Engine.Runtime
                                 "the name tells the UI and bots which kind of question this is, e.g. name=\"skirmish-hit\" (spec-gaps G382)");
                         kind = named.Value;
                         break;
-                    case "hint":
-                        if (pair.Value is StrValue h) hint = h.Value;
-                        else if (!(pair.Value is NoneValue))
-                            throw new ScriptRuntimeException(Codes.RunType, "hint= of ask() must be a str, not " + pair.Value.KindName,
-                                "the hint names how the UI should ask, e.g. \"map_click\" (spec-gaps G137)");
-                        break;
                     case "data":
                         if (!(pair.Value is DictValue) && !(pair.Value is NoneValue))
                             throw new ScriptRuntimeException(Codes.RunType, "data= of ask() must be a dict, not " + pair.Value.KindName,
@@ -243,7 +236,7 @@ namespace Kesa.Engine.Runtime
                         break;
                     default:
                         throw new ScriptRuntimeException(Codes.RunScript, "ask() has no argument '" + pair.Key + "'",
-                            Suggest.Hint(pair.Key, new[] { "name", "choices", "responses", "hint", "data", "blocks_time", "deadline", "on_timeout", "about" }));
+                            Suggest.Hint(pair.Key, new[] { "name", "choices", "responses", "data", "blocks_time", "deadline", "on_timeout", "about" }));
                 }
             }
             if (kind == null)
@@ -260,7 +253,7 @@ namespace Kesa.Engine.Runtime
                 throw new ScriptRuntimeException(Codes.RunScript,
                     "ask() has blocks_time=True and a deadline, but time stops while it is open, so the deadline is never reached",
                     "drop blocks_time=True to let time flow until the deadline (spec X2, spec-gaps G159)");
-            return new AskPayload(who, title, choices, responses, responseNames, hint, data)
+            return new AskPayload(who, title, choices, responses, responseNames, data)
             {
                 BlocksTime = blocksTime ?? deadline == null,
                 DeadlineIn = deadline,
@@ -332,7 +325,6 @@ namespace Kesa.Engine.Runtime
             return new OptionValue(Savable(display, o.Value),
                 o.Label == null ? null : Savable("label= of " + display, o.Label),
                 o.Desc == null ? null : Savable("desc= of " + display, o.Desc),
-                o.Style,
                 o.Data == null ? null : Savable("data= of " + display, o.Data));
         }
 
@@ -374,14 +366,13 @@ namespace Kesa.Engine.Runtime
         private sealed class AskPayload : Value
         {
             public AskPayload(IReadOnlyList<EntityId> who, Value title, IReadOnlyList<OptionValue> choices,
-                IReadOnlyList<string> responses, IReadOnlyList<string> responseNames, string? hint, Value data)
+                IReadOnlyList<string> responses, IReadOnlyList<string> responseNames, Value data)
             {
                 Who = who;
                 Title = title;
                 Choices = choices;
                 Responses = responses;
                 ResponseNames = responseNames;
-                Hint = hint;
                 Data = data;
             }
 
@@ -390,7 +381,6 @@ namespace Kesa.Engine.Runtime
             public IReadOnlyList<OptionValue> Choices { get; }
             public IReadOnlyList<string> Responses { get; }
             public IReadOnlyList<string> ResponseNames { get; }
-            public string? Hint { get; }
             public Value Data { get; }
             public bool BlocksTime { get; set; } = true;
 

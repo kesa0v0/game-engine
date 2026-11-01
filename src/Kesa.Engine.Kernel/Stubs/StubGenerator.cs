@@ -72,7 +72,7 @@ namespace Kesa.Engine.Stubs
             "class Text: ...\n" +
             "def text(key: str, /, **args: Any) -> Text: ...\n" +
             "class Option: ...\n" +
-            "def option(value: Any, /, *, label: str | Text | None = ..., desc: str | Text | None = ..., style: str | None = ..., " +
+            "def option(value: Any, /, *, label: str | Text | None = ..., desc: str | Text | None = ..., " +
             "data: dict[str, Any] | None = ...) -> Option: ...\n" +
             "def look(name: str, /, **keys: Any) -> Any: ...\n" +
             "@overload\n" +
@@ -135,19 +135,17 @@ namespace Kesa.Engine.Stubs
             "    by: Any\n" +
             "    response: Any\n" +
             "    interrupted: bool\n" +
-            "def ask(who: Any, title: str | Text, /, *, name: str, choices: list[Any] = ..., responses: list[str] = ..., hint: Any = ..., " +
+            "def ask(who: Any, title: str | Text, /, *, name: str, choices: list[Any] = ..., responses: list[str] = ..., " +
             "data: Any = ..., blocks_time: bool = ..., deadline: int = ..., about: Any = ..., on_timeout: Any = ...) -> Answer: ...\n" +
             "class Choice:\n" +
             "    value: Any\n" +
             "    label: Any\n" +
             "    desc: Any\n" +
-            "    style: str | None\n" +
             "    data: Any\n" +
             "    index: int\n" +
             "class Question:\n" +
             "    name: str\n" +
             "    title: Any\n" +
-            "    hint: str | None\n" +
             "    data: Any\n" +
             "    choices: list[Choice]\n" +
             "    responses: list[str]\n" +

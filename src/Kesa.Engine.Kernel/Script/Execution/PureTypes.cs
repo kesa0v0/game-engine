@@ -321,17 +321,16 @@ namespace Kesa.Engine.Script
     }
 
     /// <summary>
-    /// 질문의 선택지 하나 (spec-gaps G271): 고를 값과 보이는 모양. <c>option(값, label=, desc=, style=, data=)</c>으로 만들고,
+    /// 질문의 선택지 하나 (spec-gaps G271·G448): 고를 값과 보일 글. <c>option(값, label=, desc=, data=)</c>으로 만들고,
     /// <c>ask</c>는 맨 값을 감싸 질문의 선택지를 늘 이 모양으로 둔다. 커널은 값만 읽고 나머지는 화면이 읽는다.
     /// </summary>
     public sealed class OptionValue : Value, IValueEquality
     {
-        public OptionValue(Value value, Value? label = null, Value? desc = null, string? style = null, Value? data = null)
+        public OptionValue(Value value, Value? label = null, Value? desc = null, Value? data = null)
         {
             Value = value;
             Label = label;
             Desc = desc;
-            Style = style;
             Data = data;
         }
 
@@ -344,18 +343,15 @@ namespace Kesa.Engine.Script
         /// <summary>보일 설명. <see cref="Label"/>과 같은 모양이다.</summary>
         public Value? Desc { get; }
 
-        /// <summary>보이는 모양의 이름표 (<c>"purple-fire"</c>). 커널은 읽지 않는다.</summary>
-        public string? Style { get; }
-
-        /// <summary>화면이 읽을 자유 데이터 (<see cref="DictValue"/>). 없으면 null.</summary>
+        /// <summary>화면이 읽을 자유 데이터 (<see cref="DictValue"/>, 모양의 이름표도 여기에). 없으면 null.</summary>
         public Value? Data { get; }
 
         /// <summary>값만 있고 꾸밈이 없다 (맨 값을 감싼 것과 같다).</summary>
-        public bool IsPlain => Label == null && Desc == null && Style == null && Data == null;
+        public bool IsPlain => Label == null && Desc == null && Data == null;
 
         /// <summary>값과 꾸밈이 모두 같으면 같다 (G142).</summary>
         public bool ValueEquals(Value other) =>
-            other is OptionValue o && o.Style == Style && PureOps.ValuesEqual(o.Value, Value) &&
+            other is OptionValue o && PureOps.ValuesEqual(o.Value, Value) &&
             Same(o.Label, Label) && Same(o.Desc, Desc) && Same(o.Data, Data);
 
         private static bool Same(Value? a, Value? b) => a == null ? b == null : b != null && PureOps.ValuesEqual(a, b);

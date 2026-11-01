@@ -20,7 +20,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\n" +
             "def Branch(p: Ref[Party]):\n" +
             "    p.Score.v = 100\n" +
-            "    r = ask(p, \"Q\", choices=[\"low\", \"high\"], hint=\"std.choice\", data={\"n\": 2, \"who\": p}, name=\"Q\")\n" +
+            "    r = ask(p, \"Q\", choices=[\"low\", \"high\"], data={\"n\": 2, \"who\": p}, name=\"Q\")\n" +
             "    if r.index == 1:\n" +
             "        x = 50\n" +
             "    else:\n" +
@@ -119,7 +119,6 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(q.Who, Is.EqualTo(new[] { _red }));
             Assert.That(((StrValue)q.Title).Value, Is.EqualTo("Q"));
             Assert.That(q.Choices.Select(c => ((StrValue)c.Value).Value), Is.EqualTo(new[] { "low", "high" }));
-            Assert.That(q.Hint, Is.EqualTo("std.choice"));
             var data = (DictValue)q.Data;
             Assert.That(((EntityValue)data.Items[1].Value).Id, Is.EqualTo(_red)); // 엔티티는 저장 가능한 id로
         }

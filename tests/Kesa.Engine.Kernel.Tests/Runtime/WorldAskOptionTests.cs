@@ -10,7 +10,7 @@ using NUnit.Framework;
 namespace Kesa.Engine.Tests.Runtime
 {
     /// <summary>
-    /// 선택지에 보이는 모양을 싣는 <c>option(값, label=, desc=, style=, data=)</c> (spec-gaps G271): 맨 값도 감싸 질문의 선택지는 늘 option,
+    /// 선택지에 보일 글과 데이터를 싣는 <c>option(값, label=, desc=, data=)</c> (spec-gaps G271·G448): 맨 값도 감싸 질문의 선택지는 늘 option,
     /// 답은 안의 값, 저장·불러오기·거른 읽기가 칸 안의 값까지 다룬다.
     /// </summary>
     public class WorldAskOptionTests : LoaderTestBase
@@ -28,7 +28,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    return not entity.Fog.hidden\n" +
             "@command(free=True, acts_for=None)\n" +
             "def Offer(p: Ref[Party], u: Ref[Unit]):\n" +
-            "    opts = [option(\"accept\", label=\"cult-accept\", desc=text(\"cult-accept-desc\", unit=u), style=\"purple-fire\"," +
+            "    opts = [option(\"accept\", label=\"cult-accept\", desc=text(\"cult-accept-desc\", unit=u)," +
             " data={\"cost\": 3, \"unit\": u}), \"decline\", option(u)]\n" +
             "    r = ask(p, \"cult-offer\", choices=opts, deadline=5, on_timeout=\"decline\", name=\"cult-offer\")\n" +
             "    p.Score.v = len(opts) * 10 + r.index\n" +
@@ -37,7 +37,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@command(free=True, acts_for=None)\n" +
             "def Bad(p: Ref[Party], n: int):\n" +
             "    if n == 0:\n" +
-            "        o = option(\"a\", style=3)\n" +
+            "        o = option(\"a\", style=\"danger\")\n" +
             "    elif n == 1:\n" +
             "        o = option(option(\"a\"))\n" +
             "    elif n == 2:\n" +
@@ -81,7 +81,6 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(((StrValue)accept.Label!).Value, Is.EqualTo("cult-accept"));
             var desc = (TextValue)accept.Desc!;
             Assert.That((desc.Key, ((EntityValue)desc.Args["unit"]).Id), Is.EqualTo(("cult-accept-desc", _scout)));
-            Assert.That(accept.Style, Is.EqualTo("purple-fire"));
             Assert.That(((EntityValue)((DictValue)accept.Data!).Items[1].Value).Id, Is.EqualTo(_scout)); // 저장 가능한 id로
 
             var decline = q.Choices[1]; // 맨 값은 감쌌다
@@ -104,7 +103,7 @@ namespace Kesa.Engine.Tests.Runtime
             var q = Offer();
             var saved = Encoding.UTF8.GetString(_w.Save());
             Assert.That(saved, Does.Contain("\"option\": \"accept\""));
-            Assert.That(saved, Does.Contain("\"style\": \"purple-fire\""));
+            Assert.That(saved, Does.Contain("\"desc\": {"));
             Assert.That(saved, Does.Not.Contain("\"option\": \"decline\""), "a plain choice keeps the old save shape");
 
             var loaded = World.Load(LoadClean(), Encoding.UTF8.GetBytes(saved));
@@ -112,12 +111,27 @@ namespace Kesa.Engine.Tests.Runtime
             var w = loaded.World!;
             Assert.That(Encoding.UTF8.GetString(w.Save()), Is.EqualTo(saved), "C4");
             var back = w.OpenRequests.Single();
-            Assert.That(back.Choices.Select(c => c.Style), Is.EqualTo(new[] { "purple-fire", null, null }));
+            Assert.That(back.Choices.Select(c => c.Desc == null), Is.EqualTo(new[] { false, true, true }));
             Assert.That(PureOps.ValuesEqual(back.Choices[0], q.Choices[0]), Is.True);
 
             // 멈춘 흐름의 지역 변수 opts에 든 option도 저장되어 이어 간 본문이 그대로 읽는다
             Assert.That(w.Answer("red", back.Id, _red, 2).Succeeded, Is.True);
             Assert.That(((IntValue)w.Get(_red, w.Member("Score", "v"))).Value, Is.EqualTo(32));
+        }
+
+        /// <summary>선택지의 style과 질문의 hint가 빠지기 전(G448)의 세이브도 둘을 버리고 읽는다.</summary>
+        [Test]
+        public void ASaveFromBeforeStyleAndHintWereDroppedStillLoads()
+        {
+            Offer();
+            var saved = Encoding.UTF8.GetString(_w.Save());
+            var old = System.Text.RegularExpressions.Regex.Replace(saved, "(\"option\": \"accept\",[\\s\\S]*?)(\"data\":)", "$1\"style\": \"purple-fire\", $2");
+            old = System.Text.RegularExpressions.Regex.Replace(old, "(\"response_names\": \\[[^\\]]*\\],\\s*)", "$1\"hint\": \"map\", ");
+            Assert.That(old, Does.Contain("\"style\": \"purple-fire\"").And.Contain("\"hint\": \"map\""));
+
+            var loaded = World.Load(LoadClean(), Encoding.UTF8.GetBytes(old));
+            Assert.That(loaded.Diagnostics.Where(d => d.Severity == Severity.Error), Is.Empty);
+            Assert.That(Encoding.UTF8.GetString(loaded.World!.Save()), Is.EqualTo(saved));
         }
 
         [Test]
@@ -128,12 +142,11 @@ namespace Kesa.Engine.Tests.Runtime
                 new Dictionary<string, Value> { ["p"] = new EntityValue(_red), ["u"] = new EntityValue(_scout) })).OpenedRequest!;
             Assert.That(((TextValue)q.Choices[0].Desc!).Args["unit"], Is.SameAs(HiddenValue.Instance));
             Assert.That(((DictValue)q.Choices[0].Data!).Items[1].Value, Is.SameAs(HiddenValue.Instance));
-            Assert.That(q.Choices[0].Style, Is.EqualTo("purple-fire"));
             Assert.That(q.Choices[2].Value, Is.SameAs(HiddenValue.Instance));
             Assert.That(q.Choices.Count, Is.EqualTo(3));
         }
 
-        [TestCase(0, "RUN015", "style= of option() must be a str, not int")]
+        [TestCase(0, "RUN015", "option() has no argument 'style'")]
         [TestCase(1, "RUN015", "option() takes the value to choose, not another option")]
         [TestCase(2, "RUN015", "option() has no argument 'labl'")]
         [TestCase(3, "RUN015", "label= of option() must be a text key (str) or text(...), not int")]

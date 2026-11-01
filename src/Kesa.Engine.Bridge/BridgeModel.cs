@@ -293,7 +293,7 @@ namespace Kesa.Engine.Bridge
     public sealed class BridgeRequest
     {
         public BridgeRequest(long id, string name, IReadOnlyList<string> responses, IReadOnlyList<BridgeEntity> who, BridgeValue title,
-            IReadOnlyList<BridgeOption> choices, string? hint, BridgeValue data, bool blocksTime, long? deadline)
+            IReadOnlyList<BridgeOption> choices, BridgeValue data, bool blocksTime, long? deadline)
         {
             Id = id;
             Name = name;
@@ -301,7 +301,6 @@ namespace Kesa.Engine.Bridge
             Who = who;
             Title = title;
             Choices = choices;
-            Hint = hint;
             Data = data;
             BlocksTime = blocksTime;
             Deadline = deadline;
@@ -315,7 +314,6 @@ namespace Kesa.Engine.Bridge
         /// <summary>제목: 텍스트 키(문자열)나 글.</summary>
         public BridgeValue Title { get; }
         public IReadOnlyList<BridgeOption> Choices { get; }
-        public string? Hint { get; }
         public BridgeValue Data { get; }
         public bool BlocksTime { get; }
         public long? Deadline { get; }

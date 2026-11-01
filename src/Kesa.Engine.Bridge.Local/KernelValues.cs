@@ -47,7 +47,7 @@ namespace Kesa.Engine.Bridge.Local
                     }
                     return new BridgeText(t.Key, args);
                 case OptionValue o:
-                    return new BridgeOption(ToBridge(o.Value, defOf), Optional(o.Label, defOf), Optional(o.Desc, defOf), o.Style,
+                    return new BridgeOption(ToBridge(o.Value, defOf), Optional(o.Label, defOf), Optional(o.Desc, defOf),
                         Optional(o.Data, defOf));
                 case LookValue look:
                     var keys = new List<KeyValuePair<string, BridgeValue>>(look.Keys.Count);

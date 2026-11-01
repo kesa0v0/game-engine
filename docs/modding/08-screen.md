@@ -386,8 +386,8 @@ def hit_marks(me):
 | 칸 | 뜻 |
 |---|---|
 | `q.name` | `ask`의 `name=` |
-| `q.title`, `q.hint`, `q.data` | `ask`에 적은 것. `hint`가 없으면 `None` |
-| `q.choices` | 선택지마다 `value`·`label`·`desc`·`style`·`data`·`index`. `index`는 `engine.pick`에 넘길 번호 |
+| `q.title`, `q.data` | `ask`에 적은 것. `data`가 없으면 `None` |
+| `q.choices` | 선택지마다 `value`·`label`·`desc`·`data`·`index`. `index`는 `engine.pick`에 넘길 번호 |
 | `q.responses` | 받는 응답 커맨드(`"모드.이름"`) |
 | `q.who` | 이 질문에 답할 수 있는 내 엔티티들 |
 
@@ -415,7 +415,7 @@ def retreat(unit: Ref[Unit]):
 
 ### 아무도 그리지 않은 질문: 엔진 기본 창
 
-모드 화면이 그리지 않은 질문이 열려도 판이 멈추지 않게, UXML 해석기는 그런 질문을 제목과 답 버튼이 든 엔진 기본 창(`kesa-question` 클래스)으로 보이고 `Errors`에 경고를 한 번 남긴다. 다음 둘 가운데 하나면 모드가 그린 것으로 치고 창을 띄우지 않는다.
+모드 화면이 그리지 않은 질문이 열려도 판이 멈추지 않게, UXML 해석기는 그런 질문을 제목과 답 버튼이 든 엔진 기본 창(`kesa-question` 클래스, 제목 `kesa-question-title`, 버튼 `kesa-question-answer`, 선택지 `desc`는 버튼 안 `kesa-question-desc`)으로 보이고 `Errors`에 경고를 한 번 남긴다. 다음 둘 가운데 하나면 모드가 그린 것으로 치고 창을 띄우지 않는다.
 
 - 화면에 붙은 바인딩이 `questions("그 이름")`이나 `questions()`를 읽는다.
 - 화면에 붙은 `on-click`이 그 질문의 응답 커맨드를 가리킨다(차례 넘기기 버튼 `on-click="skirmish.EndTurn(house)"`처럼).

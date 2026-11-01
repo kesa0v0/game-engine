@@ -188,7 +188,6 @@ namespace Kesa.Engine.Runtime
                 .Add("choices", choices)
                 .Add("responses", responses)
                 .Add("response_names", names)
-                .Add("hint", request.Hint == null ? (JsonNode)JsonNull.Instance : new JsonString(request.Hint))
                 .Add("data", SaveValue(request.Data))
                 .Add("blocks_time", new JsonBool(request.BlocksTime))
                 .Add("deadline", request.Deadline == null ? (JsonNode)JsonNull.Instance : new JsonNumber(request.Deadline.Value))

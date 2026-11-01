@@ -139,7 +139,7 @@ namespace Kesa.Engine.Runtime
             _nextRequest++;
             Journal(() => _nextRequest = requestId);
             var request = new Request(requestId, id, command, ask.Who, ask.Title, ask.Choices, ask.Responses, ask.ResponseNames,
-                ask.Hint, ask.Data)
+                ask.Data)
             {
                 Name = ask.Name,
                 BlocksTime = ask.BlocksTime,

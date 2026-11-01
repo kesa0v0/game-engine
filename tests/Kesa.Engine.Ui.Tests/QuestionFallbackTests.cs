@@ -25,7 +25,7 @@ namespace Kesa.Engine.Ui.Tests
         private const string Defs =
             "Party(\"Red\")\n" +
             "@command(free=True, acts_for=None)\ndef Strike(p: Ref[Party]):\n" +
-            "    r = ask(p, \"hit-title\", name=\"hit\", choices=[\"hold\", \"retreat\"])\n    p.Hp.v += r.index\n" +
+            "    r = ask(p, \"hit-title\", name=\"hit\", choices=[option(\"hold\", desc=\"hold-desc\"), \"retreat\"])\n    p.Hp.v += r.index\n" +
             "@command(acts_for=lambda p: p)\ndef Move(p: Ref[Party]):\n    p.Hp.v += 10\n" +
             "@command(free=True, acts_for=None)\ndef Turn(p: Ref[Party]):\n    ask(p, \"turn\", name=\"turn\", responses=[\"Move\"])\n" +
             "def hp(p):\n    return p.Hp.v\n" +
@@ -95,6 +95,8 @@ namespace Kesa.Engine.Ui.Tests
             var window = Fallbacks.Single();
             var answers = window.Children.Where(c => c.Kind == "Button").ToList();
             Assert.That(answers.Select(b => b.Text), Is.EqualTo(new[] { "hold", "retreat" }));
+            Assert.That(answers.Select(b => string.Join(",", b.Children.Select(c => c.Text + "/" + string.Join(" ", c.Classes)))),
+                Is.EqualTo(new[] { "hold-desc/kesa-question-desc", "" }), "a choice's desc is a second line in its button (G448)");
             Assert.That(_ui.Errors.Single().ToString(), Does.Contain("question 'hit'").And.Contain("G386"));
 
             await answers[1].Press();

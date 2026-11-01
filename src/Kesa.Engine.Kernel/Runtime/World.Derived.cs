@@ -387,7 +387,7 @@ namespace Kesa.Engine.Runtime
                     return new TextValue(text.Key, args, text.EntityDefs);
                 case OptionValue o:
                     return new OptionValue(ToPlain(display, o.Value), o.Label == null ? null : ToPlain(display, o.Label),
-                        o.Desc == null ? null : ToPlain(display, o.Desc), o.Style, o.Data == null ? null : ToPlain(display, o.Data));
+                        o.Desc == null ? null : ToPlain(display, o.Desc), o.Data == null ? null : ToPlain(display, o.Data));
                 case ComponentViewBase _:
                     throw new ScriptRuntimeException(Codes.RunType,
                         "'" + display + "' returned a component, which cannot be a value", "return one of its members");

@@ -22,14 +22,14 @@ namespace Kesa.Engine.Tests.Runtime
         private const string Defs =
             "Party(\"Red\")\nParty(\"Blue\")\n" +
             "@command(free=True, acts_for=None)\ndef Strike(p: Ref[Party], n: int):\n" +
-            "    r = ask(p, \"hit-title\", name=\"hit\", choices=[option(\"hold\", style=\"calm\"), \"retreat\"], data={\"n\": n})\n" +
+            "    r = ask(p, \"hit-title\", name=\"hit\", choices=[option(\"hold\", label=\"calm\"), \"retreat\"], data={\"n\": n})\n" +
             "    p.Hp.v += r.index\n" +
             "@command(acts_for=lambda p: p)\ndef Move(p: Ref[Party]):\n    pass\n" +
-            "@command(free=True, acts_for=None)\ndef Turn(p: Ref[Party]):\n    ask(p, \"turn\", name=\"turn\", responses=[\"Move\"], hint=\"bar\")\n" +
+            "@command(free=True, acts_for=None)\ndef Turn(p: Ref[Party]):\n    ask(p, \"turn\", name=\"turn\", responses=[\"Move\"])\n" +
             "def hits():\n    return [q.data[\"n\"] for q in questions(\"hit\")]\n" +
             "def names():\n    return [q.name for q in questions()]\n" +
-            "def shape():\n    q = questions(\"hit\")[0]\n    return [[c.index, c.value, c.style] for c in q.choices] + [q.hint, q.title]\n" +
-            "def turn():\n    q = questions(\"turn\")[0]\n    return [q.responses, q.hint, [w.Hp.v for w in q.who]]\n" +
+            "def shape():\n    q = questions(\"hit\")[0]\n    return [[c.index, c.value, c.label] for c in q.choices] + [q.title]\n" +
+            "def turn():\n    q = questions(\"turn\")[0]\n    return [q.responses, [w.Hp.v for w in q.who]]\n" +
             "def wrong():\n    return questions(3)\n" +
             "@ui_action\ndef count():\n    ui.Seen.count = len(questions(\"hit\"))\n" +
             "@ui_action\ndef keep():\n    submit(\"Strike\", p=questions()[0], n=1)\n" +
@@ -89,9 +89,9 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(_world.Submit("alice", "core.Turn", new Dictionary<string, Value> { ["p"] = new EntityValue(_red) }).Succeeded, Is.True);
             var alice = _world.ViewAs("alice");
             Assert.That(Plain(alice.Call("core.shape").Value),
-                Is.EqualTo(new object?[] { new object?[] { 0L, "hold", "calm" }, new object?[] { 1L, "retreat", null }, null, "hit-title" }));
+                Is.EqualTo(new object?[] { new object?[] { 0L, "hold", "calm" }, new object?[] { 1L, "retreat", null }, "hit-title" }));
             Assert.That(Plain(alice.Call("core.turn").Value),
-                Is.EqualTo(new object[] { new object[] { "core.Move" }, "bar", new object[] { 3L } }));
+                Is.EqualTo(new object[] { new object[] { "core.Move" }, new object[] { 3L } }));
         }
 
         [Test]

@@ -249,11 +249,11 @@ namespace Kesa.Engine.Script
         /// <summary>질문의 선택지에 보이는 모양을 싣는 내장 (spec-gaps G271).</summary>
         public const string OptionName = "option";
 
-        private static readonly string[] OptionFields = { "label", "desc", "style", "data" };
+        private static readonly string[] OptionFields = { "label", "desc", "data" };
 
         /// <summary>
-        /// <c>option(값, label=, desc=, style=, data=)</c>: <c>label</c>·<c>desc</c>는 텍스트 키나 <c>text(...)</c>, <c>style</c>은 문자열,
-        /// <c>data</c>는 dict. 어느 것이든 None이면 적지 않은 것과 같다. 저장할 수 있는 값인지는 <c>ask</c>가 본다.
+        /// <c>option(값, label=, desc=, data=)</c>: <c>label</c>·<c>desc</c>는 텍스트 키나 <c>text(...)</c>, <c>data</c>는 dict(G448: 모양의
+        /// 이름표도 여기에). 어느 것이든 None이면 적지 않은 것과 같다. 저장할 수 있는 값인지는 <c>ask</c>가 본다.
         /// </summary>
         private static Value Option(IReadOnlyList<Value> args, IReadOnlyDictionary<string, Value> keywords)
         {
@@ -261,7 +261,6 @@ namespace Kesa.Engine.Script
             if (args[0] is OptionValue)
                 throw PureOps.TypeError("option() takes the value to choose, not another option");
             Value? label = null, desc = null, data = null;
-            string? style = null;
             foreach (var pair in keywords)
             {
                 var v = pair.Value is NoneValue ? null : pair.Value;
@@ -273,11 +272,6 @@ namespace Kesa.Engine.Script
                     case "desc":
                         desc = Shown("desc", v);
                         break;
-                    case "style":
-                        if (v != null && !(v is StrValue))
-                            throw PureOps.TypeError("style= of option() must be a str, not " + v.KindName);
-                        style = (v as StrValue)?.Value;
-                        break;
                     case "data":
                         if (v != null && !(v is DictValue))
                             throw PureOps.TypeError("data= of option() must be a dict, not " + v.KindName);
@@ -288,7 +282,7 @@ namespace Kesa.Engine.Script
                             Diagnostics.Suggest.Hint(pair.Key, OptionFields));
                 }
             }
-            return new OptionValue(args[0], label, desc, style, data);
+            return new OptionValue(args[0], label, desc, data);
         }
 
         private static Value? Shown(string field, Value? v)

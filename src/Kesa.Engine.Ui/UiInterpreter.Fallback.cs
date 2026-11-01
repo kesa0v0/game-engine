@@ -87,6 +87,13 @@ namespace Kesa.Engine.Ui
             {
                 var button = _renderer.Create("Button", window, at++, new[] { new KeyValuePair<string, string>("class", "kesa-question-answer") });
                 _renderer.SetText(button, "text", AnswerText(q, move));
+                // 고르는 데 필요한 설명은 버튼 안 둘째 줄로 (G448)
+                var desc = ChoiceOf(q, move)?.Desc;
+                if (desc != null)
+                {
+                    var line = _renderer.Create("Label", button, 0, new[] { new KeyValuePair<string, string>("class", "kesa-question-desc") });
+                    _renderer.SetText(line, "text", _text(desc));
+                }
                 var captured = move;
                 _renderer.OnClick(button, () => AnswerFallbackAsync(q.Id, captured));
             }
@@ -97,12 +104,8 @@ namespace Kesa.Engine.Ui
         private string AnswerText(BridgeRequest q, BridgeMove move)
         {
             string text;
-            if (move.Command == BridgeNames.Pick && move.Arguments.TryGetValue(BridgeNames.PickChoice, out var picked) &&
-                picked is BridgeInt index && index.Value >= 0 && index.Value < q.Choices.Count)
-            {
-                var choice = q.Choices[(int)index.Value];
-                text = _text(choice.Label ?? choice.Value);
-            }
+            var choice = ChoiceOf(q, move);
+            if (choice != null) text = _text(choice.Label ?? choice.Value);
             else
             {
                 var parts = new List<string>();
@@ -111,6 +114,13 @@ namespace Kesa.Engine.Ui
             }
             return q.Who.Count > 1 && move.By != null ? text + " — " + _text(move.By) : text;
         }
+
+        /// <summary>선택지를 고르는 답이면 그 선택지, 응답 커맨드면 null.</summary>
+        private static BridgeOption? ChoiceOf(BridgeRequest q, BridgeMove move) =>
+            move.Command == BridgeNames.Pick && move.Arguments.TryGetValue(BridgeNames.PickChoice, out var picked) &&
+            picked is BridgeInt index && index.Value >= 0 && index.Value < q.Choices.Count
+                ? q.Choices[(int)index.Value]
+                : null;
 
         private async ValueTask AnswerFallbackAsync(long request, BridgeMove move)
         {

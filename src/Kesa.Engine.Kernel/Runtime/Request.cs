@@ -11,7 +11,7 @@ namespace Kesa.Engine.Runtime
     {
         internal Request(long id, long flow, string command, IReadOnlyList<EntityId> who, Value title,
             IReadOnlyList<OptionValue> choices, IReadOnlyList<string> responses, IReadOnlyList<string> responseNames,
-            string? hint, Value data)
+            Value data)
         {
             Id = id;
             Flow = flow;
@@ -21,7 +21,6 @@ namespace Kesa.Engine.Runtime
             Choices = choices;
             Responses = responses;
             ResponseNames = responseNames;
-            Hint = hint;
             Data = data;
         }
 
@@ -52,10 +51,7 @@ namespace Kesa.Engine.Runtime
         /// <summary>선택지 (G138). 맨 값도 option으로 감싸 둔다 (G271). 어떻게 보일지는 UI가 정한다 (G137).</summary>
         public IReadOnlyList<OptionValue> Choices { get; }
 
-        /// <summary>선택 방법의 제안. 커널은 해석하지 않는다 (G137).</summary>
-        public string? Hint { get; }
-
-        /// <summary>UI가 읽을 자유 데이터 (<see cref="DictValue"/>, 없으면 <see cref="NoneValue"/>, G137).</summary>
+        /// <summary>UI가 읽을 자유 데이터 (<see cref="DictValue"/>, 없으면 <see cref="NoneValue"/>, G137). 고르는 방법의 제안도 여기에 (G448).</summary>
         public Value Data { get; }
 
         /// <summary>열려 있는 동안 <see cref="World.Advance"/>가 시간을 흘리지 않는다 (spec X2, spec-gaps G159).</summary>

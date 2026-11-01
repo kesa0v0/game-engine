@@ -134,8 +134,8 @@ namespace Kesa.Engine.Text.Tests
             var offer = T("harbor-offer", new Dictionary<string, Value> { ["who"] = new StrValue("harbor:Brig") });
             Assert.That(Attr(offer, "desc"), Is.EqualTo("brig offers a deal"));
 
-            var plain = new OptionValue(new StrValue("harbor-accept"), null, null, null, null);
-            var dressed = new OptionValue(new StrValue("x"), new StrValue("harbor:Brig"), offer, null, null);
+            var plain = new OptionValue(new StrValue("harbor-accept"), null, null, null);
+            var dressed = new OptionValue(new StrValue("x"), new StrValue("harbor:Brig"), offer, null);
             Assert.That((Label(plain), Attr(plain, "desc")), Is.EqualTo(("Accept", "take the deal")));
             Assert.That((Label(dressed), Attr(dressed, "desc")), Is.EqualTo(("brig", "Offer from brig")));
         }

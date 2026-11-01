@@ -235,27 +235,25 @@ namespace Kesa.Engine.Bridge
         public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Key);
     }
 
-    /// <summary>질문의 선택지 하나 (G271): 고를 값과 보이는 모양. 적지 않은 칸은 null.</summary>
+    /// <summary>질문의 선택지 하나 (G271·G448): 고를 값과 보일 글·데이터. 적지 않은 칸은 null.</summary>
     public sealed class BridgeOption : BridgeValue
     {
-        public BridgeOption(BridgeValue value, BridgeValue? label = null, BridgeValue? desc = null, string? style = null, BridgeValue? data = null)
+        public BridgeOption(BridgeValue value, BridgeValue? label = null, BridgeValue? desc = null, BridgeValue? data = null)
         {
             Value = value;
             Label = label;
             Desc = desc;
-            Style = style;
             Data = data;
         }
 
         public BridgeValue Value { get; }
         public BridgeValue? Label { get; }
         public BridgeValue? Desc { get; }
-        public string? Style { get; }
         public BridgeValue? Data { get; }
         public override BridgeKind Kind => BridgeKind.Option;
 
         public override bool Equals(object? obj) =>
-            obj is BridgeOption o && o.Style == Style && o.Value.Equals(Value) && Same(o.Label, Label) && Same(o.Desc, Desc) && Same(o.Data, Data);
+            obj is BridgeOption o && o.Value.Equals(Value) && Same(o.Label, Label) && Same(o.Desc, Desc) && Same(o.Data, Data);
 
         public override int GetHashCode() => Value.GetHashCode();
     }

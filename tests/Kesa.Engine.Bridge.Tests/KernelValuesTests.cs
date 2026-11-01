@@ -56,11 +56,10 @@ namespace Kesa.Engine.Bridge.Tests
         [Test]
         public void AnOptionKeepsItsLooks()
         {
-            var option = new OptionValue(new StrValue("Treat"), label: new StrValue("treat-key"), style: "danger");
+            var option = new OptionValue(new StrValue("Treat"), label: new StrValue("treat-key"));
             var bridged = KernelValues.ToBridge(option, Defs).AsOption;
             Assert.That(bridged.Value.AsString, Is.EqualTo("Treat"));
             Assert.That(bridged.Label!.AsString, Is.EqualTo("treat-key"));
-            Assert.That(bridged.Style, Is.EqualTo("danger"));
             Assert.That(bridged.Desc, Is.Null);
         }
 

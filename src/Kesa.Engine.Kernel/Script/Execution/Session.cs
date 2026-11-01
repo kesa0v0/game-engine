@@ -144,7 +144,7 @@ namespace Kesa.Engine.Script
                         return new TextValue(text.Key, args, text.EntityDefs);
                     case OptionValue o:
                         return new OptionValue(Remap(o.Value), o.Label == null ? null : Remap(o.Label), o.Desc == null ? null : Remap(o.Desc),
-                            o.Style, o.Data == null ? null : Remap(o.Data));
+                            o.Data == null ? null : Remap(o.Data));
                     case IValueContainer container:
                         return container.MapValues(Remap);
                 }

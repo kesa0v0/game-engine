@@ -160,7 +160,7 @@ namespace Kesa.Engine.Runtime
                     : request == null
                     ? new WaitPayload(wakeAt!.Value - _tick)
                     : new AskPayload(request.Who, request.Title, request.Choices, request.Responses, request.ResponseNames,
-                        request.Hint, request.Data) { BlocksTime = request.BlocksTime };
+                        request.Data) { BlocksTime = request.BlocksTime };
                 var run = new PureEvaluator.Suspended(frames, answerTo, payload);
                 var subjects = new List<EntityId>();
                 foreach (var s in AsArray(Field(obj, "subjects"), "flow subjects").Items)
@@ -227,12 +227,10 @@ namespace Kesa.Engine.Runtime
             var names = new List<string>();
             foreach (var c in AsArray(Field(r, "response_names"), "response names").Items) names.Add(Text(c, "a response name"));
             if (names.Count != responses.Count) throw new JsonFormatException("a request has unmatched response names");
-            var hintNode = Field(r, "hint");
-            string? hint = hintNode is JsonNull ? null : Text(hintNode, "a hint");
             var data = LoadValue(Field(r, "data"));
             // name이 생기기 전(G382)의 세이브는 이름 없는 질문으로 불러온다
             var nameNode = r.Get("name");
-            var request = new Request(requestId, flow, command, who, title, choices, responses, names, hint, data)
+            var request = new Request(requestId, flow, command, who, title, choices, responses, names, data)
             {
                 Name = nameNode == null ? "" : Text(nameNode, "a question name"),
                 BlocksTime = Bool(Field(r, "blocks_time"), "blocks_time"),

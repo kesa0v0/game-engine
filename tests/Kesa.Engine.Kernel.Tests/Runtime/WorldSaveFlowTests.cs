@@ -76,7 +76,7 @@ namespace Kesa.Engine.Tests.Runtime
             "    bonus = 5\n" +
             "    picked = survey(p, [p, q])\n" +
             "    for i in rg:\n" +
-            "        r2 = ask(q, \"Again\", choices=[\"x\", \"y\", \"z\"], hint=\"std.choice\", name=\"Again\")\n" +
+            "        r2 = ask(q, \"Again\", choices=[\"x\", \"y\", \"z\"], name=\"Again\")\n" +
             "        if r2.index == 0:\n" +
             "            bump(p, 10)\n" +
             "        elif r2.index == 1:\n" +
@@ -156,7 +156,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private static string Show(Request? r) =>
             r == null ? "-" : "#" + r.Id + " flow " + r.Flow + " " + r.Command + " who " + string.Join(",", r.Who) +
-                              " choices " + r.Choices.Count + " hint " + r.Hint;
+                              " choices " + r.Choices.Count;
 
         [Test]
         public void ContinuingAfterLoadingAtAnyWaitIsTheSameAsNeverSaving()

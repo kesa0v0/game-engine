@@ -225,25 +225,24 @@ namespace Kesa.Engine.Runtime
             return new TextValue(Text(o.Members[0].Value, "a text key"), args, defs);
         }
 
-        /// <summary>선택지 (G271): <c>{"option": 값, "label": …, "desc": …, "style": …, "data": …}</c>, 적지 않은 칸은 null.</summary>
+        /// <summary>선택지 (G271·G448): <c>{"option": 값, "label": …, "desc": …, "data": …}</c>, 적지 않은 칸은 null.</summary>
         private static JsonObject SaveOption(OptionValue o, Func<Value, JsonNode> save) =>
             new JsonObject()
                 .Add("option", save(o.Value))
                 .Add("label", o.Label == null ? JsonNull.Instance : save(o.Label))
                 .Add("desc", o.Desc == null ? JsonNull.Instance : save(o.Desc))
-                .Add("style", o.Style == null ? (JsonNode)JsonNull.Instance : new JsonString(o.Style))
                 .Add("data", o.Data == null ? JsonNull.Instance : save(o.Data));
 
+        // style이 빠지기 전(G448)의 세이브는 style을 버리고 읽는다
         private static bool IsOptionNode(JsonObject o) =>
-            o.Members.Count == 5 && o.Members[0].Key == "option" && o.Members[1].Key == "label" && o.Members[2].Key == "desc" &&
-            o.Members[3].Key == "style" && o.Members[4].Key == "data";
+            o.Members.Count >= 4 && o.Members[0].Key == "option" && o.Members[1].Key == "label" && o.Members[2].Key == "desc" &&
+            (o.Members.Count == 4 ? o.Members[3].Key == "data" : o.Members.Count == 5 && o.Members[3].Key == "style" && o.Members[4].Key == "data");
 
         private static OptionValue LoadOption(JsonObject o, Func<JsonNode, Value> load)
         {
             Value? Optional(JsonNode n) => n is JsonNull ? null : load(n);
-            var style = o.Members[3].Value;
             return new OptionValue(load(o.Members[0].Value), Optional(o.Members[1].Value), Optional(o.Members[2].Value),
-                style is JsonNull ? null : Text(style, "an option style"), Optional(o.Members[4].Value));
+                Optional(o.Members[o.Members.Count - 1].Value));
         }
 
         // ---- 불러오기 ----

@@ -27,7 +27,7 @@ namespace Kesa.Engine.Bridge.Tests
             Assert.That(BridgeJson.Write(new BridgeDict(new[] { P(S("b"), I(1)), P(S("a"), I(2)) })),
                 Is.EqualTo("{\"dict\":[[\"b\",1],[\"a\",2]]}"), "in the order the items went in");
             Assert.That(BridgeJson.Write(new BridgeOption(S("yes"), label: S("ok-key"))),
-                Is.EqualTo("{\"option\":\"yes\",\"label\":\"ok-key\",\"desc\":null,\"style\":null,\"data\":null}"));
+                Is.EqualTo("{\"option\":\"yes\",\"label\":\"ok-key\",\"desc\":null,\"data\":null}"));
         }
 
         [Test]
@@ -48,7 +48,7 @@ namespace Kesa.Engine.Bridge.Tests
                 P(S("known"), new BridgeList(new[] { S("pandemic:Atlanta"), S("한국어 \t") })),
                 P(I(7), new BridgeList(new BridgeValue[] { BridgeHidden.Instance, new BridgeEntity(9, null), new BridgeFixed(-250_000), BridgeNone.Instance })),
                 P(S("title"), new BridgeText("k", new[] { A("n", I(5)) })),
-                P(S("pick"), new BridgeOption(BridgeNone.Instance, S("l"), new BridgeText("d", new KeyValuePair<string, BridgeValue>[0]), "purple-fire",
+                P(S("pick"), new BridgeOption(BridgeNone.Instance, S("l"), new BridgeText("d", new KeyValuePair<string, BridgeValue>[0]),
                     new BridgeDict(new KeyValuePair<BridgeValue, BridgeValue>[0]))),
             });
             string json = BridgeJson.Write(value);

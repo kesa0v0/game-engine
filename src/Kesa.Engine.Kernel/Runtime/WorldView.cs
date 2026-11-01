@@ -298,9 +298,9 @@ namespace Kesa.Engine.Runtime
             foreach (var c in q.Choices)
             {
                 choices.Add(new OptionValue(Mask(c.Value), c.Label == null ? null : Mask(c.Label), c.Desc == null ? null : Mask(c.Desc),
-                    c.Style, c.Data == null ? null : Mask(c.Data)));
+                    c.Data == null ? null : Mask(c.Data)));
             }
-            return new Request(q.Id, q.Flow, q.Command, who, Mask(q.Title), choices, q.Responses, q.ResponseNames, q.Hint, Mask(q.Data))
+            return new Request(q.Id, q.Flow, q.Command, who, Mask(q.Title), choices, q.Responses, q.ResponseNames, Mask(q.Data))
             {
                 Name = q.Name,
                 BlocksTime = q.BlocksTime,

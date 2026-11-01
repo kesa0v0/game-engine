@@ -93,7 +93,7 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         private sealed class QuestionValue : Value, IRuntimeAttributes, IValueEquality
         {
-            private static readonly string[] Attributes = { "name", "title", "hint", "data", "choices", "responses", "who" };
+            private static readonly string[] Attributes = { "name", "title", "data", "choices", "responses", "who" };
 
             private readonly World _world;
 
@@ -115,7 +115,6 @@ namespace Kesa.Engine.Runtime
                 {
                     case "name": return new StrValue(Request.Name);
                     case "title": return _world.UiRead(Request.Title);
-                    case "hint": return Request.Hint == null ? NoneValue.Instance : new StrValue(Request.Hint);
                     case "data": return _world.UiRead(Request.Data);
                     case "choices":
                     {
@@ -137,14 +136,14 @@ namespace Kesa.Engine.Runtime
                     }
                 }
                 throw new ScriptRuntimeException(Codes.RunScript, "a question has no attribute '" + name + "'",
-                    Suggest.Hint(name, Attributes) ?? "it has name, title, hint, data, choices, responses and who");
+                    Suggest.Hint(name, Attributes) ?? "it has name, title, data, choices, responses and who");
             }
         }
 
-        /// <summary>질문 값의 선택지 하나 (G271·G383): 고를 값과 보이는 모양, 그리고 <c>engine.pick</c>에 넘길 번호.</summary>
+        /// <summary>질문 값의 선택지 하나 (G271·G383·G448): 고를 값과 보일 글·데이터, 그리고 <c>engine.pick</c>에 넘길 번호.</summary>
         private sealed class ChoiceView : Value, IRuntimeAttributes, IValueEquality
         {
-            private static readonly string[] Attributes = { "value", "label", "desc", "style", "data", "index" };
+            private static readonly string[] Attributes = { "value", "label", "desc", "data", "index" };
 
             private readonly World _world;
             private readonly OptionValue _option;
@@ -168,12 +167,11 @@ namespace Kesa.Engine.Runtime
                     case "value": return _world.UiRead(_option.Value);
                     case "label": return _option.Label == null ? NoneValue.Instance : _world.UiRead(_option.Label);
                     case "desc": return _option.Desc == null ? NoneValue.Instance : _world.UiRead(_option.Desc);
-                    case "style": return _option.Style == null ? NoneValue.Instance : new StrValue(_option.Style);
                     case "data": return _option.Data == null ? NoneValue.Instance : _world.UiRead(_option.Data);
                     case "index": return new IntValue(_index);
                 }
                 throw new ScriptRuntimeException(Codes.RunScript, "a choice has no attribute '" + name + "'",
-                    Suggest.Hint(name, Attributes) ?? "it has value, label, desc, style, data and index");
+                    Suggest.Hint(name, Attributes) ?? "it has value, label, desc, data and index");
             }
         }
     }

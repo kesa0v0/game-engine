@@ -9,7 +9,7 @@ namespace Kesa.Engine.Bridge
     /// 경계 값의 정규형 JSON (spec-gaps G326). 저장 형식의 값 규칙(<c>World.Save</c>)에 엔티티의 Def와 숨김을 더한 것이다:
     /// <c>null</c>, bool, 수(int), 문자열, 배열(리스트), <c>{"fixed": raw}</c>, <c>{"entity": id, "def": "모드:Def"}</c>(Def를 모르면
     /// <c>{"entity": id}</c>), <c>{"hidden": true}</c>, <c>{"dict": [[키, 값], ...]}</c>(넣은 순), <c>{"text": 키, "args": {...}}</c>(인자 이름 순),
-    /// <c>{"option": 값, "label": …, "desc": …, "style": …, "data": …}</c>, <c>{"look": 이름, "keys": {...}}</c>(키 이름 순),
+    /// <c>{"option": 값, "label": …, "desc": …, "data": …}</c>, <c>{"look": 이름, "keys": {...}}</c>(키 이름 순),
     /// <c>{"at": 공간|null, "value": 값}</c>, <c>{"onto": 엔티티, "point": 이름|null}</c>, <c>{"between": [자리, 자리]}</c>.
     /// 빈칸 없이 쓰고 같은 값은 같은 글자다.
     /// </summary>
@@ -77,9 +77,6 @@ namespace Kesa.Engine.Bridge
                     Optional(sb, o.Label);
                     sb.Append(",\"desc\":");
                     Optional(sb, o.Desc);
-                    sb.Append(",\"style\":");
-                    if (o.Style == null) sb.Append("null");
-                    else Quote(sb, o.Style);
                     sb.Append(",\"data\":");
                     Optional(sb, o.Data);
                     sb.Append('}');
@@ -383,12 +380,9 @@ namespace Kesa.Engine.Bridge
                         Field("desc");
                         var desc = OptionalValue();
                         Expect(',');
-                        Field("style");
-                        string? style = Word("null") ? null : String();
-                        Expect(',');
                         Field("data");
                         var data = OptionalValue();
-                        result = new BridgeOption(value, label, desc, style, data);
+                        result = new BridgeOption(value, label, desc, data);
                         break;
                     default:
                         throw Error("unknown value tag '" + tag + "'");
