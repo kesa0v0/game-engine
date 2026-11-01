@@ -614,6 +614,8 @@ namespace Kesa.Engine.Stubs
                 }
                 if (!any) Line("    ...");
                 Line();
+                // 엔진 타입(G451)은 모드가 만들거나 엔티티로 둘 수 없다: defdata로 읽는 상수만
+                if (EngineRules.IsEngine(type.Name)) return;
 
                 Line("class " + type.Name + ":");
                 // 엔티티로 읽는 속성 (G207): Def 타입이 가진 컴포넌트는 늘 있고(뗄 수 없다), 그 밖의 컴포넌트는 붙어 있지 않으면 None
@@ -779,7 +781,7 @@ namespace Kesa.Engine.Stubs
             {
                 var types = new List<DefType>();
                 foreach (var t in _schema.Types)
-                    if (Sees(t.Mod)) types.Add(t);
+                    if (Sees(t.Mod) && !EngineRules.IsEngine(t.Name)) types.Add(t);
                 // 출처는 맨 이름이다: 클래스를 받아 pyright가 결과 타입을 안다 (G306)
                 foreach (var t in types)
                 {

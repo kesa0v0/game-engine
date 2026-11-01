@@ -257,17 +257,14 @@ namespace Kesa.Engine.Runtime
         /// 핸들러·응답 커맨드, Flow 안의 값의 어긋남)를 그 질문과 함께 취소하고 Flow마다 경고(<c>SAV006</c>)를 남긴다(G214).
         /// 멈추기 전까지 한 일은 남고 반응은 부르지 않는다.
         /// </summary>
-        public static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, int stepBudget = DefaultStepBudget,
-            int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
-            int maxSettleRounds = DefaultMaxSettleRounds, bool requireViewRules = false, bool dropRemoved = false,
-            bool cancelBrokenFlows = false, int actionStepBudget = DefaultActionStepBudget)
+        public static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, bool requireViewRules = false,
+            bool dropRemoved = false, bool cancelBrokenFlows = false)
         {
             var diagnostics = new List<Diagnostic>();
             World world;
             try
             {
-                world = new World(loaded, stepBudget, maxSignalDepth, maxAdvancePerCall, maxSettleRounds,
-                    requireViewRules: requireViewRules, actionStepBudget: actionStepBudget);
+                world = new World(loaded, requireViewRules: requireViewRules);
             }
             catch (WorldException e)
             {

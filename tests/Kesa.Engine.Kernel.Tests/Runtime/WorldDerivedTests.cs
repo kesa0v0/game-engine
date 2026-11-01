@@ -130,13 +130,12 @@ namespace Kesa.Engine.Tests.Runtime
         public void NestedDerivedReadsShareTheBudgetOfTheOutermostRead()
         {
             Mod("banking", schema: WorkSchema, defs: "Job(\"Dig\")\n");
-            var loaded = LoadClean();
-
-            var roomy = new World(loaded);
+            var roomy = new World(LoadClean());
             Assert.That(Int(roomy.Get(roomy.Create("banking:Dig"), roomy.Member("Work", "outer"))), Is.EqualTo(200));
 
             // 안쪽 계산 하나는 300단계 안에 들지만 그것을 열 번 읽는 바깥 읽기는 넘는다
-            _world = new World(loaded, stepBudget: 300);
+            Mod("banking", schema: WorkSchema, defs: Rule("step_budget", 300) + "Job(\"Dig\")\n");
+            _world = new World(LoadClean());
             var dig = _world.Create("banking:Dig");
             Assert.That(Int(_world.Get(dig, M("Work", "inner"))), Is.EqualTo(20));
             var e = Fails(() => _world.Get(dig, M("Work", "outer")), Codes.RunBudget);
@@ -149,9 +148,9 @@ namespace Kesa.Engine.Tests.Runtime
         [Test]
         public void EveryOutermostReadStartsWithTheWholeBudget()
         {
-            Mod("banking", schema: WorkSchema, defs: "Job(\"Dig\")\n");
+            Mod("banking", schema: WorkSchema, defs: Rule("step_budget", 300) + "Job(\"Dig\")\n");
             // 계량기는 읽기마다 비워서 다시 쓴다: 앞 읽기들의 단계가 쌓이면 몇 번째 읽기에서 넘는다
-            _world = new World(LoadClean(), stepBudget: 300);
+            _world = new World(LoadClean());
             var dig = _world.Create("banking:Dig");
             for (int i = 0; i < 30; i++) Assert.That(Int(_world.Get(dig, M("Work", "inner"))), Is.EqualTo(20));
         }

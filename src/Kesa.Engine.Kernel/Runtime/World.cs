@@ -34,29 +34,12 @@ namespace Kesa.Engine.Runtime
 
         private static readonly Dictionary<MemberDecl, Value> NoValues = new Dictionary<MemberDecl, Value>();
 
-        /// <summary>
-        /// 읽기 실행 하나(<c>derived</c>, 입구·정책 함수, <c>choose</c> 후보)의 기본 단계 예산 (G101·G224). 값 하나를 읽는 일이라 작다.
-        /// </summary>
-        public const int DefaultStepBudget = 100000;
+        /// <summary>읽기 실행 하나의 기본 단계 예산. 게임 값은 <see cref="EngineRules"/> Def에 있다 (G451).</summary>
+        public const int DefaultStepBudget = EngineRules.DefaultStepBudget;
 
-        /// <summary>
-        /// 행동 실행 하나(커맨드의 사전 조건과 본문, <c>@on</c>·<c>@when</c> 핸들러, 멈춘 Flow를 이어서 실행하는 구간)의 기본 단계 예산 (G224).
-        /// 사전 조건만 검사할 때도 제출과 같은 예산이다.
-        /// 행동은 세계 전체를 돌 수 있어 크게 둔다: 한 단계 약 45ns(규모 벤치)로 약 0.5초, 유닛 하나에 7단계면 약 140만 개.
-        /// </summary>
-        public const int DefaultActionStepBudget = 10_000_000;
+        /// <summary>행동 실행 하나의 기본 단계 예산. 사전 조건만 검사할 때도 제출과 같은 예산이다 (G224).</summary>
+        public const int DefaultActionStepBudget = EngineRules.DefaultActionStepBudget;
 
-        /// <param name="stepBudget">읽기 실행 하나의 단계 예산 (<see cref="DefaultStepBudget"/>, G101).</param>
-        /// <param name="actionStepBudget">행동 실행 하나의 단계 예산 (<see cref="DefaultActionStepBudget"/>, G224).</param>
-        /// <param name="maxSignalDepth">
-        /// 신호 연쇄의 세대 상한 (spec-gaps G147·G150). 이보다 깊은 신호는 핸들러를 돌리지 않고 결과에 알린다.
-        /// </param>
-        /// <param name="maxAdvancePerCall">
-        /// 제출·답·응답 한 번 안에서 스크립트 <c>advance()</c>로 진행할 수 있는 틱의 합 (spec-gaps G168). 넘기려는 Flow는 오류로 버린다.
-        /// </param>
-        /// <param name="maxSettleRounds">
-        /// 정착 한 번의 회차 상한 (spec-gaps G171). 넘으면 남은 <c>when</c> 반응을 돌리지 않고 결과에 알린다.
-        /// </param>
         /// <param name="seed">
         /// 월드 시드 (spec-gaps G180). 같은 시드에 같은 입력이면 같은 난수가 나온다. 새 게임마다 다르게 할지는 호스트가 정한다.
         /// 저장에 남고 불러오면 그대로 잇는다.
@@ -64,11 +47,8 @@ namespace Kesa.Engine.Runtime
         /// <param name="requireViewRules">
         /// 서버 권위 멀티 게임처럼 숨김이 꼭 지켜져야 하는 호스트가 켠다. 켰는데 보기 규칙이 하나도 없으면 만들지 않는다 (spec-gaps G203·G315).
         /// </param>
-        public World(ContentLoadResult loaded, int stepBudget = DefaultStepBudget,
-            int maxSignalDepth = DefaultMaxSignalDepth, int maxAdvancePerCall = DefaultMaxAdvancePerCall,
-            int maxSettleRounds = DefaultMaxSettleRounds, long seed = 0, bool requireViewRules = false,
-            int actionStepBudget = DefaultActionStepBudget)
-            : this(loaded.Frozen, loaded.Schema, loaded.Scopes, stepBudget, loaded.Commands, actionStepBudget)
+        public World(ContentLoadResult loaded, long seed = 0, bool requireViewRules = false)
+            : this(loaded.Frozen, loaded.Schema, loaded.Scopes, loaded.Commands)
         {
             SetViewRules(loaded.ViewRules);
             _uiActions = loaded.UiActions;
@@ -84,15 +64,6 @@ namespace Kesa.Engine.Runtime
                     throw new ArgumentException("host function " + signature.Function.Name + " has no implementation: it was " +
                                                 "read from a declarations file, which is for engine check and stubs only; " +
                                                 "register the C# function to run a world (spec-gaps G221)", nameof(loaded));
-            if (maxSignalDepth < 1)
-                throw new ArgumentOutOfRangeException(nameof(maxSignalDepth), maxSignalDepth, "the signal depth limit must be at least 1");
-            _maxSignalDepth = maxSignalDepth;
-            if (maxAdvancePerCall < 1)
-                throw new ArgumentOutOfRangeException(nameof(maxAdvancePerCall), maxAdvancePerCall, "the advance limit must be at least 1");
-            _maxAdvancePerCall = maxAdvancePerCall;
-            if (maxSettleRounds < 1)
-                throw new ArgumentOutOfRangeException(nameof(maxSettleRounds), maxSettleRounds, "the settle round limit must be at least 1");
-            _maxSettleRounds = maxSettleRounds;
             _seed = seed;
             SetHandlers(loaded.Handlers);
             SetWhens(loaded.Whens);
@@ -104,15 +75,20 @@ namespace Kesa.Engine.Runtime
         }
 
         public World(DefSet defs, SchemaSet schema, IReadOnlyDictionary<string, ModScope>? scopes = null,
-            int stepBudget = DefaultStepBudget, IReadOnlyDictionary<string, CommandDecl>? commands = null,
-            int actionStepBudget = DefaultActionStepBudget)
+            IReadOnlyDictionary<string, CommandDecl>? commands = null)
         {
             _defs = defs;
             _schema = schema;
             _scopes = scopes ?? new SortedDictionary<string, ModScope>(StringComparer.Ordinal);
-            _stepBudget = stepBudget;
-            _actionStepBudget = actionStepBudget;
             _commands = commands ?? new SortedDictionary<string, CommandDecl>(StringComparer.Ordinal);
+            defs.TryGet(EngineRules.DefId, out var rules);
+            int Rule(string name, int fallback) =>
+                rules != null && rules.Consts.TryGet(name, out var v) ? (int)((IntValue)v.Value).Value : fallback;
+            _stepBudget = Rule(EngineRules.StepBudget, EngineRules.DefaultStepBudget);
+            _actionStepBudget = Rule(EngineRules.ActionStepBudget, EngineRules.DefaultActionStepBudget);
+            _maxSignalDepth = Rule(EngineRules.MaxSignalDepth, EngineRules.DefaultMaxSignalDepth);
+            _maxAdvancePerCall = Rule(EngineRules.MaxAdvancePerCall, EngineRules.DefaultMaxAdvancePerCall);
+            _maxSettleRounds = Rule(EngineRules.MaxSettleRounds, EngineRules.DefaultMaxSettleRounds);
         }
 
         // ---- 이름 풀기 ----

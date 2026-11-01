@@ -63,7 +63,8 @@ namespace Kesa.Engine.Text
             foreach (var mod in content.Mods)
                 mods.Add(new BridgeMod(mod.Id, mod.Directory, Path.Combine(content.ModsRoot, mod.Directory), mod.DefaultLanguage));
             var defs = new List<string>(content.Frozen.Defs.Count);
-            foreach (var def in content.Frozen.Defs) defs.Add(def.Id);
+            foreach (var def in content.Frozen.Defs)
+                if (def.Id != Schema.EngineRules.DefId) defs.Add(def.Id); // 게임 상한(G451)은 번역할 이름이 없다
             var order = content.Order;
             return Load(mods, defs, (a, b) => order != null && order.IsOrdered(a, b), diagnostics, hostFolder, hostLanguage);
         }

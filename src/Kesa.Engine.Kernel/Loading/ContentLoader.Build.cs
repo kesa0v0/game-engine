@@ -79,13 +79,14 @@ namespace Kesa.Engine.Loading
         /// <summary>
         /// Def를 로드 순서대로 등록하고, 같은 대상에 보기 규칙을 건 모드들 사이의 순서를 본다 (G315). 고정점은 <see cref="BuildSchema"/>와 같다.
         /// </summary>
-        private static DefRegistry BuildDefs(List<ModUnit> units, ModVisibility visibility, LoadOrder order,
+        private static DefRegistry BuildDefs(List<ModUnit> units, SchemaSet schema, ModVisibility visibility, LoadOrder order,
             DiagnosticBag diagnostics)
         {
             while (true)
             {
                 var stage = new StageDiagnostics(SurvivorIds(units));
                 var registry = new DefRegistry();
+                registry.Add(EngineRules.Record(schema));
                 var viewRules = new List<List<ViewRuleDecl>>();
                 foreach (var u in units)
                 {

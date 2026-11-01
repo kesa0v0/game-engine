@@ -146,8 +146,8 @@ namespace Kesa.Engine.Tests.Runtime
         {
             // 틱마다 새로 1세대라 상한 2에서도 매 틱의 연쇄(Tick 1 → Echo 2)는 모두 돈다 (G147)
             Mod("core", schema: Schema + "signal(\"Echo\", n=int)\n",
-                defs: "@on(Tick)\ndef start():\n    emit(Echo(n=now()))\n@on(Echo)\ndef echo(n):\n    pass\n");
-            var world = new World(LoadClean(), maxSignalDepth: 2);
+                defs: Rule("max_signal_depth", 2) + "@on(Tick)\ndef start():\n    emit(Echo(n=now()))\n@on(Echo)\ndef echo(n):\n    pass\n");
+            var world = new World(LoadClean());
             var r = world.Advance(3);
             Assert.That(r.Reactions.Select(x => x.Handler + " " + x.Generation + " " + x.Outcome), Is.EqualTo(new[]
             {
@@ -308,9 +308,10 @@ namespace Kesa.Engine.Tests.Runtime
         {
             // G147 힌트의 약속: 핸들러 연쇄가 wait를 거치면 다시 1세대다. 상한 1에서도 깨어난 뒤 낸 신호의 핸들러가 돈다
             Mod("core", schema: Schema + "signal(\"Ring\", u=Ref[\"Unit\"])\n",
-                defs: "Unit(\"Scout\")\n@on(Ring)\ndef again(u):\n    u.Out.n = u.Out.n + 1\n    wait(ticks=1)\n    emit(Ring(u=u))\n" +
+                defs: Rule("max_signal_depth", 1) +
+                      "Unit(\"Scout\")\n@on(Ring)\ndef again(u):\n    u.Out.n = u.Out.n + 1\n    wait(ticks=1)\n    emit(Ring(u=u))\n" +
                       "@command(free=True, acts_for=None)\ndef Bell(u: Ref[Unit]):\n    emit(Ring(u=u))\n");
-            var world = new World(LoadClean(), maxSignalDepth: 1);
+            var world = new World(LoadClean());
             _u = world.Create("core:Scout");
             world.Seat(_u, "host");
             world.Submit("host", "core.Bell", new Dictionary<string, Value> { ["u"] = new EntityValue(_u) });

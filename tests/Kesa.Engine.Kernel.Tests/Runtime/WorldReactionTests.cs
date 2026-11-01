@@ -31,7 +31,9 @@ namespace Kesa.Engine.Tests.Runtime
 
         private World Make(string logic, int maxSignalDepth = World.DefaultMaxSignalDepth)
         {
-            var world = new World(Content(logic), maxSignalDepth: maxSignalDepth);
+            // 기본값이면 패치하지 않는다: 저장을 같은 내용으로 다시 불러오는 테스트가 있다
+            string rule = maxSignalDepth == World.DefaultMaxSignalDepth ? "" : Rule("max_signal_depth", maxSignalDepth);
+            var world = new World(Content(rule + logic));
             _u = world.Create("combat:Scout");
             world.Seat(_u, "host");
             return world;
@@ -192,7 +194,7 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(dropped.Message, Is.EqualTo(
                 "signal Ping was not handled: it is generation 65, deeper than the limit 64; " +
                 "the chain repeats: Ping → combat.retaliate → Ping"));
-            Assert.That(dropped.Hint, Does.Contain("wait()").And.Contain("maxSignalDepth"));
+            Assert.That(dropped.Hint, Does.Contain("wait()").And.Contain("\"max_signal_depth\""));
             Assert.That(world.PendingSignalCount, Is.EqualTo(0));
         }
 
@@ -225,13 +227,6 @@ namespace Kesa.Engine.Tests.Runtime
             var r = Go(world);
             Assert.That(N(world), Is.EqualTo(100));
             Assert.That(r.Reactions.All(x => x.Outcome == ReactionOutcome.Finished), Is.True);
-        }
-
-        [Test]
-        public void TheLimitMustBePositive()
-        {
-            var content = Content("");
-            Assert.That(() => new World(content, maxSignalDepth: 0), Throws.TypeOf<ArgumentOutOfRangeException>());
         }
 
         // ---- 멈춘 핸들러 Flow의 저장 ----

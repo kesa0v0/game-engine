@@ -43,9 +43,9 @@ namespace Kesa.Engine.Tests.Runtime
 
         private void NewWorld(int actionStepBudget = World.DefaultActionStepBudget)
         {
-            Mod("banking", schema: Schema, defs: Defs);
+            Mod("banking", schema: Schema, defs: Rule("action_step_budget", actionStepBudget) + Defs);
             _content = LoadClean();
-            _world = new World(_content, actionStepBudget: actionStepBudget);
+            _world = new World(_content);
             _red = _world.Create("banking:Red");
             _world.Seat(_red, "host");
         }

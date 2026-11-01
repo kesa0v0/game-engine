@@ -45,7 +45,8 @@ namespace Kesa.Engine.Bridge.Local
             foreach (var mod in Loaded.Mods)
                 mods.Add(new BridgeMod(mod.Id, mod.Directory, Path.Combine(Loaded.ModsRoot, mod.Directory), mod.DefaultLanguage, mod.Presentation));
             var defs = new List<string>(Loaded.Frozen.Defs.Count);
-            foreach (var def in Loaded.Frozen.Defs) defs.Add(def.Id);
+            foreach (var def in Loaded.Frozen.Defs)
+                if (def.Id != Schema.EngineRules.DefId) defs.Add(def.Id); // 게임 상한(G451)은 보일 내용이 아니다
             defs.Sort(StringComparer.Ordinal);
             return new ValueTask<BridgeContent>(new BridgeContent(mods, defs));
         }

@@ -191,8 +191,17 @@ namespace Kesa.Engine.Schema
                 foreach (var name in EngineComponents.All)
                     _set.Add(new ComponentType(new ComponentDecl(name, SourceSpan.None, EngineComponents.Owner, null, KeyKind.Def,
                         KeysMode.All, new List<MemberDecl>())));
+                // 게임 상한 Def 타입도 같다 (G451)
+                _set.Add(EngineRules.Type());
                 bool Reserved(string name, string mod, SourceSpan span)
                 {
+                    if (EngineRules.IsEngine(name))
+                    {
+                        Error(mod, Codes.SchDuplicateName, "'" + name + "' is a Def type declared by the engine", span,
+                            hint: "pick another name; change the engine's limits with patch.set(\"" + EngineRules.DefId +
+                                  "\", …) (spec-gaps G451)");
+                        return true;
+                    }
                     if (EngineSignals.IsEngine(name))
                     {
                         Error(mod, Codes.SchDuplicateName, "'" + name + "' is a signal declared by the engine", span,
@@ -207,7 +216,8 @@ namespace Kesa.Engine.Schema
                     }
                     return false;
                 }
-                bool Engine(string name) => EngineSignals.IsEngine(name) || EngineComponents.IsEngine(name);
+                bool Engine(string name) =>
+                    EngineSignals.IsEngine(name) || EngineComponents.IsEngine(name) || EngineRules.IsEngine(name);
 
                 foreach (var m in _mods)
                 {

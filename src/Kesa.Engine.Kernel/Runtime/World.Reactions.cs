@@ -12,9 +12,9 @@ namespace Kesa.Engine.Runtime
     /// </summary>
     public sealed partial class World
     {
-        public const int DefaultMaxSignalDepth = 64;
+        public const int DefaultMaxSignalDepth = Schema.EngineRules.DefaultMaxSignalDepth;
 
-        private readonly int _maxSignalDepth = DefaultMaxSignalDepth;
+        private readonly int _maxSignalDepth;
 
         /// <summary>핸들러, 로드 순서 → 정의 순서 (S5 동률 규칙).</summary>
         private IReadOnlyList<HandlerDecl> _handlers = Array.Empty<HandlerDecl>();
@@ -137,7 +137,7 @@ namespace Kesa.Engine.Runtime
                         {
                             Message = DropMessage(e),
                             Hint = "a chain that should go on over time can wait() or run from a tick handler, which starts again at generation 1; " +
-                                   "a long chain that ends can get a higher limit from the host (maxSignalDepth) (spec-gaps G147, G150)",
+                                   "a long chain that ends can raise the limit: patch.set(\"engine:Rules\", \"max_signal_depth\", …) (spec-gaps G147, G451)",
                         });
                         continue;
                     }

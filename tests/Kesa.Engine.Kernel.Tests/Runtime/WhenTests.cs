@@ -30,7 +30,8 @@ namespace Kesa.Engine.Tests.Runtime
 
         private World Make(string defs, int maxSettleRounds = World.DefaultMaxSettleRounds)
         {
-            var world = new World(Content(defs), maxSettleRounds: maxSettleRounds);
+            string rule = maxSettleRounds == World.DefaultMaxSettleRounds ? "" : Rule("max_settle_rounds", maxSettleRounds);
+            var world = new World(Content(rule + defs));
             _a = world.Create("core:Scout");
             world.Seat(_a, "host");
             _b = world.Create("core:Scout");
@@ -133,7 +134,7 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(dropped.Count, Is.GreaterThan(0));
             Assert.That(dropped[0].Message, Does.Contain("settling went past 4 rounds; the chain was: "));
             Assert.That(dropped[0].Message, Does.EndWith("core.revive → core.curse → core.revive → core.curse → core.revive"));
-            Assert.That(dropped[0].Hint, Does.Contain("maxSettleRounds (spec-gaps G171)"));
+            Assert.That(dropped[0].Hint, Does.Contain("patch.set(\"engine:Rules\", \"max_settle_rounds\""));
             Assert.That(r.Reactions.Count(x => x.Outcome == ReactionOutcome.Finished), Is.GreaterThanOrEqualTo(4), "earlier rounds stay");
             // 고리는 처음부터 HP 0인 _b에서 돈다. _a를 건드리는 다음 제출의 정착에서 _b의 고리가 다시 시도된다
             Assert.That(dropped.All(x => ((EntityValue)x.Values["u"]).Id == _b), Is.True);
@@ -313,12 +314,6 @@ namespace Kesa.Engine.Tests.Runtime
             var again = World.Load(content, world.Save()).World!;
             Assert.That(Set(again, _a, 9).Reactions, Is.Empty);
             Assert.That(again.Advance(1).Reactions, Is.Empty);
-        }
-
-        [Test]
-        public void TheRoundLimitMustBePositive()
-        {
-            Assert.That(() => new World(Content(""), maxSettleRounds: 0), Throws.TypeOf<System.ArgumentOutOfRangeException>());
         }
 
         [Test]

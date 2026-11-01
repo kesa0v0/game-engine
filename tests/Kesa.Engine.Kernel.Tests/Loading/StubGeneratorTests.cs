@@ -67,6 +67,14 @@ namespace Kesa.Engine.Tests.Loading
                 "    def __len__(self) -> int: ...\n" +
                 "    def __contains__(self, key: object, /) -> bool: ...\n" +
                 "\n" +
+                // 엔진 상한(G451)은 defdata로 읽는 상수만
+                "class _EngineRules_consts:\n" +
+                "    @property\n    def step_budget(self) -> int: ...\n" +
+                "    @property\n    def action_step_budget(self) -> int: ...\n" +
+                "    @property\n    def max_signal_depth(self) -> int: ...\n" +
+                "    @property\n    def max_advance_per_call(self) -> int: ...\n" +
+                "    @property\n    def max_settle_rounds(self) -> int: ...\n" +
+                "\n" +
                 "class _Resource_consts:\n" +
                 "    ...\n" +
                 "\n" +
@@ -120,13 +128,13 @@ namespace Kesa.Engine.Tests.Loading
                 "\n" +
                 "class patch:\n" +
                 "    @staticmethod\n" +
-                "    def set(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any) -> None: ...\n" +
+                "    def set(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"engine:Rules\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any) -> None: ...\n" +
                 "    @staticmethod\n" +
-                "    def add(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any) -> None: ...\n" +
+                "    def add(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"engine:Rules\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any) -> None: ...\n" +
                 "    @staticmethod\n" +
-                "    def append(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any) -> None: ...\n" +
+                "    def append(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"engine:Rules\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any) -> None: ...\n" +
                 "    @staticmethod\n" +
-                "    def remove(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any = ...) -> None: ...\n" +
+                "    def remove(def_id: Literal[\"Wood\", \"Iron\", \"Base\", \"Scout\", \"engine:Rules\", \"core:Wood\", \"core:Iron\", \"core:Base\", \"core:Scout\"], path: str, value: Any = ...) -> None: ...\n" +
                 "\n" +
                 "def mod_loaded(mod: Never) -> bool: ...\n" +
                 "\n" +
@@ -147,9 +155,10 @@ namespace Kesa.Engine.Tests.Loading
                 "def spawn(def_id: Literal[\"Scout\", \"core:Scout\"], /, **components: Any) -> Unit: ...\n" +
                 "@overload\n" +
                 "def spawn(def_id: str, /, **components: Any) -> Any: ...\n" +
-                "def defid(name: Literal[\"Wood\", \"Iron\", \"Scout\", \"core:Wood\", \"core:Iron\", \"core:Scout\"], /) -> str: ...\n" +
+                "def defid(name: Literal[\"Wood\", \"Iron\", \"Scout\", \"engine:Rules\", \"core:Wood\", \"core:Iron\", \"core:Scout\"], /) -> str: ...\n" +
                 "\n" +
                 "class _DefData:\n" +
+                "    EngineRules: _EngineRules_consts | None\n" +
                 "    Resource: _Resource_consts | None\n" +
                 "    Unit: _Unit_consts | None\n" +
                 "def defdata(id: str, /) -> _DefData: ...\n" +

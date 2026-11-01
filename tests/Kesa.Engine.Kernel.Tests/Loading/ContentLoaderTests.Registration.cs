@@ -389,7 +389,7 @@ namespace Kesa.Engine.Tests.Loading
             Mod("a", defs: "Unit(\"Scout\")\n", extra: ", dependencies=[\"core\"]");
             Mod("b", defs: "Unit(\"Scout\")\n", extra: ", dependencies=[\"core\"]");
             var result = LoadClean();
-            Assert.That(result.Defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "core:Scout", "a:Scout", "b:Scout" }));
+            Assert.That(ModIds(result.Defs.Defs.Select(d => d.Id)), Is.EqualTo(new[] { "core:Scout", "a:Scout", "b:Scout" }));
         }
 
         [Test]
@@ -421,8 +421,8 @@ namespace Kesa.Engine.Tests.Loading
             Mod("core", schema: UnitSchema, defs: "Unit(\"Scout\", label=\"a\")\nUnit(\"Tank\")\n");
             Mod("rebalance", defs: "Unit(\"core:Scout\", override=True, label=\"b\")\n", extra: ", dependencies=[\"core\"]");
             var result = LoadClean();
-            Assert.That(result.Defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "core:Scout", "core:Tank" }));
-            var scout = result.Defs.Defs[0];
+            Assert.That(ModIds(result.Defs.Defs.Select(d => d.Id)), Is.EqualTo(new[] { "core:Scout", "core:Tank" }));
+            var scout = result.Defs.Defs[1]; // 0은 엔진 Def
             Assert.That(scout.Mod, Is.EqualTo("rebalance"));
             Assert.That(scout.Replaced!.Mod, Is.EqualTo("core"));
         }
@@ -450,7 +450,7 @@ namespace Kesa.Engine.Tests.Loading
 
             Write("b/mod.py", "Mod(id=\"b\", dependencies=[\"core\"], loadAfter=[\"a\"])\nuse_all(\"defs/\")\n");
             result = LoadClean();
-            Assert.That(result.Defs.Defs.Single().Mod, Is.EqualTo("b"));
+            Assert.That(result.Defs.Defs.Single(d => d.Id == "core:Scout").Mod, Is.EqualTo("b"));
         }
 
         // ---- 실패의 전파 ----
@@ -476,7 +476,7 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(diags.Select(d => (d.Code, d.Mod)),
                 Is.EquivalentTo(new[] { (Codes.SchUnknownName, "core"), (Codes.ModDependencyFailed, "scouts") }));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "core", "scouts" }));
-            Assert.That(result.Schema.Types, Is.Empty);
+            Assert.That(result.Schema.Types.Where(t => t.Name != "EngineRules"), Is.Empty);
         }
 
         [Test]
@@ -494,10 +494,10 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(result.Schema.TryGetType("Unit", out var unit), Is.True);
             Assert.That(ComponentsOf(unit), Is.EqualTo(new[] { "Health", "Skill" }));
             Assert.That(result.Schema.TryGetComponent("Morale", out _), Is.False);
-            Assert.That(result.Defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "core:Scout" }));
+            Assert.That(ModIds(result.Defs.Defs.Select(d => d.Id)), Is.EqualTo(new[] { "core:Scout" }));
 
             // 남은 Def는 최종 스키마의 객체를 가리켜야 한다 (실패한 모드의 확장이 남은 옛 객체가 아니라)
-            var scout = result.Defs.Defs.Single();
+            var scout = result.Defs.Defs.Single(d => d.Id == "core:Scout");
             Assert.That(scout.Type, Is.SameAs(unit));
             Assert.That(result.Schema.TryGetComponent("Health", out var health), Is.True);
             Assert.That(scout.TryGetField("Health", out var h), Is.True);

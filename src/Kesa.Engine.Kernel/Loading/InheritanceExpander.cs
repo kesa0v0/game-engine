@@ -131,6 +131,12 @@ namespace Kesa.Engine.Loading
             var resolved = new ResolvedDef(record, parent);
             if (parent != null) CopyInherited(parent, resolved);
 
+            // 엔진 Def(G451)는 적힌 값이 없고 모드 환경도 없다
+            if (record.Mod == EngineSignals.Owner)
+            {
+                _patcher.Apply(resolved, _log.ForDef(record.Id));
+                return resolved;
+            }
             var evaluator = new DeferredEvaluator(_environment(record.Mod), _schema, record, parent);
             bool failed = false;
             foreach (var field in record.Fields)

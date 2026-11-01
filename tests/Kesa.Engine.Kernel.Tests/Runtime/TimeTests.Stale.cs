@@ -372,7 +372,7 @@ namespace Kesa.Engine.Tests.Runtime
 
         private World Limited(string defs, int limit)
         {
-            var world = new World(Content(defs), maxAdvancePerCall: limit);
+            var world = new World(Content(Rule("max_advance_per_call", limit) + defs));
             _u = world.Create("core:Scout");
             return world;
         }
@@ -408,12 +408,6 @@ namespace Kesa.Engine.Tests.Runtime
             Go(world);
             Go(world);
             Assert.That(world.Tick, Is.EqualTo(6), "each submit gets its own 3 ticks");
-        }
-
-        [Test]
-        public void TheLimitMustBePositive()
-        {
-            Assert.That(() => new World(Content(""), maxAdvancePerCall: 0), Throws.TypeOf<ArgumentOutOfRangeException>());
         }
 
         [TestCase("advance()", "advance() takes the number of ticks")]

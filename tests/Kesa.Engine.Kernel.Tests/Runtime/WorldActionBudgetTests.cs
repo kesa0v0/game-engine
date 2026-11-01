@@ -66,8 +66,9 @@ namespace Kesa.Engine.Tests.Runtime
 
         private void NewWorld(string handlers = "", int units = 100)
         {
-            Mod("banking", schema: Schema, defs: Defs + handlers);
-            _world = new World(LoadClean(), stepBudget: 300, actionStepBudget: 20_000);
+            Mod("banking", schema: Schema,
+                defs: Rule("step_budget", 300) + Rule("action_step_budget", 20_000) + Defs + handlers);
+            _world = new World(LoadClean());
             _units.Clear();
             for (int i = 0; i < units; i++) _units.Add(_world.Create("banking:Soldier"));
             foreach (var u in _units) _world.Seat(u, "host");

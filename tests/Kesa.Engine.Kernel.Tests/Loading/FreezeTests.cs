@@ -42,7 +42,7 @@ namespace Kesa.Engine.Tests.Loading
         public void OnlyConcreteDefsAreFrozenInRegistrationOrder()
         {
             var set = Frozen();
-            Assert.That(set.Defs.Select(d => d.Id), Is.EqualTo(new[] { "core:Wood", "core:Scout" }));
+            Assert.That(ModIds(set.Defs.Select(d => d.Id)), Is.EqualTo(new[] { "core:Wood", "core:Scout" }));
             Assert.That(set.TryGet("core:Base", out _), Is.False);
             Assert.That(set.TryGet("core:Scout", out var scout), Is.True);
             Assert.That(scout.ParentId, Is.EqualTo("core:Base"));
@@ -246,7 +246,7 @@ namespace Kesa.Engine.Tests.Loading
             Mod("core", schema: Schema, defs: "Unit(\"Scout\")\n");
             var result = Load(out var diags);
             Assert.That(diags, Is.Not.Empty);
-            Assert.That(result.Frozen.Defs, Is.Empty);
+            Assert.That(ModIds(result.Frozen.Defs.Select(d => d.Id)), Is.Empty);
         }
     }
 }

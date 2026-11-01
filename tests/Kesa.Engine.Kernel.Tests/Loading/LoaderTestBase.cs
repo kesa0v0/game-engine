@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Loading;
@@ -32,6 +33,13 @@ namespace Kesa.Engine.Tests.Loading
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, text, new UTF8Encoding(false));
         }
+
+        /// <summary>게임 상한 하나를 바꾸는 Def 파일 줄 (G451).</summary>
+        protected static string Rule(string name, int value) =>
+            "patch.set(\"engine:Rules\", \"" + name + "\", " + value + ")\n";
+
+        /// <summary>모드가 만든 Def id만 (엔진 Def <c>engine:Rules</c>를 뺀다).</summary>
+        protected static IEnumerable<string> ModIds(IEnumerable<string> ids) => ids.Where(id => id != "engine:Rules");
 
         /// <summary>schema/와 defs/를 쓰는 모드 하나.</summary>
         protected void Mod(string id, string? schema = null, string? defs = null, string extra = "")

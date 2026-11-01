@@ -224,7 +224,7 @@ namespace Kesa.Engine.Loading
             }
 
             // ②b 끝: Def 등록 (고정점). 모드가 더 빠졌으면 스키마도 그 모드의 확장 없이 다시 만든다.
-            var defs = BuildDefs(units, visibility, order, runDiagnostics);
+            var defs = BuildDefs(units, schema, visibility, order, runDiagnostics);
             if (CountSurvivors(units) != survivorsBefore)
             {
                 schema = BuildSchema(units, visibility, runDiagnostics);

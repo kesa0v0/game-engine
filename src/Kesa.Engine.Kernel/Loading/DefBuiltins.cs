@@ -335,6 +335,9 @@ namespace Kesa.Engine.Loading
 
             public override Value Call(CallContext ctx, SourceSpan span, IReadOnlyList<ArgValue> args)
             {
+                if (EngineRules.IsEngine(_type.Name))
+                    throw ctx.Fail(Codes.DefBadValue, "mods cannot make Defs of the engine's type '" + _type.Name + "'", span,
+                        "change its values with patch.set(\"" + EngineRules.DefId + "\", …) (spec-gaps G451)");
                 var r = new ArgReader(ctx, _type.Name, span, args);
                 r.ExpectPositional(1, _type.Name + "(\"Id\", ...)");
                 var idArg = r.Positional[0];

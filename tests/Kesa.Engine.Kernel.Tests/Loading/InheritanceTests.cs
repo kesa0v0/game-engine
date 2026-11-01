@@ -56,7 +56,7 @@ namespace Kesa.Engine.Tests.Loading
         public void EveryDefIsExpandedInRegistrationOrder()
         {
             var defs = ExpandClean("Unit(\"Base\", abstract=True)\nUnit(\"Scout\", parent=\"core:Base\")\n");
-            Assert.That(defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "core:Wood", "core:Iron", "core:Base", "core:Scout" }));
+            Assert.That(ModIds(defs.Defs.Select(d => d.Id)), Is.EqualTo(new[] { "core:Wood", "core:Iron", "core:Base", "core:Scout" }));
             Assert.That(defs.TryGet("core:Base", out var b), Is.True);
             Assert.That(b.IsAbstract, Is.True);
             Assert.That(defs.TryGet("core:Scout", out var s), Is.True);
@@ -360,7 +360,7 @@ namespace Kesa.Engine.Tests.Loading
             var result = Load(out var diags);
             Assert.That(diags.Single().Mod, Is.EqualTo("addon"));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "addon" }));
-            Assert.That(result.Expanded.Defs.Select(d => d.Id), Is.EqualTo(new[] { "core:Wood", "core:Iron", "core:Base" }));
+            Assert.That(ModIds(result.Expanded.Defs.Select(d => d.Id)), Is.EqualTo(new[] { "core:Wood", "core:Iron", "core:Base" }));
         }
 
         [Test]

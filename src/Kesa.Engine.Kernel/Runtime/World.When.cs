@@ -13,9 +13,9 @@ namespace Kesa.Engine.Runtime
     /// </summary>
     public sealed partial class World
     {
-        public const int DefaultMaxSettleRounds = 64;
+        public const int DefaultMaxSettleRounds = Schema.EngineRules.DefaultMaxSettleRounds;
 
-        private readonly int _maxSettleRounds = DefaultMaxSettleRounds;
+        private readonly int _maxSettleRounds;
 
         /// <summary>반응, 단계 순서 → 로드 순서 → 정의 순서 (핸들러와 같은 규칙, S5).</summary>
         private IReadOnlyList<WhenDecl> _whens = Array.Empty<WhenDecl>();
@@ -131,7 +131,7 @@ namespace Kesa.Engine.Runtime
                             Message = "the reaction " + p.When.Id + " did not run: settling went past " +
                                       _maxSettleRounds.ToString(CultureInfo.InvariantCulture) + " rounds; the chain was: " + Chain(p),
                             Hint = "reactions that keep turning each other's conditions true never settle; make one of them stop, " +
-                                   "or a host with longer chains can raise maxSettleRounds (spec-gaps G171)",
+                                   "or a game with longer chains can raise the limit: patch.set(\"engine:Rules\", \"max_settle_rounds\", …) (spec-gaps G171, G451)",
                         });
                     return;
                 }

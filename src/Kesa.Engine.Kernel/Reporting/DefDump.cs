@@ -17,7 +17,12 @@ namespace Kesa.Engine.Reporting
         public static string ToJson(ContentLoadResult result)
         {
             var defs = new JsonArray();
-            foreach (var def in result.Expanded.Defs) defs.Add(new Writer(result).Def(def));
+            foreach (var def in result.Expanded.Defs)
+            {
+                // 엔진 Def(G451)는 모드가 패치했을 때만: 기본값뿐이면 모든 덤프에 같은 것이 붙는다
+                if (def.Mod == Schema.EngineSignals.Owner && def.Consts.Count == 0) continue;
+                defs.Add(new Writer(result).Def(def));
+            }
             return new JsonObject().Add("version", JsonNode.Number(Version)).Add("defs", defs).ToText();
         }
 

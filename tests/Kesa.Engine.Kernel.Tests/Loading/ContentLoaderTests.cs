@@ -94,7 +94,7 @@ namespace Kesa.Engine.Tests.Loading
             Assert.That(pop.Consts[2].Spec.Type.Display, Is.EqualTo("dict[DefId[\"Need\"], fixed]"));
             Assert.That(pop.Consts[3].Spec.Merge, Is.EqualTo(MergeMode.Append));
 
-            Assert.That(result.Defs.Defs.Select(d => d.Id), Is.EqualTo(new[] { "eco:Hunger", "eco:Food", "eco:SlumLaborers" }));
+            Assert.That(ModIds(result.Defs.Defs.Select(d => d.Id)), Is.EqualTo(new[] { "eco:Hunger", "eco:Food", "eco:SlumLaborers" }));
             Assert.That(result.Defs.TryGet("eco:SlumLaborers", out var slum), Is.True);
             Assert.That(slum.Fields.Select(f => f.Name),
                 Is.EqualTo(new[] { "label", "needs", "Wealth", "Health", "Stock" }));

@@ -74,9 +74,9 @@ namespace Kesa.Engine.Runtime
             }
         }
 
-        public const int DefaultMaxAdvancePerCall = 10000;
+        public const int DefaultMaxAdvancePerCall = EngineRules.DefaultMaxAdvancePerCall;
 
-        private readonly int _maxAdvancePerCall = DefaultMaxAdvancePerCall;
+        private readonly int _maxAdvancePerCall;
 
         /// <summary><c>advance(n)</c>에서 멈춘 Flow, 멈춘 순서대로 (G167).</summary>
         private readonly List<long> _advancers = new List<long>();
@@ -108,7 +108,7 @@ namespace Kesa.Engine.Runtime
                             want.ToString(CultureInfo.InvariantCulture) + ") after " + used.ToString(CultureInfo.InvariantCulture) +
                             " ticks asked in this call, past the limit of " + _maxAdvancePerCall.ToString(CultureInfo.InvariantCulture) +
                             " ticks per call, so the flow was dropped",
-                            "a loop of advance() should pause on a question each turn; a host that needs more can raise maxAdvancePerCall (spec-gaps G168)"),
+                            "a loop of advance() should pause on a question each turn; a game that needs more can raise the limit: patch.set(\"engine:Rules\", \"max_advance_per_call\", …) (spec-gaps G168, G451)"),
                     });
                     ResumeAfterInterrupted(flow, reactions);
                     continue;
