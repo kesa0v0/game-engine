@@ -62,6 +62,12 @@ namespace Kesa.Engine.Script
         /// </summary>
         public Func<FunctionValue, IReadOnlyList<FunctionValue>?>? Wrappers { get; set; }
 
+        /// <summary><c>with imagine(...):</c>에 들어갈 때 키워드 인자로 시험 판을 연다 (G454). 런타임만 준다.</summary>
+        public Action<IReadOnlyDictionary<string, Value>>? EnterImagine { get; set; }
+
+        /// <summary><c>with imagine():</c> 블록을 내릴 때 그 시험 판을 버린다.</summary>
+        public Action? ExitImagine { get; set; }
+
         private void Enter(Session session) => _active.Add(session);
         private void Leave() => _active.RemoveAt(_active.Count - 1);
 

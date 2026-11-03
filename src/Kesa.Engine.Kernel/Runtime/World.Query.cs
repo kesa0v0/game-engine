@@ -146,7 +146,7 @@ namespace Kesa.Engine.Runtime
             {
                 var items = new List<Value>(Ids.Count);
                 foreach (var id in Ids)
-                    if (_world.IsAlive(id)) items.Add(new EntityView(_world, id));
+                    if (_world.Current.IsAlive(id)) items.Add(new EntityView(_world, id));
                 return items;
             }
 
@@ -154,19 +154,19 @@ namespace Kesa.Engine.Runtime
             {
                 int n = 0;
                 foreach (var id in Ids)
-                    if (_world.IsAlive(id)) n++;
+                    if (_world.Current.IsAlive(id)) n++;
                 return n;
             }
 
             public bool ContainsKey(Value key)
             {
-                if (!(key is IEntityReference r) || !_world.IsAlive(r.EntityId)) return false;
+                if (!(key is IEntityReference r) || !_world.Current.IsAlive(r.EntityId)) return false;
                 foreach (var id in Ids)
                     if (id == r.EntityId) return true;
                 return false;
             }
 
-            public bool IsGone(Value item) => item is IEntityReference r && !_world.IsAlive(r.EntityId);
+            public bool IsGone(Value item) => item is IEntityReference r && !_world.Current.IsAlive(r.EntityId);
 
             public Value GetItem(Value key) =>
                 throw new ScriptRuntimeException(Codes.RunType,

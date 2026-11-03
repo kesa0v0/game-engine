@@ -93,7 +93,7 @@ namespace Kesa.Engine.Runtime
             public long Id => _id;
             public DefType Type => _type;
 
-            public Value GetAttribute(string name) => _world.DefConst(_id, _type, name);
+            public Value GetAttribute(string name) => _world.Current.DefConst(_id, _type, name);
         }
 
         // ---- defs (G305) ----
@@ -162,14 +162,14 @@ namespace Kesa.Engine.Runtime
             {
                 if (_type != null)
                 {
-                    var value = _world.ConstOf(_def, _type, name);
-                    _world._trace?.Add(new ExplainNode(ExplainKind.Read, default, _type.Name, _def.Id, name, value, new List<ExplainNode>()));
+                    var value = _world.Current.ConstOf(_def, _type, name);
+                    _world.Current._trace?.Add(new ExplainNode(ExplainKind.Read, default, _type.Name, _def.Id, name, value, new List<ExplainNode>()));
                     return value;
                 }
-                if (_world._schema.TryGetType(name, out var type))
+                if (_world.Current._schema.TryGetType(name, out var type))
                     return _def.Type == type ? new DefDataView(_world, _def, type) : (Value)NoneValue.Instance;
                 var names = new List<string>();
-                foreach (var t in _world._schema.Types) names.Add(t.Name);
+                foreach (var t in _world.Current._schema.Types) names.Add(t.Name);
                 throw new ScriptRuntimeException(Codes.RunScript,
                     "defdata(\"" + _def.Id + "\") has no Def type '" + name + "'; read its consts through its Def type, like ." +
                     _def.Type.Name + ".name", Suggest.Hint(name, names));

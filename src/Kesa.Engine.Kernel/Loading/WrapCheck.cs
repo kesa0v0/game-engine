@@ -92,7 +92,7 @@ namespace Kesa.Engine.Loading
         private static bool Preconditions(WrapDecl w, FunctionValue target, CallContext context)
         {
             var body = w.Function.Definition!.Body;
-            if (body.Count == 0 || !(body[0] is WithStmt with)) return true;
+            if (!FunctionChecker.OpensPreconditions(body, out var with)) return true;
             context.Error(Codes.CmdPreconditions,
                 "'" + target.Name + "' is a plain function, so a @wrap of it cannot open 'with preconditions:'", with.Span,
                 "only a @wrap of a @command adds preconditions; check the condition in the body instead (spec-gaps G316)");

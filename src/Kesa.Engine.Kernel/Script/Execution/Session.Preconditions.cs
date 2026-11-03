@@ -101,7 +101,7 @@ namespace Kesa.Engine.Script
             }
         }
 
-        private static bool HasBlock(FunctionDef def) => def.Body.Count > 0 && def.Body[0] is WithStmt;
+        private static bool HasBlock(FunctionDef def) => FunctionChecker.OpensPreconditions(def.Body, out _);
 
         /// <summary>
         /// 프레임 함수의 <c>with preconditions:</c> 블록 안의 문장들 (없으면 그대로). 실패한 <c>require</c>가 있으면 true.

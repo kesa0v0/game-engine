@@ -39,7 +39,7 @@ namespace Kesa.Engine.Script
             bool opens = def.IsCommand || def.IsUiAction || def.IsWrap;
             for (int i = 0; i < def.Body.Count; i++)
             {
-                if (i == 0 && opens && def.Body[0] is WithStmt with) walker.Preconditions(with, def.Parameters);
+                if (i == 0 && opens && OpensPreconditions(def.Body, out var with)) walker.Preconditions(with, def.Parameters);
                 else walker.Statement(def.Body[i]);
             }
         }
@@ -53,6 +53,24 @@ namespace Kesa.Engine.Script
         /// <c>require(...)</c>·<c>cost(...)</c>·<c>choose(...)</c> 모양의 호출인가 (이름만 본다). 모드가 그 이름을 덮어썼는지는
         /// 모드 평가가 끝난 뒤 <see cref="FunctionNameChecker"/>가 본다 (G112).
         /// </summary>
+        public const string ImagineName = "imagine";
+
+        /// <summary><c>with imagine(...):</c> 블록이면 참 (G454).</summary>
+        public static bool IsImagine(WithStmt with) =>
+            with.Context is CallExpr call && call.Callee is NameExpr callee && callee.Name == ImagineName;
+
+        /// <summary>
+        /// 본문 첫 문장이 사전 조건 블록인가. <c>with imagine():</c>은 첫 문장이어도 사전 조건이 아니다 (G454).
+        /// 이름이 틀린 <c>with</c>는 사전 조건 블록으로 보아 검사가 "preconditions만 연다"고 알린다.
+        /// </summary>
+        public static bool OpensPreconditions(IReadOnlyList<Stmt> body, out WithStmt with)
+        {
+            with = null!;
+            if (body.Count == 0 || !(body[0] is WithStmt first) || IsImagine(first)) return false;
+            with = first;
+            return true;
+        }
+
         public static bool IsPreconditionCall(Expr expr, out string name)
         {
             name = "";
@@ -277,6 +295,17 @@ namespace Kesa.Engine.Script
                 {
                     case ExprStmt es:
                         Expr(es.Expr);
+                        break;
+
+                    case WithStmt with when IsImagine(with):
+                        // 시험 판 블록은 어디든 둘 수 있다: 쓸 수 있는 함수(봇과 봇 함수)는 FunctionEffects가 본다 (G454)
+                        foreach (var argument in ((CallExpr)with.Context).Arguments)
+                        {
+                            if (argument.Name == null)
+                                Report("imagine() takes its arguments by name", argument.Value.Span, "write with imagine(): (spec-gaps G454)");
+                            Expr(argument.Value);
+                        }
+                        foreach (var inner in with.Body) Statement(inner);
                         break;
 
                     case WithStmt with:

@@ -145,10 +145,13 @@ namespace Kesa.Engine.Runtime
         private StepMeter _derivedMeter => _derivedMeterStore ??= new StepMeter(_stepBudget);
 
         private PureEvaluator Evaluator =>
-            _evaluator ??= new PureEvaluator(new WorldGlobals(this), RuntimeBuiltins(), _stepBudget, _maxCallDepth)
+            // 시험 판은 진짜 판의 스키마 이름 값을 함께 쓴다: 블록 밖에서 잡은 Unit을 시험 판의 query가 알아본다 (G454)
+            _evaluator ??= new PureEvaluator(_root?.Evaluator.Globals ?? new WorldGlobals(this), RuntimeBuiltins(), _stepBudget, _maxCallDepth)
             {
                 ParameterType = CommandParameterType,
                 Wrappers = WrappersOf,
+                EnterImagine = EnterImagine,
+                ExitImagine = ExitImagine,
             };
 
         private Dictionary<FunctionValue, CommandDecl>? _commandsByFunction;
@@ -267,6 +270,9 @@ namespace Kesa.Engine.Runtime
             AddUiBuiltins(table);
             AddHostBuiltins(table);
             AddModNamespaces(table);
+            table.Add(PureBuiltins.PlayName,
+                new PureBuiltin(PureBuiltins.PlayName, (p, k) => PlayBuiltin(_evaluator?.ScriptMod ?? "", p, k)) { CallerBody = PlayBuiltin });
+            ForwardToTrials(table);
             return table;
         }
 
@@ -610,14 +616,14 @@ namespace Kesa.Engine.Runtime
 
             public bool ValueEquals(Value other) => other is IEntityReference r && r.EntityId == Id;
 
-            public Value GetAttribute(string name) => Guard(() => _world.EntityAttribute(Id, name));
+            public Value GetAttribute(string name) => Guard(() => _world.Current.EntityAttribute(Id, name));
 
             // 자주 도는 길이라 Guard의 람다(할당)를 쓰지 않는다
             public Value GetAttribute(AttributeExpr site)
             {
                 try
                 {
-                    return _world.EntityAttribute(Id, site);
+                    return _world.Current.EntityAttribute(Id, site);
                 }
                 catch (WorldException e)
                 {
@@ -651,15 +657,15 @@ namespace Kesa.Engine.Runtime
             public RowKey? Row => _row;
             public override string KindName => Component.Name;
 
-            public Value GetAttribute(string name) => Guard(() => _world.ComponentAttribute(this, name));
+            public Value GetAttribute(string name) => Guard(() => _world.Current.ComponentAttribute(this, name));
 
-            public void SetAttribute(string name, Value value) => Guard(() => _world.WriteMember(this, name, value));
+            public void SetAttribute(string name, Value value) => Guard(() => _world.Current.WriteMember(this, name, value));
 
             public Value GetAttribute(AttributeExpr site)
             {
                 try
                 {
-                    return _world.ComponentAttribute(this, site);
+                    return _world.Current.ComponentAttribute(this, site);
                 }
                 catch (WorldException e)
                 {
@@ -671,7 +677,7 @@ namespace Kesa.Engine.Runtime
             {
                 try
                 {
-                    _world.WriteMember(this, site, value);
+                    _world.Current.WriteMember(this, site, value);
                 }
                 catch (WorldException e)
                 {
@@ -679,7 +685,7 @@ namespace Kesa.Engine.Runtime
                 }
             }
 
-            public Value ReadSlot(string name) => Guard(() => _world.ReadSlot(this, name));
+            public Value ReadSlot(string name) => Guard(() => _world.Current.ReadSlot(this, name));
 
             public string SlotName(string name) =>
                 _id + "." + Component.Name + (_row == null ? "" : "[" + _row.Value + "]") + "." + name;
@@ -762,27 +768,27 @@ namespace Kesa.Engine.Runtime
             public override string KindName => _component.Name + " rows";
 
             public Value GetAttribute(string name) =>
-                Guard(() => _world.RowOrNone(_id, _component, RowKey.Def(_world.ScriptDefId(name))));
+                Guard(() => _world.Current.RowOrNone(_id, _component, RowKey.Def(_world.Current.ScriptDefId(name))));
 
-            public Value GetItem(Value key) => Guard(() => _world.RowOrNone(_id, _component, KeyOf(key)));
+            public Value GetItem(Value key) => Guard(() => _world.Current.RowOrNone(_id, _component, KeyOf(key)));
 
-            public IReadOnlyList<Value> Iterate() => Guard(() => _world.RowKeyValues(_id, _component));
+            public IReadOnlyList<Value> Iterate() => Guard(() => _world.Current.RowKeyValues(_id, _component));
 
             public int Size() => Iterate().Count;
 
             /// <summary>그 키의 줄이 있는가. 없는 Def id는 <c>h.Skill[k]</c>처럼 "혹시 …?" 오류다 (오타가 조용히 False가 되지 않게).</summary>
-            public bool ContainsKey(Value key) => Guard(() => _world.HasRowKey(_id, _component, KeyOf(key)));
+            public bool ContainsKey(Value key) => Guard(() => _world.Current.HasRowKey(_id, _component, KeyOf(key)));
 
             /// <summary>반복 도중 그 줄이 떨어졌거나 엔티티가 죽었다 (G88·G194).</summary>
             public bool IsGone(Value key) =>
-                !_world.IsAlive(_id) || (key is IEntityReference r && !_world.IsAlive(r.EntityId)) ||
-                !Guard(() => _world.HasRowKey(_id, _component, KeyOf(key)));
+                !_world.Current.IsAlive(_id) || (key is IEntityReference r && !_world.Current.IsAlive(r.EntityId)) ||
+                !Guard(() => _world.Current.HasRowKey(_id, _component, KeyOf(key)));
 
             private RowKey KeyOf(Value key)
             {
                 switch (key)
                 {
-                    case StrValue s: return RowKey.Def(_world.ScriptDefId(s.Value));
+                    case StrValue s: return RowKey.Def(_world.Current.ScriptDefId(s.Value));
                     case IEntityReference r: return RowKey.Entity(r.EntityId);
                     case IntValue n: return RowKey.Int(n.Value);
                 }

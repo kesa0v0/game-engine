@@ -29,7 +29,17 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public byte[] Save()
         {
-            if (_undo != null || _meter != null)
+            if (_meter != null)
+                throw new InvalidOperationException("the world cannot be saved while a command or a function is running");
+            return SaveBytes();
+        }
+
+        /// <summary>
+        /// 저장 바이트. 시험 판의 복사(G453)는 봇이 생각하는 중에도 부른다: 봇은 판을 바꾸지 않으므로 커맨드 실행 중만 막는다.
+        /// </summary>
+        private byte[] SaveBytes()
+        {
+            if (_undo != null)
                 throw new InvalidOperationException("the world cannot be saved while a command or a function is running");
             if (_emitted.Count > 0) // 제출·답·응답이 끝나기 전에 비우므로 여기 오면 엔진 결함이다 (G148)
                 throw new InvalidOperationException("engine: emitted signals are still waiting for their handlers");
@@ -258,13 +268,18 @@ namespace Kesa.Engine.Runtime
         /// 멈추기 전까지 한 일은 남고 반응은 부르지 않는다.
         /// </summary>
         public static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, bool requireViewRules = false,
-            bool dropRemoved = false, bool cancelBrokenFlows = false)
+            bool dropRemoved = false, bool cancelBrokenFlows = false) =>
+            Load(loaded, save, requireViewRules, dropRemoved, cancelBrokenFlows, trialOf: null);
+
+        /// <param name="trialOf">시험 판이면 그 판을 연 진짜 판 (G453). 불러오기 전에 정해야 스키마 이름 값을 진짜 판과 함께 쓴다.</param>
+        private static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, bool requireViewRules, bool dropRemoved,
+            bool cancelBrokenFlows, World? trialOf)
         {
             var diagnostics = new List<Diagnostic>();
             World world;
             try
             {
-                world = new World(loaded, requireViewRules: requireViewRules);
+                world = new World(loaded, requireViewRules: requireViewRules) { _root = trialOf };
             }
             catch (WorldException e)
             {

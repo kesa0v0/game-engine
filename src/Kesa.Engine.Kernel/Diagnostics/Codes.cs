@@ -150,6 +150,9 @@ namespace Kesa.Engine.Diagnostics
         // 호출 깊이 (spec-gaps G452): 지금 도는 실행들의 프레임 합이 engine:Rules의 max_call_depth를 넘음
         public const string RunDepth = "RUN024";
 
+        // 시험 두기 (spec-gaps G454~G463): imagine·play를 그 자리 밖에서 씀, 블록 안의 submit·respond, 시험 판에서 쓰기 등급 호스트 함수
+        public const string RunImagine = "RUN025";
+
         // 저장과 불러오기 (spec S8, spec-gaps G140): 깨졌거나 형식이 다른 저장 / 지금 내용과 어긋나는 저장 / 모드 목록이 달라짐(경고)
         public const string SaveCorrupt = "SAV001";
         public const string SaveMismatch = "SAV002";

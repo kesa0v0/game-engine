@@ -150,7 +150,7 @@ namespace Kesa.Engine.Loading
         private void CheckChoiceLiterals(CommandDecl command)
         {
             var body = command.Function.Definition?.Body;
-            if (body == null || body.Count == 0 || !(body[0] is WithStmt with)) return;
+            if (body == null || !FunctionChecker.OpensPreconditions(body, out var with)) return;
             foreach (var stmt in with.Body)
             {
                 if (!(stmt is ExprStmt es) || !FunctionChecker.IsPreconditionCall(es.Expr, out var name) ||

@@ -120,6 +120,11 @@ namespace Kesa.Engine.Script
                             Expr(loop.Condition, locals);
                             Block(loop.Body, locals);
                             break;
+                        case WithStmt with when FunctionChecker.IsImagine(with):
+                            // imagine은 이름이 아니라 표지다 (G454): 인자와 몸체만 본다
+                            foreach (var argument in ((CallExpr)with.Context).Arguments) Expr(argument.Value, locals);
+                            Block(with.Body, locals);
+                            break;
                         case WithStmt with:
                             // 자리와 모양은 FunctionChecker가 본다 (G111). preconditions는 이름이 아니라 표지다
                             if (!(with.Context is NameExpr context && context.Name == FunctionChecker.PreconditionsName))

@@ -135,6 +135,8 @@ namespace Kesa.Engine.Script
         {
             var block = frame.Blocks[frame.Blocks.Count - 1];
             frame.Blocks.RemoveAt(frame.Blocks.Count - 1);
+            // 블록을 나가는 길(끝, return, break)은 모두 여기를 지난다
+            if (block.Imagine) _owner.ExitImagine!();
             RecycleBlock(block);
         }
 

@@ -259,7 +259,7 @@ namespace Kesa.Engine.Runtime
         private static List<ChooseInfo> ChoosesOf(CommandDecl decl)
         {
             var def = decl.Function.Definition!;
-            return def.Body.Count > 0 && def.Body[0] is WithStmt with
+            return FunctionChecker.OpensPreconditions(def.Body, out var with)
                 ? ChooseDependencies.Of(with, def.Parameters)
                 : new List<ChooseInfo>();
         }

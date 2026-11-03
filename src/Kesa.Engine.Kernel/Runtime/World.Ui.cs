@@ -406,22 +406,29 @@ namespace Kesa.Engine.Runtime
         private Value SubmitBuiltin(string mod, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
             var submissions = _act?.Submissions ?? _botRun?.Submissions ?? throw OutsideUi("submit()");
+            NoSubmitWhileImagining("submit()");
+            submissions.Add(ReadSubmit("submit()", mod, positional, keywords));
+            return NoneValue.Instance;
+        }
+
+        /// <summary><c>submit("커맨드", 이름=…)</c>의 인자를 읽는다 (<c>play</c>도 같은 꼴, G458).</summary>
+        private UiSubmission ReadSubmit(string what, string mod, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
             if (positional.Count != 1 || !(positional[0] is StrValue name))
             {
                 throw new ScriptRuntimeException(Codes.RunType,
-                    "submit() takes the command name and then its arguments by name",
+                    what + " takes the command name and then its arguments by name",
                     "write submit(\"Attack\", target=enemy) (spec-gaps G278)");
             }
             string id = name.Value.IndexOf('.') >= 0 ? name.Value : mod + "." + name.Value;
             if (!_commands.ContainsKey(id) && id != PickCommand)
             {
-                throw new ScriptRuntimeException(Codes.RunUnknownName, "submit() names '" + name.Value + "', but there is no command '" + id + "'",
+                throw new ScriptRuntimeException(Codes.RunUnknownName, what + " names '" + name.Value + "', but there is no command '" + id + "'",
                     _uiActions.ContainsKey(id) ? "a @ui_action runs on the screen; submit a @command" : Suggest.Hint(id, _commands.Keys));
             }
             var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
-            foreach (var pair in keywords) args[pair.Key] = ToPlain("argument '" + pair.Key + "' of submit()", pair.Value);
-            submissions.Add(new UiSubmission(id, args));
-            return NoneValue.Instance;
+            foreach (var pair in keywords) args[pair.Key] = ToPlain("argument '" + pair.Key + "' of " + what, pair.Value);
+            return new UiSubmission(id, args);
         }
 
         /// <summary>

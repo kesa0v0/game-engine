@@ -43,7 +43,11 @@ namespace Kesa.Engine.Script
             Live = null;
             Count = 0;
             Index = -1;
+            Imagine = false;
         }
+
+        /// <summary><c>with imagine():</c>의 몸체면 참: 내릴 때 시험 판을 버린다 (G454).</summary>
+        public bool Imagine { get; set; }
 
         /// <summary>이 블록이 <c>for</c>의 몸체면 그 문장.</summary>
         public ForStmt? Loop { get; set; }
@@ -79,6 +83,7 @@ namespace Kesa.Engine.Script
             Live = Live,
             Count = Count,
             Index = Index,
+            Imagine = Imagine,
         };
     }
 }

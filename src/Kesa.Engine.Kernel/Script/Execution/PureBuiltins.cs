@@ -99,6 +99,9 @@ namespace Kesa.Engine.Script
         /// <summary><c>questions()</c>가 준 질문 하나에 답을 내 달라고 적어 두는 내장 (G384). <c>submit</c>과 자리 규칙이 같다.</summary>
         public const string RespondName = "respond";
 
+        /// <summary><c>with imagine():</c> 블록 안에서 시험 판에 수를 두는 내장 (G454·G458). <c>@bot</c>과 봇 함수만 쓴다.</summary>
+        public const string PlayName = "play";
+
         /// <summary>그림 값 <c>look(이름, 키=값…)</c>을 만드는 내장 (G389).</summary>
         public const string LookName = "look";
 
@@ -141,7 +144,7 @@ namespace Kesa.Engine.Script
 
         private static SortedSet<string> NameSet()
         {
-            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, DefDataName, DefsName, UiName, BotName, SubmitName, QuestionsName, SeatsName, RespondName, LookName, AtName, OntoName, BetweenName, MarkName, FxName };
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, DefDataName, DefsName, UiName, BotName, SubmitName, QuestionsName, SeatsName, RespondName, PlayName, LookName, AtName, OntoName, BetweenName, MarkName, FxName };
             set.UnionWith(WritingNameArray);
             return set;
         }

@@ -153,6 +153,20 @@ namespace Kesa.Engine.Stubs
             "def questions(name: str = ..., /) -> list[Question]: ...\n" +
             "def seats(of: Any = ..., /) -> list[Any]: ...\n" +
             "def respond(question: Question, command: str, /, **args: Any) -> None: ...\n" +
+            "class _Imagine:\n" +
+            "    def __enter__(self) -> None: ...\n" +
+            "    def __exit__(self, *args: object) -> None: ...\n" +
+            "def imagine() -> _Imagine: ...\n" +
+            "class PlayResult:\n" +
+            "    ok: bool\n" +
+            "    outcome: str\n" +
+            "    failed: list[str]\n" +
+            "    error: str | None\n" +
+            "    question: Question | None\n" +
+            "@overload\n" +
+            "def play(command: str, /, **args: Any) -> PlayResult: ...\n" +
+            "@overload\n" +
+            "def play(question: Question, command: str, /, **args: Any) -> PlayResult: ...\n" +
             "def wait(*, ticks: int, about: Any = ...) -> None: ...\n" +
             "def advance(ticks: int, /) -> None: ...\n" +
             "def emit(signal: Any, /) -> None: ...\n" +

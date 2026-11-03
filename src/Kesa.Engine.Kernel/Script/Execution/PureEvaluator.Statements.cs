@@ -92,6 +92,8 @@ namespace Kesa.Engine.Script
                         return new BreakNode(brk);
                     case ContinueStmt cont:
                         return new ContinueNode(cont);
+                    case WithStmt with when FunctionChecker.IsImagine(with):
+                        return new ImagineNode(with, (CallExpr)with.Context, Body(with.Body, layout));
                 }
                 return new UnsupportedStmtNode(stmt);
             }
@@ -298,6 +300,39 @@ namespace Kesa.Engine.Script
                 while (!f.Blocks[f.Blocks.Count - 1].IsLoop) s.PopBlock(f);
                 var body = f.Blocks[f.Blocks.Count - 1];
                 body.Next = body.Body.Count;
+            }
+        }
+
+        /// <summary><c>with imagine(...):</c> (G454): 시험 판을 열고 몸체 블록을 쌓는다. 블록을 내릴 때 판을 버린다.</summary>
+        private sealed class ImagineNode : StmtNode
+        {
+            private readonly WithStmt _with;
+            private readonly CallExpr _call;
+            private readonly StmtNode[] _body;
+
+            public ImagineNode(WithStmt with, CallExpr call, StmtNode[] body) : base(with)
+            {
+                _with = with;
+                _call = call;
+                _body = body;
+            }
+
+            public override void Run(Session s, Frame f)
+            {
+                var keywords = new SortedDictionary<string, Value>(System.StringComparer.Ordinal);
+                foreach (var argument in _call.Arguments)
+                {
+                    if (argument.Name == null)
+                        throw s.Fail(Codes.RunImagine, "imagine() takes its arguments by name", "write with imagine(): (spec-gaps G454)");
+                    keywords[argument.Name] = NodeFor(argument.Value, f.Layout).Eval(s, f);
+                }
+                var enter = s.Owner.EnterImagine ??
+                            throw s.Fail(Codes.RunImagine, "imagine() can only be used while a @bot thinks",
+                                "a bot tries moves on a copy of the board (spec-gaps G454)");
+                enter(keywords);
+                var block = s.NewBlock(_with.Body, _body);
+                block.Imagine = true;
+                f.Blocks.Add(block);
             }
         }
 

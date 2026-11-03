@@ -50,6 +50,7 @@ namespace Kesa.Engine.Runtime
         public World(ContentLoadResult loaded, long seed = 0, bool requireViewRules = false)
             : this(loaded.Frozen, loaded.Schema, loaded.Scopes, loaded.Commands)
         {
+            _loaded = loaded;
             SetViewRules(loaded.ViewRules);
             _uiActions = loaded.UiActions;
             _bots = loaded.Bots;

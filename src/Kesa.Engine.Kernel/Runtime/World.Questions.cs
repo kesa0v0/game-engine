@@ -25,6 +25,14 @@ namespace Kesa.Engine.Runtime
                 throw new ScriptRuntimeException(Codes.RunType, "questions() takes nothing or the name of a kind of question (str)",
                     "write questions() for every open question you can answer, or questions(\"skirmish-hit\") (spec-gaps G383)");
             }
+            // 시험 판에서는 봇이 모든 자리에 앉아 있다: 열린 질문 모두 (G459)
+            if (IsTrial)
+            {
+                var all = new List<Value>();
+                foreach (var q in OpenRequests)
+                    if (positional.Count == 0 || q.Name == ((StrValue)positional[0]).Value) all.Add(new QuestionValue(this, q));
+                return new ListValue(all);
+            }
             if (_viewer == null)
             {
                 throw new ScriptRuntimeException(Codes.RunNotWritable,
@@ -52,22 +60,29 @@ namespace Kesa.Engine.Runtime
         private Value RespondBuiltin(string mod, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
             var submissions = _act?.Submissions ?? _botRun?.Submissions ?? throw OutsideUi("respond()");
+            NoSubmitWhileImagining("respond()");
+            submissions.Add(ReadRespond("respond()", mod, positional, keywords));
+            return NoneValue.Instance;
+        }
+
+        /// <summary><c>respond(q, "커맨드", 이름=…)</c>의 인자를 읽는다 (<c>play</c>도 같은 꼴, G458).</summary>
+        private UiSubmission ReadRespond(string what, string mod, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
             if (positional.Count != 2 || !(positional[0] is QuestionValue q) || !(positional[1] is StrValue name))
             {
                 throw new ScriptRuntimeException(Codes.RunType,
-                    "respond() takes a question from questions(), the command name and then its arguments by name",
+                    what + " takes a question from questions(), the command name and then its arguments by name",
                     "write respond(q, \"engine.pick\", choice=0) or respond(q, \"Move\", to=cell) (spec-gaps G384)");
             }
             string id = name.Value.IndexOf('.') >= 0 ? name.Value : mod + "." + name.Value;
             if (!_commands.ContainsKey(id) && id != PickCommand)
             {
-                throw new ScriptRuntimeException(Codes.RunUnknownName, "respond() names '" + name.Value + "', but there is no command '" + id + "'",
+                throw new ScriptRuntimeException(Codes.RunUnknownName, what + " names '" + name.Value + "', but there is no command '" + id + "'",
                     Suggest.Hint(id, _commands.Keys));
             }
             var args = new SortedDictionary<string, Value>(StringComparer.Ordinal);
-            foreach (var pair in keywords) args[pair.Key] = ToPlain("argument '" + pair.Key + "' of respond()", pair.Value);
-            submissions.Add(new UiSubmission(id, args, q.Request.Id));
-            return NoneValue.Instance;
+            foreach (var pair in keywords) args[pair.Key] = ToPlain("argument '" + pair.Key + "' of " + what, pair.Value);
+            return new UiSubmission(id, args, q.Request.Id);
         }
 
         /// <summary><c>respond</c>가 적은 답을 그 질문에 낸다 (G384). 질문이 이미 닫혔거나 그 커맨드를 받지 않으면 이유를 붙여 거절한다.</summary>
@@ -114,8 +129,8 @@ namespace Kesa.Engine.Runtime
                 switch (name)
                 {
                     case "name": return new StrValue(Request.Name);
-                    case "title": return _world.UiRead(Request.Title);
-                    case "data": return _world.UiRead(Request.Data);
+                    case "title": return _world.Current.UiRead(Request.Title);
+                    case "data": return _world.Current.UiRead(Request.Data);
                     case "choices":
                     {
                         var choices = new List<Value>(Request.Choices.Count);
@@ -131,7 +146,7 @@ namespace Kesa.Engine.Runtime
                     case "who":
                     {
                         var who = new List<Value>(Request.Who.Count);
-                        foreach (var e in Request.Who) who.Add(_world.ToScript(new EntityValue(e)));
+                        foreach (var e in Request.Who) who.Add(_world.Current.ToScript(new EntityValue(e)));
                         return new ListValue(who);
                     }
                 }
@@ -164,10 +179,10 @@ namespace Kesa.Engine.Runtime
             {
                 switch (name)
                 {
-                    case "value": return _world.UiRead(_option.Value);
-                    case "label": return _option.Label == null ? NoneValue.Instance : _world.UiRead(_option.Label);
-                    case "desc": return _option.Desc == null ? NoneValue.Instance : _world.UiRead(_option.Desc);
-                    case "data": return _option.Data == null ? NoneValue.Instance : _world.UiRead(_option.Data);
+                    case "value": return _world.Current.UiRead(_option.Value);
+                    case "label": return _option.Label == null ? NoneValue.Instance : _world.Current.UiRead(_option.Label);
+                    case "desc": return _option.Desc == null ? NoneValue.Instance : _world.Current.UiRead(_option.Desc);
+                    case "data": return _option.Data == null ? NoneValue.Instance : _world.Current.UiRead(_option.Data);
                     case "index": return new IntValue(_index);
                 }
                 throw new ScriptRuntimeException(Codes.RunScript, "a choice has no attribute '" + name + "'",

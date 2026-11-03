@@ -128,6 +128,10 @@ namespace Kesa.Engine.Loading
                             Type(loop.Condition, scope);
                             Block(loop.Body, scope);
                             break;
+                        case WithStmt with when FunctionChecker.IsImagine(with):
+                            foreach (var argument in ((CallExpr)with.Context).Arguments) Type(argument.Value, scope);
+                            Block(with.Body, scope);
+                            break;
                         case WithStmt with:
                             if (!(with.Context is NameExpr context && context.Name == FunctionChecker.PreconditionsName))
                                 Type(with.Context, scope);

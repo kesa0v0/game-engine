@@ -98,7 +98,7 @@ namespace Kesa.Engine.Runtime
         /// 입구 검사 (G237): <c>acts_for</c>가 고른 엔티티(응답이면 답하는 엔티티)에 이 연결이 앉아 있어야 한다. <c>None</c>은 누구나 통과한다.
         /// </summary>
         private bool MayAct(string issuer, Value target) =>
-            !(target is EntityValue entity) ||
+            IsTrial || !(target is EntityValue entity) || // 시험 판에서는 봇이 모든 자리에 앉은 것으로 본다 (G457)
             (_seats.TryGetValue(entity.Id.Value, out var seated) && string.Equals(seated.Issuer, issuer, StringComparison.Ordinal));
 
         /// <summary>엔티티가 죽을 때 그 배정을 지운다. 커맨드 안이면 되감기를 기록한다.</summary>

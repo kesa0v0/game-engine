@@ -632,6 +632,8 @@ namespace Kesa.Engine.Script
             private bool ReadsConnection(Expr expr, SortedSet<string> locals) =>
                 IsRuntime(expr, PureBuiltins.QuestionsName, locals) || IsRuntime(expr, PureBuiltins.SeatsName, locals);
 
+            private bool Plays(Expr expr, SortedSet<string> locals) => IsRuntime(expr, PureBuiltins.PlayName, locals);
+
             private bool LookMaker(Expr expr, SortedSet<string> locals) =>
                 IsRuntime(expr, PureBuiltins.LookName, locals) || IsRuntime(expr, PureBuiltins.AtName, locals) ||
                 IsRuntime(expr, PureBuiltins.OntoName, locals) || IsRuntime(expr, PureBuiltins.BetweenName, locals) ||
@@ -720,7 +722,8 @@ namespace Kesa.Engine.Script
                 {
                     if (_body.FirstWrite == null) _body.FirstWrite = call.Span;
                 }
-                else if (!IsNamed(call.Callee, locals) || ReadsConnection(call.Callee, locals) || LookMaker(call.Callee, locals))
+                else if (!IsNamed(call.Callee, locals) || ReadsConnection(call.Callee, locals) || LookMaker(call.Callee, locals) ||
+                         Plays(call.Callee, locals))
                     Expr(call.Callee, locals);
                 foreach (var arg in call.Arguments) Expr(arg.Value, locals);
             }
@@ -768,6 +771,11 @@ namespace Kesa.Engine.Script
                             Expr(loop.Condition, locals);
                             Block(loop.Body, locals);
                             break;
+                        case WithStmt with when FunctionChecker.IsImagine(with):
+                            _body.Touch(true, with.Span); // 시험 두기는 봇만 한다 (G454)
+                            foreach (var argument in ((CallExpr)with.Context).Arguments) Expr(argument.Value, locals);
+                            Block(with.Body, locals);
+                            break;
                         case WithStmt with:
                             // 사전 조건 블록의 문장은 require 호출과 이름 대입뿐이다 (G111): 그 안의 호출은 모두 식 안이다
                             _inPreconditions = true;
@@ -805,9 +813,12 @@ namespace Kesa.Engine.Script
                         else if (builtin != null)
                             _body.BuiltinExpressionCalls.Add(new KeyValuePair<string, SourceSpan>(builtin, call.Span));
                         else if (!IsNamed(call.Callee, locals) || ReadsConnection(call.Callee, locals) ||
-                                 LookMaker(call.Callee, locals))
+                                 LookMaker(call.Callee, locals) || Plays(call.Callee, locals))
                             Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
+                        break;
+                    case NameExpr name when Plays(name, locals):
+                        _body.Touch(true, name.Span); // 시험 두기는 봇만 한다 (G454)
                         break;
                     case NameExpr name when StateRoot(name, locals) is bool bare:
                         _body.Touch(bare, name.Span);

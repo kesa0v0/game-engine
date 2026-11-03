@@ -149,6 +149,7 @@ namespace Kesa.Engine.Runtime
             }
             finally
             {
+                _trials.Clear(); // 오류로 끝나면 블록을 내리지 않고 나온다
                 _meter = null;
                 _viewer = savedViewer;
                 _botRun = null;

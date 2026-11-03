@@ -202,7 +202,7 @@ namespace Kesa.Engine.Runtime
             public override bool Writes => _signature.Function.Effect == HostEffect.Writes;
 
             public override Value Call(IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords) =>
-                _world.CallHost(_signature, positional, keywords);
+                _world.Current.CallHost(_signature, positional, keywords);
         }
 
         private Value CallHost(HostSignature signature, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
@@ -258,6 +258,8 @@ namespace Kesa.Engine.Runtime
                         name + "(): " + first.Message);
                 }
             }
+
+            if (function.Effect == HostEffect.Writes) NoHostWritesInTrial(name);
 
             // C# 값으로 (G222)
             var implementation = function.Implementation!;

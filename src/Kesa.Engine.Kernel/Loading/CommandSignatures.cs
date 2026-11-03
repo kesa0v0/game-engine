@@ -93,7 +93,7 @@ namespace Kesa.Engine.Loading
         private static void CheckWhereTypes(CommandDecl command, List<CommandParameter> parameters, CallContext context)
         {
             var body = command.Function.Definition!.Body;
-            if (body.Count == 0 || !(body[0] is WithStmt with)) return;
+            if (!FunctionChecker.OpensPreconditions(body, out var with)) return;
             foreach (var stmt in with.Body)
             {
                 if (!(stmt is ExprStmt es) || !FunctionChecker.IsPreconditionCall(es.Expr, out var name) ||
