@@ -16,7 +16,8 @@ namespace Kesa.Engine.Tests.Runtime
         private const string Schema =
             "component(\"Hp\", v=field(int, default=3))\n" +
             "deftype(\"Party\", components=[\"Hp\"])\ndeftype(\"Unit\", components=[\"Hp\"])\n" +
-            "bot_state(\"Mind\", seen=field(list[int], default=[]), kill=ref(\"Unit\", optional=True), note=field(str, default=\"\"))\n";
+            "bot_state(\"Mind\", seen=field(list[int], default=[]), kill=ref(\"Unit\", optional=True), note=field(str, default=\"\"), " +
+            "made=field(list[Ref[\"Unit\"]], default=[]))\n";
 
         private const string Defs =
             "Party(\"Red\")\nParty(\"Blue\")\nUnit(\"Soldier\")\nUnit(\"Tank\", Hp=Hp(v=5))\n" +
@@ -30,8 +31,10 @@ namespace Kesa.Engine.Tests.Runtime
             "        with imagine():\n" +
             "            r = play(\"Hit\", target=u)\n" +
             "            bot.Mind.seen = bot.Mind.seen + [u.Hp.v if r.ok and u in query(Unit) else -1]\n" +
-            "            if u not in query(Unit):\n" +
-            "                bot.Mind.kill = u\n" +
+            // 블록 안에서는 u가 시험 판에서 죽었으므로 기억에는 블록 밖에서 적는다
+            "            dies = u not in query(Unit)\n" +
+            "        if dies:\n" +
+            "            bot.Mind.kill = u\n" +
             "    submit(\"Hit\", target=bot.Mind.kill)\n" +
             // 안쪽 블록의 수는 바깥 시험 판에 남지 않는다
             "@bot\ndef nested(me: Ref[Party]):\n" +
@@ -84,6 +87,28 @@ namespace Kesa.Engine.Tests.Runtime
             "        n = spawn(\"core:Soldier\")\n" +
             "        made = len([u for u in query(Unit)])\n" +
             "    bot.Mind.seen = [gone, made, len([u for u in query(Unit)]), t.Hp.v]\n" +
+            // 시간 굴리기 (G460): 틱마다 진영의 체력이 는다. 질문이 시간을 막으면 덜 간다
+            "@on(Tick)\ndef regrow():\n    for p in query(Party):\n        p.Hp.v += 1\n" +
+            "@bot\ndef waiter(me: Ref[Party]):\n" +
+            "    with imagine():\n" +
+            "        went = advance(4)\n" +
+            "        grown = me.Hp.v\n" +
+            "        play(\"Duel\", p=me)\n" +
+            "        stuck = advance(2)\n" +
+            "    bot.Mind.seen = [went, grown, stuck, me.Hp.v]\n" +
+            // 난수 (G461): 시험 판의 주사위는 봇 난수열에서 시드를 받고, seed=가 같으면 같은 운이다
+            "@command(free=True, acts_for=None)\ndef Roll(p: Ref[Party]):\n    p.Hp.v = random.randint(1, 1000000)\n" +
+            "@bot\ndef roller(me: Ref[Party]):\n" +
+            "    with imagine():\n        play(\"Roll\", p=me)\n        a = me.Hp.v\n" +
+            "    with imagine():\n        play(\"Roll\", p=me)\n        b = me.Hp.v\n" +
+            "    with imagine(seed=4):\n        play(\"Roll\", p=me)\n        c = me.Hp.v\n" +
+            "    with imagine(seed=4):\n        play(\"Roll\", p=me)\n        d = me.Hp.v\n" +
+            "    bot.Mind.seen = [a, b, c, d]\n" +
+            // 시험 id (G463): 안쪽 블록과 바깥 블록, 다음 생각까지 이어 센다
+            "@bot\ndef maker(me: Ref[Party]):\n" +
+            "    with imagine():\n" +
+            "        with imagine():\n            a = spawn(\"core:Soldier\")\n            bot.Mind.kill = a\n" +
+            "        b = spawn(\"core:Soldier\")\n        bot.Mind.made = [b]\n" +
             "@bot\ndef asker(me: Ref[Party]):\n    with imagine():\n        ask(me, \"x\", choices=[1], name=\"x\")\n" +
             "@bot\ndef leaky(me: Ref[Party]):\n    with imagine():\n        submit(\"Hit\", target=[u for u in query(Unit)][0])\n" +
             "@bot\ndef loose(me: Ref[Party]):\n    play(\"Hit\", target=[u for u in query(Unit)][0])\n" +
@@ -187,6 +212,63 @@ namespace Kesa.Engine.Tests.Runtime
             // 전차를 1로 가정하면 한 대에 죽고, 새 병사까지 시험 판에는 둘이다. 진짜 판은 둘 그대로다
             Assert.That(Seen(bot), Is.EqualTo(new[] { 1L, 2L, 2L, 5L }));
             Assert.That(_world.Save(), Is.EqualTo(before));
+        }
+
+        [Test]
+        public void InsideTheBlockTimeRollsOnTheCopyOnly()
+        {
+            long tick = _world.Tick;
+            var result = Think("waiter", out var bot);
+            Assert.That(result.Outcome, Is.EqualTo(ThinkOutcome.Thought), result.Error?.Message);
+            // 4틱에 체력이 3에서 7, 결투 질문이 시간을 막아 0틱, 진짜 판은 3 그대로
+            Assert.That(Seen(bot), Is.EqualTo(new[] { 4L, 7L, 0L, 3L }));
+            Assert.That(_world.Tick, Is.EqualTo(tick));
+        }
+
+        private List<long> Rolls(long worldSeed, long botSeed, out BotState bot)
+        {
+            var world = new World(LoadClean(), seed: worldSeed);
+            var red = world.Create("core:Red");
+            world.Seat(red, "bot", SeatKind.Ai);
+            bot = world.NewBot("core.roller", red, seed: botSeed);
+            var result = world.ViewAs("bot").Think(bot);
+            Assert.That(result.Outcome, Is.EqualTo(ThinkOutcome.Thought), result.Error?.Message);
+            return Seen(bot);
+        }
+
+        [Test]
+        public void TheImaginedDiceFollowTheBotSeedNotTheWorldSeed()
+        {
+            var one = Rolls(1, 7, out var bot);
+            var other = Rolls(2, 7, out _);
+            Assert.That(other, Is.EqualTo(one)); // 월드 시드가 달라도 봇 시드가 같으면 같은 상상
+            Assert.That(one[0], Is.Not.EqualTo(one[1])); // 블록마다 새 운
+            Assert.That(one[2], Is.EqualTo(one[3])); // seed=가 같으면 같은 운
+            Assert.That(bot.RandomCalls, Is.EqualTo(2)); // seed=는 봇 난수열을 쓰지 않는다
+            Assert.That(Rolls(1, 8, out _).Take(2), Is.Not.EqualTo(one.Take(2)));
+        }
+
+        private static List<long> Made(BotState bot) =>
+            ((ListValue)bot.Stored("Mind", "made")).Items.Select(v => ((EntityValue)v).Id.Value).ToList();
+
+        [Test]
+        public void ImaginedEntitiesGetIdsOfTheirOwnThatNeverRepeat()
+        {
+            var bot = _world.NewBot("core.maker", _red);
+            var first = _view.Think(bot);
+            Assert.That(first.Outcome, Is.EqualTo(ThinkOutcome.Thought), first.Error?.Message);
+            long b = 1L << 62;
+            // 안쪽 블록이 b를 쓰고 나면 바깥 블록은 b+1부터다
+            Assert.That(((EntityValue)bot.Stored("Mind", "kill")).Id.Value, Is.EqualTo(b));
+            Assert.That(Made(bot), Is.EqualTo(new[] { b + 1 }));
+            // 저장했다 되살려도 이어 센다
+            var again = _world.LoadBot(bot.Save(), out _);
+            Assert.That(_view.Think(again).Outcome, Is.EqualTo(ThinkOutcome.Thought));
+            Assert.That(((EntityValue)again.Stored("Mind", "kill")).Id.Value, Is.EqualTo(b + 2));
+            Assert.That(Made(again), Is.EqualTo(new[] { b + 3 }));
+            Assert.That(again.TrialIds, Is.EqualTo(b + 4));
+            Assert.That(_world.IsAlive(new EntityId(b)), Is.False);
+            Assert.That(_world.Create("core:Soldier").Value, Is.LessThan(b));
         }
 
         [Test]

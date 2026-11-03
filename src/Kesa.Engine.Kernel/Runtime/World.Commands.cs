@@ -174,7 +174,8 @@ namespace Kesa.Engine.Runtime
                 case EntityRefTypeRef reference:
                     if (!(value is EntityValue entity)) return WrongType();
                     // 보는 쪽으로 도는 중(UI 동작, G278)이면 숨긴 엔티티는 죽은 것과 똑같이 응답한다 (G198)
-                    if (!_entities.TryGetValue(entity.Id.Value, out var record) || HiddenFromViewer(entity.Id.Value))
+                    // 봇 기억에 쓸 때 블록 안이면 시험 판의 엔티티다 (G454)
+                    if (!Current._entities.TryGetValue(entity.Id.Value, out var record) || HiddenFromViewer(entity.Id.Value))
                         return Reject(ArgumentProblem.DeadEntity, "is " + entity.Id + ", which no longer exists");
                     if (record.Def.Type.Name != reference.Target.Name)
                         return Reject(ArgumentProblem.WrongEntityType,

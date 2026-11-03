@@ -47,8 +47,17 @@ namespace Kesa.Engine.Runtime
             if (_botRun == null)
                 throw ImagineError("imagine() can only be used while a @bot thinks",
                     "a bot tries moves on a copy of the board; game code changes the real board (spec-gaps G454)");
+            long? given = null;
             foreach (var pair in keywords)
-                throw ImagineError("imagine() takes no argument '" + pair.Key + "'", "write with imagine(): (spec-gaps G454)");
+            {
+                if (pair.Key != SeedArgument)
+                    throw ImagineError("imagine() takes no argument '" + pair.Key + "'",
+                        "write with imagine(): or with imagine(seed=1): (spec-gaps G454, G461)");
+                if (!(pair.Value is IntValue k))
+                    throw new ScriptRuntimeException(Codes.RunType, "imagine(seed=...) takes an int, not " + pair.Value.KindName,
+                        "the same seed= gives the same luck on the imagined board (spec-gaps G461)");
+                given = k.Value;
+            }
             if (_viewRules.Count > 0)
                 throw ImagineError("imagine() cannot be used yet in a game with @view_rule",
                     "the copy would hold what this bot cannot see (spec-gaps G462)");
@@ -65,11 +74,42 @@ namespace Kesa.Engine.Runtime
             }
             var trial = copy.World;
             trial._meter = _meter; // 시험 판의 일도 봇 한 번 부르기의 예산으로 센다 (G375·G460)
+            // 진짜 판의 다음 난수를 알면 안 된다: 시드는 봇 난수열에서, seed=면 봇 시드와 그 값에서 (G461)
+            trial._seed = given is long k2 ? ImagineSeed(_botRun.Seed, k2) : unchecked((long)BeginDraws().Next());
+            // 시험 판의 새 엔티티는 봇마다 이어 세는 따로 구간에서 받는다 (G463)
+            trial._nextId = Math.Max(_botRun.TrialIds, source._nextId);
             _trials.Add(trial);
         }
 
-        /// <summary>블록을 나간다: 맨 위 시험 판을 버린다.</summary>
-        private void ExitImagine() => _trials.RemoveAt(_trials.Count - 1);
+        /// <summary>블록을 나간다: 맨 위 시험 판을 버린다. 그 판에서 쓴 시험 id는 봇과 바깥 시험 판이 이어 받는다 (G463).</summary>
+        private void ExitImagine()
+        {
+            var trial = _trials[_trials.Count - 1];
+            _trials.RemoveAt(_trials.Count - 1);
+            var run = _botRun!;
+            run.TrialIds = Math.Max(run.TrialIds, trial._nextId);
+            if (_trials.Count > 0) _trials[_trials.Count - 1]._nextId = Math.Max(_trials[_trials.Count - 1]._nextId, run.TrialIds);
+        }
+
+        private const string SeedArgument = "seed";
+
+        /// <summary>시험 판에서 생기는 엔티티 id의 시작. 진짜 판은 1부터라 닿지 않는다 (G463).</summary>
+        internal const long TrialIdBase = 1L << 62;
+
+        /// <summary><c>imagine(seed=k)</c>의 시드: SHA-256(봇 시드, k, "imagine")의 앞 8바이트 (G461). 봇 난수열을 쓰지 않는다.</summary>
+        private static long ImagineSeed(long botSeed, long k)
+        {
+            var tag = Encoding.UTF8.GetBytes("imagine");
+            var input = new byte[16 + tag.Length];
+            WriteLittleEndian(input, 0, botSeed);
+            WriteLittleEndian(input, 8, k);
+            Array.Copy(tag, 0, input, 16, tag.Length);
+            byte[] digest;
+            using (var sha = System.Security.Cryptography.SHA256.Create()) digest = sha.ComputeHash(input);
+            long seed = 0;
+            for (int i = 0; i < 8; i++) seed |= (long)digest[i] << (8 * i);
+            return seed;
+        }
 
         /// <summary>
         /// <c>play("커맨드", 이름=…)</c>·<c>play(q, "커맨드", 이름=…)</c> (G458): 맨 위 시험 판에 <c>submit</c>·<c>respond</c>처럼 수를 둔다.
@@ -94,6 +134,23 @@ namespace Kesa.Engine.Runtime
                 throw new ScriptRuntimeException(e.Code, e.Message, e.Hint);
             }
             return new PlayValue(this, delivered);
+        }
+
+        /// <summary>
+        /// 블록 안의 <c>advance(n)</c> (G460): 맨 위 시험 판을 n틱 굴리고 실제로 간 틱 수를 돌려준다. 막는 질문이 열려 있으면 덜 간다.
+        /// 한도는 커맨드의 <c>advance</c>와 같은 <c>max_advance_per_call</c>이고, 틱 핸들러의 일도 봇의 예산으로 센다.
+        /// </summary>
+        private Value AdvanceImagined(IReadOnlyList<Value> positional)
+        {
+            if (positional.Count != 1 || !(positional[0] is IntValue n) || n.Value < 1)
+                throw new ScriptRuntimeException(Codes.RunType, "advance() takes the number of ticks (an int of at least 1)",
+                    "write went = advance(10) (spec-gaps G460)");
+            var trial = Current;
+            if (n.Value > trial._maxAdvancePerCall)
+                throw ImagineError("advance(" + n.Value + ") is past the limit of " + trial._maxAdvancePerCall + " ticks per call",
+                    "advance in smaller steps, or the game can raise the limit: patch.set(\"engine:Rules\", \"max_advance_per_call\", …) (spec-gaps G451, G460)");
+            int went = trial.AdvanceTicks(n.Value, new List<Reaction>(), out _);
+            return new IntValue(went);
         }
 
         /// <summary>봇 쪽에 남는 내장: 봇의 기억·내기·자리·시험 두기 자체. 나머지 판을 읽고 쓰는 내장은 맨 위 시험 판으로 간다.</summary>

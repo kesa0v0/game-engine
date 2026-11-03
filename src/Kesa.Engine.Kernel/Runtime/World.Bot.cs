@@ -22,10 +22,21 @@ namespace Kesa.Engine.Runtime
 
         private sealed class BotRun
         {
-            public BotRun(SortedDictionary<string, SortedDictionary<string, Value>> draft) => Draft = draft;
+            public BotRun(SortedDictionary<string, SortedDictionary<string, Value>> draft, long seed, long trialIds)
+            {
+                Draft = draft;
+                Seed = seed;
+                TrialIds = trialIds;
+            }
 
             public SortedDictionary<string, SortedDictionary<string, Value>> Draft { get; }
             public List<UiSubmission> Submissions { get; } = new List<UiSubmission>();
+
+            /// <summary>봇 시드: <c>imagine(seed=k)</c>의 시험 판 시드를 정한다 (G461).</summary>
+            public long Seed { get; }
+
+            /// <summary>시험 판에서 다음에 생길 엔티티 id (G463).</summary>
+            public long TrialIds { get; set; }
         }
 
         /// <summary><c>@bot</c> id들 (<c>모드id.함수이름</c>, 이름순).</summary>
@@ -122,7 +133,7 @@ namespace Kesa.Engine.Runtime
 
             var args = new SortedDictionary<string, Value>(StringComparer.Ordinal) { [decl.Parameters[0].Name] = new EntityValue(bot.Me) };
             foreach (var pair in bot.SortedSettings) args[pair.Key] = pair.Value;
-            var run = new BotRun(bot.Draft());
+            var run = new BotRun(bot.Draft(), bot.Seed, bot.TrialIds);
             var stream = BotStream(bot);
             var savedViewer = _viewer;
             var savedRand = _rand;
@@ -155,14 +166,14 @@ namespace Kesa.Engine.Runtime
                 _botRun = null;
                 _rand = savedRand;
             }
-            bot.Commit(run.Draft, stream.Calls);
+            bot.Commit(run.Draft, stream.Calls, run.TrialIds);
             return new ThinkResult(decl.Id, ThinkOutcome.Thought) { Submissions = run.Submissions };
         }
 
         // ---- 봇 저장 (G372) ----
 
         /// <summary>
-        /// <c>{"bot", "me", "seed", "calls", "settings", "states"}</c>. 예산은 남기지 않는다(호스트가 붙일 때 정한다).
+        /// <c>{"bot", "me", "seed", "calls", "trial_ids", "settings", "states"}</c>. 예산은 남기지 않는다(호스트가 붙일 때 정한다).
         /// 값은 월드 저장과 같은 모양이다.
         /// </summary>
         internal static byte[] SaveBot(BotState bot)
@@ -181,6 +192,7 @@ namespace Kesa.Engine.Runtime
                 .Add("me", new JsonNumber(bot.Me.Value))
                 .Add("seed", new JsonNumber(bot.Seed))
                 .Add("calls", new JsonNumber(bot.RandomCalls))
+                .Add("trial_ids", new JsonNumber(bot.TrialIds))
                 .Add("settings", settings)
                 .Add("states", states));
         }
@@ -238,7 +250,10 @@ namespace Kesa.Engine.Runtime
                         draft[record.Key][field.Key] = value;
                     }
                 }
-                bot.Commit(draft, Long(Field(root, "calls"), "the bot's random calls"));
+                // 시험 두기 전에 저장한 봇에는 없다
+                long trialIds = root.Get("trial_ids") is { } ids ? Long(ids, "the bot's next imagined id") : TrialIdBase;
+                if (trialIds < TrialIdBase) throw new JsonFormatException("the bot's next imagined id is below 2^62");
+                bot.Commit(draft, Long(Field(root, "calls"), "the bot's random calls"), trialIds);
                 return bot;
             }
             catch (JsonFormatException e)

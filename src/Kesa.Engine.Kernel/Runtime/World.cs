@@ -168,6 +168,9 @@ namespace Kesa.Engine.Runtime
                 }
             }
 
+            // 진짜 판의 id는 시험 판의 구간(2^62~)에 닿지 않는다 (G463). 닿을 일은 없지만 조용히 넘지 않는다
+            if (IsTrial ? _nextId == long.MaxValue : _nextId >= TrialIdBase)
+                throw new WorldException(Codes.RunRange, "entity ids ran out");
             var id = _nextId++;
             var entity = new EntityRecord(id, def, LayoutOf(def));
             planned.CopyTo(entity.Values);

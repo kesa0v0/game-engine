@@ -71,6 +71,9 @@ namespace Kesa.Engine.Script
         /// <summary>시험 판이 열려 있나: 그동안 봇 본문은 커맨드 본문처럼 판에 쓸 수 있다 (G455).</summary>
         public Func<bool>? Imagining { get; set; }
 
+        /// <summary>블록 안의 <c>advance(n)</c>: 시험 판의 시간을 바로 굴리고 간 틱 수를 돌려준다 (G460).</summary>
+        public Func<IReadOnlyList<Value>, Value>? AdvanceImagined { get; set; }
+
         private void Enter(Session session) => _active.Add(session);
         private void Leave() => _active.RemoveAt(_active.Count - 1);
 

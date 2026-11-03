@@ -38,7 +38,9 @@ namespace Kesa.Engine.Script
                     }
                     if (b.Writes && !writable && Imagining)
                     {
-                        // 시험 판에 쓰기는 되지만, 봇 본문은 멈추거나 신호의 반응을 돌릴 수 없다: 그런 일은 커맨드로 둔다 (G455)
+                        // 시험 판에 쓰기는 되지만, 봇 본문은 멈추거나 신호의 반응을 돌릴 수 없다: 그런 일은 커맨드로 둔다 (G455).
+                        // advance는 멈추지 않고 시험 판의 시간을 바로 굴린다 (G460)
+                        if (b.Name == PureBuiltins.AdvanceName && keywords.Count == 0) return _owner.AdvanceImagined!(positional);
                         if (b.Suspends || b.Immediate != null)
                             throw Fail(Codes.RunImagine, b.Name + "() cannot be used directly inside 'with imagine():'",
                                 "play a command that does it: play(\"Command\", ...) (spec-gaps G455)");

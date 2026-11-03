@@ -153,6 +153,7 @@ namespace Kesa.Engine.Runtime
                 EnterImagine = EnterImagine,
                 ExitImagine = ExitImagine,
                 Imagining = () => _trials.Count > 0,
+                AdvanceImagined = AdvanceImagined,
             };
 
         private Dictionary<FunctionValue, CommandDecl>? _commandsByFunction;

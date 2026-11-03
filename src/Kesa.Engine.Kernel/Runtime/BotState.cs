@@ -43,6 +43,12 @@ namespace Kesa.Engine.Runtime
         /// <summary>봇 난수열에서 난수 함수를 부른 횟수. 다음 호출의 n이다 (G373).</summary>
         public long RandomCalls { get; internal set; }
 
+        /// <summary>
+        /// 시험 판(<c>with imagine():</c>)에서 다음에 생길 엔티티의 id (G463). 2^62부터 봇마다 이어 세고 기억과 함께 저장한다: 블록 밖으로 들고
+        /// 나온 시험 판의 엔티티가 나중의 다른 엔티티와 겹치지 않는다.
+        /// </summary>
+        public long TrialIds { get; private set; } = World.TrialIdBase;
+
         /// <summary>한 번 생각할 때의 단계 예산 (G375). 저장하지 않는다: 호스트가 붙일 때마다 정한다.</summary>
         public int StepBudget { get; set; }
 
@@ -69,10 +75,11 @@ namespace Kesa.Engine.Runtime
             return copy;
         }
 
-        internal void Commit(SortedDictionary<string, SortedDictionary<string, Value>> draft, long randomCalls)
+        internal void Commit(SortedDictionary<string, SortedDictionary<string, Value>> draft, long randomCalls, long trialIds)
         {
             _records = draft;
             RandomCalls = randomCalls;
+            TrialIds = trialIds;
             Version++;
         }
 

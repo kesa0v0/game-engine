@@ -463,7 +463,7 @@ namespace Kesa.Engine.Runtime
         private bool Gone(EntityValue e)
         {
             Read(e.Id.Value, AliveRead); // 살았는지에 따라 읽는 값이 달라진다: 영수증에 든다 (G91·G246과 같다)
-            return !IsAlive(e.Id) || HiddenFromViewer(e.Id.Value);
+            return !Current.IsAlive(e.Id) || HiddenFromViewer(e.Id.Value); // 블록 안에서는 시험 판에서 산 것 (G454)
         }
 
         /// <summary>스크립트의 <c>ui</c>(봇이면 <c>bot</c>, G371): 기록 이름으로 <see cref="UiRecord"/>를 준다.</summary>

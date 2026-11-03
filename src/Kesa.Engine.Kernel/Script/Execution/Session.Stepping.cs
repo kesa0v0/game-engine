@@ -185,7 +185,8 @@ namespace Kesa.Engine.Script
                 return;
             }
             var value = Invoke(callee, positional, keywords, call.Span, frame.Writable, frame.UiWritable);
-            if (callee is PureBuiltin b && b.Suspends)
+            // 블록 안의 advance는 멈추지 않고 간 틱 수를 돌려준다 (G460). 다른 멈춤은 Invoke가 이미 막았다
+            if (callee is PureBuiltin b && b.Suspends && !(Imagining && !frame.Writable))
             {
                 // 즉시 핸들러 안에서는 시간을 막는 질문만 멈출 수 있다 (G310)
                 if (frame.Immediate && b.RefusedInImmediate?.Invoke(value) is string why)
