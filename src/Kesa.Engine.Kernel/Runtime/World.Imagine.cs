@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Loading;
+using Kesa.Engine.Schema;
 using Kesa.Engine.Script;
 
 namespace Kesa.Engine.Runtime
@@ -58,9 +60,6 @@ namespace Kesa.Engine.Runtime
                         "the same seed= gives the same luck on the imagined board (spec-gaps G461)");
                 given = k.Value;
             }
-            if (_viewRules.Count > 0)
-                throw ImagineError("imagine() cannot be used yet in a game with @view_rule",
-                    "the copy would hold what this bot cannot see (spec-gaps G462)");
             if (_loaded == null)
                 throw new InvalidOperationException("this world was made without loaded content, so it cannot copy itself for imagine()");
 
@@ -73,12 +72,65 @@ namespace Kesa.Engine.Runtime
                 throw new InvalidOperationException("imagine() could not copy the board:" + problems);
             }
             var trial = copy.World;
+            // 봇이 본 판만 (G462·G464). 안쪽 블록은 이미 거른 바깥 시험 판을 복사하므로 가림 표시만 잇는다
+            if (source == this && _viewRules.Count > 0) trial.Veil(this);
+            else if (source._veiled != null) trial._veiled = new SortedSet<string>(source._veiled, StringComparer.Ordinal);
             trial._meter = _meter; // 시험 판의 일도 봇 한 번 부르기의 예산으로 센다 (G375·G460)
             // 진짜 판의 다음 난수를 알면 안 된다: 시드는 봇 난수열에서, seed=면 봇 시드와 그 값에서 (G461)
             trial._seed = given is long k2 ? ImagineSeed(_botRun.Seed, k2) : unchecked((long)BeginDraws().Next());
             // 시험 판의 새 엔티티는 봇마다 이어 세는 따로 구간에서 받는다 (G463)
             trial._nextId = Math.Max(_botRun.TrialIds, source._nextId);
             _trials.Add(trial);
+        }
+
+        // ---- 봇이 본 판 (G462·G464) ----
+
+        /// <summary>시험 판에서 봇이 못 보는 Def 컴포넌트: 값은 지우고 붙지 않은 것처럼 본다. <c>attach</c>가 채우면 빠진다.</summary>
+        private SortedSet<string>? _veiled;
+
+        private static string VeilKey(long id, string component) => id.ToString(CultureInfo.InvariantCulture) + "/" + component;
+
+        private bool Veiled(long id, string component) => _veiled != null && _veiled.Contains(VeilKey(id, component));
+
+        /// <summary>
+        /// 진짜 판에서 막 복사한 시험 판을 봇의 눈(<paramref name="root"/>의 보는 쪽)으로 거른다: 못 보는 엔티티는 없애고, 못 보는 컴포넌트는
+        /// 런타임에 붙은 것이면 떼고 Def의 것이면 값을 지워 가린다. 지운 값은 어디에도 남지 않는다.
+        /// </summary>
+        private void Veil(World root)
+        {
+            var gone = new List<EntityId>();
+            foreach (long id in LiveIds())
+            {
+                if (root.HiddenFromViewer(id))
+                {
+                    gone.Add(new EntityId(id));
+                    continue;
+                }
+                var entity = _entities[id];
+                foreach (var component in new List<ComponentType>(ComponentsOf(entity)))
+                {
+                    if (!root.HiddenFromViewer(id, component.Name)) continue;
+                    if (entity.Runtime.ContainsKey(component.Name))
+                    {
+                        Remove(new EntityId(id), component.Name);
+                        continue;
+                    }
+                    UnindexRefs(entity, component);
+                    foreach (var member in component.Members) entity.Values.Remove(member);
+                    entity.Rows.Remove(component.Name);
+                    IndexRefs(entity, component); // Def 값의 Ref는 남는다
+                    (_veiled ??= new SortedSet<string>(StringComparer.Ordinal)).Add(VeilKey(id, component.Name));
+                }
+            }
+            foreach (var id in gone) Destroy(id);
+        }
+
+        /// <summary>가린 Def 컴포넌트에 <c>attach</c>한 추측을 쓴다 (G464): 준 칸만 쓰고 나머지는 Def 값이다.</summary>
+        private void Unveil(EntityId id, ComponentType component, Init[] inits)
+        {
+            Given(inits, h => h.Component == component && !component.IsKeyed, "the value does not belong to '" + component.Name + "'");
+            _veiled!.Remove(VeilKey(id.Value, component.Name));
+            foreach (var init in inits) Set(id, init.Member, init.Value);
         }
 
         /// <summary>블록을 나간다: 맨 위 시험 판을 버린다. 그 판에서 쓴 시험 id는 봇과 바깥 시험 판이 이어 받는다 (G463).</summary>

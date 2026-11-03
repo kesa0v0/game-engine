@@ -309,17 +309,5 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(d.Code, Is.EqualTo(Codes.CmdUiEffect));
             Assert.That(d.Message, Does.Contain("uses bot state"));
         }
-
-        [Test]
-        public void AGameWithViewRulesCannotImagineYet()
-        {
-            Mod("core", schema: Schema, defs: Defs + "@view_rule(Unit)\ndef open(viewer, entity):\n    return True\n");
-            var world = new World(LoadClean());
-            var red = world.Create("core:Red");
-            world.Create("core:Soldier");
-            world.Seat(red, "bot", SeatKind.Ai);
-            var result = world.ViewAs("bot").Think(world.NewBot("core.carry", red));
-            Assert.That(result.Error!.Code, Is.EqualTo(Codes.RunImagine));
-        }
     }
 }

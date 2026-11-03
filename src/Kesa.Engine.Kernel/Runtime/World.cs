@@ -304,6 +304,11 @@ namespace Kesa.Engine.Runtime
             NoHostWrites("Add");
             var entity = Record(id);
             var component = ComponentNamed(componentName);
+            if (Veiled(id.Value, componentName))
+            {
+                Unveil(id, component, inits);
+                return;
+            }
             if (Has(entity, component))
                 throw new WorldException(Codes.RunNoComponent, id + " already has a '" + componentName + "'");
             var given = Given(inits, h => h.Component == component && !component.IsKeyed,
@@ -457,10 +462,12 @@ namespace Kesa.Engine.Runtime
             throw Unknown("there is no component '" + name + "'", name, names);
         }
 
-        private static bool Has(EntityRecord entity, ComponentType component) =>
-            entity.Layout.Find(component) != null || entity.Runtime.Count > 0 && entity.Runtime.ContainsKey(component.Name);
+        // 시험 판에서 가린 Def 컴포넌트는 붙지 않은 것이다 (G464)
+        private bool Has(EntityRecord entity, ComponentType component) =>
+            entity.Layout.Find(component) != null && !Veiled(entity.Id, component.Name) ||
+            entity.Runtime.Count > 0 && entity.Runtime.ContainsKey(component.Name);
 
-        private static void Require(EntityRecord entity, ComponentType component)
+        private void Require(EntityRecord entity, ComponentType component)
         {
             if (!Has(entity, component))
                 throw new WorldException(Codes.RunNoComponent,
