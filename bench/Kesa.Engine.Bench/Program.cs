@@ -81,7 +81,9 @@ namespace Kesa.Engine.Bench
             "    hungriest().Food.amount += 1\n" +
             "@bot\n" +
             "def feeder(me: Ref[Side]):\n" +
-            "    submit(\"Feed\", target=hungriest())\n";
+            "    submit(\"Feed\", target=hungriest())\n" +
+            // 시험 판 복사만 (--copy)
+            "@bot\ndef imaginer(me: Ref[Side]):\n    with imagine():\n        pass\n";
 
         private static readonly Dictionary<string, Value> NoArgs = new Dictionary<string, Value>();
 
@@ -90,7 +92,7 @@ namespace Kesa.Engine.Bench
             if (StackProbe.Handles(args)) return 0;
             if (MinimaxProbe.Handles(args)) return 0;
             var sizes = new List<int>();
-            bool profileDerived = false, profileTick = false, profileBot = false, shapes = false, copy = false;
+            bool profileDerived = false, profileTick = false, profileBot = false, profileLoad = false, shapes = false, copy = false;
             foreach (var a in args)
             {
                 if (a == "--shapes") shapes = true;
@@ -98,6 +100,7 @@ namespace Kesa.Engine.Bench
                 else if (a == "--profile-derived") profileDerived = true;
                 else if (a == "--profile-tick") profileTick = true;
                 else if (a == "--profile-bot") profileBot = true;
+                else if (a == "--profile-load") profileLoad = true;
                 else sizes.Add(int.Parse(a, CultureInfo.InvariantCulture));
             }
             if (sizes.Count == 0) sizes.AddRange(new[] { 1000, 10000, 100000 });
@@ -108,11 +111,12 @@ namespace Kesa.Engine.Bench
             Write(root, "core/defs/defs.py", Defs);
             Write(root, "core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse_all(\"defs/\")\n");
             var content = Load(root);
-            if (profileDerived || profileTick || profileBot)
+            if (profileDerived || profileTick || profileBot || profileLoad)
             {
                 if (profileDerived) ProfileDerived(content);
                 else if (profileTick) ProfileTick(content);
-                else ProfileBot(content);
+                else if (profileBot) ProfileBot(content);
+                else ProfileLoad(content);
                 Directory.Delete(root, true);
                 return 0;
             }
@@ -317,6 +321,22 @@ namespace Kesa.Engine.Bench
                               (sw.Elapsed.TotalMilliseconds / hiddenThinks).ToString("0.00", CultureInfo.InvariantCulture) + " ms");
         }
 
+        /// <summary>프로파일러용(<c>--profile-load</c>): 유닛 1만 개의 저장을 10초 동안 거듭 불러온다.</summary>
+        private static void ProfileLoad(ContentLoadResult content)
+        {
+            var world = new World(content);
+            for (int i = 0; i < 10000; i++) world.Create("core:Soldier");
+            byte[] save = world.Save();
+            long loads = 0;
+            var sw = Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < 10000)
+            {
+                World.Load(content, save);
+                loads++;
+            }
+            Console.WriteLine("loads: " + loads + ", " + (sw.Elapsed.TotalMilliseconds / loads).ToString("0.0", CultureInfo.InvariantCulture) + " ms each");
+        }
+
         /// <summary>프로파일러용(<c>--profile-tick</c>): 유닛 1만 개를 갱신하는 스크립트 틱을 10초 동안 돌린다.</summary>
         private static void ProfileTick(ContentLoadResult content)
         {
@@ -442,6 +462,14 @@ namespace Kesa.Engine.Bench
                 CopyRow("Load (incl. new World)", n, Measure(reps, () =>
                 {
                     if (!World.Load(content, save).Succeeded) throw new InvalidOperationException("the copy did not load");
+                }), save);
+                var side = world.Create("core:Blue");
+                world.Seat(side, "bot", SeatKind.Ai);
+                var bot = world.NewBot("core.imaginer", side);
+                var view = world.ViewAs("bot");
+                CopyRow("think: with imagine(): pass", n, Measure(reps, () =>
+                {
+                    if (view.Think(bot).Outcome != ThinkOutcome.Thought) throw new InvalidOperationException("the bot failed");
                 }), save);
             }
         }

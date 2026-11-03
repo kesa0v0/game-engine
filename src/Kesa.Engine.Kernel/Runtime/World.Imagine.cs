@@ -64,7 +64,8 @@ namespace Kesa.Engine.Runtime
                 throw new InvalidOperationException("this world was made without loaded content, so it cannot copy itself for imagine()");
 
             var source = Current;
-            var copy = Load(_loaded, source.SaveBytes(), false, false, false, this);
+            var tree = source.SaveTree();
+            var copy = Load(_loaded, () => tree, false, false, false, this);
             if (copy.World == null)
             {
                 var problems = new StringBuilder();

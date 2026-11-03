@@ -34,10 +34,13 @@ namespace Kesa.Engine.Runtime
             return SaveBytes();
         }
 
+        private byte[] SaveBytes() => CanonicalJson.Write(SaveTree());
+
         /// <summary>
-        /// 저장 바이트. 시험 판의 복사(G453)는 봇이 생각하는 중에도 부른다: 봇은 판을 바꾸지 않으므로 커맨드 실행 중만 막는다.
+        /// 저장의 나무. 시험 판의 복사(G453)는 봇이 생각하는 중에도 부르고 글로 쓰지 않고 이 나무를 바로 읽는다: 봇은 판을 바꾸지 않으므로
+        /// 커맨드 실행 중만 막는다.
         /// </summary>
-        private byte[] SaveBytes()
+        private JsonObject SaveTree()
         {
             if (_undo != null)
                 throw new InvalidOperationException("the world cannot be saved while a command or a function is running");
@@ -96,7 +99,7 @@ namespace Kesa.Engine.Runtime
                 .Add("rand", SaveRandCounts());
             var hosts = SaveHostFunctions();
             if (hosts != null) root.Add("host", hosts);
-            return CanonicalJson.Write(root);
+            return root;
         }
 
         /// <summary>살아 있는 엔티티 id (id 순).</summary>
@@ -269,10 +272,10 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         public static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, bool requireViewRules = false,
             bool dropRemoved = false, bool cancelBrokenFlows = false) =>
-            Load(loaded, save, requireViewRules, dropRemoved, cancelBrokenFlows, trialOf: null);
+            Load(loaded, () => AsObject(CanonicalJson.Read(save), "the save"), requireViewRules, dropRemoved, cancelBrokenFlows, trialOf: null);
 
         /// <param name="trialOf">시험 판이면 그 판을 연 진짜 판 (G453). 불러오기 전에 정해야 스키마 이름 값을 진짜 판과 함께 쓴다.</param>
-        private static WorldLoadResult Load(ContentLoadResult loaded, byte[] save, bool requireViewRules, bool dropRemoved,
+        private static WorldLoadResult Load(ContentLoadResult loaded, Func<JsonObject> read, bool requireViewRules, bool dropRemoved,
             bool cancelBrokenFlows, World? trialOf)
         {
             var diagnostics = new List<Diagnostic>();
@@ -288,7 +291,7 @@ namespace Kesa.Engine.Runtime
             }
             try
             {
-                var root = AsObject(CanonicalJson.Read(save), "the save");
+                var root = read();
                 world.Restore(root, diagnostics, dropRemoved, cancelBrokenFlows);
             }
             catch (JsonFormatException e)
