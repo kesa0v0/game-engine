@@ -87,6 +87,18 @@ Unity.exe -batchmode -nographics -projectPath <패키지를 manifest에 적은 �
 
 로그에 `KESA SMOKE TEST: OK`가 나오면 skirmish 화면이 Unity의 요소 트리로 맞게 만들어졌고, 창 배치와 런타임 USS(`UssCheck`), 판 위 그림(skirmish `looks/`의 표시가 SpriteRenderer로 칸 자리에, 모르는 그림은 대체 그림)도 맞는 것이다. 에디터가 그 프로젝트를 열고 있으면 잠금 때문에 바로 끝나므로, 프로젝트를 다른 폴더로 복사하고 `manifest.json`의 패키지 경로를 절대 경로로 바꿔 돌린다(USS 확인은 그 프로젝트의 `Assets/KesaUssCheck`에 시트를 잠시 만들었다 지운다).
 
+## 봇이 생각하는 시간
+
+`BotSeat.Run()`은 판단(`IBotPolicy.Act`)을 부르고, 모드 봇의 `Act`는 생각 한 번을 끝까지 돌린다(G378). 같은 프로세스 호스트는 경계가 비동기여도 부른 스레드에서 바로 끝내므로, `Update()`에서 부르면 그동안 그 프레임이 멈춘다(G468).
+
+- 생각 한 번은 봇의 단계 예산으로 막힌다(기본은 `engine:Rules`의 `action_step_budget` 1천만, G375). 크기를 따르는 일(`query`, 목록 연산, `with imagine():`의 판 복사)도 그 양만큼 세므로(G467) 예산을 다 써도 데스크톱 Release에서 1만 유닛 판 기준 약 0.25초 안이다. 플러그인 DLL은 Debug 빌드이고 IL2CPP·모바일은 재지 않았다: 더 느리다고 본다.
+- 보통 봇("다 훑고 수 하나 내기")은 1만 유닛 판에서 몇 ms다. 멈춤이 보이는 것은 깊이 읽는 봇(minimax, 시험 판 여러 번)이다.
+- 호스트가 고를 것:
+  - 봇마다 예산을 낮춘다: `session.Bot(봇, 엔티티, stepBudget: 100_000)`·`LoadBot(바이트, stepBudget)`. 넘은 생각은 버려지므로(수를 내지 않음) 오래 생각하는 봇은 기억에 진행을 두고 부를 때마다 한 걸음씩 간다(모더 안내서 9장).
+  - 차례제처럼 기다려도 되는 게임이면 "생각 중" 표시를 먼저 그린 다음 프레임에 `Run()`을 부르고 멈춤을 받아들인다.
+  - 한 프레임에 하는 일을 줄인다: 데모처럼 `maxActs: 1`과 부르는 간격(`botDelay`).
+- 커널을 작업 스레드에 두는 호스트(화면이 안 멈춤)는 아직 없다. 경계는 그것도 받게 되어 있다(G327).
+
 ## 데모 프로젝트
 
 `hosts/unity/demo`는 이 패키지를 `file:`로 가져다 쓰는 Unity 프로젝트다(`.gitignore`는 Unity 프로젝트용 템플릿). 먼저 저장소 루트에서 `dotnet build`를 한 뒤 Unity 6000.3으로 열고 `Assets/Scenes/Demo.unity`를 재생하면 `samples/skirmish`가 같은 프로세스에서 돌며 UXML 화면이 뜬다(`KesaDemo`). 창 없이 확인: `-executeMethod KesaDemoSetup.Check`(편집 모드는 프레임이 돌지 않아 `KesaDemo.Pass(밀리초)`로 시간을 넘기고 `Finish()`로 staged가 다 따라잡게 한다). 연출을 눈으로 따라가려면 재생 중 `KesaDemo`의 Playback Speed를 내린다(0.25면 4배 느림). 카메라가 비춘 판을 PNG로 보려면 `-nographics` 없이 `-executeMethod KesaDemoSetup.Shot -kesaShot <png 경로>`(패널은 들어가지 않는다).
@@ -95,3 +107,4 @@ Unity.exe -batchmode -nographics -projectPath <패키지를 manifest에 적은 �
 
 - USS의 `@import`, `url()`로 그림이 아닌 파일(폰트 등) 읽기.
 - 인라인 `style` 속성, `Include` 밖의 여러 이벤트, 키보드 입력.
+- 커널을 작업 스레드에 두는 호스트: 긴 봇 생각·틱 동안에도 화면이 돈다(G468, "봇이 생각하는 시간").
