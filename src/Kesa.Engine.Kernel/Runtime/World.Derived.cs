@@ -152,6 +152,7 @@ namespace Kesa.Engine.Runtime
                 Wrappers = WrappersOf,
                 EnterImagine = EnterImagine,
                 ExitImagine = ExitImagine,
+                Imagining = () => _trials.Count > 0,
             };
 
         private Dictionary<FunctionValue, CommandDecl>? _commandsByFunction;

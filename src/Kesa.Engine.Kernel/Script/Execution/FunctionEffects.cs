@@ -70,7 +70,7 @@ namespace Kesa.Engine.Script
                 {
                     if (body.Function.Random) continue;
                     SourceSpan? witness = body.FirstRandom;
-                    foreach (var calls in new[] { body.StatementCalls, body.ExpressionCalls })
+                    foreach (var calls in new[] { body.StatementCalls, body.ImagineCalls, body.ExpressionCalls })
                     foreach (var call in calls)
                         if (call.Callee.Random && (witness == null || Before(call.Span, witness.Value))) witness = call.Span;
                     if (witness == null) continue;
@@ -88,7 +88,7 @@ namespace Kesa.Engine.Script
                 {
                     if (body.Function.TouchesUi) continue;
                     SourceSpan? witness = body.FirstUiTouch;
-                    foreach (var calls in new[] { body.StatementCalls, body.ExpressionCalls })
+                    foreach (var calls in new[] { body.StatementCalls, body.ImagineCalls, body.ExpressionCalls })
                     foreach (var call in calls)
                         if (call.Callee.TouchesUi && (witness == null || Before(call.Span, witness.Value))) witness = call.Span;
                     if (witness == null) continue;
@@ -105,7 +105,8 @@ namespace Kesa.Engine.Script
                 {
                     if (body.Function.WritesUi) continue;
                     SourceSpan? witness = body.FirstUiWrite;
-                    foreach (var call in body.StatementCalls)
+                    foreach (var calls in new[] { body.StatementCalls, body.ImagineCalls })
+                    foreach (var call in calls)
                         if (call.Callee.WritesUi && (witness == null || Before(call.Span, witness.Value))) witness = call.Span;
                     if (witness == null) continue;
                     body.Function.UiWriteWitness = witness;
@@ -223,7 +224,7 @@ namespace Kesa.Engine.Script
                 {
                     if (has(body.Function)) continue;
                     SourceSpan? witness = first(body);
-                    foreach (var calls in expressions ? new[] { body.StatementCalls, body.ExpressionCalls } : new[] { body.StatementCalls })
+                    foreach (var calls in expressions ? new[] { body.StatementCalls, body.ImagineCalls, body.ExpressionCalls } : new[] { body.StatementCalls, body.ImagineCalls })
                     foreach (var call in calls)
                         if (has(call.Callee) && (witness == null || Before(call.Span, witness.Value))) witness = call.Span;
                     if (witness == null) continue;
@@ -453,6 +454,9 @@ namespace Kesa.Engine.Script
             /// <summary>식 안에서 부른 같은 모드의 함수.</summary>
             public List<Call> ExpressionCalls { get; } = new List<Call>();
 
+            /// <summary><c>with imagine():</c> 안에서 문장으로 부른 함수: 시험 판에 쓰므로 이 함수를 쓰기 함수로 만들지 않는다 (G455).</summary>
+            public List<Call> ImagineCalls { get; } = new List<Call>();
+
             /// <summary>본문에서 커맨드 이름을 쓴 곳 (호출이든 값이든, G118).</summary>
             public List<Call> CommandUses { get; } = new List<Call>();
 
@@ -601,6 +605,9 @@ namespace Kesa.Engine.Script
             /// <summary><c>with preconditions:</c> 블록 안을 걷는 중인가 (G178: 거기서는 난수를 쓸 수 없다).</summary>
             private bool _inPreconditions;
 
+            /// <summary>몇 겹의 <c>with imagine():</c> 안을 걷는 중인가. 그 안의 쓰기는 시험 판의 것이다 (G455).</summary>
+            private int _imagining;
+
             private readonly UiNames _ui;
             private readonly UiNames _bot;
 
@@ -717,10 +724,10 @@ namespace Kesa.Engine.Script
                     return;
                 }
                 var callee = Resolve(call.Callee, locals);
-                if (callee != null) _body.StatementCalls.Add(new Call(callee, call.Span));
+                if (callee != null) (_imagining > 0 ? _body.ImagineCalls : _body.StatementCalls).Add(new Call(callee, call.Span));
                 else if (WritingBuiltin(call.Callee, locals) != null)
                 {
-                    if (_body.FirstWrite == null) _body.FirstWrite = call.Span;
+                    if (_body.FirstWrite == null && _imagining == 0) _body.FirstWrite = call.Span;
                 }
                 else if (!IsNamed(call.Callee, locals) || ReadsConnection(call.Callee, locals) || LookMaker(call.Callee, locals) ||
                          Plays(call.Callee, locals))
@@ -747,7 +754,7 @@ namespace Kesa.Engine.Script
                             if (StateField(assign.Target, locals) is bool written) _body.Write(written, assign.Span);
                             else if (assign.Target is AttributeExpr target)
                             {
-                                if (_body.FirstWrite == null) _body.FirstWrite = assign.Span;
+                                if (_body.FirstWrite == null && _imagining == 0) _body.FirstWrite = assign.Span;
                                 Expr(target.Target, locals);
                             }
                             if (assign.Op == "=" && assign.Target is NameExpr && assign.Value is CallExpr assigned)
@@ -774,7 +781,9 @@ namespace Kesa.Engine.Script
                         case WithStmt with when FunctionChecker.IsImagine(with):
                             _body.Touch(true, with.Span); // 시험 두기는 봇만 한다 (G454)
                             foreach (var argument in ((CallExpr)with.Context).Arguments) Expr(argument.Value, locals);
+                            _imagining++;
                             Block(with.Body, locals);
+                            _imagining--;
                             break;
                         case WithStmt with:
                             // 사전 조건 블록의 문장은 require 호출과 이름 대입뿐이다 (G111): 그 안의 호출은 모두 식 안이다

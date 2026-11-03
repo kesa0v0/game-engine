@@ -36,7 +36,14 @@ namespace Kesa.Engine.Script
                             "call it on its own line in a @ui_action or in a function that changes UI state called on its own " +
                             "line from it (spec-gaps G282)");
                     }
-                    if (b.Writes && !writable)
+                    if (b.Writes && !writable && Imagining)
+                    {
+                        // 시험 판에 쓰기는 되지만, 봇 본문은 멈추거나 신호의 반응을 돌릴 수 없다: 그런 일은 커맨드로 둔다 (G455)
+                        if (b.Suspends || b.Immediate != null)
+                            throw Fail(Codes.RunImagine, b.Name + "() cannot be used directly inside 'with imagine():'",
+                                "play a command that does it: play(\"Command\", ...) (spec-gaps G455)");
+                    }
+                    else if (b.Writes && !writable)
                     {
                         throw Fail(Codes.RunNotWritable,
                             b.Name + "() " + PureBuiltins.EffectPhrase(b.Name) + ", so it cannot be called here",
@@ -56,7 +63,7 @@ namespace Kesa.Engine.Script
                     return b.Body(positional);
                 case HostCallable h:
                     // 로드 검사가 이름으로 부른 곳은 막았다. 함수 값으로 부르는 길의 방어선 (G216)
-                    if (h.Writes && !writable)
+                    if (h.Writes && !writable && !Imagining)
                     {
                         throw Fail(Codes.RunNotWritable, h.Name + "() changes the world, so it cannot be called here",
                             "call it on its own line (or as 'x = " + h.Name + "(...)') in a @command body or in a " +

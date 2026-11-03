@@ -59,6 +59,32 @@ namespace Kesa.Engine.Tests.Runtime
             "    with imagine():\n" +
             "        r = play(\"Hit\", target=None)\n" +
             "        bot.Mind.note = r.outcome\n" +
+            // 시험 판에서 연 질문은 열린 채 남고, 봇이 답마다 가지를 나눈다 (G459)
+            "@command(free=True, acts_for=None)\ndef Duel(p: Ref[Party]):\n    r = ask(p, \"duel\", choices=[10, 20], name=\"duel\")\n    p.Hp.v += r.choice\n" +
+            "@bot\ndef duelist(me: Ref[Party]):\n" +
+            "    other = [p for p in query(Party) if p != me][0]\n" +
+            "    with imagine():\n" +
+            "        r = play(\"Duel\", p=other)\n" +
+            "        open = [q.name for q in questions()]\n" +
+            "        for c in r.question.choices:\n" +
+            "            with imagine():\n" +
+            "                a = play(r.question, \"engine.pick\", choice=c.index)\n" +
+            "                bot.Mind.seen = bot.Mind.seen + [other.Hp.v if a.ok else -1]\n" +
+            "        bad = play(r.question, \"engine.pick\", choice=5)\n" +
+            "        bot.Mind.note = bad.outcome + \" \" + open[0]\n" +
+            "    bot.Mind.seen = bot.Mind.seen + [len(questions())]\n" +
+            // 가정 쓰기 (G455): 블록 안에서는 커맨드 본문처럼 판에 쓴다. 쓰는 함수도 블록 안에서 부를 수 있다
+            "def weaken(u):\n    u.Hp.v = 1\n" +
+            "@bot\ndef supposer(me: Ref[Party]):\n" +
+            "    t = [u for u in query(Unit)][1]\n" +
+            "    with imagine():\n" +
+            "        weaken(t)\n" +
+            "        play(\"Hit\", target=t, power=1)\n" +
+            "        gone = 0 if t in query(Unit) else 1\n" +
+            "        n = spawn(\"core:Soldier\")\n" +
+            "        made = len([u for u in query(Unit)])\n" +
+            "    bot.Mind.seen = [gone, made, len([u for u in query(Unit)]), t.Hp.v]\n" +
+            "@bot\ndef asker(me: Ref[Party]):\n    with imagine():\n        ask(me, \"x\", choices=[1], name=\"x\")\n" +
             "@bot\ndef leaky(me: Ref[Party]):\n    with imagine():\n        submit(\"Hit\", target=[u for u in query(Unit)][0])\n" +
             "@bot\ndef loose(me: Ref[Party]):\n    play(\"Hit\", target=[u for u in query(Unit)][0])\n" +
             "@bot\ndef broken(me: Ref[Party]):\n    with imagine():\n        x = [][0]\n";
@@ -141,6 +167,38 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(((StrValue)bot.Stored("Mind", "note")).Value, Is.EqualTo("arguments_rejected"));
         }
 
+        [Test]
+        public void AQuestionOpenedOnTheCopyStaysOpenForTheBotToAnswer()
+        {
+            var result = Think("duelist", out var bot);
+            Assert.That(result.Outcome, Is.EqualTo(ThinkOutcome.Thought), result.Error?.Message);
+            // 상대(파랑)에게 물은 질문에 답마다 가지를 나눴고, 진짜 판에는 질문이 없다
+            Assert.That(Seen(bot), Is.EqualTo(new[] { 13L, 23L, 0L }));
+            Assert.That(((StrValue)bot.Stored("Mind", "note")).Value, Is.EqualTo("refused duel"));
+            Assert.That(_world.OpenRequests, Is.Empty);
+        }
+
+        [Test]
+        public void InsideTheBlockTheBotMayWriteAssumptionsOnTheCopy()
+        {
+            byte[] before = _world.Save();
+            var result = Think("supposer", out var bot);
+            Assert.That(result.Outcome, Is.EqualTo(ThinkOutcome.Thought), result.Error?.Message);
+            // 전차를 1로 가정하면 한 대에 죽고, 새 병사까지 시험 판에는 둘이다. 진짜 판은 둘 그대로다
+            Assert.That(Seen(bot), Is.EqualTo(new[] { 1L, 2L, 2L, 5L }));
+            Assert.That(_world.Save(), Is.EqualTo(before));
+        }
+
+        [Test]
+        public void AFunctionThatWritesCanOnlyBeCalledInsideTheBlock()
+        {
+            Mod("core", schema: Schema, defs: "def weaken(u):\n    u.Hp.v = 1\n" +
+                                              "@bot\ndef rash(me: Ref[Party]):\n    weaken(me)\n");
+            Load(out var diags);
+            Assert.That(diags.Single().Message, Is.EqualTo("the @bot 'rash' changes the game; it can only change bot.… and submit commands"));
+        }
+
+        [TestCase("asker", "ask() cannot be used directly inside 'with imagine():'")]
         [TestCase("leaky", "submit() cannot be used inside 'with imagine():'")]
         [TestCase("loose", "play() can only be used inside 'with imagine():'")]
         public void ImagineAndPlayKeepToTheirPlaces(string bot, string message)

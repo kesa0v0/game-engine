@@ -230,7 +230,7 @@ namespace Kesa.Engine.Script
         {
             if (assign.Target is AttributeExpr attr)
             {
-                if (frame.Writable || frame.UiWritable)
+                if (frame.Writable || frame.UiWritable || Imagining)
                 {
                     ExecWrite(assign, attr, frame);
                     return;
@@ -294,7 +294,7 @@ namespace Kesa.Engine.Script
                         : "only members of a component or of a row can be written (spec-gaps G117)");
             }
             // UI 기록은 UI 쓰기 모드에서만, 게임 상태는 쓰기 모드에서만 (G278·G282)
-            if (owner is IUiRecord ? !frame.UiWritable : !frame.Writable)
+            if (owner is IUiRecord ? !frame.UiWritable : !frame.Writable && !Imagining)
             {
                 if (owner is IUiRecord) throw NotUiWritable(frame);
                 throw Fail(Codes.RunNotWritable,
@@ -356,6 +356,9 @@ namespace Kesa.Engine.Script
             site.Cache = resolved;
             return resolved;
         }
+
+        /// <summary>봇 본문이 <c>with imagine():</c> 안에 있나 (G455).</summary>
+        private bool Imagining => _owner.Imagining?.Invoke() == true;
 
         /// <summary>대입할 지역 변수의 칸 (대입하는 이름은 언제나 그 배치에 있다, G104).</summary>
         private int SlotOf(NameExpr site, Frame frame)

@@ -68,6 +68,9 @@ namespace Kesa.Engine.Script
         /// <summary><c>with imagine():</c> 블록을 내릴 때 그 시험 판을 버린다.</summary>
         public Action? ExitImagine { get; set; }
 
+        /// <summary>시험 판이 열려 있나: 그동안 봇 본문은 커맨드 본문처럼 판에 쓸 수 있다 (G455).</summary>
+        public Func<bool>? Imagining { get; set; }
+
         private void Enter(Session session) => _active.Add(session);
         private void Leave() => _active.RemoveAt(_active.Count - 1);
 

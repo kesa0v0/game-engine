@@ -167,7 +167,7 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>
         /// <c>play</c>의 결과 (G458·G459): <c>ok</c>(본문까지 돌았나), <c>outcome</c>(<see cref="SubmitOutcome"/>·<see cref="AnswerOutcome"/>의
-        /// 이름, 낼 곳을 못 찾았으면 <c>"needs_request"</c>), <c>failed</c>(실패한 require의 문구 키), <c>error</c>, <c>question</c>(이 수가 연 질문).
+        /// 이름, 낼 곳을 못 찾았으면 <c>"refused"</c>), <c>failed</c>(실패한 require의 문구 키), <c>error</c>, <c>question</c>(이 수가 연 질문).
         /// </summary>
         private sealed class PlayValue : Value, IRuntimeAttributes
         {
@@ -194,7 +194,7 @@ namespace Kesa.Engine.Runtime
                     case "outcome":
                         return new StrValue(submitted != null ? Snake(submitted.Outcome.ToString())
                             : answered != null ? Snake(answered.Outcome.ToString())
-                            : "needs_request");
+                            : "refused");
                     case "failed":
                     {
                         var report = submitted?.Preconditions ?? answered?.Preconditions;
