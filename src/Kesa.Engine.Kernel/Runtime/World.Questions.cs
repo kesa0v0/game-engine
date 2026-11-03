@@ -124,17 +124,20 @@ namespace Kesa.Engine.Runtime
 
             public bool ValueEquals(Value other) => other is QuestionValue q && q.Request.Id == Request.Id;
 
+            /// <summary>시험 판에서 이 봇이 원래 못 보던 질문이면 내용을 가린다 (G466).</summary>
+            private bool Masked => _world.Current.QuestionMasked(Request.Id);
+
             public Value GetAttribute(string name)
             {
                 switch (name)
                 {
                     case "name": return new StrValue(Request.Name);
-                    case "title": return _world.Current.UiRead(Request.Title);
-                    case "data": return _world.Current.UiRead(Request.Data);
+                    case "title": return Masked ? HiddenValue.Instance : _world.Current.UiRead(Request.Title);
+                    case "data": return Masked ? HiddenValue.Instance : _world.Current.UiRead(Request.Data);
                     case "choices":
                     {
                         var choices = new List<Value>(Request.Choices.Count);
-                        for (int i = 0; i < Request.Choices.Count; i++) choices.Add(new ChoiceView(_world, Request.Choices[i], i));
+                        for (int i = 0; i < Request.Choices.Count; i++) choices.Add(new ChoiceView(_world, Request.Choices[i], i, Masked));
                         return new ListValue(choices);
                     }
                     case "responses":
@@ -164,11 +167,15 @@ namespace Kesa.Engine.Runtime
             private readonly OptionValue _option;
             private readonly int _index;
 
-            public ChoiceView(World world, OptionValue option, int index)
+            /// <summary>번호만 읽히고 내용은 가려짐이다 (G466).</summary>
+            private readonly bool _masked;
+
+            public ChoiceView(World world, OptionValue option, int index, bool masked = false)
             {
                 _world = world;
                 _option = option;
                 _index = index;
+                _masked = masked;
             }
 
             public override string KindName => "choice";
@@ -177,6 +184,7 @@ namespace Kesa.Engine.Runtime
 
             public Value GetAttribute(string name)
             {
+                if (_masked && name != "index" && Array.IndexOf(Attributes, name) >= 0) return HiddenValue.Instance;
                 switch (name)
                 {
                     case "value": return _world.Current.UiRead(_option.Value);

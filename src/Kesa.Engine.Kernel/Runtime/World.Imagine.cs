@@ -74,8 +74,16 @@ namespace Kesa.Engine.Runtime
             }
             var trial = copy.World;
             // 봇이 본 판만 (G462·G464). 안쪽 블록은 이미 거른 바깥 시험 판을 복사하므로 가림 표시만 잇는다
-            if (source == this && _viewRules.Count > 0) trial.Veil(this);
-            else if (source._veiled != null) trial._veiled = new SortedSet<string>(source._veiled, StringComparer.Ordinal);
+            if (source == this && _viewRules.Count > 0)
+            {
+                trial.Veil(this);
+                trial._maskedQuestions = QuestionsTheBotCannotSee();
+            }
+            else
+            {
+                if (source._veiled != null) trial._veiled = new SortedSet<string>(source._veiled, StringComparer.Ordinal);
+                if (source._maskedQuestions != null) trial._maskedQuestions = new SortedSet<long>(source._maskedQuestions);
+            }
             trial._meter = _meter; // 시험 판의 일도 봇 한 번 부르기의 예산으로 센다 (G375·G460)
             // 진짜 판의 다음 난수를 알면 안 된다: 시드는 봇 난수열에서, seed=면 봇 시드와 그 값에서 (G461)
             trial._seed = given is long k2 ? ImagineSeed(_botRun.Seed, k2) : unchecked((long)BeginDraws().Next());
@@ -124,6 +132,21 @@ namespace Kesa.Engine.Runtime
                 }
             }
             foreach (var id in gone) Destroy(id);
+        }
+
+        /// <summary>복사할 때 열려 있던 질문 가운데 이 봇이 블록 밖에서 못 보던 것: 시험 판에서 뼈대만 읽힌다 (G466).</summary>
+        private SortedSet<long>? _maskedQuestions;
+
+        private bool QuestionMasked(long request) => _maskedQuestions != null && _maskedQuestions.Contains(request);
+
+        private SortedSet<long> QuestionsTheBotCannotSee()
+        {
+            var seen = new SortedSet<long>();
+            foreach (var q in _viewer!.OpenRequests) seen.Add(q.Id);
+            var masked = new SortedSet<long>();
+            foreach (var q in OpenRequests)
+                if (!seen.Contains(q.Id)) masked.Add(q.Id);
+            return masked;
         }
 
         /// <summary>가린 Def 컴포넌트에 <c>attach</c>한 추측을 쓴다 (G464): 준 칸만 쓰고 나머지는 Def 값이다.</summary>

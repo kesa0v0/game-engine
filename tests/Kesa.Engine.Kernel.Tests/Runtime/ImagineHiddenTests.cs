@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Kesa.Engine.Runtime;
 using Kesa.Engine.Script;
@@ -36,6 +37,52 @@ namespace Kesa.Engine.Tests.Runtime
             "        with imagine():\n" +
             "            inner = c.Card.face\n" +
             "    bot.Mind.seen = [hidden, ghosts, guessed, inner, 1 if c.Card is None else 0]\n";
+
+        private const string Tell =
+            "Side(\"Blue\")\n" +
+            "@command(free=True, acts_for=None)\ndef Tell(p: Ref[Side]):\n" +
+            "    c = [d for d in query(Deck)][0]\n" +
+            "    r = ask(p, \"tell\", choices=[c.Card.face, 0], name=\"tell\", data={\"face\": c.Card.face})\n" +
+            // 질문의 뼈대(이름·선택지 번호)는 읽히고 번호로 답할 수 있다
+            "@bot\ndef shape(me: Ref[Side]):\n" +
+            "    with imagine():\n" +
+            "        q = questions()[0]\n" +
+            "        a = play(q, \"engine.pick\", choice=q.choices[1].index)\n" +
+            "        seen = [len(q.choices), q.choices[1].index, 1 if a.ok else 0, 1 if q.name == \"tell\" else 0]\n" +
+            "    bot.Mind.seen = seen\n" +
+            "@bot\ndef snoop(me: Ref[Side]):\n    with imagine():\n        x = questions()[0].data[\"face\"]\n" +
+            "@bot\ndef snoop_choice(me: Ref[Side]):\n    with imagine():\n        x = questions()[0].choices[0].value + 1\n";
+
+        private (World World, BotState Shape, ThinkResult Snoop, ThinkResult SnoopChoice) Told()
+        {
+            Mod("core", schema: Schema, defs: Defs + Tell);
+            var world = new World(LoadClean());
+            var card = world.Create("core:Card");
+            world.Set(card, world.Member("Card", "face"), new IntValue(42));
+            var red = world.Create("core:Red");
+            var blue = world.Create("core:Blue");
+            world.Seat(red, "bot", SeatKind.Ai);
+            world.Seat(blue, "other", SeatKind.Human);
+            // 파랑에게 숨긴 앞면으로 계산한 질문을 연다. 빨강 봇은 블록 밖에서 이 질문을 못 본다
+            Assert.That(world.Submit("host", "core.Tell", new Dictionary<string, Value> { ["p"] = new EntityValue(blue) }).Succeeded, Is.True);
+            var view = world.ViewAs("bot");
+            var shape = world.NewBot("core.shape", red);
+            var result = view.Think(shape);
+            Assert.That(result.Outcome, Is.EqualTo(ThinkOutcome.Thought), result.Error?.Message);
+            return (world, shape, view.Think(world.NewBot("core.snoop", red)), view.Think(world.NewBot("core.snoop_choice", red)));
+        }
+
+        [Test]
+        public void AQuestionToAnotherSeatShowsOnlyItsShapeOnTheCopy()
+        {
+            var (_, shape, snoop, snoopChoice) = Told();
+            Assert.That(((ListValue)shape.Stored("Mind", "seen")).Items.Select(v => ((IntValue)v).Value), Is.EqualTo(new[] { 2L, 1L, 1L, 1L }));
+            // 내용(data, 선택지 값)은 가려짐이라 숨긴 앞면 42를 읽을 수 없다
+            Assert.That(snoop.Outcome, Is.EqualTo(ThinkOutcome.ScriptError));
+            Assert.That(snoop.Error!.Message, Does.Not.Contain("42"));
+            Assert.That(snoopChoice.Outcome, Is.EqualTo(ThinkOutcome.ScriptError));
+            Assert.That(snoopChoice.Error!.Message, Does.Contain("hidden"));
+        }
 
         [Test]
         public void TheCopyHoldsOnlyWhatTheBotSees()
