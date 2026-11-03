@@ -202,7 +202,7 @@ namespace Kesa.Engine.Script
                     foreach (var item in dict.Items) yield return item.Key;
                     yield break;
                 case RangeValue range:
-                    for (long i = 0; i < range.Count; i++) yield return new IntValue(range.At(i));
+                    for (long i = 0; i < range.Count; i++) yield return IntValue.Of(range.At(i));
                     yield break;
                 case IRuntimeIterable runtime:
                     foreach (var item in runtime.Iterate()) yield return item;
@@ -338,7 +338,7 @@ namespace Kesa.Engine.Script
                                 "loop over the range instead");
                         }
                         var items = new List<Value>();
-                        for (long i = 0; i < range.Count; i++) items.Add(new IntValue(range.At(i)));
+                        for (long i = 0; i < range.Count; i++) items.Add(IntValue.Of(range.At(i)));
                         return items;
                     default:
                         throw PureOps.TypeError(name + "() with one argument needs a list, not " + args[0].KindName,
@@ -389,10 +389,10 @@ namespace Kesa.Engine.Script
             Arity("len", args, 1);
             switch (args[0])
             {
-                case ListValue list: return new IntValue(list.Items.Count);
-                case DictValue dict: return new IntValue(dict.Items.Count);
-                case RangeValue range: return new IntValue(range.Count);
-                case IRuntimeCollection collection: return new IntValue(collection.Size());
+                case ListValue list: return IntValue.Of(list.Items.Count);
+                case DictValue dict: return IntValue.Of(dict.Items.Count);
+                case RangeValue range: return IntValue.Of(range.Count);
+                case IRuntimeCollection collection: return IntValue.Of(collection.Size());
             }
             throw PureOps.TypeError("len() needs a list, dict, range or component rows, not " + args[0].KindName);
         }

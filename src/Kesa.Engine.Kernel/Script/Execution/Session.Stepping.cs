@@ -88,7 +88,9 @@ namespace Kesa.Engine.Script
                     frame.Returned = value; // 부른 C# 쪽이 읽고 나서 돌려준다
                     return;
                 case ResultTo.Local:
-                    _stack[_stack.Count - 1].Locals[frame.ResultName!] = value;
+                    var caller = _stack[_stack.Count - 1];
+                    if (frame.ResultSlot >= 0) caller.Locals.Set(frame.ResultSlot, value);
+                    else caller.Locals[frame.ResultName!] = value;
                     break;
             }
             Recycle(frame);
@@ -157,7 +159,7 @@ namespace Kesa.Engine.Script
         /// 문장 수준의 호출: 한 줄 전체(<paramref name="target"/> 없음)이거나 이름 대입의 오른쪽 전체 (G117·G135).
         /// <c>def</c>는 프레임을 쌓고 돌아가 실행 고리가 이어서 실행한다. 람다·내장은 그 자리에서 값을 낸다.
         /// </summary>
-        public void StatementCall(CallExpr call, Frame frame, string? target)
+        public void StatementCall(CallExpr call, Frame frame, string? target, int targetSlot = -1)
         {
             if (call.Callee is NameExpr name && LookupName(name, frame) is PureBuiltin pay && pay.Name == PureBuiltins.PayName)
             {
@@ -170,6 +172,7 @@ namespace Kesa.Engine.Script
                 var called = Push(fn, null, positional, keywords, call.Span, frame.Writable, frame.UiWritable);
                 called.Result = target == null ? ResultTo.Discard : ResultTo.Local;
                 called.ResultName = target;
+                called.ResultSlot = targetSlot;
                 called.Immediate = frame.Immediate;
                 return;
             }
@@ -181,6 +184,7 @@ namespace Kesa.Engine.Script
                     : PushInner(inner, positional, keywords, call.Span, frame.Writable, frame.UiWritable);
                 called.Result = target == null ? ResultTo.Discard : ResultTo.Local;
                 called.ResultName = target;
+                called.ResultSlot = targetSlot;
                 called.Immediate = frame.Immediate;
                 return;
             }
@@ -198,7 +202,8 @@ namespace Kesa.Engine.Script
                 _answerTo = target;
                 return;
             }
-            if (target != null) frame.Locals[target] = value;
+            if (targetSlot >= 0) frame.Locals.Set(targetSlot, value);
+            else if (target != null) frame.Locals[target] = value;
             // emit: 즉시 핸들러가 있으면 다음 문장 전에 하나씩 부른다 (G310)
             if (callee is PureBuiltin { Immediate: { } immediate } emit && positional.Count == 1)
             {
@@ -418,12 +423,12 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary><c>x = f(...)</c>의 호출을 <see cref="Eval"/>처럼 단계를 세고 오류 위치를 붙여 실행한다.</summary>
-        public void StatementCallTraced(CallExpr call, Frame frame, string target)
+        public void StatementCallTraced(CallExpr call, Frame frame, string target, int targetSlot = -1)
         {
             try
             {
                 Tick();
-                StatementCall(call, frame, target);
+                StatementCall(call, frame, target, targetSlot);
             }
             catch (ScriptRuntimeException e) when (Annotate(e, call.Span))
             {

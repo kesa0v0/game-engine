@@ -21,6 +21,22 @@ namespace Kesa.Engine.Script
     public sealed class IntValue : Value
     {
         public IntValue(long value) => Value = value;
+
+        private const int CacheLow = -256, CacheHigh = 1023;
+
+        // 값은 불변이라 작은 수는 하나를 나눠 쓴다: 반복 변수·칸 번호·산술 결과마다 새로 만들지 않는다
+        private static readonly IntValue[] Cache = MakeCache();
+
+        private static IntValue[] MakeCache()
+        {
+            var cache = new IntValue[CacheHigh - CacheLow + 1];
+            for (int i = 0; i < cache.Length; i++) cache[i] = new IntValue(i + CacheLow);
+            return cache;
+        }
+
+        public static IntValue Of(long value) =>
+            value >= CacheLow && value <= CacheHigh ? Cache[value - CacheLow] : new IntValue(value);
+
         public long Value { get; }
         public override string KindName => "int";
     }
@@ -195,7 +211,17 @@ namespace Kesa.Engine.Script
         /// 제출이나 신호로만 실행되는 입구(커맨드·핸들러·반응, 호스트가 부르는 UI 동작)인가. 로직에서 부르거나 값으로 쓸 수 없다
         /// (G118, 핸들러는 G145, UI 동작은 G280).
         /// </summary>
-        public bool IsEntry => IsCommand || IsHandler || IsWhen || IsUiAction || IsBot || IsWrap;
+        public bool IsEntry
+        {
+            get
+            {
+                // 호출마다 묻는다: 정의는 바뀌지 않으므로 한 번만 따진다
+                if (_entry == 0) _entry = IsCommand || IsHandler || IsWhen || IsUiAction || IsBot || IsWrap ? 2 : 1;
+                return _entry == 2;
+            }
+        }
+
+        private int _entry;
 
         /// <summary><c>@wrap</c>으로 다른 함수를 감싸는 함수인가 (G311·G312). 대상을 부르는 자리에서만 불린다.</summary>
         public bool IsWrap => Definition != null && Definition.IsWrap;

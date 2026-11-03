@@ -71,7 +71,7 @@ namespace Kesa.Engine.Script
         /// <summary>지금 실행 중인 항목의 위치 (아직 시작 전이면 -1).</summary>
         public long Index { get; set; } = -1;
 
-        public Value ItemAt(long i) => Range != null ? new IntValue(Range.At(i)) : Items![(int)i];
+        public Value ItemAt(long i) => Range != null ? IntValue.Of(Range.At(i)) : Items![(int)i];
 
         public Block Copy() => new Block(Body, Next)
         {

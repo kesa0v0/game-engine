@@ -23,6 +23,7 @@ namespace Kesa.Engine.Script
                 UiWritable = UiWritable,
                 Result = Result,
                 ResultName = ResultName,
+                ResultSlot = ResultSlot,
                 Immediate = Immediate,
                 Dispatch = Dispatch?.Copy(),
             };
@@ -50,6 +51,7 @@ namespace Kesa.Engine.Script
             UiWritable = false;
             Result = ResultTo.Host;
             ResultName = null;
+            ResultSlot = -1;
             Returned = NoneValue.Instance;
             Immediate = false;
             Dispatch = null;
@@ -86,6 +88,9 @@ namespace Kesa.Engine.Script
 
         /// <summary><see cref="ResultTo.Local"/>일 때 부른 쪽 프레임의 지역 변수 이름 (<c>x = f()</c>).</summary>
         public string? ResultName { get; set; }
+
+        /// <summary><see cref="ResultName"/>의 칸 번호 (부른 문장이 미리 푼 것). 불러온 저장에서 이어 가면 모르므로 -1이고 이름으로 찾는다.</summary>
+        public int ResultSlot { get; set; } = -1;
 
         /// <summary><see cref="ResultTo.Host"/>일 때 함수가 돌려준 값.</summary>
         public Value Returned { get; set; } = NoneValue.Instance;

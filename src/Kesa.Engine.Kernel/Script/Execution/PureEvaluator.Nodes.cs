@@ -703,10 +703,12 @@ namespace Kesa.Engine.Script
                             "loop over a list, a dict or range(...)");
                 }
                 long count = range?.Count ?? items!.Count;
+                // 한 겹짜리면 많아야 count개다: 자라며 다시 잡지 않게 미리 잡는다
+                if (_clauses.Length == 1 && sink.Items != null && count <= 4096) sink.Items.Capacity = (int)count;
                 for (long i = 0; i < count; i++)
                 {
                     s.Tick();
-                    scope.Locals.Set(clause.Slot, range != null ? new IntValue(range.At(i)) : items![(int)i]);
+                    scope.Locals.Set(clause.Slot, range != null ? IntValue.Of(range.At(i)) : items![(int)i]);
                     bool pass = true;
                     foreach (var condition in clause.Conditions)
                     {

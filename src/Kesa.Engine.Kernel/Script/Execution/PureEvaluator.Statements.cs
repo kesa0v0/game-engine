@@ -66,7 +66,7 @@ namespace Kesa.Engine.Script
                         if (assign.Target is NameExpr name && assign.Op == "=")
                         {
                             // 이름 대입의 오른쪽 전체인 호출은 문장이다: 쓰기 함수의 결과를 받을 수 있다 (G135)
-                            if (assign.Value is CallExpr valueCall) return new CallAssignNode(assign, valueCall, name.Name);
+                            if (assign.Value is CallExpr valueCall) return new CallAssignNode(assign, valueCall, name.Name, layout.SlotOf(name.Name));
                             int slot = layout.SlotOf(name.Name);
                             if (slot >= 0) return new LocalAssignNode(assign, slot, NodeBuilder.For(assign.Value, layout));
                         }
@@ -124,13 +124,17 @@ namespace Kesa.Engine.Script
             private readonly CallExpr _call;
             private readonly string _target;
 
-            public CallAssignNode(AssignStmt site, CallExpr call, string target) : base(site)
+            /// <summary>받을 지역 변수의 칸: 돌려받을 때마다 이름으로 찾지 않는다.</summary>
+            private readonly int _slot;
+
+            public CallAssignNode(AssignStmt site, CallExpr call, string target, int slot) : base(site)
             {
                 _call = call;
                 _target = target;
+                _slot = slot;
             }
 
-            public override void Run(Session s, Frame f) => s.StatementCallTraced(_call, f, _target);
+            public override void Run(Session s, Frame f) => s.StatementCallTraced(_call, f, _target, _slot);
         }
 
         /// <summary>지역 변수 대입 <c>x = 식</c>.</summary>

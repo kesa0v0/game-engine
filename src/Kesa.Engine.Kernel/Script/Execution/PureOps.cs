@@ -146,7 +146,7 @@ namespace Kesa.Engine.Script
                 default: throw TypeError("operator '" + Operators.Symbol(op) + "' is not supported");
             }
             if (!ok) throw ArithmeticError("integer overflow in '" + Operators.Symbol(op) + "'");
-            return new IntValue(result);
+            return IntValue.Of(result);
         }
 
         private static Value FixedArithmetic(BinaryOp op, Fixed a, Fixed b)
@@ -177,7 +177,7 @@ namespace Kesa.Engine.Script
             if (operand is IntValue i)
             {
                 if (!FixedMath.TryNegate(i.Value, out long r)) throw ArithmeticError("integer overflow in unary '-'");
-                return new IntValue(r);
+                return IntValue.Of(r);
             }
             if (operand is FixedValue f)
             {
