@@ -13,7 +13,7 @@ namespace Kesa.Engine.ConsoleHost.Tests
     /// <summary>예시 게임 <c>samples/pandemic</c>(협력 보드게임 따라 해 보기) 1조각: 지도와 말.</summary>
     public class PandemicTests
     {
-        private static string Root()
+        internal static string Root()
         {
             for (var dir = new DirectoryInfo(TestContext.CurrentContext.TestDirectory); dir != null; dir = dir.Parent)
             {

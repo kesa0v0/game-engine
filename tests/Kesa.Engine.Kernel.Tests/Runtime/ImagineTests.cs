@@ -109,6 +109,8 @@ namespace Kesa.Engine.Tests.Runtime
             "    with imagine():\n" +
             "        with imagine():\n            a = spawn(\"core:Soldier\")\n            bot.Mind.kill = a\n" +
             "        b = spawn(\"core:Soldier\")\n        bot.Mind.made = [b]\n" +
+            "@command(free=True, acts_for=None)\ndef Spin():\n    while True:\n        pass\n" +
+            "@bot\ndef spinner(me: Ref[Party]):\n    with imagine():\n        r = play(\"Spin\")\n        bot.Mind.note = r.outcome\n" +
             "@bot\ndef asker(me: Ref[Party]):\n    with imagine():\n        ask(me, \"x\", choices=[1], name=\"x\")\n" +
             "@bot\ndef leaky(me: Ref[Party]):\n    with imagine():\n        submit(\"Hit\", target=[u for u in query(Unit)][0])\n" +
             "@bot\ndef loose(me: Ref[Party]):\n    play(\"Hit\", target=[u for u in query(Unit)][0])\n" +
@@ -269,6 +271,18 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(again.TrialIds, Is.EqualTo(b + 4));
             Assert.That(_world.IsAlive(new EntityId(b)), Is.False);
             Assert.That(_world.Create("core:Soldier").Value, Is.LessThan(b));
+        }
+
+        [Test]
+        public void WorkOnTheCopyCountsAgainstTheBotsBudget()
+        {
+            byte[] before = _world.Save();
+            var bot = _world.NewBot("core.spinner", _red, stepBudget: 5000);
+            var result = _view.Think(bot);
+            Assert.That(result.Outcome, Is.EqualTo(ThinkOutcome.ScriptError));
+            Assert.That(result.Error!.Code, Is.EqualTo(Codes.RunBudget), result.Error.Message);
+            Assert.That(((StrValue)bot.Stored("Mind", "note")).Value, Is.EqualTo(""));
+            Assert.That(_world.Save(), Is.EqualTo(before));
         }
 
         [Test]

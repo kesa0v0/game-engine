@@ -1,6 +1,6 @@
 # 인계 메모
 
-마지막 갱신: 2026-11-03. 브랜치 `spec-v0.5-scaffold`, 테스트 2940개 통과(커널 2476, CLI 42, 콘솔 호스트 101, 번역 65, 경계 75, UI 174, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
+마지막 갱신: 2026-11-03. 브랜치 `spec-v0.5-scaffold`, 테스트 2942개 통과(커널 2477, CLI 42, 콘솔 호스트 102, 번역 65, 경계 75, UI 174, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
 
 ## 상태
 
@@ -22,7 +22,9 @@
 
 ## 다음 할 일
 
-봇 틀의 약한 곳을 보완하는 중이다(점수 도우미보다 먼저, 사용자 뜻). 시험 두기는 끝났다. 아래 1·2 중 무엇부터 할지 사용자에게 고르게 한다.
+**먼저 물을 것 (시험 두기의 남은 구멍, 재현됨):** 시험 판의 `questions()`·`r.question`은 열린 질문을 모두 주는데(G459), 블록 밖에서 이 봇이 볼 수 없던 **다른 자리에게 연 질문**의 `data`·`title`·선택지 `label`·`desc`·`data`·`value`에 숨긴 컴포넌트로 계산한 값이 들어 있으면 봇이 읽는다(블록 밖은 G200대로 답할 질문만). 후보: 복사 때 봇이 보던 질문을 기억해 두고, 나머지는 이름·응답·`who`·선택지 번호만 남기고 내용은 가림(시험 판에서 새로 연 질문은 거른 판에서 계산되니 그대로). 정하면 G466.
+
+봇 틀의 약한 곳을 보완하는 중이다(점수 도우미보다 먼저, 사용자 뜻). 시험 두기는 위 구멍 말고 끝났다. 아래 1·2 중 무엇부터 할지 사용자에게 고르게 한다.
 
 1. 로직 언어 속도: 벤치 `--minimax`(틱택토 전체 55만 판)에서 3.7µs/판, C# 91ns/판(41배), 판 하나 약 80단계. 먼저 어디에 시간이 드는지 잰다. 같이 할 것: 식 안의 호출도 문장 호출처럼 C# 스택 없이 프레임만 쌓게 고치고(벤치 `--stack`으로 확인) `max_call_depth` 천장(지금 300, G452)을 크게(예: 1만) 올린다.
 2. 큰 판 읽기: 유닛 수천 개의 판을 봇이 매 틱 훑는 비용(spec 9절), 봇 경로의 약 50% 덧비용 프로파일. 긴 봇 생각이 호스트 화면을 막는 것도 같이 본다. 시험 판 복사를 저장 JSON 없이 직접 복사로 바꾸는 것(내부 최적화, 방식은 계약에 없음 G453)도 여기서 잰다.
@@ -53,6 +55,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 루트에서 `dotnet build`와 `dotnet test`로 2940개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다.
+1. `git pull` 후 루트에서 `dotnet build`와 `dotnet test`로 2942개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다.
 2. `CLAUDE.md`와 이 문서를 읽는다. 필요한 `docs/spine-spec.md` 절과 결정(`list --tag …`·`show 번호`)만 본다. 판 위 그림은 `src/Kesa.Engine.Ui/Look*.cs`, UI 해석은 `UiInterpreter*.cs`, 커널 쪽 월드 표시는 `Runtime/World.Look.cs`·`World.Fx.cs`다.
 3. 위 "다음 할 일"을 사용자와 정한다. 작업 방식(한국어, 허락 질문으로 멈추지 않기, push는 사용자가 말할 때만 등)은 CLAUDE.md에 있다.

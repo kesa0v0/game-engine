@@ -87,7 +87,7 @@ def hunter(me: Ref[Party]):
   답한다(`"engine.pick"` 포함). 시험 판에서는 봇이 모든 자리에 앉은 것으로 보므로 상대 진영의 수도 둘 수 있다. 차례와 전제 조건은 그대로
   검사한다.
 - **결과 `r`:** `r.ok`(본문까지 돌았나), `r.outcome`(`"succeeded"`·`"refused"`(낼 곳이 없음)·`"arguments_rejected"`·
-  `"preconditions_failed"`·`"script_error"`, 질문에 답했으면 `"bad_choice"` 등), `r.failed`(실패한 `require`의 문구 키),
+  `"preconditions_failed"`·`"script_error"`, 질문에 답했으면 답의 결과 이름, 예: `"preconditions_failed"`), `r.failed`(실패한 `require`의 문구 키),
   `r.error`(오류 글), `r.question`(이 수가 연 질문). 실패한 `play`는 시험 판에 아무것도 남기지 않는다.
 - **한 블록 안의 `play`는 같은 판에 이어 둔다**(MCTS가 끝까지 두는 꼴). **블록 안의 블록**은 그 자리를 다시 복사한다(minimax의 가지).
 - **질문:** 시험 판에서 커맨드가 `ask`에서 멈추면 질문이 열린 채 남는다. 블록 안의 `questions()`는 시험 판의 열린 질문을 모두 주므로

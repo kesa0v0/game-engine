@@ -156,7 +156,7 @@ namespace Kesa.Engine.Stubs
             "class _Imagine:\n" +
             "    def __enter__(self) -> None: ...\n" +
             "    def __exit__(self, *args: object) -> None: ...\n" +
-            "def imagine() -> _Imagine: ...\n" +
+            "def imagine(*, seed: int = ...) -> _Imagine: ...\n" +
             "class PlayResult:\n" +
             "    ok: bool\n" +
             "    outcome: str\n" +
@@ -168,7 +168,7 @@ namespace Kesa.Engine.Stubs
             "@overload\n" +
             "def play(question: Question, command: str, /, **args: Any) -> PlayResult: ...\n" +
             "def wait(*, ticks: int, about: Any = ...) -> None: ...\n" +
-            "def advance(ticks: int, /) -> None: ...\n" +
+            "def advance(ticks: int, /) -> int: ...\n" +
             "def emit(signal: Any, /) -> None: ...\n" +
             "def destroy(entity: Any, /) -> None: ...\n" +
             "def attach(entity: Any, component: Any, /) -> None: ...\n" +

@@ -69,7 +69,8 @@ namespace Kesa.Engine.Runtime
             {
                 var problems = new StringBuilder();
                 foreach (var d in copy.Diagnostics) problems.Append('\n').Append(d);
-                throw new InvalidOperationException("imagine() could not copy the board:" + problems);
+                // 엔진 결함이지만 호스트를 죽이지 않고 그 생각만 실패하게 한다
+                throw ImagineError("imagine() could not copy the board:" + problems, "this is an engine bug; please report it (spec-gaps G453)");
             }
             var trial = copy.World;
             // 봇이 본 판만 (G462·G464). 안쪽 블록은 이미 거른 바깥 시험 판을 복사하므로 가림 표시만 잇는다
