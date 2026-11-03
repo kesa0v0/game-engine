@@ -169,12 +169,29 @@ namespace Kesa.Engine.Script
             private readonly StmtNode[][] _bodies;
             private readonly StmtNode[]? _orElse;
 
+            /// <summary>가지마다 몸체가 바로 실행해도 되는가 (<see cref="Inline"/>), 마지막은 <c>else</c>.</summary>
+            private readonly bool[] _inline;
+
             public IfNode(IfStmt site, ExprNode[] conditions, StmtNode[][] bodies, StmtNode[]? orElse) : base(site)
             {
                 _site = site;
                 _conditions = conditions;
                 _bodies = bodies;
                 _orElse = orElse;
+                _inline = new bool[bodies.Length + 1];
+                for (int i = 0; i < bodies.Length; i++) _inline[i] = Inline(bodies[i]);
+                _inline[bodies.Length] = orElse != null && Inline(orElse);
+            }
+
+            /// <summary>
+            /// 몸체가 지역 대입·상태 쓰기·식·pass뿐이면 블록을 쌓지 않고 그 자리에서 돌린다. 이런 문장은 프레임을 쌓거나 멈추거나 블록을 건드리지
+            /// 않으므로 결과·단계 수·저장 모양이 블록으로 돌 때와 같다.
+            /// </summary>
+            private static bool Inline(StmtNode[] body)
+            {
+                foreach (var node in body)
+                    if (!(node is LocalAssignNode || node is OtherAssignNode || node is ExprStmtNode || node is PassNode)) return false;
+                return true;
             }
 
             public override void Run(Session s, Frame f)
@@ -182,10 +199,20 @@ namespace Kesa.Engine.Script
                 for (int i = 0; i < _conditions.Length; i++)
                 {
                     if (!PureOps.Truthy(_conditions[i].Eval(s, f))) continue;
-                    f.Blocks.Add(s.NewBlock(_site.Branches[i].Body, _bodies[i]));
+                    Enter(s, f, _site.Branches[i].Body, _bodies[i], _inline[i]);
                     return;
                 }
-                if (_orElse != null) f.Blocks.Add(s.NewBlock(_site.OrElse!, _orElse));
+                if (_orElse != null) Enter(s, f, _site.OrElse!, _orElse, _inline[_bodies.Length]);
+            }
+
+            private static void Enter(Session s, Frame f, IReadOnlyList<Stmt> body, StmtNode[] code, bool inline)
+            {
+                if (!inline)
+                {
+                    f.Blocks.Add(s.NewBlock(body, code));
+                    return;
+                }
+                foreach (var node in code) s.Exec(node, f);
             }
         }
 

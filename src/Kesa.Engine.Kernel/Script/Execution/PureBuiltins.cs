@@ -401,17 +401,22 @@ namespace Kesa.Engine.Script
         {
             if (args.Count < 1 || args.Count > 3)
                 throw PureOps.TypeError("range() takes 1 to 3 arguments, got " + args.Count);
-            var ints = new long[args.Count];
-            for (int i = 0; i < args.Count; i++)
-            {
-                if (!(args[i] is IntValue n)) throw PureOps.TypeError("range() needs int arguments, not " + args[i].KindName);
-                ints[i] = n.Value;
-            }
+            long Int(int i) =>
+                args[i] is IntValue n ? n.Value : throw PureOps.TypeError("range() needs int arguments, not " + args[i].KindName);
 
-            long start = args.Count == 1 ? 0 : ints[0];
-            long stop = args.Count == 1 ? ints[0] : ints[1];
-            long step = args.Count == 3 ? ints[2] : 1;
+            long start = args.Count == 1 ? 0 : Int(0);
+            long stop = args.Count == 1 ? Int(0) : Int(1);
+            long step = args.Count == 3 ? Int(2) : 1;
             if (step == 0) throw PureOps.TypeError("range() step must not be zero");
+
+            // 흔한 크기는 넘칠 일이 없어 그냥 센다. 끝값이 아주 크면 아래의 큰 정수로 센다
+            const long safe = 1L << 40;
+            if (start > -safe && start < safe && stop > -safe && stop < safe && step > -safe && step < safe)
+            {
+                long width = stop - start;
+                long n = step > 0 ? (width > 0 ? (width + step - 1) / step : 0) : (width < 0 ? (width + step + 1) / step : 0);
+                return new RangeValue(start, step, n);
+            }
 
             // 원소 수 = ceil((stop - start) / step), 범위를 넘지 않게 큰 정수로 센다
             var span = new BigInteger(stop) - new BigInteger(start);

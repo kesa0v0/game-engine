@@ -97,7 +97,7 @@ namespace Kesa.Engine.Script
         }
 
         /// <summary>문장 하나를 실행한다: 1단계를 쓰고, 오류에는 이 문장의 위치를 붙인다(안쪽 식이 이미 붙였으면 그대로).</summary>
-        private void Exec(PureEvaluator.StmtNode node, Frame frame)
+        internal void Exec(PureEvaluator.StmtNode node, Frame frame)
         {
             try
             {
