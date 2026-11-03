@@ -151,6 +151,7 @@ namespace Kesa.Engine.Runtime
                 ParameterType = CommandParameterType,
                 Wrappers = WrappersOf,
                 EnterImagine = EnterImagine,
+                ImagineSteps = () => Current.CopySteps(),
                 ExitImagine = ExitImagine,
                 Imagining = () => _trials.Count > 0,
                 AdvanceImagined = AdvanceImagined,

@@ -40,6 +40,23 @@ namespace Kesa.Engine.Runtime
 
         private bool IsTrial => _root != null;
 
+        /// <summary>복사하는 엔티티·값·줄 하나를 이만큼으로 센다 (G467, 잰 값: 저장 나무를 만들고 다시 읽는 비용).</summary>
+        private const int CopyStepWeight = 300;
+
+        /// <summary>이 판을 복사하는 단계 몫 (G467): 엔티티와 그 값·런타임 컴포넌트·줄의 수.</summary>
+        private long CopySteps()
+        {
+            long items = 0;
+            foreach (long id in LiveIds())
+            {
+                var entity = _entities[id];
+                items += 1 + entity.Values.Count + entity.Runtime.Count;
+                foreach (var rows in entity.Rows.Values)
+                    items += rows.ByDef.Count + rows.ByEntity.Count + rows.ByInt.Count;
+            }
+            return items * CopyStepWeight;
+        }
+
         private static ScriptRuntimeException ImagineError(string message, string hint) =>
             new ScriptRuntimeException(Codes.RunImagine, message, hint);
 

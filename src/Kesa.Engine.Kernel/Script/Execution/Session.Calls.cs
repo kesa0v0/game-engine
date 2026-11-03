@@ -59,10 +59,13 @@ namespace Kesa.Engine.Script
                             "random numbers can only be drawn in a @command, @on or @when body and the functions it calls; " +
                             "derived values, conditions and preconditions must give the same answer every time (spec-gaps G178)");
                     }
-                    if (b.CallerBody != null) return b.CallerBody(TopMod, positional, keywords);
-                    if (b.KeywordBody != null) return b.KeywordBody(positional, keywords);
-                    if (keywords.Count > 0) throw Fail(Codes.RunScript, b.Name + "() does not take keyword arguments");
-                    return b.Body(positional);
+                    Value made;
+                    if (b.CallerBody != null) made = b.CallerBody(TopMod, positional, keywords);
+                    else if (b.KeywordBody != null) made = b.KeywordBody(positional, keywords);
+                    else if (keywords.Count > 0) throw Fail(Codes.RunScript, b.Name + "() does not take keyword arguments");
+                    else made = b.Body(positional);
+                    Charge(BuiltinSteps(b.Name, positional, made));
+                    return made;
                 case HostCallable h:
                     // 로드 검사가 이름으로 부른 곳은 막았다. 함수 값으로 부르는 길의 방어선 (G216)
                     if (h.Writes && !writable && !Imagining)
@@ -71,9 +74,32 @@ namespace Kesa.Engine.Script
                             "call it on its own line (or as 'x = " + h.Name + "(...)') in a @command body or in a " +
                             "function that changes the world called on its own line from it (spec-gaps G216)");
                     }
-                    return h.Call(positional, keywords);
+                    var returned = h.Call(positional, keywords);
+                    Charge(Size(returned));
+                    return returned;
             }
             throw Fail(Codes.RunScript, "'" + function.KindName + "' is not callable");
+        }
+
+        /// <summary>내장 호출의 크기 몫 (G467): 만든 묶음, 그리고 다 훑는 내장은 받은 묶음.</summary>
+        private static long BuiltinSteps(string name, IReadOnlyList<Value> positional, Value made)
+        {
+            long steps = Size(made);
+            switch (name)
+            {
+                case "min":
+                case "max":
+                case "sum":
+                case PureBuiltins.AnyName:
+                case PureBuiltins.AllName:
+                    foreach (var arg in positional) steps += Size(arg);
+                    break;
+                case "len":
+                    // 리스트의 길이는 바로 알지만 엔티티 묶음은 지금 살아 있는 것을 센다
+                    if (positional.Count == 1 && positional[0] is IRuntimeSized live) steps += live.Held;
+                    break;
+            }
+            return steps;
         }
 
         private static bool SameFunction(FunctionValue a, FunctionValue b) =>

@@ -111,8 +111,10 @@ namespace Kesa.Engine.Runtime
         /// <c>len</c>·<c>in</c>·참/거짓은 지금 살아 있는 것만 본다. 인덱스와 리스트 연산은 받지 않는다: 리스트가 필요하면
         /// 컴프리헨션으로 그 순간의 사본을 만든다(<c>[u for u in c.units]</c>).
         /// </summary>
-        private sealed class EntityGroup : Value, IRuntimeLiveCollection, IRuntimeIndexable, IValueEquality
+        private sealed class EntityGroup : Value, IRuntimeLiveCollection, IRuntimeIndexable, IValueEquality, IRuntimeSized
         {
+            public int Held => Ids.Count;
+
             /// <summary>살아 있는 원소가 같으면 같다 (<c>WeakSet</c>끼리의 비교처럼). 리스트와는 다르다.</summary>
             public bool ValueEquals(Value other)
             {

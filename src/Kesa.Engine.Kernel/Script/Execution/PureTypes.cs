@@ -150,6 +150,12 @@ namespace Kesa.Engine.Script
         bool IsGone(Value item);
     }
 
+    /// <summary>판 크기를 따르는 묶음 (엔티티 묶음): 받을 때 든 수만큼 단계를 센다 (G467). 세는 데 원소를 훑지 않는다.</summary>
+    public interface IRuntimeSized
+    {
+        int Held { get; }
+    }
+
     /// <summary>
     /// 다른 값을 담은 런타임 값 (컴포넌트 값 <c>Wounded(turns=...)</c>). 이어서 실행할 프레임 사본을 만들 때 안에 든 람다도
     /// 사본의 것으로 바꿔야 해서(G143) 담은 값을 바꾼 새 값을 만든다.

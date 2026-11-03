@@ -252,9 +252,22 @@ namespace Kesa.Engine.Script
             if (++_meter.Used > _meter.Budget) throw BudgetExceeded();
         }
 
+        /// <summary>크기를 따르는 일(목록 만들기·훑기, 판 복사)을 그 양만큼 센다 (G467).</summary>
+        public void Charge(long steps)
+        {
+            if (steps <= 0) return;
+            if (steps > _meter.Budget - _meter.Used)
+            {
+                _meter.Used = _meter.Budget;
+                throw BudgetExceeded();
+            }
+            _meter.Used += (int)steps;
+        }
+
         private ScriptRuntimeException BudgetExceeded() =>
             Fail(Codes.RunBudget, "the function used more than " + _meter.Budget + " evaluation steps",
-                "a loop may be too large or endless; the budget is shared by everything one read computes, " +
-                "including the derived values it reads");
+                "a loop may be too large or endless; query(), entity groups, list operations and imagine() count one step " +
+                "per item they make, scan or copy; the budget is shared by everything one read computes, " +
+                "including the derived values it reads (spec-gaps G467)");
     }
 }

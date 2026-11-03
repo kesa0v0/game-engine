@@ -360,6 +360,7 @@ namespace Kesa.Engine.Script
                 var enter = s.Owner.EnterImagine ??
                             throw s.Fail(Codes.RunImagine, "imagine() can only be used while a @bot thinks",
                                 "a bot tries moves on a copy of the board (spec-gaps G454)");
+                s.Charge(s.Owner.ImagineSteps?.Invoke() ?? 0);
                 enter(keywords);
                 var block = s.NewBlock(_with.Body, _body);
                 block.Imagine = true;

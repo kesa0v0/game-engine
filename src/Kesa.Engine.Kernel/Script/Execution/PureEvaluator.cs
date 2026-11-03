@@ -65,6 +65,9 @@ namespace Kesa.Engine.Script
         /// <summary><c>with imagine(...):</c>에 들어갈 때 키워드 인자로 시험 판을 연다 (G454). 런타임만 준다.</summary>
         public Action<IReadOnlyDictionary<string, Value>>? EnterImagine { get; set; }
 
+        /// <summary>지금 판을 복사하는 단계 몫: 블록에 들어가기 전에 센다 (G467).</summary>
+        public Func<long>? ImagineSteps { get; set; }
+
         /// <summary><c>with imagine():</c> 블록을 내릴 때 그 시험 판을 버린다.</summary>
         public Action? ExitImagine { get; set; }
 

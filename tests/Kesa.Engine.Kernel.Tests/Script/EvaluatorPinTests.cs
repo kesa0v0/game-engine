@@ -172,7 +172,7 @@ namespace Kesa.Engine.Tests.Script
                 });
             }
             Assert.That(string.Join(",", shown), Is.EqualTo("195,big,True,8,0,-9,3,1"));
-            Assert.That(meter.Used, Is.EqualTo(443));
+            Assert.That(meter.Used, Is.EqualTo(453)); // 목록 연산·훑기의 크기 몫 포함 (G467)
         }
     }
 }

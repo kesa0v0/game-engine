@@ -444,9 +444,46 @@ namespace Kesa.Engine.Script
         }
 
         /// <param name="site">연산자를 쓴 식이나 복합 대입: 지원하지 않는 연산자의 오류 문구에 원래 글자를 쓴다.</param>
-        public Value Binary(BinaryOp op, Value left, Value right, Node site) =>
-            PureOps.Binary(op, left, right) ??
-            throw Fail(Codes.RunScript, "operator '" + Symbol(site) + "' is not supported in a logic function", "see spec-gaps G96");
+        public Value Binary(BinaryOp op, Value left, Value right, Node site)
+        {
+            var result = PureOps.Binary(op, left, right) ??
+                         throw Fail(Codes.RunScript, "operator '" + Symbol(site) + "' is not supported in a logic function", "see spec-gaps G96");
+            if (left is IntValue && right is IntValue) return result;
+            // 훑는 것은 훑은 쪽, 만드는 것은 만든 것의 크기만큼 (G467)
+            switch (op)
+            {
+                case BinaryOp.In:
+                case BinaryOp.NotIn:
+                    Charge(Size(right));
+                    break;
+                case BinaryOp.Add:
+                case BinaryOp.Multiply:
+                    Charge(Size(result));
+                    break;
+                case BinaryOp.Equal:
+                case BinaryOp.NotEqual:
+                case BinaryOp.Less:
+                case BinaryOp.LessEqual:
+                case BinaryOp.Greater:
+                case BinaryOp.GreaterEqual:
+                    Charge(Size(left));
+                    break;
+            }
+            return result;
+        }
+
+        /// <summary>문자 이만큼을 한 단계로 센다: 문자 복사는 노드 하나보다 훨씬 싸다.</summary>
+        private const int CharsPerStep = 16;
+
+        /// <summary>크기로 세는 값의 크기 (G467). 그 밖의 값은 0.</summary>
+        internal static long Size(Value value) => value switch
+        {
+            ListValue list => list.Items.Count,
+            DictValue dict => dict.Items.Count,
+            StrValue str => str.Value.Length / CharsPerStep,
+            IRuntimeSized sized => sized.Held,
+            _ => 0,
+        };
 
         private static string Symbol(Node site) =>
             site is AssignStmt assign ? assign.Op.Substring(0, assign.Op.Length - 1) : ((BinaryExpr)site).Op;
