@@ -49,6 +49,14 @@ namespace Kesa.Engine.Loading
                 if (ExcludeFailedAtPatchStage(units, run, order, runDiagnostics)) continue;
 
                 diagnostics.AddRange(runDiagnostics.ToSortedList());
+                // 비밀이 Flow 지역 변수에 남는 꼴 (G465): 뒤 모드의 보기 규칙이 앞 모드의 컴포넌트를 가릴 수 있어 모두 모은 뒤에 본다
+                var hidden = new SortedSet<string>(StringComparer.Ordinal);
+                foreach (var u in units)
+                    if (!u.Failed)
+                        foreach (var rule in u.Functions.ViewRules)
+                            if (run.Schema.TryGetComponent(rule.Target, out _)) hidden.Add(rule.Target);
+                foreach (var u in units)
+                    if (!u.Failed) SecretLocals.Check(u.Functions, hidden, new CallContext(u.Manifest.Id, u.Bag));
                 var mods = new List<ModManifest>();
                 var patches = new List<PatchCall>();
                 var scopes = new SortedDictionary<string, ModScope>(StringComparer.Ordinal);

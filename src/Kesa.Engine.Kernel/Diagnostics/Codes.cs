@@ -219,5 +219,8 @@ namespace Kesa.Engine.Diagnostics
 
         // submit("커맨드", ...)의 대상: 없는 커맨드, 보이지 않는 커맨드, 매개변수 이름 (spec-gaps G278)
         public const string CmdSubmit = "CMD008";
+
+        // 비밀이 Flow 지역 변수에 남음 (spec-gaps G465, 경고): 난수나 가려지는 컴포넌트에서 만든 값을 멈춤 뒤에도 씀. 봇의 시험 판이 그대로 쓴다
+        public const string CmdSecretLocal = "CMD009";
     }
 }
