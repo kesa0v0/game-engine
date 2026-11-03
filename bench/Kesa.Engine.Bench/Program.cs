@@ -90,10 +90,11 @@ namespace Kesa.Engine.Bench
             if (StackProbe.Handles(args)) return 0;
             if (MinimaxProbe.Handles(args)) return 0;
             var sizes = new List<int>();
-            bool profileDerived = false, profileTick = false, shapes = false;
+            bool profileDerived = false, profileTick = false, shapes = false, copy = false;
             foreach (var a in args)
             {
                 if (a == "--shapes") shapes = true;
+                else if (a == "--copy") copy = true;
                 else if (a == "--profile-derived") profileDerived = true;
                 else if (a == "--profile-tick") profileTick = true;
                 else sizes.Add(int.Parse(a, CultureInfo.InvariantCulture));
@@ -110,6 +111,13 @@ namespace Kesa.Engine.Bench
             {
                 if (profileDerived) ProfileDerived(content);
                 else ProfileTick(content);
+                Directory.Delete(root, true);
+                return 0;
+            }
+
+            if (copy)
+            {
+                Copies(content);
                 Directory.Delete(root, true);
                 return 0;
             }
@@ -354,6 +362,36 @@ namespace Kesa.Engine.Bench
             public double Ms { get; }
             public long Bytes { get; }
         }
+
+        /// <summary>
+        /// 시험 두기의 통째 복사 (G453, --copy): 지금 복사는 저장 바이트를 새 판에 읽는 것과 같아서 빈 판 만들기·Save·Load를 따로 잰다.
+        /// </summary>
+        private static void Copies(ContentLoadResult content)
+        {
+            Console.WriteLine("| step | units | median ms | KB allocated | save KB |");
+            Console.WriteLine("|---|---:|---:|---:|---:|");
+            foreach (int n in new[] { 10, 100, 1000, 10000 })
+            {
+                var world = new World(content);
+                for (int i = 0; i < n; i++) world.Create("core:Soldier");
+                var amount = world.Member("Food", "amount");
+                foreach (var id in world.All("Unit")) world.Set(id, amount, new IntValue(id.Value % 7));
+                byte[] save = world.Save();
+                int reps = n >= 10000 ? 5 : 21;
+                CopyRow("new World", n, Measure(reps, () => new World(content)), save);
+                CopyRow("Save", n, Measure(reps, () => world.Save()), save);
+                CopyRow("Load (incl. new World)", n, Measure(reps, () =>
+                {
+                    if (!World.Load(content, save).Succeeded) throw new InvalidOperationException("the copy did not load");
+                }), save);
+            }
+        }
+
+        private static void CopyRow(string step, int n, Result r, byte[] save) =>
+            Console.WriteLine("| " + step + " | " + n.ToString("N0", CultureInfo.InvariantCulture) + " | " +
+                              r.Ms.ToString("0.000", CultureInfo.InvariantCulture) + " | " +
+                              (r.Bytes / 1024).ToString("N0", CultureInfo.InvariantCulture) + " | " +
+                              (save.Length / 1024).ToString("N0", CultureInfo.InvariantCulture) + " |");
 
         private static Result Once(Action body)
         {
