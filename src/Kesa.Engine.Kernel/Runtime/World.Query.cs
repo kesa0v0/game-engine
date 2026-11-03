@@ -92,7 +92,7 @@ namespace Kesa.Engine.Runtime
             var names = new string[positional.Count];
             for (int i = 0; i < positional.Count; i++) names[i] = SchemaNameArgument(PureBuiltins.QueryName, positional[i]);
             var ids = Guard(() => Query(names));
-            if (_viewer != null) ids = ViewQueried(ids, names);
+            if (_viewer != null && _viewRules.Count > 0) ids = ViewQueried(ids, names);
             if (_trace != null)
             {
                 var items = new List<Value>(ids.Count);

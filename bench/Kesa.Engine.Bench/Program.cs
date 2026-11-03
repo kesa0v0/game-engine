@@ -90,13 +90,14 @@ namespace Kesa.Engine.Bench
             if (StackProbe.Handles(args)) return 0;
             if (MinimaxProbe.Handles(args)) return 0;
             var sizes = new List<int>();
-            bool profileDerived = false, profileTick = false, shapes = false, copy = false;
+            bool profileDerived = false, profileTick = false, profileBot = false, shapes = false, copy = false;
             foreach (var a in args)
             {
                 if (a == "--shapes") shapes = true;
                 else if (a == "--copy") copy = true;
                 else if (a == "--profile-derived") profileDerived = true;
                 else if (a == "--profile-tick") profileTick = true;
+                else if (a == "--profile-bot") profileBot = true;
                 else sizes.Add(int.Parse(a, CultureInfo.InvariantCulture));
             }
             if (sizes.Count == 0) sizes.AddRange(new[] { 1000, 10000, 100000 });
@@ -107,10 +108,11 @@ namespace Kesa.Engine.Bench
             Write(root, "core/defs/defs.py", Defs);
             Write(root, "core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse_all(\"defs/\")\n");
             var content = Load(root);
-            if (profileDerived || profileTick)
+            if (profileDerived || profileTick || profileBot)
             {
                 if (profileDerived) ProfileDerived(content);
-                else ProfileTick(content);
+                else if (profileTick) ProfileTick(content);
+                else ProfileBot(content);
                 Directory.Delete(root, true);
                 return 0;
             }
@@ -256,6 +258,63 @@ namespace Kesa.Engine.Bench
             }
             Console.WriteLine("derived reads: " + reads.ToString("N0", CultureInfo.InvariantCulture) + ", " +
                               (sw.Elapsed.TotalMilliseconds * 1e6 / reads).ToString("0", CultureInfo.InvariantCulture) + " ns each");
+        }
+
+        /// <summary>
+        /// 프로파일러용(<c>--profile-bot</c>): 유닛 1만 개를 훑는 봇을 호스트 경계(<c>LocalHost</c>·<c>BotSeat</c>)로 10초 동안 돌리고,
+        /// 같은 봇을 월드에서 바로 생각만 시킨 것과 나란히 잰다.
+        /// </summary>
+        private static void ProfileBot(ContentLoadResult content)
+        {
+            var world = new World(content);
+            for (int i = 0; i < 10000; i++) world.Create("core:Soldier");
+            var side = world.Create("core:Blue");
+            var host = new LocalHost(content, world);
+            host.Seat(side.Value, "bot", ai: true).GetAwaiter().GetResult();
+            var session = host.Open("bot").GetAwaiter().GetResult();
+            var seat = new BotSeat(session, session.Bot("core.feeder", side.Value).GetAwaiter().GetResult(), maxActs: 1);
+            var bare = world.NewBot("core.feeder", side);
+            var view = world.ViewAs("bot");
+            long runs = 0, thinks = 0;
+            var sw = Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < 5000)
+            {
+                seat.Run().GetAwaiter().GetResult();
+                runs++;
+            }
+            double seatMs = sw.Elapsed.TotalMilliseconds / runs;
+            sw.Restart();
+            while (sw.ElapsedMilliseconds < 5000)
+            {
+                view.Think(bare);
+                thinks++;
+            }
+            double thinkMs = sw.Elapsed.TotalMilliseconds / thinks;
+            Console.WriteLine("seat run (think + submit through the bridge): " + seatMs.ToString("0.00", CultureInfo.InvariantCulture) +
+                              " ms, bare think: " + thinkMs.ToString("0.00", CultureInfo.InvariantCulture) + " ms");
+
+            // 숨긴 정보가 있는 게임: 모두 보이게 답하는 가장 싼 보기 규칙 하나를 더해 같은 봇을 잰다
+            string root = Path.Combine(Path.GetTempPath(), "kesa-engine-bench-hidden");
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+            Write(root, "core/schema/types.py", Schema);
+            Write(root, "core/defs/defs.py", Defs + "@view_rule(Unit)\ndef open(viewer, entity):\n    return True\n");
+            Write(root, "core/mod.py", "Mod(id=\"core\")\nuse_all(\"schema/\")\nuse_all(\"defs/\")\n");
+            var hidden = new World(Load(root));
+            Directory.Delete(root, true);
+            for (int i = 0; i < 10000; i++) hidden.Create("core:Soldier");
+            var blue = hidden.Create("core:Blue");
+            hidden.Seat(blue, "bot", SeatKind.Ai);
+            var hiddenBot = hidden.NewBot("core.feeder", blue);
+            var hiddenView = hidden.ViewAs("bot");
+            long hiddenThinks = 0;
+            sw.Restart();
+            while (sw.ElapsedMilliseconds < 5000)
+            {
+                hiddenView.Think(hiddenBot);
+                hiddenThinks++;
+            }
+            Console.WriteLine("bare think with one view rule: " +
+                              (sw.Elapsed.TotalMilliseconds / hiddenThinks).ToString("0.00", CultureInfo.InvariantCulture) + " ms");
         }
 
         /// <summary>프로파일러용(<c>--profile-tick</c>): 유닛 1만 개를 갱신하는 스크립트 틱을 10초 동안 돌린다.</summary>

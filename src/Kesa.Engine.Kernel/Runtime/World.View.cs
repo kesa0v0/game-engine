@@ -30,6 +30,7 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         internal bool MaySee(string issuer, EntityId id, string? component, List<Diagnostic> diagnostics)
         {
+            if (_viewRules.Count == 0) return true;
             string? target = component;
             if (target == null)
             {
@@ -37,21 +38,31 @@ namespace Kesa.Engine.Runtime
                 target = entity.Def.Type.Name;
             }
             if (!_viewRules.TryGetValue(target, out var chain)) return true;
-            // 규칙은 실제 상태를 읽는다. 보는 쪽으로 부르는 중(G248)이면 잠시 풀고, 규칙이 읽은 곳은 그 영수증에 든다
-            var saved = _viewer;
-            _viewer = null;
+            var saved = _viewerSlot;
+            var key = (issuer, id.Value, component);
+            if (saved != null && _seen.TryGetValue(key, out bool known)) return known;
+            // 규칙은 실제 상태를 읽는다. 보는 쪽으로 부르는 중(G248)이면 잠시 풀고(기억한 답은 그대로), 규칙이 읽은 곳은 그 영수증에 든다
+            _viewerSlot = null;
+            bool seen;
             try
             {
+                seen = false;
                 var seats = SeatsOf(issuer);
-                if (seats.Count == 0) return MaySeeAs(chain, NoneValue.Instance, id, component, diagnostics);
-                foreach (var viewer in seats)
-                    if (MaySeeAs(chain, new EntityValue(viewer), id, component, diagnostics)) return true;
-                return false;
+                if (seats.Count == 0) seen = MaySeeAs(chain, NoneValue.Instance, id, component, diagnostics);
+                else
+                    foreach (var viewer in seats)
+                        if (MaySeeAs(chain, new EntityValue(viewer), id, component, diagnostics))
+                        {
+                            seen = true;
+                            break;
+                        }
             }
             finally
             {
-                _viewer = saved;
+                _viewerSlot = saved;
             }
+            if (saved != null) _seen[key] = seen;
+            return seen;
         }
 
         /// <summary>

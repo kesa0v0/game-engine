@@ -72,7 +72,25 @@ namespace Kesa.Engine.Runtime
         /// 보는 쪽으로 부르는 중이면 그 연결. 함수 안의 읽기가 <see cref="WorldView"/>처럼 걸러진다. 보기 정책과 <c>derived</c> 계산(G199)
         /// 안에서는 잠시 풀어 실제 상태를 읽는다.
         /// </summary>
-        private WorldView? _viewer;
+        private WorldView? _viewerSlot;
+
+        /// <summary>
+        /// 보는 쪽. 들어가고 나갈 때(생각 한 번, 화면 부르기 한 번, 화면 동작 한 번) 보기 규칙의 답을 잊는다: 그 사이 판은 바뀌지 않고 규칙은
+        /// 순수하므로(G197) 같은 물음에는 같은 답이다.
+        /// </summary>
+        private WorldView? _viewer
+        {
+            get => _viewerSlot;
+            set
+            {
+                _viewerSlot = value;
+                if (_seen.Count > 0) _seen.Clear();
+            }
+        }
+
+        /// <summary>보는 쪽이 있는 동안 (연결, 엔티티, 컴포넌트) → 보이나. 큰 판에서 같은 엔티티를 여러 번 읽을 때 규칙을 다시 돌리지 않는다.</summary>
+        private readonly Dictionary<(string Issuer, long Id, string? Component), bool> _seen =
+            new Dictionary<(string Issuer, long Id, string? Component), bool>();
 
         /// <summary>배정 표가 바뀐 횟수: 보는 쪽 영수증은 이것도 본다(앉은 곳이 바뀌면 보이는 것이 바뀐다).</summary>
         internal long SeatsVersion { get; private set; }
@@ -106,14 +124,16 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>보는 쪽으로 부르는 중이고 이 살아 있는 엔티티가 안 보인다.</summary>
-        private bool HiddenFromViewer(long id) => _viewer != null && _entities.ContainsKey(id) && !_viewer.Sees(new EntityId(id));
+        // 보기 규칙이 하나도 없으면 모두 보인다: 읽기마다 규칙을 찾지 않는다 (큰 판에서 봇 읽기의 덧비용)
+        private bool HiddenFromViewer(long id) =>
+            _viewer != null && _viewRules.Count > 0 && _entities.ContainsKey(id) && !_viewer.Sees(new EntityId(id));
 
         /// <summary>보는 쪽으로 부르는 중이고 이 엔티티의 이 컴포넌트가 안 보인다.</summary>
         private bool HiddenFromViewer(long id, string component) =>
-            _viewer != null && _entities.ContainsKey(id) && !_viewer.Sees(new EntityId(id), component);
+            _viewer != null && _viewRules.Count > 0 && _entities.ContainsKey(id) && !_viewer.Sees(new EntityId(id), component);
 
         /// <summary>읽은 값의 Ref: 못 보는 엔티티는 <see cref="HiddenValue"/>, 목록에서는 빠진다 (G198).</summary>
-        private Value ViewFiltered(Value value) => _viewer == null ? value : _viewer.Filter(value);
+        private Value ViewFiltered(Value value) => _viewer == null || _viewRules.Count == 0 ? value : _viewer.Filter(value);
 
         /// <summary><c>query</c>의 목록을 보이는 것만으로: 엔티티가 보이고 이름으로 고른 컴포넌트가 모두 보여야 한다 (<see cref="WorldView.Query"/>).</summary>
         private IReadOnlyList<EntityId> ViewQueried(IReadOnlyList<EntityId> ids, string[] names)
