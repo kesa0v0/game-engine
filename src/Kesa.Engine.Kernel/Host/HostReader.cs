@@ -26,44 +26,38 @@ namespace Kesa.Engine.Host
         internal void Close() => _closed = true;
 
         /// <summary>월드를 부른다. 호출이 끝난 창구는 쓸 수 없고, 부르는 동안은 엔진이 하는 일이라 공개 쓰기 막기를 푼다.</summary>
-        private protected T Use<T>(Func<T> body)
+        private protected EngineScope Engine()
         {
             if (_closed)
                 throw new InvalidOperationException("the accessor of host function " + _function +
                                                     " was used after the call ended; do not keep it (spec-gaps G217)");
-            return World.AsEngine(body);
+            return new EngineScope(World);
         }
 
-        private protected void Use(Action body) => Use(() =>
-        {
-            body();
-            return true;
-        });
+        public MemberHandle Member(string owner, string member) { using (Engine()) return World.Member(owner, member); }
 
-        public MemberHandle Member(string owner, string member) => Use(() => World.Member(owner, member));
-
-        public bool IsAlive(EntityId id) => Use(() => World.IsAlive(id));
-        public string DefOf(EntityId id) => Use(() => World.DefOf(id));
-        public bool Has(EntityId id, string component) => Use(() => World.Has(id, component));
+        public bool IsAlive(EntityId id) { using (Engine()) return World.IsAlive(id); }
+        public string DefOf(EntityId id) { using (Engine()) return World.DefOf(id); }
+        public bool Has(EntityId id, string component) { using (Engine()) return World.Has(id, component); }
 
         /// <summary>멤버 값. Def 타입의 const도 이것으로 읽는다.</summary>
-        public Value Get(EntityId id, MemberHandle member) => Use(() => World.Get(id, member));
+        public Value Get(EntityId id, MemberHandle member) { using (Engine()) return World.Get(id, member); }
 
-        public Value GetRow(EntityId id, MemberHandle member, string key) => Use(() => World.GetRow(id, member, key));
-        public Value GetRow(EntityId id, MemberHandle member, EntityId key) => Use(() => World.GetRow(id, member, key));
-        public Value GetRow(EntityId id, MemberHandle member, long key) => Use(() => World.GetRow(id, member, key));
-        public bool HasRow(EntityId id, string component, string key) => Use(() => World.HasRow(id, component, key));
-        public bool HasRow(EntityId id, string component, EntityId key) => Use(() => World.HasRow(id, component, key));
-        public bool HasRow(EntityId id, string component, long key) => Use(() => World.HasRow(id, component, key));
-        public IReadOnlyList<string> RowKeys(EntityId id, string component) => Use(() => World.RowKeys(id, component));
-        public IReadOnlyList<long> RowInts(EntityId id, string component) => Use(() => World.RowInts(id, component));
-        public IReadOnlyList<EntityId> RowEntities(EntityId id, string component) => Use(() => World.RowEntities(id, component));
+        public Value GetRow(EntityId id, MemberHandle member, string key) { using (Engine()) return World.GetRow(id, member, key); }
+        public Value GetRow(EntityId id, MemberHandle member, EntityId key) { using (Engine()) return World.GetRow(id, member, key); }
+        public Value GetRow(EntityId id, MemberHandle member, long key) { using (Engine()) return World.GetRow(id, member, key); }
+        public bool HasRow(EntityId id, string component, string key) { using (Engine()) return World.HasRow(id, component, key); }
+        public bool HasRow(EntityId id, string component, EntityId key) { using (Engine()) return World.HasRow(id, component, key); }
+        public bool HasRow(EntityId id, string component, long key) { using (Engine()) return World.HasRow(id, component, key); }
+        public IReadOnlyList<string> RowKeys(EntityId id, string component) { using (Engine()) return World.RowKeys(id, component); }
+        public IReadOnlyList<long> RowInts(EntityId id, string component) { using (Engine()) return World.RowInts(id, component); }
+        public IReadOnlyList<EntityId> RowEntities(EntityId id, string component) { using (Engine()) return World.RowEntities(id, component); }
 
-        public IReadOnlyList<EntityId> All(string typeName) => Use(() => World.All(typeName));
-        public IReadOnlyList<EntityId> Query(params string[] names) => Use(() => World.Query(names));
-        public IReadOnlyList<EntityId> Inverse(EntityId target, MemberHandle reference) => Use(() => World.Inverse(target, reference));
+        public IReadOnlyList<EntityId> All(string typeName) { using (Engine()) return World.All(typeName); }
+        public IReadOnlyList<EntityId> Query(params string[] names) { using (Engine()) return World.Query(names); }
+        public IReadOnlyList<EntityId> Inverse(EntityId target, MemberHandle reference) { using (Engine()) return World.Inverse(target, reference); }
 
         /// <summary>지금 틱 (스크립트의 <c>now()</c>).</summary>
-        public long Now => Use(() => World.Tick);
+        public long Now { get { using (Engine()) return World.Tick; } }
     }
 }

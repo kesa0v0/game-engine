@@ -21,6 +21,9 @@ namespace Kesa.Engine.Tests.Runtime
         private const string Defs =
             "Tile(\"Grass\")\n" +
             "@command(free=True, acts_for=None)\n" +
+            "def MeasureRead(at: Ref[Tile]):\n" +
+            "    core.terrain.measure_read(at)\n" +
+            "@command(free=True, acts_for=None)\n" +
             "def Walk(start: Ref[Tile], goal: Ref[Tile]):\n" +
             "    path = core.path.find(start, goal)\n" +
             "    start.Terrain.cost = len(path) * 10 + path[1].Terrain.cost\n" +
@@ -102,6 +105,7 @@ namespace Kesa.Engine.Tests.Runtime
         private HostAccess? _access;
         private HostReader? _reader;
         private EntityId _built;
+        private long _readAllocated = -1;
 
         [SetUp]
         public void NewWorld()
@@ -136,6 +140,14 @@ namespace Kesa.Engine.Tests.Runtime
             {
                 var cost = a.Member("Terrain", "cost");
                 a.Set(at, cost, new IntValue(((IntValue)a.Get(at, cost)).Value + by));
+            });
+            core.Writes("def terrain.measure_read(at: Ref[Tile]) -> None", "", (HostAccess a, EntityId at) =>
+            {
+                var cost = a.Member("Terrain", "cost");
+                for (int i = 0; i < 100; i++) a.Get(at, cost);
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                for (int i = 0; i < 1000; i++) a.Get(at, cost);
+                _readAllocated = GC.GetAllocatedBytesForCurrentThread() - before;
             });
             core.Writes("def terrain.build() -> None", "", (HostAccess a) => { _built = a.Create("core:Grass"); });
             core.Writes("def terrain.roll(at: Ref[Tile]) -> None", "", (HostAccess a, EntityId at) =>
@@ -182,6 +194,14 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(_calls, Is.EqualTo(new[] { "find " + _a + " " + _b + " 50" }));
             // 길이 2 * 10 + 돌려받은 둘째 엔티티의 cost 4
             Assert.That(Cost(_a), Is.EqualTo(24));
+        }
+
+        [Test]
+        public void ReadingThroughTheAccessorDoesNotAllocate()
+        {
+            var r = Submit("MeasureRead", Arg("at", _a));
+            Assert.That(r.Succeeded, Is.True, r.Error?.ToString());
+            Assert.That(_readAllocated, Is.EqualTo(0));
         }
 
         [Test]

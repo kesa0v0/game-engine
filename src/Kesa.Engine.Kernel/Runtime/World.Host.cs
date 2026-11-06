@@ -34,19 +34,14 @@ namespace Kesa.Engine.Runtime
         }
 
         /// <summary>창구가 월드를 부르는 동안: 엔진이 하는 일이라 막기를 푼다.</summary>
-        internal T AsEngine<T>(Func<T> body)
+        internal int EnterEngine()
         {
             int saved = _hostDepth;
             _hostDepth = 0;
-            try
-            {
-                return body();
-            }
-            finally
-            {
-                _hostDepth = saved;
-            }
+            return saved;
         }
+
+        internal void LeaveEngine(int saved) => _hostDepth = saved;
 
         /// <summary>창구의 난수: 스크립트 <c>random.이름</c>과 같은 몸체·같은 흐름 (G217).</summary>
         internal Value HostRandom(string name, params Value[] args)
