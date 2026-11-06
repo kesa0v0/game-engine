@@ -74,9 +74,10 @@ namespace Kesa.Engine.Bridge.Local
 
         public ValueTask<BridgeAdvance> Advance(int ticks)
         {
+            long before = World.ActionSteps;
             var advanced = World.Advance(ticks);
             Log.Note(advanced.Tick, advanced.Reactions);
-            return new ValueTask<BridgeAdvance>(new BridgeAdvance(advanced.Advanced, advanced.Tick, advanced.Blocked));
+            return new ValueTask<BridgeAdvance>(new BridgeAdvance(advanced.Advanced, advanced.Tick, advanced.Blocked, World.ActionSteps - before));
         }
 
         internal LocalProblems Log { get; } = new LocalProblems();

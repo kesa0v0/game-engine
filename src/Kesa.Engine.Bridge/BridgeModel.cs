@@ -477,16 +477,20 @@ namespace Kesa.Engine.Bridge
     /// <summary>틱 진행 결과. 시간을 막는 질문이 열려 있으면 <see cref="Blocked"/>.</summary>
     public sealed class BridgeAdvance
     {
-        public BridgeAdvance(int advanced, long tick, bool blocked)
+        public BridgeAdvance(int advanced, long tick, bool blocked, long steps = 0)
         {
             Advanced = advanced;
             Tick = tick;
             Blocked = blocked;
+            Steps = steps;
         }
 
         public int Advanced { get; }
         public long Tick { get; }
         public bool Blocked { get; }
+
+        /// <summary>이 진행 동안 스크립트가 쓴 평가 걸음 (G473). 진단용이고 세는 법은 바뀔 수 있다.</summary>
+        public long Steps { get; }
     }
 
     /// <summary>

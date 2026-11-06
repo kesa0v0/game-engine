@@ -157,6 +157,20 @@ namespace Kesa.Engine.Bridge.Tests
             Assert.That(Read(old.Stamp).Missed, Is.False);
         }
 
+        /// <summary>걸음 합계 (G473): 그 진행 동안 쓴 만큼이고 실패해 되감긴 핸들러도 든다.</summary>
+        [Test]
+        public void AnAdvanceReportsTheStepsItUsed()
+        {
+            var calm = Wait(_host.Advance(1));
+            Assert.That(calm.Steps, Is.GreaterThan(0));
+            BreakTick();
+            var failed = Wait(_host.Advance(1));
+            Assert.That(failed.Steps, Is.GreaterThan(calm.Steps), "the failing path reads more before it is rolled back");
+
+            Wait(_alice.Submit("arena.Heavy", Args()));
+            Assert.That(Wait(_host.Advance(1)).Steps, Is.LessThan(_world.ActionSteps), "only this advance, not the running total");
+        }
+
         [Test]
         public void TheLogOutlivesALoad()
         {

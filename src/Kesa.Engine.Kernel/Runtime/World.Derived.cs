@@ -76,8 +76,15 @@ namespace Kesa.Engine.Runtime
         {
             var meter = _meter!;
             _meter = null;
+            ActionSteps += meter.Used;
             return meter.Used > _heavyWarningSteps && _warnings != null ? meter.Used : 0;
         }
+
+        /// <summary>
+        /// 이 월드에서 커맨드·핸들러·반응·Flow가 지금까지 쓴 단계 수 (G473). 진단용이다: 세는 법은 바뀔 수 있고, 저장하지 않으며, 스크립트는 읽지 못한다.
+        /// 실패해 되감긴 실행도 든다. 화면 동작과 봇의 생각은 들지 않는다.
+        /// </summary>
+        public long ActionSteps { get; private set; }
 
         private void WarnHeavy(int used, string label, SourceSpan span)
         {
