@@ -115,7 +115,7 @@ namespace Kesa.Engine.Runtime
         private JsonObject SaveEntity(EntityRecord entity)
         {
             var runtime = new JsonArray();
-            foreach (var name in entity.Runtime.Keys) runtime.Add(new JsonString(name));
+            foreach (var name in entity.RuntimeNames) runtime.Add(new JsonString(name));
 
             // 키 없는 컴포넌트의 엔티티 값: 컴포넌트 이름 순, 멤버 이름 순 (쓴 값은 기본값과 같아도 적는다)
             var byName = new SortedDictionary<string, ComponentType>(StringComparer.Ordinal);
@@ -129,7 +129,7 @@ namespace Kesa.Engine.Runtime
             }
 
             var rows = new JsonObject();
-            foreach (var pair in entity.Rows)
+            foreach (var pair in entity.AllRows)
             {
                 _schema.TryGetComponent(pair.Key, out var component);
                 var list = new JsonArray();
@@ -153,7 +153,7 @@ namespace Kesa.Engine.Runtime
                 .Add("attached", new JsonBool(row.Attached))
                 .Add("values", SaveValues(component, row.Values));
 
-        private static JsonObject SaveValues(ComponentType component, Dictionary<MemberDecl, Value> values)
+        private static JsonObject SaveValues(ComponentType component, ValueSlots values)
         {
             var byName = new SortedDictionary<string, MemberDecl>(StringComparer.Ordinal);
             foreach (var m in component.Members) byName[m.Name] = m;
@@ -378,7 +378,7 @@ namespace Kesa.Engine.Runtime
             {
                 var entity = pair.Key;
                 foreach (var component in ComponentsOf(entity)) IndexRefs(entity, component);
-                foreach (var rows in entity.Rows.Values)
+                foreach (var rows in entity.AllRowGroups)
                     foreach (var key in rows.ByEntity.Keys)
                     {
                         if (!_keyHolders.TryGetValue(key, out var holders)) _keyHolders.Add(key, holders = new SortedSet<long>());
@@ -484,7 +484,7 @@ namespace Kesa.Engine.Runtime
                     problems.Removed(where + ": the component '" + name + "' no longer exists");
                 else if (entity.Def.Components.Contains(name))
                     problems.Add(where + ": '" + name + "' was attached at runtime, but its Def now has it");
-                else entity.Runtime.Add(name, component);
+                else entity.AttachRuntime(component);
             }
 
             foreach (var pair in AsObject(Field(obj, "values"), "entity values").Members)
@@ -538,14 +538,14 @@ namespace Kesa.Engine.Runtime
                     CheckFilled(component, defComponent?.Members, entity.Values, at, problems);
                     continue;
                 }
-                entity.Rows.TryGetValue(component.Name, out var rows);
+                entity.TryGetRows(component.Name, out var rows);
                 if (component.KeyKind == KeyKind.Def && component.Keys != KeysMode.All && defComponent != null)
                     foreach (var key in defComponent.Rows.Keys)
                     {
                         defComponent.Rows.TryGet(key, out var defRow);
                         RowRecord? record = null;
                         rows?.ByDef.TryGetValue(key, out record);
-                        CheckFilled(component, defRow.Members, record?.Values ?? NoValues, at + "['" + key + "']", problems);
+                        CheckFilled(component, defRow.Members, record?.Values ?? ValueSlots.None, at + "['" + key + "']", problems);
                     }
                 if (rows == null) continue;
                 foreach (var pair in rows.ByDef)
@@ -558,7 +558,7 @@ namespace Kesa.Engine.Runtime
         }
 
         private static void CheckFilled(ComponentType component, OrderedMap<ResolvedValue>? defMembers,
-            Dictionary<MemberDecl, Value> values, string where, LoadProblems problems)
+            ValueSlots values, string where, LoadProblems problems)
         {
             foreach (var member in component.Members)
             {
@@ -587,7 +587,7 @@ namespace Kesa.Engine.Runtime
                     CheckRequiredRefs(component, entity.Values, where + " " + component.Name, problems);
                     continue;
                 }
-                if (!entity.Rows.TryGetValue(component.Name, out var rows)) continue;
+                if (!entity.TryGetRows(component.Name, out var rows)) continue;
                 foreach (var pair in rows.ByDef)
                     CheckRequiredRefs(component, pair.Value.Values, where + " " + component.Name + "['" + pair.Key + "']", problems);
                 foreach (var pair in rows.ByEntity)
@@ -598,7 +598,7 @@ namespace Kesa.Engine.Runtime
             }
         }
 
-        private static void CheckRequiredRefs(ComponentType component, Dictionary<MemberDecl, Value> values, string where,
+        private static void CheckRequiredRefs(ComponentType component, ValueSlots values, string where,
             LoadProblems problems)
         {
             foreach (var member in component.Members)
@@ -626,7 +626,7 @@ namespace Kesa.Engine.Runtime
             return component;
         }
 
-        private void RestoreValues(ComponentType component, JsonObject saved, Dictionary<MemberDecl, Value> target, string where,
+        private void RestoreValues(ComponentType component, JsonObject saved, ValueSlots target, string where,
             LoadProblems problems)
         {
             foreach (var pair in saved.Members)

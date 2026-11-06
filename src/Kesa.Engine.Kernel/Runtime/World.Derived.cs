@@ -534,7 +534,7 @@ namespace Kesa.Engine.Runtime
             if (row == null) return Read(null, component, member, DefMembers(entity, component), entity.Values);
             if (!FindRow(entity, component, row.Value, out var defRow, out var record))
                 throw NoRow(new EntityId(entity.Id), component, row.Value);
-            return Read(row, component, member, defRow?.Members, record?.Values ?? NoValues);
+            return Read(row, component, member, defRow?.Members, record?.Values ?? ValueSlots.None);
         }
 
         // ---- 함수 본문이 보는 값 ----

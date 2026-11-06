@@ -157,7 +157,7 @@ namespace Kesa.Engine.Runtime
 
         /// <summary>엔티티 값 → Def 값 → 스키마 기본값 (Flyweight, spec S4).</summary>
         private Value Read(RowKey? row, ComponentType component, MemberDecl member, OrderedMap<ResolvedValue>? defMembers,
-            Dictionary<MemberDecl, Value> values)
+            ValueSlots values)
         {
             var spec = member.Spec;
             if (member.Kind == MemberKind.Derived)
@@ -245,7 +245,7 @@ namespace Kesa.Engine.Runtime
             }
         }
 
-        private void Reindex(MemberDecl member, long source, Dictionary<MemberDecl, Value> values, Value next)
+        private void Reindex(MemberDecl member, long source, ValueSlots values, Value next)
         {
             if (values.TryGetValue(member, out var old) && old is EntityValue o) RemoveInverse(member, o.Id.Value, source);
             if (next is EntityValue n) AddInverse(member, n.Id.Value, source);

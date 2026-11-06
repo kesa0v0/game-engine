@@ -34,7 +34,7 @@ namespace Kesa.Engine.Runtime
             var component = Keyed(ComponentNamed(componentName), KeyKind.Int);
             Require(entity, component);
             var keys = new List<long>();
-            if (entity.Rows.TryGetValue(componentName, out var rows)) keys.AddRange(rows.ByInt.Keys);
+            if (entity.TryGetRows(componentName, out var rows)) keys.AddRange(rows.ByInt.Keys);
             return keys;
         }
 
@@ -68,7 +68,7 @@ namespace Kesa.Engine.Runtime
             else
             {
                 if (entity.Def.Components.TryGet(component.Name, out var rc)) foreach (var k in rc.Rows.Keys) keys.Add(k);
-                if (entity.Rows.TryGetValue(component.Name, out var rows))
+                if (entity.TryGetRows(component.Name, out var rows))
                     foreach (var pair in rows.ByDef)
                         if (pair.Value.Attached) keys.Add(pair.Key);
             }
@@ -82,7 +82,7 @@ namespace Kesa.Engine.Runtime
             var component = Keyed(ComponentNamed(componentName), KeyKind.Entity);
             Require(entity, component);
             var keys = new List<EntityId>();
-            if (entity.Rows.TryGetValue(componentName, out var rows))
+            if (entity.TryGetRows(componentName, out var rows))
                 foreach (var key in rows.ByEntity.Keys) keys.Add(new EntityId(key));
             return keys;
         }
@@ -97,7 +97,7 @@ namespace Kesa.Engine.Runtime
             if (!row) throw NoRow(id, component, key);
             if (member.Kind == MemberKind.Derived) return ReadDerivedTop(entity, component, key, member.Member);
             return Read(key, component, member.Member, defRow?.Members,
-                record?.Values ?? NoValues);
+                record?.Values ?? ValueSlots.None);
         }
 
         private void SetRow(EntityId id, MemberHandle member, RowKey key, Value value)
@@ -161,7 +161,7 @@ namespace Kesa.Engine.Runtime
             }
             catch
             {
-                entity.Rows[componentName].Remove(key);
+                entity.RowsNamed(componentName).Remove(key);
                 if (key.IsEntity && _keyHolders.TryGetValue(key.EntityKey, out var held))
                 {
                     held.Remove(id.Value);
@@ -184,7 +184,7 @@ namespace Kesa.Engine.Runtime
             if (record == null || !record.Attached)
                 throw new WorldException(Codes.RunNoRow,
                     "the '" + componentName + "' row " + key + " of " + id + " comes from its Def and cannot be removed");
-            var keyedRows = entity.Rows[componentName];
+            var keyedRows = entity.RowsNamed(componentName);
             Touch(id.Value, componentName);
             Stamp(id.Value, componentName);
             keyedRows.Remove(key);
@@ -203,7 +203,7 @@ namespace Kesa.Engine.Runtime
             record = null;
             Require(entity, component);
             CheckKey(component, key);
-            if (entity.Rows.TryGetValue(component.Name, out var rows)) record = rows.Find(key);
+            if (entity.TryGetRows(component.Name, out var rows)) record = rows.Find(key);
             if (key.Kind != KeyKind.Def) return record != null && record.Attached; // 엔티티·int 키 줄은 런타임에만 있다
 
             if (entity.Def.Components.Contains(component.Name) && entity.Def.TryGetRow(component.Name, key.DefKey!, out var r))

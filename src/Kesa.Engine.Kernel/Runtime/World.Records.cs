@@ -10,7 +10,7 @@ namespace Kesa.Engine.Runtime
     /// <summary>
     /// 월드의 내부 저장 구조: 엔티티·줄 기록, 줄 키, Def별 컴포넌트 배치. 저장 방식은 약속이 아니다(S4).
     /// 이 타입들은 일부러 <see cref="World"/>의 private 안쪽 타입으로 둔다: 바깥으로 빼면 커널 어디서나 저장 구조를 만질 수 있게 되고,
-    /// 저장 구조는 백본 ECS화 때 저장 인터페이스와 함께 다시 짠다(G226, 2026-10-18 파일 정리에서 정함).
+    /// 값의 저장 방식은 <see cref="ValueSlots"/>와 <see cref="EntityStore"/> 안에만 둔다(G475).
     /// </summary>
     public sealed partial class World
     {
@@ -50,7 +50,7 @@ namespace Kesa.Engine.Runtime
 
             public void Add(MemberDecl member, Value value) => _items.Add(new KeyValuePair<MemberDecl, Value>(member, value));
 
-            public void CopyTo(Dictionary<MemberDecl, Value> target)
+            public void CopyTo(ValueSlots target)
             {
                 foreach (var pair in _items) target[pair.Key] = pair.Value;
             }
@@ -97,8 +97,39 @@ namespace Kesa.Engine.Runtime
             return layout;
         }
 
+        /// <summary>살아 있는 엔티티들. 읽기마다 지나므로 인터페이스 없이 sealed로 둔다 (P6).</summary>
+        private sealed class EntityStore
+        {
+            private readonly Dictionary<long, EntityRecord> _records = new Dictionary<long, EntityRecord>();
+
+            public EntityRecord this[long id] => _records[id];
+            public bool ContainsKey(long id) => _records.ContainsKey(id);
+            public bool TryGetValue(long id, out EntityRecord record) => _records.TryGetValue(id, out record);
+            public void Add(long id, EntityRecord record) => _records.Add(id, record);
+            public bool Remove(long id) => _records.Remove(id);
+        }
+
+        /// <summary>엔티티나 줄 하나의 값 칸들 (쓴 값, 생성 순간에 계산한 값).</summary>
+        private sealed class ValueSlots
+        {
+            public static readonly ValueSlots None = new ValueSlots();
+
+            private readonly Dictionary<MemberDecl, Value> _values = new Dictionary<MemberDecl, Value>();
+
+            public int Count => _values.Count;
+            public Value this[MemberDecl member] { set => _values[member] = value; }
+            public bool ContainsKey(MemberDecl member) => _values.ContainsKey(member);
+            public bool TryGetValue(MemberDecl member, out Value value) => _values.TryGetValue(member, out value);
+            public bool Remove(MemberDecl member) => _values.Remove(member);
+        }
+
         private sealed class EntityRecord
         {
+            private readonly SortedDictionary<string, ComponentType> _runtime =
+                new SortedDictionary<string, ComponentType>(StringComparer.Ordinal);
+
+            private readonly SortedDictionary<string, KeyedRows> _rows = new SortedDictionary<string, KeyedRows>(StringComparer.Ordinal);
+
             public EntityRecord(long id, FrozenDef def, DefLayout layout)
             {
                 Id = id;
@@ -112,19 +143,30 @@ namespace Kesa.Engine.Runtime
             /// <summary>Def의 컴포넌트를 번호로 찾는 표 (같은 Def의 엔티티가 나눠 씀).</summary>
             public DefLayout Layout { get; }
 
-            /// <summary>키 없는 컴포넌트의 엔티티 값 (쓴 값, 생성 순간에 계산한 값).</summary>
-            public Dictionary<MemberDecl, Value> Values { get; } = new Dictionary<MemberDecl, Value>();
+            /// <summary>키 없는 컴포넌트의 엔티티 값.</summary>
+            public ValueSlots Values { get; } = new ValueSlots();
 
-            /// <summary>런타임에 붙인 컴포넌트 (이름 순).</summary>
-            public SortedDictionary<string, ComponentType> Runtime { get; } =
-                new SortedDictionary<string, ComponentType>(StringComparer.Ordinal);
+            // ---- 런타임에 붙인 컴포넌트 (이름 순) ----
 
-            /// <summary>키 컴포넌트별 줄 기록 (이름 순).</summary>
-            public SortedDictionary<string, KeyedRows> Rows { get; } = new SortedDictionary<string, KeyedRows>(StringComparer.Ordinal);
+            public int RuntimeCount => _runtime.Count;
+            public IEnumerable<string> RuntimeNames => _runtime.Keys;
+            public IEnumerable<ComponentType> RuntimeComponents => _runtime.Values;
+            public bool IsRuntime(string name) => _runtime.Count > 0 && _runtime.ContainsKey(name);
+            public void AttachRuntime(ComponentType component) => _runtime.Add(component.Name, component);
+            public bool DetachRuntime(string name) => _runtime.Remove(name);
+
+            // ---- 키 컴포넌트별 줄 기록 (이름 순) ----
+
+            public IEnumerable<KeyValuePair<string, KeyedRows>> AllRows => _rows;
+            public IEnumerable<KeyedRows> AllRowGroups => _rows.Values;
+            public KeyedRows RowsNamed(string name) => _rows[name];
+            public bool TryGetRows(string name, out KeyedRows rows) => _rows.TryGetValue(name, out rows);
+            public void PutRows(string name, KeyedRows rows) => _rows.Add(name, rows);
+            public bool DropRows(string name) => _rows.Remove(name);
 
             public KeyedRows RowsOf(ComponentType component)
             {
-                if (!Rows.TryGetValue(component.Name, out var rows)) Rows.Add(component.Name, rows = new KeyedRows());
+                if (!_rows.TryGetValue(component.Name, out var rows)) _rows.Add(component.Name, rows = new KeyedRows());
                 return rows;
             }
         }
@@ -166,7 +208,7 @@ namespace Kesa.Engine.Runtime
         {
             public RowRecord(bool attached) => Attached = attached;
             public bool Attached { get; }
-            public Dictionary<MemberDecl, Value> Values { get; } = new Dictionary<MemberDecl, Value>();
+            public ValueSlots Values { get; } = new ValueSlots();
         }
 
         private readonly struct RowKey

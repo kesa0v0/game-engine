@@ -28,12 +28,12 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         private readonly struct UndoEntry
         {
-            private readonly Dictionary<MemberDecl, Value>? _values;
+            private readonly ValueSlots? _values;
             private readonly MemberDecl? _member;
             private readonly Value? _old;
             private readonly Action? _action;
 
-            private UndoEntry(Dictionary<MemberDecl, Value>? values, MemberDecl? member, Value? old, Action? action)
+            private UndoEntry(ValueSlots? values, MemberDecl? member, Value? old, Action? action)
             {
                 _values = values;
                 _member = member;
@@ -44,7 +44,7 @@ namespace Kesa.Engine.Runtime
             public static UndoEntry Of(Action action) => new UndoEntry(null, null, null, action);
 
             /// <summary>칸에 원래 값이 있었으면 그 값으로, 없었으면(<paramref name="old"/>가 null) 지운다.</summary>
-            public static UndoEntry Slot(Dictionary<MemberDecl, Value> values, MemberDecl member, Value? old) =>
+            public static UndoEntry Slot(ValueSlots values, MemberDecl member, Value? old) =>
                 new UndoEntry(values, member, old, null);
 
             public void Run()
@@ -102,7 +102,7 @@ namespace Kesa.Engine.Runtime
         /// <paramref name="owner"/> 엔티티의 값 칸 하나에 쓴다. 커맨드 실행 중이면 원래 값(또는 "값 없음")을 기록한다. 그 엔티티를 읽은
         /// <c>when</c> 조건을 다음 정착에서 다시 보게 표시하고 그 컴포넌트에 도장을 찍는다 (S5, G235).
         /// </summary>
-        private void Assign(long owner, ComponentType component, Dictionary<MemberDecl, Value> values, MemberDecl member, Value value)
+        private void Assign(long owner, ComponentType component, ValueSlots values, MemberDecl member, Value value)
         {
             Touch(owner, component.Name);
             Stamp(owner, component.Name);

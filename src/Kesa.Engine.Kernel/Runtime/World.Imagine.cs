@@ -50,8 +50,8 @@ namespace Kesa.Engine.Runtime
             foreach (long id in LiveIds())
             {
                 var entity = _entities[id];
-                items += 1 + entity.Values.Count + entity.Runtime.Count;
-                foreach (var rows in entity.Rows.Values)
+                items += 1 + entity.Values.Count + entity.RuntimeCount;
+                foreach (var rows in entity.AllRowGroups)
                     items += rows.ByDef.Count + rows.ByEntity.Count + rows.ByInt.Count;
             }
             return items * CopyStepWeight;
@@ -137,14 +137,14 @@ namespace Kesa.Engine.Runtime
                 foreach (var component in new List<ComponentType>(ComponentsOf(entity)))
                 {
                     if (!root.HiddenFromViewer(id, component.Name)) continue;
-                    if (entity.Runtime.ContainsKey(component.Name))
+                    if (entity.IsRuntime(component.Name))
                     {
                         Remove(new EntityId(id), component.Name);
                         continue;
                     }
                     UnindexRefs(entity, component);
                     foreach (var member in component.Members) entity.Values.Remove(member);
-                    entity.Rows.Remove(component.Name);
+                    entity.DropRows(component.Name);
                     IndexRefs(entity, component); // Def 값의 Ref는 남는다
                     (_veiled ??= new SortedSet<string>(StringComparer.Ordinal)).Add(VeilKey(id, component.Name));
                 }

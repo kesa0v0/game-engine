@@ -22,7 +22,7 @@ namespace Kesa.Engine.Runtime
         private readonly DefSet _defs;
         private readonly SchemaSet _schema;
         private long _nextId = 1;
-        private readonly Dictionary<long, EntityRecord> _entities = new Dictionary<long, EntityRecord>();
+        private readonly EntityStore _entities = new EntityStore();
         private readonly Dictionary<DefType, SortedSet<long>> _byType = new Dictionary<DefType, SortedSet<long>>();
 
         /// <summary>Ref 칼럼 → 대상 엔티티 → 그 대상을 가리키는 엔티티들 (역방향 컬렉션, spec S3).</summary>
@@ -144,7 +144,7 @@ namespace Kesa.Engine.Runtime
                 "'" + defId + "' has no such component, or it is keyed (add rows with AddRow)");
             // 모든 검사를 마친 뒤에 월드를 바꾼다 (실패한 호출은 흔적이 없다)
             var planned = new Planned();
-            var plannedRows = new EntityRecord(0, def, LayoutOf(def));
+            SortedDictionary<string, KeyedRows>? plannedRows = null;
             foreach (var name in def.Components.Keys)
             {
                 def.Components.TryGet(name, out var rc);
@@ -164,7 +164,9 @@ namespace Kesa.Engine.Runtime
                     if (values.Count == 0 && values.Pending.Count == 0) continue;
                     var record = new RowRecord(attached: false);
                     values.CopyTo(record.Values);
-                    plannedRows.RowsOf(component).ByDef.Add(key, record);
+                    plannedRows ??= new SortedDictionary<string, KeyedRows>(StringComparer.Ordinal);
+                    if (!plannedRows.TryGetValue(component.Name, out var keyed)) plannedRows.Add(component.Name, keyed = new KeyedRows());
+                    keyed.ByDef.Add(key, record);
                     planned.Pending.AddRange(values.Pending);
                 }
             }
@@ -175,7 +177,8 @@ namespace Kesa.Engine.Runtime
             var id = _nextId++;
             var entity = new EntityRecord(id, def, LayoutOf(def));
             planned.CopyTo(entity.Values);
-            foreach (var pair in plannedRows.Rows) entity.Rows.Add(pair.Key, pair.Value);
+            if (plannedRows != null)
+                foreach (var pair in plannedRows) entity.PutRows(pair.Key, pair.Value);
             _entities.Add(id, entity);
             if (!_byType.TryGetValue(def.Type, out var set)) _byType.Add(def.Type, set = new SortedSet<long>());
             set.Add(id);
@@ -241,7 +244,7 @@ namespace Kesa.Engine.Runtime
                 foreach (var holder in holders)
                 {
                     if (!_entities.TryGetValue(holder, out var h)) continue;
-                    foreach (var pair in h.Rows)
+                    foreach (var pair in h.AllRows)
                     {
                         var rows = pair.Value;
                         if (!rows.ByEntity.TryGetValue(id.Value, out var row)) continue;
@@ -321,13 +324,13 @@ namespace Kesa.Engine.Runtime
             Touch(id.Value, component.Name);
             TouchSource(component.Name);
             Stamp(id.Value, component.Name);
-            entity.Runtime.Add(component.Name, component);
+            entity.AttachRuntime(component);
             values.CopyTo(entity.Values);
             Journal(() =>
             {
                 foreach (var member in component.Members) entity.Values.Remove(member);
-                entity.Rows.Remove(component.Name);
-                entity.Runtime.Remove(component.Name);
+                entity.DropRows(component.Name);
+                entity.DetachRuntime(component.Name);
             });
             IndexRefs(entity, component);
             if (values.Pending.Count == 0) return;
@@ -339,7 +342,7 @@ namespace Kesa.Engine.Runtime
             {
                 UnindexRefs(entity, component);
                 foreach (var member in component.Members) entity.Values.Remove(member);
-                entity.Runtime.Remove(component.Name);
+                entity.DetachRuntime(component.Name);
                 throw;
             }
         }
@@ -353,23 +356,23 @@ namespace Kesa.Engine.Runtime
             if (entity.Def.Components.Contains(componentName))
                 throw new WorldException(Codes.RunNoComponent,
                     "'" + componentName + "' comes from " + id + "'s Def '" + entity.Def.Id + "' and cannot be removed");
-            if (!entity.Runtime.ContainsKey(componentName))
+            if (!entity.IsRuntime(componentName))
                 throw new WorldException(Codes.RunNoComponent, id + " has no '" + componentName + "'");
             UnindexRefs(entity, component);
             var oldValues = new List<KeyValuePair<MemberDecl, Value>>();
             foreach (var member in component.Members)
                 if (entity.Values.TryGetValue(member, out var v)) oldValues.Add(new KeyValuePair<MemberDecl, Value>(member, v));
-            entity.Rows.TryGetValue(componentName, out var oldRows);
+            entity.TryGetRows(componentName, out var oldRows);
             Touch(id.Value, componentName);
             TouchSource(componentName);
             Stamp(id.Value, componentName);
             foreach (var member in component.Members) entity.Values.Remove(member);
-            entity.Rows.Remove(componentName);
-            entity.Runtime.Remove(componentName);
+            entity.DropRows(componentName);
+            entity.DetachRuntime(componentName);
             Journal(() =>
             {
-                entity.Runtime.Add(componentName, component);
-                if (oldRows != null) entity.Rows.Add(componentName, oldRows);
+                entity.AttachRuntime(component);
+                if (oldRows != null) entity.PutRows(componentName, oldRows);
                 foreach (var pair in oldValues) entity.Values[pair.Key] = pair.Value;
             });
             DropContributionsTo(id.Value, component);
@@ -466,7 +469,7 @@ namespace Kesa.Engine.Runtime
         // 시험 판에서 가린 Def 컴포넌트는 붙지 않은 것이다 (G464)
         private bool Has(EntityRecord entity, ComponentType component) =>
             entity.Layout.Find(component) != null && !Veiled(entity.Id, component.Name) ||
-            entity.Runtime.Count > 0 && entity.Runtime.ContainsKey(component.Name);
+            entity.IsRuntime(component.Name);
 
         private void Require(EntityRecord entity, ComponentType component)
         {
@@ -488,7 +491,7 @@ namespace Kesa.Engine.Runtime
                 entity.Def.Components.TryGet(name, out var rc);
                 list.Add(rc.Component);
             }
-            foreach (var c in entity.Runtime.Values) list.Add(c);
+            foreach (var c in entity.RuntimeComponents) list.Add(c);
             return list;
         }
 
