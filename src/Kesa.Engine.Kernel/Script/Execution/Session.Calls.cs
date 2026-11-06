@@ -98,6 +98,20 @@ namespace Kesa.Engine.Script
                     // 리스트의 길이는 바로 알지만 엔티티 묶음은 지금 살아 있는 것을 센다
                     if (positional.Count == 1 && positional[0] is IRuntimeSized live) steps += live.Held;
                     break;
+                // 크기는 없지만 노드 하나보다 훨씬 비싸다: 잰 시간을 한 걸음(약 45ns)으로 나눈 값 (G472)
+                case "sqrt":
+                    steps += 5;
+                    break;
+                case "sin":
+                case "cos":
+                case "sin_deg":
+                case "cos_deg":
+                    steps += 100;
+                    break;
+                case "atan2":
+                case "atan2_deg":
+                    steps += 400;
+                    break;
             }
             return steps;
         }

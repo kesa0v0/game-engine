@@ -461,7 +461,8 @@ namespace Kesa.Engine.Script
                     Charge(Size(result));
                     break;
                 case BinaryOp.Power:
-                    if (right is IntValue exponent) Charge(exponent.Value); // fixed의 정확한 곱은 지수만큼 커진다
+                    // fixed의 정확한 곱은 지수만큼 커진다: 지수 1024에 약 173µs라 지수의 네 배 (G472)
+                    if (right is IntValue exponent) Charge(exponent.Value * 4);
                     break;
                 case BinaryOp.Equal:
                 case BinaryOp.NotEqual:

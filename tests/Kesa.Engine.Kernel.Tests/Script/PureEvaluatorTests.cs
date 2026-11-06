@@ -64,12 +64,20 @@ namespace Kesa.Engine.Tests.Script
             Assert.That(Show(Call("def f():\n    pi = 3\n    return pi\n", "f")), Is.EqualTo("3"));
         }
 
-        [Test]
-        public void AFixedPowerCostsItsExponentInSteps()
+        /// <summary>예산이 시간을 막으려면 비싼 수학은 그만큼 센다: 시간 비례 몫을 넘는 예산에서만 돈다.</summary>
+        [TestCase("1.0 ** 1000", 3000, 4100)]
+        [TestCase("sin(1)", 80, 120)]
+        [TestCase("cos_deg(1)", 80, 120)]
+        [TestCase("atan2(1, 2)", 350, 450)]
+        [TestCase("atan2_deg(1, 2)", 350, 450)]
+        public void ExpensiveMathCostsSteps(string expression, int tooSmall, int enough)
         {
-            var (evaluator, find) = Build("def f():\n    return 1.0 ** 1000\n", budget: 500);
-            var e = Assert.Throws<ScriptRuntimeException>(() => evaluator.Run(find("f"), new Value[0]))!;
+            string source = "def f():\n    return " + expression + "\n";
+            var (small, findSmall) = Build(source, budget: tooSmall);
+            var e = Assert.Throws<ScriptRuntimeException>(() => small.Run(findSmall("f"), new Value[0]))!;
             Assert.That(e.Code, Is.EqualTo(Codes.RunBudget));
+            var (large, findLarge) = Build(source, budget: enough);
+            Assert.That(() => large.Run(findLarge("f"), new Value[0]), Throws.Nothing);
         }
 
         private static string Show(Value v)
