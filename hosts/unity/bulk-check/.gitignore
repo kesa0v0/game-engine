@@ -1,0 +1,13 @@
+Library/
+Temp/
+Logs/
+Build/
+obj/
+UserSettings/
+ProjectSettings/
+Packages/packages-lock.json
+Assets/Empty.unity*
+*.meta
+*.csproj
+*.slnx
+*.sln
