@@ -69,6 +69,8 @@ public sealed class KesaDemo : MonoBehaviour
     private int _boardProblems;
     private BotSeat? _bot;
     private IScriptBot? _botScript;
+    private IHostOperator? _host;
+    private long _problemsSeen;
     private string _botProblems = "";
     private long _questionsAt = -1;
     private readonly SortedDictionary<long, string> _questions = new SortedDictionary<long, string>();
@@ -103,6 +105,7 @@ public sealed class KesaDemo : MonoBehaviour
         foreach (var p in mods.Inputs.Problems) Debug.LogWarning("Kesa inputs: " + p);
         if (mods.Disabled.Count > 0) Debug.LogWarning("Kesa mods disabled by errors: " + string.Join(", ", mods.Disabled));
         var game = mods.NewMatch(1);
+        _host = game.Host;
         var world = game.Host.World;
         if (startCommand.Length > 0 && !world.Submit("host", startCommand, new Dictionary<string, Value>()).Succeeded)
             throw new InvalidOperationException("the start command '" + startCommand + "' was refused");
@@ -212,6 +215,13 @@ public sealed class KesaDemo : MonoBehaviour
         {
             foreach (var e in _ui.Errors) Debug.LogWarning("Kesa screen: " + e);
             _ui.ClearErrors();
+        }
+        if (_host != null)
+        {
+            var found = await _host.Problems(_problemsSeen);
+            _problemsSeen = found.Stamp;
+            if (found.Missed) Debug.LogWarning("Kesa: some older problems were dropped");
+            foreach (var p in found.Items) Debug.LogWarning("Kesa: " + p);
         }
         if (_botScript != null)
         {

@@ -489,6 +489,61 @@ namespace Kesa.Engine.Bridge
         public bool Blocked { get; }
     }
 
+    /// <summary>
+    /// 실행 중 난 문제 하나 (G470): 실패한 핸들러·커맨드·화면 동작·봇, 버려진 신호, 무거운 실행의 경고. 개발자용 진단이고 글은 영어다.
+    /// 숨긴 값이 글에 들 수 있어 판 주인만 받는다.
+    /// </summary>
+    public sealed class BridgeProblem
+    {
+        public BridgeProblem(long stamp, long tick, bool isWarning, string? code, string source, string message, string? hint = null, string? place = null)
+        {
+            Stamp = stamp;
+            Tick = tick;
+            IsWarning = isWarning;
+            Code = code;
+            Source = source;
+            Message = message;
+            Hint = hint;
+            Place = place;
+        }
+
+        public long Stamp { get; }
+
+        /// <summary>기록할 때의 틱. 여러 틱을 한 번에 진행했으면 그 끝이다.</summary>
+        public long Tick { get; }
+
+        public bool IsWarning { get; }
+        public string? Code { get; }
+
+        /// <summary>핸들러, 커맨드, 화면 동작이나 봇의 이름.</summary>
+        public string Source { get; }
+
+        public string Message { get; }
+        public string? Hint { get; }
+
+        /// <summary>알면 소스 위치(<c>파일:줄:열</c>).</summary>
+        public string? Place { get; }
+
+        public override string ToString() =>
+            (IsWarning ? "warning " : "error ") + (Code == null ? "" : Code + " ") + "in " + Source + " (tick " + Tick + "): " + Message +
+            (Place == null ? "" : " at " + Place) + (Hint == null ? "" : " (" + Hint + ")");
+    }
+
+    /// <summary>도장 뒤에 난 문제들, 난 순서대로 (G470). <see cref="Missed"/>면 더 들고 있지 않은 문제를 건너뛰었다.</summary>
+    public sealed class BridgeProblems
+    {
+        public BridgeProblems(long stamp, bool missed, IReadOnlyList<BridgeProblem> items)
+        {
+            Stamp = stamp;
+            Missed = missed;
+            Items = items;
+        }
+
+        public long Stamp { get; }
+        public bool Missed { get; }
+        public IReadOnlyList<BridgeProblem> Items { get; }
+    }
+
     /// <summary>연출 방식 이름 (G429).</summary>
     public static class BridgePresentation
     {

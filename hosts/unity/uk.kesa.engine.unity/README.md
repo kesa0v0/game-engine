@@ -42,6 +42,7 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
 
 - 게임 상태는 커맨드(`Deliver`·`Submit`)로만 바뀐다. 화면 요소에 값을 직접 쓰면 다음 갱신 때 덮인다.
 - 화면 동작이 낸 `submit`이 거절돼도 `BridgeResult.Succeeded`는 참이다. 실패는 `Deliveries`에만 있으니 `ActionResult`에서 본다(G283).
+- 실패한 핸들러, 버려진 신호, 무거운 실행의 경고(`RUN021`)는 호출 결과에 실리지 않는다. 프레임마다 `host.Problems(도장)`을 읽어 로그에 적는다(G470). 숨긴 값이 글에 들 수 있어 플레이어에게 그대로 보여 주지 않는다.
 - 부르다 실패한 바인딩은 직전 값을 유지하고 `UiInterpreter.Errors`에 쌓인다(G341). 비우는 것은 `ClearErrors`뿐이다.
 
 ## 판 위 그림

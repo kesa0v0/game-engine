@@ -484,6 +484,7 @@ namespace Kesa.Engine.Bridge.Local
         {
             var args = KernelValues.ToKernel(arguments);
             var delivered = World.Deliver(Connection, new UiSubmission(command, args));
+            _host.Log.Note(World.Tick, command, delivered);
             var view = View;
             return Done(KernelResults.Result(view.Show(delivered), DefOf(view)));
         }
@@ -496,21 +497,27 @@ namespace Kesa.Engine.Bridge.Local
         {
             var args = KernelValues.ToKernel(arguments);
             var view = View;
-            return Done(KernelResults.Result(view.Show(World.Submit(Connection, command, args)), DefOf(view)));
+            var submitted = World.Submit(Connection, command, args);
+            _host.Log.Note(World.Tick, command, submitted);
+            return Done(KernelResults.Result(view.Show(submitted), DefOf(view)));
         }
 
         public ValueTask<BridgeResult> Respond(long request, string command, IReadOnlyDictionary<string, BridgeValue> arguments)
         {
             var args = KernelValues.ToKernel(arguments);
             var view = View;
-            return Done(KernelResults.Result(view.Show(World.Respond(Connection, request, command, args)), DefOf(view)));
+            var answered = World.Respond(Connection, request, command, args);
+            _host.Log.Note(World.Tick, command, answered);
+            return Done(KernelResults.Result(view.Show(answered), DefOf(view)));
         }
 
         /// <summary>화면 동작을 하고 적힌 <c>submit</c>을 차례로 낸다. 하나가 실패해도 나머지는 낸다(콘솔 호스트와 같다, G283).</summary>
         public ValueTask<BridgeResult> Act(string action, IReadOnlyDictionary<string, BridgeValue> arguments)
         {
             var view = View;
-            return Done(Delivered(view, view.Show(view.Act(_ui, action, KernelValues.ToKernel(arguments)))));
+            var acted = view.Act(_ui, action, KernelValues.ToKernel(arguments));
+            if (acted.Error != null) _host.Log.Note(World.Tick, action, acted.Error);
+            return Done(Delivered(view, view.Show(acted)));
         }
 
         public ValueTask<BridgeResult?> WorldInput(string input, IReadOnlyList<long> entities, BridgeWhere? place = null)
@@ -520,6 +527,7 @@ namespace Kesa.Engine.Bridge.Local
             bool at = place != null && place.Shape == BridgeWhereShape.At && place.Name != null && place.Target != null;
             var view = View;
             var acted = view.WorldInput(_ui, input, ids, at ? place!.Name : null, at ? KernelValues.ToKernel(place!.Target!) : null);
+            if (acted?.Error != null) _host.Log.Note(World.Tick, input, acted.Error);
             return Done(acted == null ? null : Delivered(view, view.Show(acted)));
         }
 
@@ -530,6 +538,7 @@ namespace Kesa.Engine.Bridge.Local
             foreach (var submission in acted.Submissions)
             {
                 var delivered = World.Deliver(Connection, submission);
+                _host.Log.Note(World.Tick, submission.Command, delivered);
                 var after = View;
                 deliveries.Add(new BridgeDelivery(submission.Command, KernelResults.Arguments(submission.Arguments, DefOf(view)),
                     KernelResults.Result(after.Show(delivered), DefOf(after))));

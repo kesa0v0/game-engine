@@ -25,6 +25,12 @@ namespace Kesa.Engine.Bridge
 
         ValueTask<BridgeAdvance> Advance(int ticks);
 
+        /// <summary>
+        /// 도장 <paramref name="since"/> 뒤에 어느 연결, 어느 실행에서든 난 문제 (G470). 처음은 0을 넘기고 결과의 도장을 다음에 넘긴다.
+        /// 불러오기로 판을 갈아 끼워도 이어지고, 오래된 것은 버린다.
+        /// </summary>
+        ValueTask<BridgeProblems> Problems(long since);
+
         ValueTask<byte[]> Save();
 
         /// <summary>저장을 불러와 판을 갈아 끼운다. 모든 세션의 키는 다시 부를 것이 된다.</summary>

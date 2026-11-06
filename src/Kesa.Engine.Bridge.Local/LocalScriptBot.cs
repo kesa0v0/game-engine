@@ -35,13 +35,17 @@ namespace Kesa.Engine.Bridge.Local
             var problems = new List<BridgeReason>();
             var thought = world.ViewAs(_connection).Think(_state);
             if (thought.Error != null)
+            {
                 problems.Add(new BridgeReason(BridgeReasonKind.Error, message: thought.Error.Message, code: thought.Error.Code));
+                _host.Log.Note(world.Tick, thought.Bot, thought.Error);
+            }
             foreach (var a in thought.ArgumentRejections)
                 problems.Add(new BridgeReason(BridgeReasonKind.Argument, message: a.Message, parameter: a.Parameter, code: a.Problem.ToString()));
             bool any = false;
             foreach (var submission in thought.Submissions)
             {
                 var delivered = world.Deliver(_connection, submission);
+                _host.Log.Note(world.Tick, submission.Command, delivered);
                 var view = world.ViewAs(_connection);
                 Func<EntityId, string?> defOf = id => view.IsAlive(id) ? view.DefOf(id) : null;
                 var result = KernelResults.Result(view.Show(delivered), defOf);

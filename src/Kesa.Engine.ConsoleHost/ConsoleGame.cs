@@ -119,8 +119,20 @@ namespace Kesa.Engine.ConsoleHost
                         _out.WriteLine(_text.Say("pick-number", ("n", Int(options.Count))));
                 }
                 _out.WriteLine("[" + picked.Seat + "] " + picked.Run());
+                WriteProblems();
             }
         }
+
+        // 개발자용 진단이라 번역하지 않는다 (G470)
+        private void WriteProblems()
+        {
+            var problems = Wait(_host.Problems(_problemsSeen));
+            _problemsSeen = problems.Stamp;
+            if (problems.Missed) _out.WriteLine("! some older problems were dropped");
+            foreach (var problem in problems.Items) _out.WriteLine("! " + problem);
+        }
+
+        private long _problemsSeen;
 
         // ---- 자리 ----
 
