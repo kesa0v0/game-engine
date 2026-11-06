@@ -104,6 +104,7 @@ namespace Kesa.Engine.Runtime
         {
             NoHostWrites("SetRow");
             var entity = Record(id);
+            OwnHandle(member);
             var component = KeyedMember(member);
             if (!FindRow(entity, component, key, out _, out var record)) throw NoRow(id, component, key);
             var stored = CheckWrite(member.Display, member.Member, value);

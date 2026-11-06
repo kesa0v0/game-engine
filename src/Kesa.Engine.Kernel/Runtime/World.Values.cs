@@ -89,12 +89,24 @@ namespace Kesa.Engine.Runtime
                 "declare a default for it (spec-gaps G93)");
         }
 
+        /// <summary>쓰기는 이 로드의 핸들만 받는다: 다른 로드의 멤버로 쓴 값은 게임에도 저장에도 닿지 않는다 (G479).</summary>
+        private void OwnHandle(MemberHandle member)
+        {
+            var component = member.Component;
+            if (component == null) return;
+            var own = _schema.Components;
+            if (component.Index >= own.Count || !ReferenceEquals(own[component.Index], component))
+                throw new ArgumentException("the handle of '" + member.Display + "' belongs to another load of the content; " +
+                                            "get it again with Member (spec-gaps G479)");
+        }
+
         /// <summary>처음 값들을 검사해 멤버별로 모은다. 다른 컴포넌트의 값이나 같은 칸을 두 번 주면 오류.</summary>
         private Dictionary<MemberDecl, Value> Given(Init[] inits, Func<MemberHandle, bool> belongs, string notBelonging)
         {
             var given = new Dictionary<MemberDecl, Value>();
             foreach (var init in inits)
             {
+                OwnHandle(init.Member);
                 if (!belongs(init.Member))
                     throw new WorldException(Codes.RunNoComponent, "cannot give '" + init.Member.Display + "' here: " + notBelonging);
                 if (given.ContainsKey(init.Member.Member))

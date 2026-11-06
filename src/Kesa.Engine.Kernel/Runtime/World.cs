@@ -290,6 +290,7 @@ namespace Kesa.Engine.Runtime
             var entity = Record(id);
             if (member.Component == null)
                 throw new WorldException(Codes.RunNotWritable, "'" + member.Display + "' is a const of the Def type and cannot be written");
+            OwnHandle(member);
             var component = NotKeyed(member);
             Require(entity, component);
             var stored = CheckWrite(member.Display, member.Member, value);

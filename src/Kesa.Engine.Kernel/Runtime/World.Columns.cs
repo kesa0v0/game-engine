@@ -79,10 +79,8 @@ namespace Kesa.Engine.Runtime
         {
             if (member.Component == null)
                 throw new WorldException(Codes.RunType, "'" + member.Display + "' is a const of the Def type and has no column");
-            var component = NotKeyed(member);
-            if (!_schema.TryGetComponent(component.Name, out var own) || !ReferenceEquals(own, component))
-                throw new ArgumentException("the handle of '" + member.Display + "' belongs to another load of the content");
-            return component;
+            OwnHandle(member);
+            return NotKeyed(member);
         }
 
         private bool PartRowShown(EntityRecord record, MemberHandle[] members)

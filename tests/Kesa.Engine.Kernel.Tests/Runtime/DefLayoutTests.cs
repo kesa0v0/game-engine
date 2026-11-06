@@ -32,5 +32,35 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(((IntValue)second.Get(unit, food)).Value, Is.EqualTo(5));
             Assert.That(((IntValue)second.Get(unit, second.Member("Health", "hp"))).Value, Is.EqualTo(7));
         }
+
+        [Test]
+        public void WritingThroughAHandleFromAnotherLoadIsRefused()
+        {
+            const string schema =
+                "component(\"Food\", amount=field(int, default=0))\n" +
+                "component(\"Rank\", key=int, level=field(int, default=0))\n" +
+                "deftype(\"Unit\", components=[\"Food\", \"Rank\"])\n";
+            Mod("banking", schema: schema, defs: "Unit(\"Soldier\")\n");
+            var first = new World(LoadClean());
+            var second = new World(LoadClean());
+            var unit = second.Create("banking:Soldier");
+            second.AddRow(unit, "Rank", 1L);
+            var before = second.Save();
+            var food = first.Member("Food", "amount");
+            var level = first.Member("Rank", "level");
+
+            void Refused(TestDelegate write) =>
+                Assert.That(Assert.Throws<System.ArgumentException>(write)!.Message, Does.Contain("another load"));
+
+            Refused(() => second.Set(unit, food, new IntValue(9)));
+            Refused(() => second.SetRow(unit, level, 1L, new IntValue(9)));
+            Refused(() => second.Create("banking:Soldier", new Init(food, new IntValue(9))));
+            Refused(() => second.AddRow(unit, "Rank", 2L, new Init(level, new IntValue(9))));
+            Refused(() => second.WriteColumn(food, new[] { unit.Value }, new long[] { 9 }));
+            Assert.That(second.Save(), Is.EqualTo(before));
+
+            second.Set(unit, second.Member("Food", "amount"), new IntValue(9));
+            Assert.That(((IntValue)second.Get(unit, second.Member("Food", "amount"))).Value, Is.EqualTo(9));
+        }
     }
 }
