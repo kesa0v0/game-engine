@@ -167,6 +167,7 @@ def rivals(house):
 | `s.Hull.hp` | 컴포넌트 `Hull`의 멤버 |
 | `s.Hull.hp -= 3` | 쓰기(`field`와 `ref`만, 쓰는 곳에서만) |
 | `s.Ship.base_hp` | Def 타입 이름으로 그 엔티티 Def의 `const` 읽기 |
+| `s.id` | 엔티티 번호(정수, 2장) |
 | `defdata("Medic").Role.treat_all` | 엔티티가 없는 Def의 `const`를 Def id로 읽기 |
 | `defs(City)` | 그 Def 타입의 Def 전체 id 목록 |
 | `house.ships` | 역방향 컬렉션(그 상회를 가리키는 배들) |

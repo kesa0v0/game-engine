@@ -111,6 +111,9 @@ PRICES = {defid("Sloop"): 8}           # 사전 키도
 
 - 엔티티가 자기 Def를 알려면 `ship.defid`(전체 이름, G293)를 읽는다: `if ship.defid == defid("Sloop")`. 도시처럼 Def가 정체성인 엔티티를 찾을 때 쓴다
   (`samples/pandemic`의 `city_of`).
+- 엔티티의 번호는 `ship.id`로 읽는다. 재사용되지 않는 정수이고 만든 순서대로 커지므로, 위치가 같은 두 유닛을 결정적으로 가를 때 쓴다:
+  `if a.id < b.id`. 숫자에서 엔티티로 되돌아가는 길은 없으니 가리키려면 `ref`를 쓴다. 숫자를 글이나 게임 규칙의 의미로 쓰지 않는다:
+  만드는 순서가 바뀌면 함께 바뀐다.
 - 호스트(C# API, 명령 인자, 저장 파일)는 전체 이름만 받는다.
 - `TextKey` 값은 번역 키 문자열이다(`label="harbor-good-fish"`). 글은 `locale/`의 번역 파일에 둔다(8장).
   Def 자신의 화면 이름은 따로 적지 않고 번역 파일의 `def-harbor-Sloop` 키에 둔다(`/`도 `-`로: `def-harbor-rigs-Brig`).

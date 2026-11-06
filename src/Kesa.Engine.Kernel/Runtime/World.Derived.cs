@@ -834,6 +834,7 @@ namespace Kesa.Engine.Runtime
                 // 가리키는 쪽이나 그 Ref가 든 컴포넌트가 안 보이면 빠진다 (G198)
                 return new EntityGroup(this, ViewFiltered(Inverse(id, handle), inverse.Source.Name), inverse.Name);
             }
+            if (name == "id") return IntValue.Of(id.Value); // 이름이 겹치면 모드 것이 먼저다 (G474)
             throw new ScriptRuntimeException(Codes.RunScript,
                 id + " (" + entity.Def.Id + ") has no component or collection '" + name + "'", Suggest.Hint(name, candidates));
         }

@@ -652,6 +652,7 @@ namespace Kesa.Engine.Stubs
                     if (Sees(c.Mod) && !listed.Contains(c.Name)) Line("    " + c.Name + ": " + Attached(c) + " | None");
                 Line("    " + type.Name + ": " + ConstsName(type));
                 ReadOnly("defid", DefIdLiteral(type.Name));
+                ReadOnly("id", "int");
                 foreach (var inverse in type.Inverses)
                     if (Sees(inverse.Mod)) ReadOnly(inverse.Name, "Sequence[Any]");
                 var parameters = new List<string>

@@ -88,6 +88,7 @@ namespace Kesa.Engine.Tests.Loading
                 "    Resource: _Resource_consts\n" +
                 "    @property\n" +
                 "    def defid(self) -> Literal[\"Wood\", \"Iron\", \"core:Wood\", \"core:Iron\"]: ...\n" +
+                "    @property\n    def id(self) -> int: ...\n" +
                 "    def __init__(self, id: str, /, *, parent: Literal[\"Wood\", \"Iron\", \"core:Wood\", \"core:Iron\"] | None = None, abstract: bool = False, " +
                 "override: bool = False) -> None: ...\n" +
                 "\n" +
@@ -105,6 +106,7 @@ namespace Kesa.Engine.Tests.Loading
                 "    Unit: _Unit_consts\n" +
                 "    @property\n" +
                 "    def defid(self) -> Literal[\"Scout\", \"core:Scout\"]: ...\n" +
+                "    @property\n    def id(self) -> int: ...\n" +
                 "    def __init__(self, id: str, /, *, parent: Literal[\"Base\", \"Scout\", \"core:Base\", \"core:Scout\"] | None = None, abstract: bool = False, " +
                 "override: bool = False, move: int = ..., ratio: fixed = ..., label: TextKey = ..., tags: list[str] = ..., " +
                 "cost: dict[Literal[\"Wood\", \"Iron\", \"core:Wood\", \"core:Iron\"], int] = ..., Health: Health = ..., " +

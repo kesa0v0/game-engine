@@ -426,6 +426,7 @@ namespace Kesa.Engine.Loading
                 foreach (var inverse in type.Inverses)
                     if (inverse.Name == name)
                         return new GroupType(new EntityType(null));
+                if (name == "id") return StaticType.Unknown; // 이름이 겹치면 모드 것이 먼저다 (G474)
 
                 if (!Reporting) return StaticType.Unknown;
                 var candidates = new List<string>();
