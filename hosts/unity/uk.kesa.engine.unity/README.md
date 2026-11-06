@@ -12,6 +12,7 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
 3. 코드에서:
    ```csharp
    var mods = LoadedMods.Load(modsRoot, languages: new[] { "ko", "en" });
+   // 호스트 함수가 있으면 먼저 `HostFunctions`에 등록해 `Load(…, host: host)`로 넘긴다(`host.For("게임모드id").Pure(…)`)
    // mods.Diagnostics·mods.Disabled: 오류가 난 모드는 빠진 채로 온다. 보일지, 멈출지는 게임이 정한다
    var match = mods.NewMatch(seed: 1);   // 새 게임마다 이것만 다시
    var session = await match.Host.Open("me");

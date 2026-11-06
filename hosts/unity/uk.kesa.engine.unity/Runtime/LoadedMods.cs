@@ -5,6 +5,7 @@ using System.Linq;
 using Kesa.Engine.Bridge;
 using Kesa.Engine.Bridge.Local;
 using Kesa.Engine.Diagnostics;
+using Kesa.Engine.Host;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Runtime;
 using Kesa.Engine.Text;
@@ -70,14 +71,15 @@ namespace Kesa.Engine.Unity
         /// <paramref name="modsRoot"/>의 모드를 불러온다. 오류가 난 모드는 빼고 남은 모드로 만들며 던지지 않는다 (G353).
         /// <paramref name="lookKinds"/>는 그림 요소·공간 종류(G413). 없으면 기본 종류(glTF 모델 포함)이고, 게임은 <see cref="GameObjectLookRenderer.StandardKinds"/>에 제 종류를 더해 넘긴다.
         /// <paramref name="enabled"/>는 켤 모드 id(G439): 목록 순이 동률일 때의 로드 순서다. 없으면 루트의 모드를 다 켠다. 목록을 저장하는 것은 게임이다.
+        /// <paramref name="host"/>는 게임이 등록한 호스트 함수. 없으면 호스트 함수를 쓰는 모드는 오류로 빠진다.
         /// </summary>
         public static LoadedMods Load(string modsRoot, IReadOnlyList<string> languages, string? hostLocaleFolder = null, LookKinds? lookKinds = null,
-            IReadOnlyList<string>? enabled = null)
+            IReadOnlyList<string>? enabled = null, HostFunctions? host = null)
         {
             var bag = new DiagnosticBag();
             var discovery = ModDiscovery.Discover(modsRoot, bag);
             var order = enabled == null ? ModSorter.Sort(discovery, bag) : ModSorter.Sort(discovery, enabled, bag);
-            var content = ContentLoader.Load(modsRoot, order, bag);
+            var content = ContentLoader.Load(modsRoot, order, bag, host);
             var translations = Translations.Load(content, bag, hostLocaleFolder);
             var translator = translations.For(languages, message => Debug.LogWarning("Kesa translation: " + message));
             var folders = content.Mods.Select(m => Path.Combine(content.ModsRoot, m.Directory)).ToList();
