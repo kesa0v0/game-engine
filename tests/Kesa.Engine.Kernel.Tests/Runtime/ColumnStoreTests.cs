@@ -207,5 +207,19 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(((IntValue)again.Get(ids[5], again.Member("Stun", "left"))).Value, Is.EqualTo(11));
             Assert.That(((IntValue)again.Get(ids[6], again.Member("Body", "hp"))).Value, Is.EqualTo(106));
         }
+
+        [Test]
+        public void SweepingLeavesASaveThatRoundTrips()
+        {
+            var ids = Grunts(400);
+            _world.Add(ids[399], "Stun", new Init(_left, new IntValue(11)));
+            for (int i = 0; i < 300; i++) _world.Destroy(ids[i]);
+
+            var bytes = _world.Save();
+            var again = World.Load(Loaded(), bytes).World;
+            Assert.That(again!.Save(), Is.EqualTo(bytes));
+            Assert.That(((IntValue)again.Get(ids[399], again.Member("Stun", "left"))).Value, Is.EqualTo(11));
+            Assert.That(((IntValue)again.Get(ids[300], again.Member("Body", "hp"))).Value, Is.EqualTo(400));
+        }
     }
 }
