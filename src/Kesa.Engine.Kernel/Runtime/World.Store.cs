@@ -50,7 +50,7 @@ namespace Kesa.Engine.Runtime
                 _records.Add(id, record);
                 record.Dead = false;
                 record.Layout.Table.DeadRows--;
-                foreach (var component in record.RuntimeComponents) SideToWrite(component).Attached++;
+                foreach (var component in record.RuntimeComponents) SideToWrite(component).AttachedIds.Add(id);
                 _dead--;
                 Structure++;
             }
@@ -61,7 +61,7 @@ namespace Kesa.Engine.Runtime
                 _records.Remove(id);
                 record.Dead = true;
                 record.Layout.Table.DeadRows++;
-                foreach (var component in record.RuntimeComponents) SideToWrite(component).Attached--;
+                foreach (var component in record.RuntimeComponents) SideToWrite(component).AttachedIds.Remove(id);
                 _dead++;
                 Structure++;
                 return true;
@@ -76,15 +76,15 @@ namespace Kesa.Engine.Runtime
                 Structure++;
             }
 
-            public void Attached(ComponentType component)
+            public void Attached(long id, ComponentType component)
             {
-                SideToWrite(component).Attached++;
+                SideToWrite(component).AttachedIds.Add(id);
                 Structure++;
             }
 
-            public void Detached(ComponentType component)
+            public void Detached(long id, ComponentType component)
             {
-                SideToWrite(component).Attached--;
+                SideToWrite(component).AttachedIds.Remove(id);
                 Structure++;
             }
 
@@ -382,8 +382,8 @@ namespace Kesa.Engine.Runtime
 
             public ComponentType Component { get; }
 
-            /// <summary>이 컴포넌트를 런타임에 붙이고 있는 살아 있는 엔티티 수.</summary>
-            public int Attached { get; set; }
+            /// <summary>이 컴포넌트를 런타임에 붙이고 있는 살아 있는 엔티티.</summary>
+            public SortedSet<long> AttachedIds { get; } = new SortedSet<long>();
 
             public Value? Read(long id, int column) =>
                 _rows.TryGetValue(id, out int row) ? _columns[column]?.Read(row) : null;
@@ -521,29 +521,35 @@ namespace Kesa.Engine.Runtime
 
             // ---- 묶음 쓰기 (G478): 값 객체를 거치지 않는다 ----
 
-            public long NumberIn(int column, out bool written)
+            public long NumberOf(MemberDecl member, CellKind kind, out bool written)
             {
-                var cells = _table!.ColumnAt(column);
-                written = cells.Has(_row);
-                return cells.Numbers[_row];
+                int column = _table!.ColumnOf(member);
+                if (column >= 0)
+                {
+                    var cells = _table.ColumnAt(column);
+                    written = cells.Has(_row);
+                    return cells.Numbers[_row];
+                }
+                written = TryGetValue(member, out var value);
+                return written ? Column.Number(kind, value) : 0;
             }
 
-            public void WriteNumber(int column, long number)
+            public void WriteNumber(MemberDecl member, CellKind kind, long number)
             {
-                if (!_table!.Has(column, _row)) _count++;
+                int column = _table!.ColumnOf(member);
+                if (column < 0)
+                {
+                    this[member] = Column.Box(kind, number);
+                    return;
+                }
+                if (!_table.Has(column, _row)) _count++;
                 _table.ColumnAt(column).WriteNumber(_row, number);
             }
 
-            public void RestoreNumber(int column, long number, bool written)
+            public void RestoreNumber(MemberDecl member, CellKind kind, long number, bool written)
             {
-                if (written)
-                {
-                    WriteNumber(column, number);
-                    return;
-                }
-                if (!_table!.Has(column, _row)) return;
-                _table.Erase(column, _row);
-                _count--;
+                if (written) WriteNumber(member, kind, number);
+                else Remove(member);
             }
 
             public void MoveTo(int row) => _row = row;

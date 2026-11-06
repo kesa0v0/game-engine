@@ -32,6 +32,7 @@ namespace Kesa.Engine.Tests.Runtime
             "@view_rule(Secret)\ndef hidden(viewer, entity):\n    return False\n" +
             "@command(free=True, acts_for=None)\ndef BulkThenFail():\n    core.bulk.grow()\n    x = 1 // 0\n" +
             "@command(free=True, acts_for=None)\ndef Bulk():\n    core.bulk.grow()\n" +
+            "@command(free=True, acts_for=None)\ndef StunThenFail(u: Ref[Unit]):\n    core.bulk.stun(u)\n    x = 1 // 0\n" +
             "@command(free=True, acts_for=None)\ndef KillBulkFail(u: Ref[Unit]):\n    core.bulk.grow()\n    destroy(u)\n    x = 1 // 0\n" +
             "def total():\n    return core.bulk.sum()\n" +
             "def secrets():\n    return core.bulk.secrets()\n" +
@@ -59,6 +60,8 @@ namespace Kesa.Engine.Tests.Runtime
                     a.WriteColumn(hp, part.Ids, next);
                 }
             });
+            core.Writes("def bulk.stun(u: Ref[Unit]) -> None", "", (HostAccess a, EntityId u) =>
+                a.WriteColumn(a.Member("Stun", "left"), new[] { u.Value }, new long[] { 44 }));
             core.Pure("def bulk.sum() -> int", "", (HostReader r) =>
             {
                 var hp = r.Member("Body", "hp");
@@ -409,13 +412,119 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(Refused(_world.Member("Bag", "n")).Code, Is.EqualTo(Codes.RunNoRow), "키 컴포넌트");
             Assert.That(Refused(_world.Member("Unit", "kind")).Code, Is.EqualTo(Codes.RunType), "const");
 
+        }
+
+        private List<(long Id, long Left)> ReadLeft(MemberHandle left)
+        {
+            var seen = new List<(long, long)>();
+            foreach (var part in _world.Parts("Unit", left))
+            {
+                var ids = part.Ids;
+                var values = part.Longs(left);
+                for (int i = 0; i < ids.Length; i++) seen.Add((ids[i], values[i]));
+            }
+            return seen;
+        }
+
+        [Test]
+        public void AttachedComponentsComeInIdOrderAndOnlyOnThoseThatHaveThem()
+        {
             var left = _world.Member("Stun", "left");
-            Assert.That(_world.Parts("Unit", left).MoveNext(), Is.False);
+            var a = _world.Create("core:Grunt");
+            var none = _world.Create("core:Grunt");
+            var b = _world.Create("core:Grunt");
+            var tank = _world.Create("core:Tank");
+            Assert.That(ReadLeft(left), Is.Empty);
+
+            _world.Add(tank, "Stun");
+            _world.Add(b, "Stun", new Init(left, new IntValue(8)));
+            _world.Add(a, "Stun");
+            Assert.That(ReadLeft(left), Is.EqualTo(new[] { (a.Value, 3L), (b.Value, 8L), (tank.Value, 3L) }), "Def 등록 순, 그 안은 붙인 순서가 아니라 id 순");
+
+            _world.Remove(a, "Stun");
+            _world.Destroy(tank);
+            Assert.That(ReadLeft(left), Is.EqualTo(new[] { (b.Value, 8L) }));
+            Assert.That(none.Value, Is.Not.EqualTo(b.Value));
+        }
+
+        [Test]
+        public void DefAndAttachedColumnsLineUpInOnePart()
+        {
+            var left = _world.Member("Stun", "left");
+            var a = _world.Create("core:Tank");
+            var plain = _world.Create("core:Tank");
+            var b = _world.Create("core:Tank");
+            _world.Set(b, _hp, new IntValue(60));
+            _world.Add(a, "Stun", new Init(left, new IntValue(4)));
+            _world.Add(b, "Stun", new Init(left, new IntValue(5)));
+
+            var seen = new List<(long, long, long)>();
+            foreach (var part in _world.Parts("Unit", _hp, left))
+                for (int i = 0; i < part.Count; i++)
+                    seen.Add((part.Ids[i], part.Longs(_hp)[i], part.Longs(left)[i]));
+            Assert.That(seen, Is.EqualTo(new[] { (a.Value, 50L, 4L), (b.Value, 60L, 5L) }));
+            Assert.That(_world.IsAlive(plain), Is.True);
+        }
+
+        [Test]
+        public void AttachingNoLongerStopsPartsOfDefColumns()
+        {
+            var id = _world.Create("core:Grunt");
             _world.Add(id, "Stun");
-            Assert.That(Refused(left).Code, Is.EqualTo(Codes.RunType), "런타임에 붙은 컴포넌트");
-            Assert.Throws<WorldException>(() => _world.WriteColumn(left, new[] { id.Value }, new long[] { 1 }));
-            _world.Remove(id, "Stun");
-            Assert.That(_world.Parts("Unit", left).MoveNext(), Is.False, "떼면 다시 읽을 수 있다");
+            Assert.That(ReadHp(_world, _hp).Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void WriteColumnReachesAttachedValuesAndRewinds()
+        {
+            var left = _world.Member("Stun", "left");
+            var a = _world.Create("core:Grunt");
+            var b = _world.Create("core:Grunt");
+            _world.Add(a, "Stun");
+            _world.Add(b, "Stun", new Init(left, new IntValue(8)));
+
+            foreach (var part in _world.Parts("Unit", left))
+            {
+                _world.WriteColumn(left, part.Ids, new long[] { 20, 21 });
+                Assert.That(part.Longs(left).ToArray(), Is.EqualTo(new long[] { 20, 21 }), "다시 부르면 새 값이다");
+            }
+            Assert.That(((IntValue)_world.Get(a, left)).Value, Is.EqualTo(20));
+
+            var bytes = _world.Save();
+            var again = World.Load(_loaded, bytes).World!;
+            Assert.That(again.Save(), Is.EqualTo(bytes));
+            Assert.That(((IntValue)again.Get(b, again.Member("Stun", "left"))).Value, Is.EqualTo(21));
+        }
+
+        [Test]
+        public void AFailedCommandBringsAttachedValuesAndMembersBack()
+        {
+            var left = _world.Member("Stun", "left");
+            var id = _world.Create("core:Grunt");
+            _world.Add(id, "Stun");
+            var before = _world.Save();
+            Assert.That(_world.Submit("host", "core.StunThenFail", new Dictionary<string, Value> { ["u"] = new EntityValue(id) }).Outcome,
+                Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(_world.Save(), Is.EqualTo(before), "쓴 적 없던 곁표 칸은 다시 쓴 적 없는 칸이다");
+            Assert.That(ReadLeft(left), Is.EqualTo(new[] { (id.Value, 3L) }));
+
+            var doomed = _world.Create("core:Grunt");
+            _world.Add(doomed, "Stun");
+            Assert.That(Submit("KillBulkFail", doomed).Outcome, Is.EqualTo(SubmitOutcome.ScriptError));
+            Assert.That(ReadLeft(left).Select(p => p.Id), Is.EqualTo(new[] { id.Value, doomed.Value }), "되감으면 파괴된 것이 조각에 돌아온다");
+        }
+
+        [Test]
+        public void AttachmentsSurviveALoad()
+        {
+            var left = _world.Member("Stun", "left");
+            var id = _world.Create("core:Grunt");
+            _world.Add(id, "Stun", new Init(left, new IntValue(6)));
+            var again = World.Load(_loaded, _world.Save()).World!;
+            var loadedLeft = again.Member("Stun", "left");
+            var seen = new List<long>();
+            foreach (var part in again.Parts("Unit", loadedLeft)) seen.AddRange(part.Longs(loadedLeft).ToArray());
+            Assert.That(seen, Is.EqualTo(new[] { 6L }));
         }
 
         [Test]

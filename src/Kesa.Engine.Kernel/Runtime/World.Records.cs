@@ -141,14 +141,14 @@ namespace Kesa.Engine.Runtime
             public void AttachRuntime(ComponentType component)
             {
                 _runtime.Add(component.Name, component);
-                _store.Attached(component);
+                _store.Attached(Id, component);
             }
 
             public bool DetachRuntime(string name)
             {
                 if (!_runtime.TryGetValue(name, out var component)) return false;
                 _runtime.Remove(name);
-                _store.Detached(component);
+                _store.Detached(Id, component);
                 return true;
             }
 
