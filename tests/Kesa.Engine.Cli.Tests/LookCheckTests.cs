@@ -195,10 +195,9 @@ namespace Kesa.Engine.Cli.Tests
         }
 
         [Test]
-        public void InputAndScreenFilesAreNotRead()
+        public void InputFilesAreNotRead()
         {
             Write("core/keys.input.xml", "<not closed");
-            Write("core/ui/screen.uxml", "<not closed");
             Assert.That(Report(0), Does.Contain("errors: 0, warnings: 0"));
         }
 

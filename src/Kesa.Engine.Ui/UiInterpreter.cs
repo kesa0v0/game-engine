@@ -53,12 +53,13 @@ namespace Kesa.Engine.Ui
 
         private readonly SortedDictionary<string, BridgeCommand> _commands = new SortedDictionary<string, BridgeCommand>(StringComparer.Ordinal);
         private readonly SortedDictionary<string, BridgeCommand> _uiActions = new SortedDictionary<string, BridgeCommand>(StringComparer.Ordinal);
+        private readonly SortedDictionary<string, int> _handlers = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        private readonly UiChecker _checker;
         private readonly SortedDictionary<string, RuntimeBinding> _bindings = new SortedDictionary<string, RuntimeBinding>(StringComparer.Ordinal);
         private readonly List<UiNode> _eventNodes = new List<UiNode>();
         private readonly List<UiNode> _windowNodes = new List<UiNode>();
         private readonly List<UiProblem> _errors = new List<UiProblem>();
         private readonly SortedSet<string> _errorTexts = new SortedSet<string>(StringComparer.Ordinal);
-        private readonly Dictionary<string, UiDocument?> _includes = new Dictionary<string, UiDocument?>(StringComparer.Ordinal);
         private readonly Dictionary<string, UssReadResult?> _styleSheets = new Dictionary<string, UssReadResult?>(StringComparer.Ordinal);
 
         private bool _loaded;
@@ -86,6 +87,7 @@ namespace Kesa.Engine.Ui
             _renderer = renderer;
             _text = text;
             _files = files;
+            _checker = new UiChecker(session.CheckCall, _handlers, files);
         }
 
         /// <summary>이 해석기의 창이 들어가는 창 목록. ESC는 호스트가 여기의 <see cref="UiWindows.Escape"/>로 보낸다.</summary>
@@ -112,7 +114,7 @@ namespace Kesa.Engine.Ui
             await EnsureLoadedAsync();
             var problems = new List<UiProblem>();
             CheckArguments(document, arguments, document.Root.Place, problems);
-            await ValidateAsync(document, problems, new List<string> { document.Name });
+            await _checker.CheckAsync(document, problems);
             if (problems.Count > 0) return new UiMountResult(null, problems);
 
             var scope = new UiScope(null);
@@ -208,6 +210,9 @@ namespace Kesa.Engine.Ui
             if (_loaded) return;
             foreach (var c in await _session.Commands()) _commands[c.Name] = c;
             foreach (var a in await _session.UiActions()) _uiActions[a.Name] = a;
+            // 같은 이름이면 화면 동작이 먼저다(누를 때와 같은 순서)
+            foreach (var c in _commands.Values) _handlers[c.Name] = c.Parameters.Count;
+            foreach (var a in _uiActions.Values) _handlers[a.Name] = a.Parameters.Count;
             _loaded = true;
         }
 
@@ -228,113 +233,6 @@ namespace Kesa.Engine.Ui
             var array = new string[list.Count];
             for (int i = 0; i < array.Length; i++) array[i] = list[i];
             return array;
-        }
-
-        private async ValueTask ValidateAsync(UiDocument document, List<UiProblem> problems, List<string> stack)
-        {
-            await ValidateElementAsync(document.Root, problems, stack, insideWindow: false);
-        }
-
-        private readonly SortedDictionary<string, string?> _callChecks = new SortedDictionary<string, string?>(StringComparer.Ordinal);
-
-        private async ValueTask CheckCallAsync(string place, string attribute, UiExpr expression, List<UiProblem> problems)
-        {
-            if (!(expression is CallExpr call)) return;
-            string key = call.Function + "/" + call.Arguments.Count;
-            if (!_callChecks.TryGetValue(key, out var why))
-            {
-                why = await _session.CheckCall(call.Function, call.Arguments.Count);
-                _callChecks[key] = why;
-            }
-            if (why != null) problems.Add(new UiProblem(place, attribute + ": " + why));
-        }
-
-        private async ValueTask ValidateElementAsync(UiElement element, List<UiProblem> problems, List<string> stack, bool insideWindow)
-        {
-            foreach (var b in element.Bindings)
-                await CheckCallAsync(element.Place, b.Kind == UiBindKind.Property ? "bind-" + b.Name : "bind-class", b.Expression, problems);
-            if (element.Repeat != null) await CheckCallAsync(element.Place, element.Repeat.Attribute, element.Repeat.Source, problems);
-            foreach (var e in element.Events) ValidateEvent(element.Place, e, problems);
-            // Include를 건너면 읽기만으로는 창 안인지 모르므로 올리기 전에 본다
-            if (element.Window != null && insideWindow)
-                problems.Add(new UiProblem(element.Place, "a window cannot be inside another window (move it out of the window element above it)"));
-            bool inside = insideWindow || element.Window != null;
-            if (element.DragHandle && !inside) problems.Add(new UiProblem(element.Place, "window-drag is only inside a window (an element with window=\"…\" above it)"));
-
-            if (element.Include != null) await ValidateIncludeAsync(element, problems, stack, inside);
-            foreach (var child in element.Children) await ValidateElementAsync(child, problems, stack, inside);
-        }
-
-        private void ValidateEvent(string place, UiEvent e, List<UiProblem> problems)
-        {
-            string name = e.Call.Function;
-            if (!_commands.TryGetValue(name, out var target) && !_uiActions.TryGetValue(name, out target))
-            {
-                var known = new List<string>();
-                foreach (var k in _commands.Keys) known.Add(k);
-                foreach (var k in _uiActions.Keys) known.Add(k);
-                known.Sort(StringComparer.Ordinal);
-                problems.Add(new UiProblem(place, "on-" + e.Name + ": '" + name + "' is neither a command nor a UI action" + UiSuggest.Hint(name, known)));
-                return;
-            }
-            if (e.Call.Arguments.Count > target.Parameters.Count)
-                problems.Add(new UiProblem(place, "on-" + e.Name + ": '" + name + "' takes " + target.Parameters.Count + " argument(s), got " + e.Call.Arguments.Count));
-        }
-
-        private async ValueTask ValidateIncludeAsync(UiElement element, List<UiProblem> problems, List<string> stack, bool insideWindow)
-        {
-            var include = element.Include!;
-            var included = LoadInclude(include.Source, element.Place, problems);
-            if (included == null) return;
-            if (stack.Contains(include.Source))
-            {
-                problems.Add(new UiProblem(element.Place, "Include '" + include.Source + "' includes itself (" + string.Join(" -> ", stack) + ")"));
-                return;
-            }
-            var given = new List<string>();
-            foreach (var arg in include.Arguments)
-            {
-                given.Add(arg.Key);
-                await CheckCallAsync(element.Place, arg.Key, arg.Value, problems);
-                if (Array.IndexOf(ToArray(included.Parameters), arg.Key) < 0)
-                    problems.Add(new UiProblem(element.Place, include.Source + " does not take '" + arg.Key + "'" + UiSuggest.Hint(arg.Key, included.Parameters)));
-            }
-            foreach (var name in included.Parameters)
-                if (!given.Contains(name)) problems.Add(new UiProblem(element.Place, "Include '" + include.Source + "' needs the value '" + name + "'"));
-
-            stack.Add(include.Source);
-            await ValidateElementAsync(included.Root, problems, stack, insideWindow);
-            stack.RemoveAt(stack.Count - 1);
-        }
-
-        private UiDocument? LoadInclude(string source, string place, List<UiProblem>? problems)
-        {
-            if (_includes.TryGetValue(source, out var cached))
-            {
-                if (cached == null) problems?.Add(new UiProblem(place, "Include '" + source + "' could not be read"));
-                return cached;
-            }
-            string? notModPath = UiPaths.WhyNotModPath(source);
-            if (notModPath != null)
-            {
-                problems?.Add(new UiProblem(place, "Include " + notModPath));
-                return null;
-            }
-            string? text = _files?.Invoke(source);
-            if (text == null)
-            {
-                problems?.Add(new UiProblem(place, "Include '" + source + "' was not found" + (_files == null ? " (no way to find files was given)" : "")));
-                return null;
-            }
-            var read = UxmlReader.Read(source, text);
-            if (!read.Succeeded)
-            {
-                problems?.AddRange(read.Problems);
-                _includes[source] = null;
-                return null;
-            }
-            _includes[source] = read.Document;
-            return read.Document;
         }
 
         // USS의 문제는 화면을 막지 않고 Errors에만 간다 (G364)

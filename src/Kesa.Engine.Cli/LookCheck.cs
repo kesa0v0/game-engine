@@ -26,7 +26,7 @@ namespace Kesa.Engine.Cli
             foreach (var format in StandardModelFormats) kinds.AddModelFormat(format);
 
             var folders = content.Mods.Select(m => Path.Combine(content.ModsRoot, m.Directory)).ToList();
-            var library = LookLibrary.Load(Sources(content), kinds, path => Exists(path, folders));
+            var library = LookLibrary.Load(Sources(content), kinds, path => Find(path, folders) != null);
             foreach (var problem in library.Problems)
             {
                 var span = SpanOf(problem.Place);
@@ -50,15 +50,20 @@ namespace Kesa.Engine.Cli
             }
         }
 
-        // 호스트의 ModFolderAssets.Find와 같은 규칙: 모드 폴더 안의 상대 경로만 (G335)
-        private static bool Exists(string path, IReadOnlyList<string> folders)
+        // 호스트의 ModFolderAssets.Find와 같은 규칙: 모드 폴더 안의 상대 경로만, 나중 모드부터 (G335)
+        internal static string? Find(string path, IReadOnlyList<string> folders)
         {
-            if (path.Length == 0 || Path.IsPathRooted(path) || path.IndexOf(':') >= 0) return false;
-            if (path.Split('/', '\\').Contains("..")) return false;
-            return folders.Any(folder => File.Exists(Path.Combine(folder, path)));
+            if (path.Length == 0 || Path.IsPathRooted(path) || path.IndexOf(':') >= 0) return null;
+            if (path.Split('/', '\\').Contains("..")) return null;
+            for (int i = folders.Count - 1; i >= 0; i--)
+            {
+                string full = Path.Combine(folders[i], path);
+                if (File.Exists(full)) return full;
+            }
+            return null;
         }
 
-        private static SourceSpan SpanOf(string place)
+        internal static SourceSpan SpanOf(string place)
         {
             int colon = place.LastIndexOf(':');
             return colon >= 0 && int.TryParse(place.Substring(colon + 1), out int line)

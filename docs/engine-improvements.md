@@ -89,7 +89,7 @@ Commander는 이웃 찾기와 이동 수학을 틱마다 한 번에 처리하는
 
 `.space.xml`·`.look.xml`·`.view.xml`의 오류는 Unity에서 `mods.Looks.Problems`로만 나온다.
 
-**해결:** `engine check`가 이 파일들을 읽는다. 문제는 `LOK001`, 게임이 등록했을 수 있는 종류는 경고 `LOK002`다(G480).
+**해결:** `engine check`가 이 파일들을 읽는다. 문제는 `LOK001`, 게임이 등록했을 수 있는 종류는 경고 `LOK002`다(G480). 화면 파일도 본다(`UIX001`, G481).
 
 ### 10. Unity 6.3과 이름이 겹친다
 

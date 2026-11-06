@@ -67,7 +67,7 @@ namespace Kesa.Engine.Ui
         private async ValueTask<UiNode> BuildIncludeAsync(UiElement definition, UiNode? parent, ElementId? parentId, int index, UiScope scope, string path)
         {
             var include = definition.Include!;
-            var document = LoadInclude(include.Source, definition.Place, null)!;
+            var document = _checker.LoadInclude(include.Source, definition.Place, null)!;
             var wrapper = new UiNode(definition, null, parent, scope, path);
             var innerScope = new UiScope(null);
             wrapper.InnerScope = innerScope;

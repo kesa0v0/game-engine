@@ -178,6 +178,9 @@ namespace Kesa.Engine.Diagnostics
         // 게임이 C#으로 등록했을 수 있어 확인하지 못한 종류 (G480)
         public const string LookUnverified = "LOK002";
 
+        // 화면 파일(.uxml·.uss)을 engine check가 읽다 난 문제 (G481)
+        public const string UiFileProblem = "UIX001";
+
         // 번역 파일 (spec X4). 번역 오류는 모드를 끄지 않고 그 글만 뺀다 (spec-gaps G257)
         // .ftl 구문 오류 (G257)
         public const string LocSyntax = "LOC001";
