@@ -24,6 +24,12 @@ namespace Kesa.Engine.Tests.Runtime
             "def MeasureRead(at: Ref[Tile]):\n" +
             "    core.terrain.measure_read(at)\n" +
             "@command(free=True, acts_for=None)\n" +
+            "def Digits(at: Ref[Tile]):\n" +
+            "    at.Terrain.cost = core.math.digits(1, 2, 3, 4, 5, 6, 7, 8)\n" +
+            "@command(free=True, acts_for=None)\n" +
+            "def WriteDigits(at: Ref[Tile]):\n" +
+            "    core.terrain.write_digits(at, 2, 3, 4, 5, 6, 7, 8)\n" +
+            "@command(free=True, acts_for=None)\n" +
             "def Walk(start: Ref[Tile], goal: Ref[Tile]):\n" +
             "    path = core.path.find(start, goal)\n" +
             "    start.Terrain.cost = len(path) * 10 + path[1].Terrain.cost\n" +
@@ -141,6 +147,12 @@ namespace Kesa.Engine.Tests.Runtime
                 var cost = a.Member("Terrain", "cost");
                 a.Set(at, cost, new IntValue(((IntValue)a.Get(at, cost)).Value + by));
             });
+            core.Pure("def math.digits(a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: int) -> int", "",
+                (long a, long b, long c, long d, long e, long f, long g, long h) =>
+                    a * 10000000 + b * 1000000 + c * 100000 + d * 10000 + e * 1000 + f * 100 + g * 10 + h);
+            core.Writes("def terrain.write_digits(at: Ref[Tile], b: int, c: int, d: int, e: int, f: int, g: int, h: int) -> None", "",
+                (HostAccess x, EntityId at, long b, long c, long d, long e, long f, long g, long h) =>
+                    x.Set(at, x.Member("Terrain", "cost"), new IntValue(b * 1000000 + c * 100000 + d * 10000 + e * 1000 + f * 100 + g * 10 + h)));
             core.Writes("def terrain.measure_read(at: Ref[Tile]) -> None", "", (HostAccess a, EntityId at) =>
             {
                 var cost = a.Member("Terrain", "cost");
@@ -194,6 +206,15 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(_calls, Is.EqualTo(new[] { "find " + _a + " " + _b + " 50" }));
             // 길이 2 * 10 + 돌려받은 둘째 엔티티의 cost 4
             Assert.That(Cost(_a), Is.EqualTo(24));
+        }
+
+        [Test]
+        public void EightArgumentsArriveInOrder()
+        {
+            Assert.That(Submit("Digits", Arg("at", _a)).Succeeded, Is.True);
+            Assert.That(Cost(_a), Is.EqualTo(12345678));
+            Assert.That(Submit("WriteDigits", Arg("at", _a)).Succeeded, Is.True);
+            Assert.That(Cost(_a), Is.EqualTo(2345678));
         }
 
         [Test]

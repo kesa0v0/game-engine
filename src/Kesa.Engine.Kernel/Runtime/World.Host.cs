@@ -200,6 +200,9 @@ namespace Kesa.Engine.Runtime
                 _world.Current.CallHost(_signature, positional, keywords);
         }
 
+        // 값 검사 동안만 쓴다. 검사는 스크립트를 부르지 않아 호스트 호출이 겹쳐도 안전하다.
+        private readonly List<ArgumentRejection> _hostRejections = new List<ArgumentRejection>();
+
         private Value CallHost(HostSignature signature, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
         {
             var function = signature.Function;
@@ -212,10 +215,14 @@ namespace Kesa.Engine.Runtime
                 throw new ScriptRuntimeException(Codes.RunScript, name + "() takes " + parameters.Count + " argument" +
                                                                   (parameters.Count == 1 ? "" : "s") + ", got " + positional.Count);
             }
-            var given = new Value?[parameters.Count];
-            for (int i = 0; i < positional.Count; i++) given[i] = positional[i];
+            Value?[]? given = null;
             foreach (var pair in keywords)
             {
+                if (given == null)
+                {
+                    given = new Value?[parameters.Count];
+                    for (int i = 0; i < positional.Count; i++) given[i] = positional[i];
+                }
                 int index = parameters.Count - 1;
                 while (index >= 0 && parameters[index].Name != pair.Key) index--;
                 if (index < 0)
@@ -231,12 +238,13 @@ namespace Kesa.Engine.Runtime
             }
 
             // 검사: 커맨드 인자와 같다 (G115)
-            var rejections = new List<ArgumentRejection>();
+            var rejections = _hostRejections;
+            rejections.Clear();
             var fitted = new Value[parameters.Count];
             for (int i = 0; i < parameters.Count; i++)
             {
                 var p = parameters[i];
-                var value = given[i];
+                var value = given != null ? given[i] : i < positional.Count ? positional[i] : null;
                 if (value == null)
                 {
                     if (p.Default == null)
@@ -257,8 +265,7 @@ namespace Kesa.Engine.Runtime
             if (function.Effect == HostEffect.Writes) NoHostWritesInTrial(name);
 
             // C# 값으로 (G222)
-            var implementation = function.Implementation!;
-            var types = implementation.GetType().GetMethod("Invoke")!.GetParameters();
+            var types = function.ParameterTypes!;
             int skip = function.TakesAccess ? 1 : 0;
             var args = new object?[types.Length];
             HostReader? access = null;
@@ -267,22 +274,21 @@ namespace Kesa.Engine.Runtime
                 access = function.Effect == HostEffect.Writes ? new HostAccess(this, name) : new HostReader(this, name);
                 args[0] = access;
             }
-            for (int i = 0; i < fitted.Length; i++) args[i + skip] = ToClr(fitted[i], types[i + skip].ParameterType);
+            for (int i = 0; i < fitted.Length; i++) args[i + skip] = ToClr(fitted[i], types[i + skip]);
 
             object? result;
             _hostDepth++;
             try
             {
-                result = implementation.DynamicInvoke(args);
+                result = function.Invoker!(args);
             }
-            catch (TargetInvocationException e) when (e.InnerException is WorldException world)
+            catch (WorldException world)
             {
                 // 창구가 낸 월드 오류(죽은 엔티티 등)는 스크립트의 같은 읽기·쓰기와 같은 오류다
                 throw new ScriptRuntimeException(world.Code, "in host function " + name + ": " + world.Message, world.Hint, world);
             }
-            catch (TargetInvocationException e) when (e.InnerException != null)
+            catch (Exception inner)
             {
-                var inner = e.InnerException;
                 throw new ScriptRuntimeException(Codes.RunHostFailed,
                     "host function " + name + " failed: " + inner.GetType().Name + ": " + inner.Message,
                     "this is a bug in the game's C# code, not in the mod (spec-gaps G219)", inner);
@@ -295,7 +301,8 @@ namespace Kesa.Engine.Runtime
 
             if (signature.Returns == null) return NoneValue.Instance;
             var returned = FromClr(result);
-            var problems = new List<ArgumentRejection>();
+            var problems = _hostRejections;
+            problems.Clear();
             var checkedValue = returned == null ? null : Fit("return", "return", signature.Returns, returned, problems);
             if (checkedValue == null)
             {

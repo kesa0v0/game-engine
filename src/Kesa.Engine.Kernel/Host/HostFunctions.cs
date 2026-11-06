@@ -170,17 +170,19 @@ namespace Kesa.Engine.Host
 
         internal bool Has(string path) => _functions.ContainsKey(path);
 
-        private HostModFunctions Add(string signature, string doc, HostEffect effect, Delegate implementation)
+        private HostModFunctions Add(string signature, string doc, HostEffect effect, Delegate implementation,
+            Func<object?[], object?> invoker)
         {
             if (implementation == null) throw new ArgumentNullException(nameof(implementation));
-            return Register(signature, doc, effect, implementation);
+            return Register(signature, doc, effect, implementation, invoker);
         }
 
         /// <summary>구현 없이 선언만 (<see cref="HostFunctions.ImportDeclarations"/>). 검사와 스텁에만 쓴다 (G221).</summary>
         internal HostModFunctions Declare(string signature, string doc, HostEffect effect) =>
-            Register(signature, doc, effect, null);
+            Register(signature, doc, effect, null, null);
 
-        private HostModFunctions Register(string signature, string doc, HostEffect effect, Delegate? implementation)
+        private HostModFunctions Register(string signature, string doc, HostEffect effect, Delegate? implementation,
+            Func<object?[], object?>? invoker)
         {
             if (signature == null) throw new ArgumentNullException(nameof(signature));
             if (doc == null) throw new ArgumentNullException(nameof(doc));
@@ -209,7 +211,7 @@ namespace Kesa.Engine.Host
             bool takesAccess = implementation == null
                 ? HostShape.CheckDeclaration(name, header, effect)
                 : HostShape.Check(name, header, effect, implementation);
-            _functions.Add(header.Name, new HostFunction(Mod, header.Name, effect, signature, doc, header, implementation)
+            _functions.Add(header.Name, new HostFunction(Mod, header.Name, effect, signature, doc, header, implementation, invoker)
                 { TakesAccess = takesAccess });
             return this;
         }
@@ -219,8 +221,15 @@ namespace Kesa.Engine.Host
     public sealed class HostFunction
     {
         internal HostFunction(string mod, string path, HostEffect effect, string signature, string doc, FunctionDef header,
-            Delegate? implementation)
+            Delegate? implementation, Func<object?[], object?>? invoker)
         {
+            Invoker = invoker;
+            if (implementation != null)
+            {
+                var parameters = implementation.GetType().GetMethod("Invoke")!.GetParameters();
+                ParameterTypes = new Type[parameters.Length];
+                for (int i = 0; i < parameters.Length; i++) ParameterTypes[i] = parameters[i].ParameterType;
+            }
             Mod = mod;
             Path = path;
             Effect = effect;
@@ -250,6 +259,11 @@ namespace Kesa.Engine.Host
 
         /// <summary>등록한 C# 함수. 선언 파일에서 읽은 것이면 null이다 (G221).</summary>
         internal Delegate? Implementation { get; }
+
+        /// <summary>구현을 부르는 람다. 인자는 창구까지 포함해 <see cref="ParameterTypes"/> 순서다.</summary>
+        internal Func<object?[], object?>? Invoker { get; }
+
+        internal Type[]? ParameterTypes { get; }
 
         /// <summary>구현 없이 선언 파일에서 읽은 것인가. 이런 함수로는 월드를 만들 수 없다 (G221).</summary>
         public bool IsDeclarationOnly => Implementation == null;
