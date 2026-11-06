@@ -152,9 +152,9 @@ namespace Kesa.Engine.Ui
                     // 옮기던 중이면 그 재생이 새 길을 이어 받는다
                     if (shown.MoveTotal == 0)
                     {
-                        // 순간이동으로 끝난 옛 재생이 같은 물체로 되살아나지 않게
-                        _playbacks.RemoveAll(p => !p.Live);
-                        _playbacks.Add(new MovePlayback(this, shown));
+                        var mover = new MovePlayback(this, shown);
+                        shown.Mover = mover;
+                        _playbacks.Add(mover);
                     }
                     shown.MoveFrom = from!.Value;
                     shown.MoveElapsed = 0;
@@ -297,7 +297,7 @@ namespace Kesa.Engine.Ui
             }
 
             // 순간이동이 MoveTotal을 0으로 돌리면 여기서도 끝난다
-            public bool Live => !_shown.Gone && _shown.MoveTotal > 0;
+            public bool Live => !_shown.Gone && _shown.MoveTotal > 0 && ReferenceEquals(_shown.Mover, this);
             public bool Holding => Live;
 
             public void Advance(long milliseconds)

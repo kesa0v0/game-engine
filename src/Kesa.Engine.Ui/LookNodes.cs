@@ -36,6 +36,9 @@ namespace Kesa.Engine.Ui
         public long MoveElapsed { get; set; }
         public long MoveTotal { get; set; }
 
+        /// <summary>이 물체를 옮기는 재생. 순간이동으로 끝난 옛 재생은 새 재생이 여기 앉으면 되살아나지 못한다.</summary>
+        public object? Mover { get; set; }
+
         /// <summary>무대에서 지워졌다. 그것을 돌리던 재생이 끝난다.</summary>
         public bool Gone { get; set; }
 

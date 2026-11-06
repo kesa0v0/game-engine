@@ -210,6 +210,21 @@ namespace Kesa.Engine.Ui.Tests
             Assert.That(stage.Problems, Is.Empty);
         }
 
+        /// <summary>순간이동으로 끝난 재생이 다음 옮기기에 되살아나면 물체 하나를 두 재생이 밀어 두 배로 빨라진다.</summary>
+        [Test]
+        public void AJumpThenAMoveInTheSameFramePlaysOnce()
+        {
+            var stage = Stage(Walker);
+            stage.Apply(Objects(1, 0));
+            stage.Apply(Objects(2, 4));
+            stage.Advance(125);
+            stage.Apply(Objects(3, 0, slide: new BridgeInt(0)));
+            stage.Apply(Objects(4, 4));
+            Assert.That(stage.PlayingCount, Is.EqualTo(1));
+            stage.Advance(250);
+            Assert.That(_renderer.Dump("entity:7"), Does.StartWith("@(2.0, 0.0, 0.0) "), "halfway, not arrived");
+        }
+
         [Test]
         public void AnObjectThatLeavesWhileMovingExitsWhereItIsShown()
         {
