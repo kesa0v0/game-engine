@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Kesa.Engine.Numerics;
 using Kesa.Engine.Runtime;
@@ -16,6 +17,12 @@ namespace Kesa.Engine.Host
         }
 
         public void Set(EntityId id, MemberHandle member, Value value) { using (Engine()) World.Set(id, member, value); }
+        /// <summary>묶음으로 쓴다: int와 bool (G478).</summary>
+        public void WriteColumn(MemberHandle member, ReadOnlySpan<long> ids, ReadOnlySpan<long> values) { using (Engine()) World.WriteColumn(member, ids, values); }
+
+        /// <summary>묶음으로 쓴다: fixed (G478).</summary>
+        public void WriteColumn(MemberHandle member, ReadOnlySpan<long> ids, ReadOnlySpan<Fixed> values) { using (Engine()) World.WriteColumn(member, ids, values); }
+
         public void SetRow(EntityId id, MemberHandle member, string key, Value value) { using (Engine()) World.SetRow(id, member, key, value); }
         public void SetRow(EntityId id, MemberHandle member, EntityId key, Value value) { using (Engine()) World.SetRow(id, member, key, value); }
         public void SetRow(EntityId id, MemberHandle member, long key, Value value) { using (Engine()) World.SetRow(id, member, key, value); }

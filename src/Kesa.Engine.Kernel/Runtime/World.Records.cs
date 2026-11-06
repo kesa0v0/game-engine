@@ -78,7 +78,7 @@ namespace Kesa.Engine.Runtime
                     _types[type.Index] = type;
                     _components[type.Index] = rc;
                 }
-                Table = new DefTable(_types);
+                Table = new DefTable(_types, _components);
             }
 
             /// <summary>이 Def의 엔티티 값을 담는 표.</summary>
@@ -108,8 +108,11 @@ namespace Kesa.Engine.Runtime
 
             private readonly SortedDictionary<string, KeyedRows> _rows = new SortedDictionary<string, KeyedRows>(StringComparer.Ordinal);
 
+            private readonly EntityStore _store;
+
             public EntityRecord(EntityStore store, long id, FrozenDef def, DefLayout layout)
             {
+                _store = store;
                 Id = id;
                 Def = def;
                 Layout = layout;
@@ -134,8 +137,20 @@ namespace Kesa.Engine.Runtime
             public IEnumerable<string> RuntimeNames => _runtime.Keys;
             public IEnumerable<ComponentType> RuntimeComponents => _runtime.Values;
             public bool IsRuntime(string name) => _runtime.Count > 0 && _runtime.ContainsKey(name);
-            public void AttachRuntime(ComponentType component) => _runtime.Add(component.Name, component);
-            public bool DetachRuntime(string name) => _runtime.Remove(name);
+
+            public void AttachRuntime(ComponentType component)
+            {
+                _runtime.Add(component.Name, component);
+                _store.Attached(component);
+            }
+
+            public bool DetachRuntime(string name)
+            {
+                if (!_runtime.TryGetValue(name, out var component)) return false;
+                _runtime.Remove(name);
+                _store.Detached(component);
+                return true;
+            }
 
             // ---- 키 컴포넌트별 줄 기록 (이름 순) ----
 

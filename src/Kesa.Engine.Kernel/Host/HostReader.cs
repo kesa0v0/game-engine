@@ -43,6 +43,9 @@ namespace Kesa.Engine.Host
         /// <summary>멤버 값. Def 타입의 const도 이것으로 읽는다.</summary>
         public Value Get(EntityId id, MemberHandle member) { using (Engine()) return World.Get(id, member); }
 
+        /// <summary>칼럼을 읽기 전용 조각으로 읽는다 (G478).</summary>
+        public World.ColumnParts Parts(string typeName, params MemberHandle[] members) { using (Engine()) return World.Parts(typeName, members); }
+
         public Value GetRow(EntityId id, MemberHandle member, string key) { using (Engine()) return World.GetRow(id, member, key); }
         public Value GetRow(EntityId id, MemberHandle member, EntityId key) { using (Engine()) return World.GetRow(id, member, key); }
         public Value GetRow(EntityId id, MemberHandle member, long key) { using (Engine()) return World.GetRow(id, member, key); }

@@ -100,20 +100,26 @@ namespace Kesa.Engine.Runtime
         {
             if (_rewinding || !_stamps.TryGetValue(id, out var s)) return;
             long now = ++_clock;
-            if (_undo != null && s.Any <= _stampFloor)
+            if (_undo != null) JournalStamp(s, name);
+            s.Any = now;
+            if (name != null) (s.ByName ??= new Dictionary<string, long>(StringComparer.Ordinal))[name] = now;
+        }
+
+        // 람다를 따로 둔다: Stamp에 두면 되감기가 없어도 클로저를 할당한다
+        private void JournalStamp(Stamps s, string? name)
+        {
+            if (s.Any <= _stampFloor)
             {
                 long oldAny = s.Any;
                 Journal(() => s.Any = oldAny);
             }
-            s.Any = now;
             if (name == null) return;
             var byName = s.ByName ??= new Dictionary<string, long>(StringComparer.Ordinal);
             if (byName.TryGetValue(name, out var old))
             {
-                if (_undo != null && old <= _stampFloor) Journal(() => byName[name] = old);
+                if (old <= _stampFloor) Journal(() => byName[name] = old);
             }
-            else if (_undo != null) Journal(() => byName.Remove(name));
-            byName[name] = now;
+            else Journal(() => byName.Remove(name));
         }
 
         // ---- query 목록 출처의 도장 (G246) ----
