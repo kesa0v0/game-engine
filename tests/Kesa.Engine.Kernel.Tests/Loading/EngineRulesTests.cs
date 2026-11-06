@@ -26,6 +26,7 @@ namespace Kesa.Engine.Tests.Loading
             var content = LoadClean();
             Assert.That(Limit(content, "step_budget"), Is.EqualTo(100_000));
             Assert.That(Limit(content, "action_step_budget"), Is.EqualTo(10_000_000));
+            Assert.That(Limit(content, "heavy_warning_steps"), Is.EqualTo(100_000));
             Assert.That(Limit(content, "max_signal_depth"), Is.EqualTo(64));
             Assert.That(Limit(content, "max_advance_per_call"), Is.EqualTo(10_000));
             Assert.That(Limit(content, "max_settle_rounds"), Is.EqualTo(64));

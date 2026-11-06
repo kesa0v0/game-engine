@@ -22,6 +22,9 @@ namespace Kesa.Engine.Schema
         /// <summary>행동 실행 하나(커맨드, 핸들러, 이어 가는 Flow, 봇 한 번)의 단계 예산 (G224·G375).</summary>
         public const string ActionStepBudget = "action_step_budget";
 
+        /// <summary>행동 실행 하나가 이보다 많은 단계를 쓰면 실패 없이 경고 <c>RUN021</c> (G225·G471). 읽기 예산과 따로 움직인다.</summary>
+        public const string HeavyWarningSteps = "heavy_warning_steps";
+
         /// <summary>신호 연쇄의 세대 상한 (G147).</summary>
         public const string MaxSignalDepth = "max_signal_depth";
 
@@ -35,6 +38,8 @@ namespace Kesa.Engine.Schema
 
         /// <summary>한 단계 약 45ns(규모 벤치)로 약 0.5초, 유닛 하나에 7단계면 약 140만 개.</summary>
         public const int DefaultActionStepBudget = 10_000_000;
+
+        public const int DefaultHeavyWarningSteps = 100_000;
 
         /// <summary>지금 도는 실행들의 함수 호출 깊이(프레임 합) 상한 (G452).</summary>
         public const string MaxCallDepth = "max_call_depth";
@@ -54,6 +59,7 @@ namespace Kesa.Engine.Schema
         {
             (StepBudget, DefaultStepBudget, int.MaxValue),
             (ActionStepBudget, DefaultActionStepBudget, int.MaxValue),
+            (HeavyWarningSteps, DefaultHeavyWarningSteps, int.MaxValue),
             (MaxSignalDepth, DefaultMaxSignalDepth, int.MaxValue),
             (MaxAdvancePerCall, DefaultMaxAdvancePerCall, int.MaxValue),
             (MaxSettleRounds, DefaultMaxSettleRounds, int.MaxValue),

@@ -23,7 +23,7 @@ namespace Kesa.Engine.Bridge.Tests
         private const string Command = "@command(free=True, acts_for=None)\n";
 
         private const string Defs =
-            "patch.set(\"engine:Rules\", \"step_budget\", 200)\n" +
+            "patch.set(\"engine:Rules\", \"heavy_warning_steps\", 200)\n" +
             "Hero(\"Red\")\n" +
             Command + "def Poke(h: Ref[Hero]):\n    emit(Hurt(target=h))\n" +
             Command + "def Crash():\n    h = 1 // 0\n" +

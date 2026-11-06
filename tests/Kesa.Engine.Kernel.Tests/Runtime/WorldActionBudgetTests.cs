@@ -64,10 +64,10 @@ namespace Kesa.Engine.Tests.Runtime
         private World _world = null!;
         private readonly List<EntityId> _units = new List<EntityId>();
 
-        private void NewWorld(string handlers = "", int units = 100)
+        private void NewWorld(string handlers = "", int units = 100, int readBudget = 300, int heavyWarning = 300)
         {
             Mod("banking", schema: Schema,
-                defs: Rule("step_budget", 300) + Rule("action_step_budget", 20_000) + Defs + handlers);
+                defs: Rule("step_budget", readBudget) + Rule("heavy_warning_steps", heavyWarning) + Rule("action_step_budget", 20_000) + Defs + handlers);
             _world = new World(LoadClean());
             _units.Clear();
             for (int i = 0; i < units; i++) _units.Add(_world.Create("banking:Soldier"));
@@ -81,7 +81,7 @@ namespace Kesa.Engine.Tests.Runtime
             Assert.That(w.Code, Is.EqualTo(Codes.RunHeavy));
             Assert.That(w.Severity, Is.EqualTo(Severity.Warning));
             Assert.That(w.Message, Does.StartWith(label + " used "));
-            Assert.That(w.Message, Does.Contain("evaluation steps, more than the read budget of 300 (it fails at 20000)"));
+            Assert.That(w.Message, Does.Contain("evaluation steps, more than heavy_warning_steps of 300 (it fails at 20000)"));
         }
 
         private long Food(EntityId id) => ((IntValue)_world.Get(id, _world.Member("Food", "amount"))).Value;
@@ -134,6 +134,23 @@ namespace Kesa.Engine.Tests.Runtime
                 Assert.That(r.Warnings[0].Span.Line, Is.GreaterThan(0), "it points at the handler");
             }
             Assert.That(Food(_units[0]), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void TheWarningMovesWithoutTheReadBudget()
+        {
+            NewWorld(Grow, heavyWarning: 1_000_000);
+            Assert.That(_world.Advance(1).Reactions[0].Warnings, Is.Empty);
+            var bureau = _world.Create("banking:Bureau");
+            Assert.That(() => _world.Get(bureau, _world.Member("Census", "total")),
+                Throws.TypeOf<WorldException>().With.Property("Code").EqualTo(Codes.RunBudget), "the read budget stays small");
+        }
+
+        [Test]
+        public void TheReadBudgetMovesWithoutTheWarning()
+        {
+            NewWorld(Grow, readBudget: 1_000_000);
+            Assert.That(_world.Advance(1).Reactions[0].Warnings[0].Code, Is.EqualTo(Codes.RunHeavy));
         }
 
         [Test]

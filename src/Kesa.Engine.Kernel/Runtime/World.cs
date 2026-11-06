@@ -87,6 +87,7 @@ namespace Kesa.Engine.Runtime
                 rules != null && rules.Consts.TryGet(name, out var v) ? (int)((IntValue)v.Value).Value : fallback;
             _stepBudget = Rule(EngineRules.StepBudget, EngineRules.DefaultStepBudget);
             _actionStepBudget = Rule(EngineRules.ActionStepBudget, EngineRules.DefaultActionStepBudget);
+            _heavyWarningSteps = Rule(EngineRules.HeavyWarningSteps, EngineRules.DefaultHeavyWarningSteps);
             _maxSignalDepth = Rule(EngineRules.MaxSignalDepth, EngineRules.DefaultMaxSignalDepth);
             _maxAdvancePerCall = Rule(EngineRules.MaxAdvancePerCall, EngineRules.DefaultMaxAdvancePerCall);
             _maxSettleRounds = Rule(EngineRules.MaxSettleRounds, EngineRules.DefaultMaxSettleRounds);

@@ -26,6 +26,8 @@ namespace Kesa.Engine.Runtime
         /// <summary>행동 실행(커맨드 본문, 핸들러, Flow 이어 하기) 하나의 단계 예산 (G224).</summary>
         private readonly int _actionStepBudget;
 
+        private readonly int _heavyWarningSteps;
+
         /// <summary>함수 호출 깊이 상한 (G452).</summary>
         private readonly int _maxCallDepth;
 
@@ -74,14 +76,14 @@ namespace Kesa.Engine.Runtime
         {
             var meter = _meter!;
             _meter = null;
-            return meter.Used > _stepBudget && _warnings != null ? meter.Used : 0;
+            return meter.Used > _heavyWarningSteps && _warnings != null ? meter.Used : 0;
         }
 
         private void WarnHeavy(int used, string label, SourceSpan span)
         {
             _warnings!.Add(new Diagnostic(Codes.RunHeavy, Severity.Warning,
-                label + " used " + used.ToString(CultureInfo.InvariantCulture) + " evaluation steps, more than the read budget of " +
-                _stepBudget.ToString(CultureInfo.InvariantCulture) + " (it fails at " +
+                label + " used " + used.ToString(CultureInfo.InvariantCulture) + " evaluation steps, more than heavy_warning_steps of " +
+                _heavyWarningSteps.ToString(CultureInfo.InvariantCulture) + " (it fails at " +
                 _actionStepBudget.ToString(CultureInfo.InvariantCulture) + ")",
                 null, span, "spread the work over ticks, or move it into a host function (spec-gaps G225)"));
         }

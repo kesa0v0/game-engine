@@ -71,6 +71,7 @@ namespace Kesa.Engine.Tests.Loading
                 "class _EngineRules_consts:\n" +
                 "    @property\n    def step_budget(self) -> int: ...\n" +
                 "    @property\n    def action_step_budget(self) -> int: ...\n" +
+                "    @property\n    def heavy_warning_steps(self) -> int: ...\n" +
                 "    @property\n    def max_signal_depth(self) -> int: ...\n" +
                 "    @property\n    def max_advance_per_call(self) -> int: ...\n" +
                 "    @property\n    def max_settle_rounds(self) -> int: ...\n" +
