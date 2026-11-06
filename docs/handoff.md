@@ -1,6 +1,6 @@
 # 인계 메모
 
-마지막 갱신: 2026-11-03. 브랜치 `spec-v0.5-scaffold`, 테스트 2947개 통과(커널 2482, CLI 42, 콘솔 호스트 102, 번역 65, 경계 75, UI 174, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
+마지막 갱신: 2026-11-06. 브랜치 `spec-v0.5-scaffold`, 테스트 3028개 통과(커널 2550, CLI 42, 콘솔 호스트 102, 번역 65, 경계 87, UI 175, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
 
 ## 상태
 
@@ -21,6 +21,8 @@
 **사용자가 플레이 모드에서 확인함:** 화면 카드·창·모달·USS, 고르기·정보창·이동·공격, 옮기기, 맞는 효과(고리·피해 숫자), 빗나감 글, staged(봇이 기다림, 미끄러지는 중 클릭은 건너뛰기), 퇴장, 여우(3D 바닥·기울인 카메라·끌기·휠·피해 숫자). 데모 `KesaDemo`의 Playback Speed로 연출을 느리게 볼 수 있다. **본 적 없는 것:** 질문 기본 창의 모양(`kesa-question`), IL2CPP 빌드.
 
 ## 다음 할 일
+
+`docs/engine-improvements.md`(Commander에서 나온 후보)에서 1·2·5·6·8·11·12·13번을 마쳤다: 판 갱신 비용, 문제 통로 `IHostOperator.Problems`(G470), `heavy_warning_steps`(G471), 수학 함수와 `**`(G472), 걸음 합계(G473), `e.id`(G474). 남은 것: Commander의 측정 도구로 1·2번 효과 다시 재기, 틱을 프레임에 나눌 때의 엔티티별 변경 추적(2번의 나머지), 3·4·7·9·10번, 근거를 기다리는 14~16번. `KesaDemo`의 `Problems` 줄은 Unity에서 컴파일해 보지 않았다.
 
 봇 틀의 보완이 끝났다: 시험 두기, 로직 언어 속도의 잔손질, 큰 판 읽기. 점수 도우미는 공식으로 만들지 않고 모양만 `docs/std-ideas.md`에 뒀다(G469, 모드가 Def 가중치·`defs()`·`@wrap`으로 짬). 큰 판 읽기에서 한 것: 보기 규칙이 없으면 읽기마다 찾지 않고 있으면 한 번 동안 답을 기억, 시험 판 복사는 저장 글 없이 나무를 바로 읽음(1만 판 115 → 약 80ms), 크기를 따르는 일은 그 양만큼 단계를 셈(G467: 복사는 엔티티·값 하나에 300걸음, 묶음·목록은 원소마다 1), 긴 봇 생각이 화면을 막는 것은 호스트가 예산과 부르는 때로 다룸(G468, Unity README "봇이 생각하는 시간"). 남은 것은 아래 1뿐이고 미뤄 둔 것이라, 다음 큰 주제를 사용자와 정한다.
 
@@ -51,6 +53,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 루트에서 `dotnet build`와 `dotnet test`로 2947개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다.
+1. `git pull` 후 루트에서 `dotnet build`와 `dotnet test`로 3028개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다.
 2. `CLAUDE.md`와 이 문서를 읽는다. 필요한 `docs/spine-spec.md` 절과 결정(`list --tag …`·`show 번호`)만 본다. 판 위 그림은 `src/Kesa.Engine.Ui/Look*.cs`, UI 해석은 `UiInterpreter*.cs`, 커널 쪽 월드 표시는 `Runtime/World.Look.cs`·`World.Fx.cs`다.
 3. 위 "다음 할 일"을 사용자와 정한다. 작업 방식(한국어, 허락 질문으로 멈추지 않기, push는 사용자가 말할 때만 등)은 CLAUDE.md에 있다.
