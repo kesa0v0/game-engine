@@ -50,9 +50,10 @@
 - 호스트 함수 인자 8개 초과(`HostOverloads.cs`를 16개까지), 호스트 창구의 `choices`.
 - 따옴표 없는 Def 참조(`Resource.Wood`), 비트 연산(G96), S8 `migrate`.
 - 커널을 작업 스레드에 두는 호스트(G468): 묶은 읽기나 밀어 주는 화면 사본, 호스트 함수의 Unity API 금지를 그때 정한다. 시험 판 복사를 저장 나무 없이 바로 복사하기(1만 판 약 80ms, G453 내부).
+- 봇 생각을 여러 프레임에 나누기(사용자가 미룸, 정한 것 없음): 실시간 게임을 볼 때 생각 중 판 잠금은 못 쓴다. 후보는 ① 엔진을 고치지 않고 봇이 기억에 자리를 남겨 틱마다 조금씩 생각(유닛 훑기에 맞고 깊은 탐색에는 안 맞음, 돌려 보지 않음) ② 사본 위에서 나누기(판 복사 비용과 식 안의 C# 재귀 호출에서 못 멈추는 것을 먼저 풀어야 함). 바이트코드 VM이 꼭 필요한지는 확인하지 않았다.
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 루트에서 `dotnet build`와 `dotnet test`로 3032개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다.
+1. `git pull` 후 루트에서 `dotnet build`와 `dotnet test`로 3074개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다.
 2. `CLAUDE.md`와 이 문서를 읽는다. 필요한 `docs/spine-spec.md` 절과 결정(`list --tag …`·`show 번호`)만 본다. 판 위 그림은 `src/Kesa.Engine.Ui/Look*.cs`, UI 해석은 `UiInterpreter*.cs`, 커널 쪽 월드 표시는 `Runtime/World.Look.cs`·`World.Fx.cs`다.
 3. 위 "다음 할 일"을 사용자와 정한다. 작업 방식(한국어, 허락 질문으로 멈추지 않기, push는 사용자가 말할 때만 등)은 CLAUDE.md에 있다.
