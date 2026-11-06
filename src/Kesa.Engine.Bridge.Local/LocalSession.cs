@@ -28,6 +28,12 @@ namespace Kesa.Engine.Bridge.Local
 
         private long _objectStamp;
 
+        /// <summary>물체를 마지막으로 다 확인한 때. 그대로면 어느 영수증도 볼 필요가 없다. 월드가 null이면 다시 확인한다.</summary>
+        private World? _objectsWorld;
+
+        private (long Clock, long Tick, long Seats, long Requests) _objectsMoment;
+        private long _objectsUi;
+
         /// <summary>표시 함수마다 지난 영수증과 낸 열쇠(G395). 영수증이 null이면 다시 부른다.</summary>
         private readonly SortedDictionary<string, MarkSet> _markSets = new SortedDictionary<string, MarkSet>(StringComparer.Ordinal);
 
@@ -112,6 +118,30 @@ namespace Kesa.Engine.Bridge.Local
 
         public ValueTask<BridgeWorldObjects> WorldObjects(long since)
         {
+            var world = World;
+            var moment = world.ReceiptMoment();
+            long uiVersion = _ui.Version;
+            if (!ReferenceEquals(world, _objectsWorld) || moment != _objectsMoment || uiVersion != _objectsUi)
+            {
+                bool failed = RefreshObjects();
+                // 실패한 칸은 영수증이 없어 세계가 그대로여도 다시 불러 본다
+                _objectsWorld = failed ? null : world;
+                _objectsMoment = moment;
+                _objectsUi = uiVersion;
+            }
+            if (since >= _objectStamp) return Done(new BridgeWorldObjects(_objectStamp, Array.Empty<BridgeWorldObject>(), Array.Empty<long>()));
+            var changed = new List<BridgeWorldObject>();
+            foreach (var pair in _objects)
+                if (pair.Value.Shown != null && pair.Value.Stamp > since) changed.Add(pair.Value.Shown);
+            var gone = new List<long>();
+            foreach (var pair in _gone)
+                if (since > 0 && pair.Value > since) gone.Add(pair.Key);
+            return Done(new BridgeWorldObjects(_objectStamp, changed, gone));
+        }
+
+        /// <summary>물체마다 영수증을 보고 바뀐 것을 다시 계산한다. 영수증 없이 끝난 칸이 있으면 참.</summary>
+        private bool RefreshObjects()
+        {
             var view = View;
             var ids = new SortedSet<long>();
             foreach (var id in view.WorldEntities()) ids.Add(id.Value);
@@ -123,10 +153,12 @@ namespace Kesa.Engine.Bridge.Local
                 if (_objects[id].Shown != null) _gone[id] = ++_objectStamp;
                 _objects.Remove(id);
             }
+            bool failed = false;
             foreach (var id in ids)
             {
                 if (_objects.TryGetValue(id, out var old) && old.Receipt != null && !old.Receipt.Changed(World)) continue;
                 var shown = Compute(view, id, out var receipt);
+                failed |= receipt == null;
                 var before = old?.Shown;
                 long stamp = old?.Stamp ?? 0;
                 if (!Equals(shown, before))
@@ -137,13 +169,7 @@ namespace Kesa.Engine.Bridge.Local
                 }
                 _objects[id] = new Tracked(receipt, shown, stamp);
             }
-            var changed = new List<BridgeWorldObject>();
-            foreach (var pair in _objects)
-                if (pair.Value.Shown != null && pair.Value.Stamp > since) changed.Add(pair.Value.Shown);
-            var gone = new List<long>();
-            foreach (var pair in _gone)
-                if (since > 0 && pair.Value > since) gone.Add(pair.Key);
-            return Done(new BridgeWorldObjects(_objectStamp, changed, gone));
+            return failed;
         }
 
         public ValueTask<BridgeWorldObject?> WorldObject(string key, long entity)

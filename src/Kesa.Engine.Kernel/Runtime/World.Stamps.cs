@@ -37,6 +37,9 @@ namespace Kesa.Engine.Runtime
         /// <summary>엔티티 상태가 마지막으로 바뀐 때 (전역 시계). 그대로면 어느 엔티티도 바뀌지 않았다.</summary>
         public long Version() => _clock;
 
+        /// <summary>영수증(<see cref="CallResult.Changed"/>)이 보는 월드 쪽 값 전부. 그대로면 UI 기록 말고는 어느 영수증도 바뀌지 않았다.</summary>
+        public (long Clock, long Tick, long Seats, long Requests) ReceiptMoment() => (_clock, _tick, SeatsVersion, RequestsVersion);
+
         /// <summary>이 엔티티가 마지막으로 바뀐 때 (어느 칸이든, 만들어진 때 포함). 죽었거나 없는 엔티티는 0.</summary>
         public long Version(EntityId id) =>
             _entities.ContainsKey(id.Value) && _stamps.TryGetValue(id.Value, out var s) ? s.Any : 0;

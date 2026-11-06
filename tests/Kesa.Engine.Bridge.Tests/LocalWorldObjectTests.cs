@@ -28,7 +28,8 @@ namespace Kesa.Engine.Bridge.Tests
             "Unit(\"Foot\", look=drawn, where=spot)\n" +
             "Unit(\"Tree\", look=\"pine\", where=lambda u: at(0))\n" +
             "Unit(\"Odd\", look=lambda u: look(\"odd\", n=1 // u.Pos.x), where=lambda u: at(0))\n" +
-            "@view_rule(Unit)\ndef far(viewer, entity):\n    return entity.Pos.x != 99\n" +
+            "Unit(\"Clock\", look=lambda u: look(\"clock\", t=now()), where=lambda u: at(0))\n" +
+            "@view_rule(Unit)\ndef far(viewer, entity):\n    return entity.Pos.x != 99 and (entity.Pos.x != 77 or viewer is not None)\n" +
             "@ui_action\ndef pick(u: Ref[Unit]):\n    ui.Sel.unit = u\n";
 
         private string _root = "";
@@ -132,6 +133,33 @@ namespace Kesa.Engine.Bridge.Tests
             Set(odd, "x", Int(1));
             var fixedNow = await_(_alice.WorldObjects(all.Stamp)).Changed.Single();
             Assert.That((fixedNow.Error, fixedNow.Look!.Name), Is.EqualTo(((string?)null, "odd")));
+        }
+
+        /// <summary>어느 칸에도 쓰지 않는 바뀜도 놓치지 않는다: 틱만 흐름, 앉기만 바뀜.</summary>
+        [Test]
+        public void TimeAndSeatsReachObjectsWithoutAnyWrite()
+        {
+            var clock = _world.Create("arena:Clock");
+            var first = await_(_alice.WorldObjects(0));
+            _world.Advance(1);
+            var ticked = await_(_alice.WorldObjects(first.Stamp));
+            Assert.That(ticked.Changed.Single().Entity.Id, Is.EqualTo(clock.Value));
+
+            Set(_foot, "x", Int(77));
+            var hidden = await_(_alice.WorldObjects(ticked.Stamp));
+            Assert.That(hidden.Gone, Is.EqualTo(new[] { _foot.Value }), "a spectator does not see it");
+            _world.Seat(_tree, "alice");
+            Assert.That(await_(_alice.WorldObjects(hidden.Stamp)).Changed.Single().Entity.Id, Is.EqualTo(_foot.Value));
+        }
+
+        [Test]
+        public void AnUnchangedWorldStillAnswersAnOlderStamp()
+        {
+            var first = await_(_alice.WorldObjects(0));
+            Set(_foot, "x", Int(3));
+            var moved = await_(_alice.WorldObjects(first.Stamp));
+            Assert.That(await_(_alice.WorldObjects(moved.Stamp)).Changed, Is.Empty);
+            Assert.That(await_(_alice.WorldObjects(first.Stamp)).Changed.Single().Entity.Id, Is.EqualTo(_foot.Value), "another reader may be behind");
         }
 
         [Test]
