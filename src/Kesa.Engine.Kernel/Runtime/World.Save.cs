@@ -350,8 +350,7 @@ namespace Kesa.Engine.Runtime
                     problems.Skipped.Add(id);
                     continue;
                 }
-                var entity = new EntityRecord(id, def, LayoutOf(def));
-                _entities.Add(id, entity);
+                var entity = _entities.Create(id, def, LayoutOf(def));
                 StampCreated(id);
                 if (!_byType.TryGetValue(def.Type, out var set)) _byType.Add(def.Type, set = new SortedSet<long>());
                 set.Add(id);

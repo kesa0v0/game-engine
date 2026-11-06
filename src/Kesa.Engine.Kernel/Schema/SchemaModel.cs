@@ -231,6 +231,12 @@ namespace Kesa.Engine.Schema
         /// 컴포넌트에 들지 않은 멤버(Def 타입의 <c>const</c>)는 이름만이다.
         /// </summary>
         internal string Display { get; set; } = "";
+
+        /// <summary>든 컴포넌트. Def 타입의 <c>const</c>면 null.</summary>
+        internal ComponentType? Owner { get; set; }
+
+        /// <summary><see cref="Owner"/> 안의 번호. 값 칼럼의 위치다.</summary>
+        internal int Index { get; set; }
     }
 
     // ---- 스키마 파일이 모은 선언 (②a 실행 결과, 아직 이름을 풀지 않음) ----
@@ -484,10 +490,13 @@ namespace Kesa.Engine.Schema
         internal ComponentType(ComponentDecl decl)
         {
             Decl = decl;
+            int index = 0;
             foreach (var m in decl.Members)
             {
                 _members[m.Name] = m;
                 m.Display = decl.Name + "." + m.Name;
+                m.Owner = this;
+                m.Index = index++;
             }
         }
 

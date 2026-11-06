@@ -175,11 +175,10 @@ namespace Kesa.Engine.Runtime
             if (IsTrial ? _nextId == long.MaxValue : _nextId >= TrialIdBase)
                 throw new WorldException(Codes.RunRange, "entity ids ran out");
             var id = _nextId++;
-            var entity = new EntityRecord(id, def, LayoutOf(def));
+            var entity = _entities.Create(id, def, LayoutOf(def));
             planned.CopyTo(entity.Values);
             if (plannedRows != null)
                 foreach (var pair in plannedRows) entity.PutRows(pair.Key, pair.Value);
-            _entities.Add(id, entity);
             if (!_byType.TryGetValue(def.Type, out var set)) _byType.Add(def.Type, set = new SortedSet<long>());
             set.Add(id);
             Touch(id, null);
@@ -235,7 +234,7 @@ namespace Kesa.Engine.Runtime
             set.Remove(id.Value);
             Journal(() =>
             {
-                _entities.Add(id.Value, entity);
+                _entities.Restore(id.Value, entity);
                 set.Add(id.Value);
             });
 
@@ -257,6 +256,7 @@ namespace Kesa.Engine.Runtime
                 _keyHolders.Remove(id.Value);
                 Journal(() => _keyHolders.Add(id.Value, holders));
             }
+            if (_undo == null) _entities.Sweep();
         }
 
         public bool IsAlive(EntityId id) => _entities.ContainsKey(id.Value);

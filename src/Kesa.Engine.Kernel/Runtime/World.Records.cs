@@ -78,7 +78,11 @@ namespace Kesa.Engine.Runtime
                     _types[type.Index] = type;
                     _components[type.Index] = rc;
                 }
+                Table = new DefTable(_types);
             }
+
+            /// <summary>이 Def의 엔티티 값을 담는 표.</summary>
+            public DefTable Table { get; }
 
             /// <summary>이 Def의 그 컴포넌트, 없으면 null. 다른 로드의 컴포넌트 타입이면(번호가 같아도 다른 객체) 이름으로 찾는다.</summary>
             public ResolvedComponent? Find(ComponentType component)
@@ -97,32 +101,6 @@ namespace Kesa.Engine.Runtime
             return layout;
         }
 
-        /// <summary>살아 있는 엔티티들. 읽기마다 지나므로 인터페이스 없이 sealed로 둔다 (P6).</summary>
-        private sealed class EntityStore
-        {
-            private readonly Dictionary<long, EntityRecord> _records = new Dictionary<long, EntityRecord>();
-
-            public EntityRecord this[long id] => _records[id];
-            public bool ContainsKey(long id) => _records.ContainsKey(id);
-            public bool TryGetValue(long id, out EntityRecord record) => _records.TryGetValue(id, out record);
-            public void Add(long id, EntityRecord record) => _records.Add(id, record);
-            public bool Remove(long id) => _records.Remove(id);
-        }
-
-        /// <summary>엔티티나 줄 하나의 값 칸들 (쓴 값, 생성 순간에 계산한 값).</summary>
-        private sealed class ValueSlots
-        {
-            public static readonly ValueSlots None = new ValueSlots();
-
-            private readonly Dictionary<MemberDecl, Value> _values = new Dictionary<MemberDecl, Value>();
-
-            public int Count => _values.Count;
-            public Value this[MemberDecl member] { set => _values[member] = value; }
-            public bool ContainsKey(MemberDecl member) => _values.ContainsKey(member);
-            public bool TryGetValue(MemberDecl member, out Value value) => _values.TryGetValue(member, out value);
-            public bool Remove(MemberDecl member) => _values.Remove(member);
-        }
-
         private sealed class EntityRecord
         {
             private readonly SortedDictionary<string, ComponentType> _runtime =
@@ -130,12 +108,16 @@ namespace Kesa.Engine.Runtime
 
             private readonly SortedDictionary<string, KeyedRows> _rows = new SortedDictionary<string, KeyedRows>(StringComparer.Ordinal);
 
-            public EntityRecord(long id, FrozenDef def, DefLayout layout)
+            public EntityRecord(EntityStore store, long id, FrozenDef def, DefLayout layout)
             {
                 Id = id;
                 Def = def;
                 Layout = layout;
+                Values = new ValueSlots(store, layout.Table, this);
             }
+
+            /// <summary>지워졌으나 되감기로 돌아올 수 있어 줄을 아직 쥐고 있다.</summary>
+            public bool Dead { get; set; }
 
             public long Id { get; }
             public FrozenDef Def { get; }
@@ -144,7 +126,7 @@ namespace Kesa.Engine.Runtime
             public DefLayout Layout { get; }
 
             /// <summary>키 없는 컴포넌트의 엔티티 값.</summary>
-            public ValueSlots Values { get; } = new ValueSlots();
+            public ValueSlots Values { get; }
 
             // ---- 런타임에 붙인 컴포넌트 (이름 순) ----
 

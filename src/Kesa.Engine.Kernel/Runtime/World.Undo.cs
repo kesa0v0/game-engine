@@ -93,6 +93,7 @@ namespace Kesa.Engine.Runtime
             {
                 _undo = null;
                 undo.Clear(); // 붙잡은 값을 놓는다
+                _entities.Sweep();
             }
         }
 
