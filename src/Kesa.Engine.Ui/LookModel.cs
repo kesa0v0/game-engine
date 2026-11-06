@@ -229,6 +229,19 @@ namespace Kesa.Engine.Ui
         }
     }
 
+    /// <summary>게임 코드 없이는 만들 수 없는 공간의 자리 표시 (G480). 그리는 데 쓰지 않고 이름만 이어 준다.</summary>
+    internal sealed class UnverifiedLayout : SpaceLayout
+    {
+        public override long Unit => BridgeFixed.Scale;
+
+        public override bool TryPlace(BridgeValue place, out LookPosition position, out string error)
+        {
+            position = default;
+            error = "";
+            return true;
+        }
+    }
+
     /// <summary>공간 종류 하나 (G394·G410): 이름, 받는 설정, 설정으로 공간을 만드는 일. 기본 종류도 게임의 종류도 이것으로 등록한다.</summary>
     public abstract class SpaceKind
     {

@@ -195,15 +195,19 @@ namespace Kesa.Engine.Ui
     /// <summary>읽거나 검사하다 찾은 문제 하나. <see cref="Place"/>는 <c>파일:줄</c>.</summary>
     public sealed class UiProblem
     {
-        public UiProblem(string place, string message)
+        public UiProblem(string place, string message, bool unverified = false)
         {
             Place = place;
             Message = message;
+            Unverified = unverified;
         }
 
         public string Place { get; }
 
         public string Message { get; }
+
+        /// <summary>틀린 것이 아니라 게임 코드가 없어 확인하지 못한 것 (<see cref="LookKinds.AllowUnknown"/>, G480).</summary>
+        public bool Unverified { get; }
 
         public override string ToString() => Place + ": " + Message;
     }

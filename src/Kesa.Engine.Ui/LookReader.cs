@@ -102,6 +102,13 @@ namespace Kesa.Engine.Ui
                 }
                 if (!kinds.TryGetSpace(kindName, out var kind))
                 {
+                    if (kinds.AllowUnknown)
+                    {
+                        problems.Add(Unverified(place, "kind=\"" + kindName + "\"", "space kind", "settings", kindName, kinds.SpaceNames));
+                        // 이 공간을 쓰는 보는 법이 "그런 공간 없음"으로 잘못 걸리지 않게 이름은 남긴다
+                        if (name != null) spaces.Add(new SpaceDeclaration(name, kindName, source.Mod, place, new UnverifiedLayout()));
+                        continue;
+                    }
                     problems.Add(new UiProblem(place, "kind=\"" + kindName + "\": no space kind is registered with this name" +
                         UiSuggest.Hint(kindName, kinds.SpaceNames) + " (can be: " + string.Join(", ", kinds.SpaceNames) + ")"));
                     continue;
@@ -151,6 +158,11 @@ namespace Kesa.Engine.Ui
                 }
                 if (!kinds.TryGetRig(rigName, out var rig))
                 {
+                    if (kinds.AllowUnknown)
+                    {
+                        problems.Add(Unverified(place, "rig=\"" + rigName + "\"", "camera rig", "settings", rigName, kinds.RigNames));
+                        continue;
+                    }
                     problems.Add(new UiProblem(place, "rig=\"" + rigName + "\": no camera rig is registered with this name" +
                         UiSuggest.Hint(rigName, kinds.RigNames) + " (can be: " + string.Join(", ", kinds.RigNames) + ")"));
                     continue;
@@ -279,6 +291,10 @@ namespace Kesa.Engine.Ui
         public static string Place(string path, XObject node) =>
             path + ":" + (node is IXmlLineInfo info && info.HasLineInfo() ? info.LineNumber : 0);
 
+        private static UiProblem Unverified(string place, string written, string what, string contents, string name, IEnumerable<string> standard) =>
+            new UiProblem(place, written + ": not a standard " + what + "; fine if the game registers it, but its " + contents + " are not checked" +
+                UiSuggest.Hint(name, standard) + " (standard: " + string.Join(", ", standard) + ")", unverified: true);
+
         private sealed class ElementReader
         {
             private readonly string _path;
@@ -303,10 +319,13 @@ namespace Kesa.Engine.Ui
 
                 if (kindName == "Include") Problem(place, "Include in a look file is not supported yet");
                 bool known = _kinds.TryGetElement(kindName, out var kind);
-                if (!known && kindName != "Include")
+                if (!known && kindName != "Include" && _kinds.AllowUnknown)
+                    _problems.Add(Unverified(place, "<" + kindName + ">", "look element", "attributes", kindName, _kinds.ElementNames));
+                else if (!known && kindName != "Include")
                     Problem(place, "<" + kindName + ">: no look element is registered with this name" + UiSuggest.Hint(kindName, _kinds.ElementNames) +
                         " (can be: " + string.Join(", ", _kinds.ElementNames) + ")");
-                if (known && kind.Parents != null && (parent == null || !kind.Parents.Contains(parent)))
+                bool parentUnverified = _kinds.AllowUnknown && parent != null && !_kinds.TryGetElement(parent, out _);
+                if (known && !parentUnverified && kind.Parents != null && (parent == null || !kind.Parents.Contains(parent)))
                     Problem(place, "<" + kindName + "> goes directly inside " + string.Join(" or ", kind.Parents.Select(p => "<" + p + ">")) +
                         (parent == null ? ", not at the top of a look" : ", not inside <" + parent + ">"));
 

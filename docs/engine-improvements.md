@@ -89,6 +89,8 @@ Commander는 이웃 찾기와 이동 수학을 틱마다 한 번에 처리하는
 
 `.space.xml`·`.look.xml`·`.view.xml`의 오류는 Unity에서 `mods.Looks.Problems`로만 나온다.
 
+**해결:** `engine check`가 이 파일들을 읽는다. 문제는 `LOK001`, 게임이 등록했을 수 있는 종류는 경고 `LOK002`다(G480).
+
 ### 10. Unity 6.3과 이름이 겹친다
 
 `UnityEngine.EntityId`와 `Kesa.Engine.Runtime.EntityId`가 부딪혀, 두 namespace를 함께 쓰는 파일은 별칭이나 전체 이름이 필요하다.
@@ -164,4 +166,3 @@ def advance(u):
 |---|---|---|
 | 1 | Commander 측정 다시 하기 | 1·2번의 효과를 같은 조건으로 확인하고 14~16번의 근거를 얻는다 |
 | 2 | 2번의 나머지 | 틱을 프레임에 나눌 때 필요하다 |
-| 3 | 9번 | 그림과 공간 파일의 오류를 Unity 없이 찾는다 |

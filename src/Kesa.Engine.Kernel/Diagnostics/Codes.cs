@@ -173,6 +173,11 @@ namespace Kesa.Engine.Diagnostics
         // 호스트 함수 이름의 잘못된 사용: 이름 공간을 값으로 씀, 함수에 속성을 붙임, 모드 최상위 이름이 이름 공간을 가림 (spec S7, spec-gaps G218)
         public const string HostName = "HST002";
 
+        // 그림·공간·보는 법 파일을 engine check가 읽다 난 문제 (G480)
+        public const string LookProblem = "LOK001";
+        // 게임이 C#으로 등록했을 수 있어 확인하지 못한 종류 (G480)
+        public const string LookUnverified = "LOK002";
+
         // 번역 파일 (spec X4). 번역 오류는 모드를 끄지 않고 그 글만 뺀다 (spec-gaps G257)
         // .ftl 구문 오류 (G257)
         public const string LocSyntax = "LOC001";

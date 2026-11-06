@@ -46,7 +46,7 @@ namespace Kesa.Engine.Ui
                     var read = new List<LookDefinition>();
                     LookReader.ReadLooks(source, kinds, read, problems);
                     if (fileExists != null)
-                        foreach (var look in read) CheckFiles(look.Elements, fileExists, problems);
+                        foreach (var look in read) CheckFiles(look.Elements, kinds, fileExists, problems);
                     foreach (var look in read) Put(looks, look.Name, look, l => l.Mod, l => l.Place, "look", problems);
                 }
                 else if (source.Path.EndsWith(LookReader.SpaceExtension, StringComparison.OrdinalIgnoreCase))
@@ -103,14 +103,20 @@ namespace Kesa.Engine.Ui
             return null;
         }
 
-        private static void CheckFiles(IReadOnlyList<LookElement> elements, Func<string, bool> fileExists, List<UiProblem> problems)
+        private static void CheckFiles(IReadOnlyList<LookElement> elements, LookKinds kinds, Func<string, bool> fileExists, List<UiProblem> problems)
         {
             foreach (var element in elements)
             {
                 foreach (var attribute in element.Attributes)
-                    if (attribute.Value.Type == LookAttributeType.Path && !fileExists(attribute.Value.Text!))
-                        problems.Add(new UiProblem(element.Place, attribute.Key + "=\"" + attribute.Value.Text + "\": no such file in the mods"));
-                CheckFiles(element.Children, fileExists, problems);
+                {
+                    if (attribute.Value.Type != LookAttributeType.Path) continue;
+                    string written = attribute.Key + "=\"" + attribute.Value.Text + "\": ";
+                    if (!fileExists(attribute.Value.Text!)) problems.Add(new UiProblem(element.Place, written + "no such file in the mods"));
+                    if (!kinds.AllowUnknown || element.Kind != "Model" || attribute.Key != "src") continue;
+                    string? format = kinds.ModelProblem(attribute.Value.Text!);
+                    if (format != null) problems.Add(new UiProblem(element.Place, written + format + "; fine if the game registers a loader for it", unverified: true));
+                }
+                CheckFiles(element.Children, kinds, fileExists, problems);
             }
         }
 

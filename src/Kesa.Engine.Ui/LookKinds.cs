@@ -27,8 +27,16 @@ namespace Kesa.Engine.Ui
             _modelFormats.Add(extension.ToLowerInvariant());
         }
 
+        /// <summary>
+        /// 게임 코드 없이 모드 폴더만 보는 도구용 (G480). 등록되지 않은 요소·공간·리그·모델 확장자를 틀렸다고 하지 않고
+        /// <see cref="UiProblem.Unverified"/>로 알린다. 게임이 등록했을 수 있어서다.
+        /// </summary>
+        public bool AllowUnknown { get; set; }
+
         /// <summary>그 경로를 맡을 모델 로더가 없으면 이유.</summary>
-        public string? CheckModel(string path)
+        public string? CheckModel(string path) => AllowUnknown ? null : ModelProblem(path);
+
+        internal string? ModelProblem(string path)
         {
             int dot = path.LastIndexOf('.');
             string extension = dot < 0 || dot < path.LastIndexOf('/') ? "" : path.Substring(dot).ToLowerInvariant();
@@ -170,7 +178,7 @@ namespace Kesa.Engine.Ui
         {
             // 제 부모가 정해진 종류(Clip)는 읽을 때 이미 알렸다
             foreach (var child in model.Children)
-                if (!(kinds.TryGetElement(child.Kind, out var kind) && kind.Parents != null))
+                if (kinds.TryGetElement(child.Kind, out var kind) ? kind.Parents == null : !kinds.AllowUnknown)
                     yield return "inside a <Model> go only <State>s, <Attach>es and <Paint>s; put <" + child.Kind + "> in an <Attach bone=\"…\"> or beside the <Model>";
             var painted = new List<string>();
             foreach (var paint in model.Children.Where(c => c.Kind == "Paint"))
