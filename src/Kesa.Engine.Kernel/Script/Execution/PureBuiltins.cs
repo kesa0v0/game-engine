@@ -163,6 +163,14 @@ namespace Kesa.Engine.Script
             Add("min", a => Extreme("min", a, -1));
             Add("max", a => Extreme("max", a, 1));
             Add("clamp", Clamp);
+            Add("sqrt", Sqrt);
+            Add("sin", a => Angle("sin", a, FixedFunctions.Sin));
+            Add("cos", a => Angle("cos", a, FixedFunctions.Cos));
+            Add("sin_deg", a => Angle("sin_deg", a, FixedFunctions.SinDegrees));
+            Add("cos_deg", a => Angle("cos_deg", a, FixedFunctions.CosDegrees));
+            Add("atan2", a => Atan2("atan2", a, FixedFunctions.Atan2));
+            Add("atan2_deg", a => Atan2("atan2_deg", a, FixedFunctions.Atan2Degrees));
+            table.Add("pi", new FixedValue(FixedFunctions.Pi));
             Add("len", Len);
             Add("range", Range);
             Add("sum", Sum);
@@ -313,6 +321,26 @@ namespace Kesa.Engine.Script
             Arity(name, args, 1);
             var v = NumberArg(name, args[0]);
             return v is IntValue ? v : new IntValue(round(((FixedValue)v).Value));
+        }
+
+        private static Value Sqrt(IReadOnlyList<Value> args)
+        {
+            Arity("sqrt", args, 1);
+            var x = NumberArg("sqrt", args[0]);
+            if (!FixedFunctions.TrySqrt(PureOps.ToFixed(x), out var root)) throw PureOps.ArithmeticError("sqrt() of a negative number");
+            return new FixedValue(root);
+        }
+
+        private static Value Angle(string name, IReadOnlyList<Value> args, Func<Fixed, Fixed> function)
+        {
+            Arity(name, args, 1);
+            return new FixedValue(function(PureOps.ToFixed(NumberArg(name, args[0]))));
+        }
+
+        private static Value Atan2(string name, IReadOnlyList<Value> args, Func<Fixed, Fixed, Fixed> function)
+        {
+            Arity(name, args, 2);
+            return new FixedValue(function(PureOps.ToFixed(NumberArg(name, args[0])), PureOps.ToFixed(NumberArg(name, args[1]))));
         }
 
         private static Value Abs(IReadOnlyList<Value> args)

@@ -86,6 +86,14 @@ namespace Kesa.Engine.Stubs
             "def floor(x: int | float, /) -> int: ...\n" +
             "def ceil(x: int | float, /) -> int: ...\n" +
             "def clamp(x: Any, low: Any, high: Any, /) -> Any: ...\n" +
+            "def sqrt(x: int | float, /) -> float: ...\n" +
+            "def sin(radians: int | float, /) -> float: ...\n" +
+            "def cos(radians: int | float, /) -> float: ...\n" +
+            "def atan2(y: int | float, x: int | float, /) -> float: ...\n" +
+            "def sin_deg(degrees: int | float, /) -> float: ...\n" +
+            "def cos_deg(degrees: int | float, /) -> float: ...\n" +
+            "def atan2_deg(y: int | float, x: int | float, /) -> float: ...\n" +
+            "pi: float\n" +
             "class Contribution:\n" +
             "    id: int | None\n" +
             "    op: str\n" +

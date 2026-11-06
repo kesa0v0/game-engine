@@ -460,6 +460,9 @@ namespace Kesa.Engine.Script
                 case BinaryOp.Multiply:
                     Charge(Size(result));
                     break;
+                case BinaryOp.Power:
+                    if (right is IntValue exponent) Charge(exponent.Value); // fixed의 정확한 곱은 지수만큼 커진다
+                    break;
                 case BinaryOp.Equal:
                 case BinaryOp.NotEqual:
                 case BinaryOp.Less:

@@ -57,6 +57,21 @@ namespace Kesa.Engine.Tests.Script
             return evaluator.Run(find(function), args);
         }
 
+        [Test]
+        public void PowerAssignsAndALocalPiWins()
+        {
+            Assert.That(Show(Call("def f():\n    x = 3\n    x **= 2\n    return x\n", "f")), Is.EqualTo("9"));
+            Assert.That(Show(Call("def f():\n    pi = 3\n    return pi\n", "f")), Is.EqualTo("3"));
+        }
+
+        [Test]
+        public void AFixedPowerCostsItsExponentInSteps()
+        {
+            var (evaluator, find) = Build("def f():\n    return 1.0 ** 1000\n", budget: 500);
+            var e = Assert.Throws<ScriptRuntimeException>(() => evaluator.Run(find("f"), new Value[0]))!;
+            Assert.That(e.Code, Is.EqualTo(Codes.RunBudget));
+        }
+
         private static string Show(Value v)
         {
             switch (v)
@@ -212,6 +227,19 @@ namespace Kesa.Engine.Tests.Script
         [TestCase("max(1, 2.5)", "2.5")]
         [TestCase("max(3, 2.5)", "3.0")]
         [TestCase("min([4, 2, 9])", "2")]
+        [TestCase("sqrt(4)", "2.0")]
+        [TestCase("sqrt(2.25)", "1.5")]
+        [TestCase("sin_deg(30)", "0.5")]
+        [TestCase("cos_deg(60.0)", "0.5")]
+        [TestCase("atan2_deg(1, 1)", "45.0")]
+        [TestCase("sin(pi)", "0.0")]
+        [TestCase("sin(pi / 2)", "1.0")]
+        [TestCase("pi", "3.141593")]
+        [TestCase("2 ** 10", "1024")]
+        [TestCase("2 ** 3 ** 2", "512")]
+        [TestCase("-2 ** 2", "-4")]
+        [TestCase("1.5 ** 2", "2.25")]
+        [TestCase("0 ** 0", "1")]
         [TestCase("clamp(15, 1, 9)", "9")]
         [TestCase("clamp(0, 1, 9)", "1")]
         [TestCase("clamp(5, 1, 9)", "5")]
@@ -233,6 +261,16 @@ namespace Kesa.Engine.Tests.Script
         [TestCase("sum(range(3), 1)", "4")]
         public void Builtins(string expression, string expected) => Assert.That(Eval(expression), Is.EqualTo(expected));
 
+        [TestCase("sqrt(-1)")]
+        [TestCase("sqrt('a')")]
+        [TestCase("sin()")]
+        [TestCase("atan2(1)")]
+        [TestCase("2 ** -1")]
+        [TestCase("2 ** 0.5")]
+        [TestCase("2 ** 64")]
+        [TestCase("2.0 ** 1025")]
+        [TestCase("1000.0 ** 10")]
+        [TestCase("'a' ** 2")]
         [TestCase("clamp(1, 9, 1)")]
         [TestCase("floor('a')")]
         [TestCase("min([])")]

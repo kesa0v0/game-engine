@@ -14,6 +14,7 @@ namespace Kesa.Engine.Script
         Divide,
         FloorDivide,
         Modulo,
+        Power,
         Equal,
         NotEqual,
         Less,
@@ -48,6 +49,7 @@ namespace Kesa.Engine.Script
                 case "/": return BinaryOp.Divide;
                 case "//": return BinaryOp.FloorDivide;
                 case "%": return BinaryOp.Modulo;
+                case "**": return BinaryOp.Power;
                 case "==": return BinaryOp.Equal;
                 case "!=": return BinaryOp.NotEqual;
                 case "<": return BinaryOp.Less;
@@ -92,6 +94,7 @@ namespace Kesa.Engine.Script
                 case BinaryOp.Divide: return "/";
                 case BinaryOp.FloorDivide: return "//";
                 case BinaryOp.Modulo: return "%";
+                case BinaryOp.Power: return "**";
                 case BinaryOp.Equal: return "==";
                 case BinaryOp.NotEqual: return "!=";
                 case BinaryOp.Less: return "<";

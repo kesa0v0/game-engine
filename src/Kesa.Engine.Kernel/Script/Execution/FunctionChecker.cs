@@ -13,7 +13,7 @@ namespace Kesa.Engine.Script
     {
         private static readonly HashSet<string> AllowedAssign = new HashSet<string>
         {
-            "=", "+=", "-=", "*=", "/=", "//=", "%=",
+            "=", "+=", "-=", "*=", "/=", "//=", "%=", "**=",
         };
 
         public const string PreconditionsName = "preconditions";
@@ -363,7 +363,6 @@ namespace Kesa.Engine.Script
                     case BinaryExpr bin:
                         switch (bin.Op)
                         {
-                            case "**":
                             case "&":
                             case "|":
                             case "^":
@@ -371,7 +370,7 @@ namespace Kesa.Engine.Script
                             case ">>":
                             case "@":
                                 Report("operator '" + bin.Op + "' is not supported in logic functions", bin.Span,
-                                    "use + - * / // % and comparisons (spec-gaps G96)");
+                                    "use + - * / // % ** and comparisons (spec-gaps G96)");
                                 break;
                             case "is":
                             case "is not":

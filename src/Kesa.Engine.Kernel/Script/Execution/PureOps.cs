@@ -86,8 +86,27 @@ namespace Kesa.Engine.Script
                 case BinaryOp.FloorDivide:
                 case BinaryOp.Modulo:
                     return Arithmetic(op, left, right);
+                case BinaryOp.Power:
+                    return Power(left, right);
             }
             return null;
+        }
+
+        private static Value Power(Value left, Value right)
+        {
+            if (!IsNumber(left) || !IsNumber(right))
+                throw TypeError("unsupported operand types for '**': " + left.KindName + " and " + right.KindName);
+            if (!(right is IntValue exponent)) throw TypeError("the exponent of '**' must be an int, not " + right.KindName, "use sqrt() for a square root");
+            if (exponent.Value < 0) throw ArithmeticError("a negative exponent in '**'");
+            if (left is IntValue a)
+            {
+                if (!FixedFunctions.TryPower(a.Value, exponent.Value, out long whole)) throw ArithmeticError("integer overflow in '**'");
+                return IntValue.Of(whole);
+            }
+            if (exponent.Value > FixedFunctions.MaxFixedExponent)
+                throw ArithmeticError("the exponent of a fixed value in '**' must be at most " + FixedFunctions.MaxFixedExponent);
+            if (!FixedFunctions.TryPower(((FixedValue)left).Value, exponent.Value, out Fixed result)) throw ArithmeticError("fixed overflow in '**'");
+            return new FixedValue(result);
         }
 
         public static Value Arithmetic(BinaryOp op, Value left, Value right)

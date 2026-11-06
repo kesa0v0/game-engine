@@ -197,20 +197,26 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         // 로직에서 허용하지 않는 연산자·대입은 함수를 정의할 때 로드 오류다 (spec-gaps G96·G102). 재귀는 된다 (G452)
-        [TestCase("def f(h) -> int:\n    return 2 ** 3\n")]
         [TestCase("def f(h) -> int:\n    return 1 | 2\n")]
         [TestCase("def f(h) -> int:\n    return 1 << 2\n")]
         [TestCase("def f(h) -> int:\n    return ~1\n")]
-        [TestCase("def f(h) -> int:\n    x = 1\n    x **= 2\n    return x\n")]
         [TestCase("def f(h) -> int:\n    h[0] += 1\n    return 1\n")]
         [TestCase("def f(h) -> int:\n    for i in range(3):\n        if i is 3:\n            return 1\n    return 2\n")]
-        [TestCase("g = lambda h: h ** 2\n")]
+        [TestCase("g = lambda h: h ^ 2\n")]
         public void ForbiddenLogicConstructsAreLoadErrors(string schema)
         {
             Mod("core", schema: schema);
             var result = Load(out var diags);
             Assert.That(diags.Select(d => d.Code), Does.Contain(Codes.EvlUnsupported), string.Join("\n", diags));
             Assert.That(result.Disabled, Is.EqualTo(new[] { "core" }));
+        }
+
+        /// <summary>내장이 늘어도 같은 이름을 이미 쓰는 모드는 그대로 불린다 (G472).</summary>
+        [Test]
+        public void AModMayKeepItsOwnSqrtAndPi()
+        {
+            Mod("core", schema: "pi = 3\ndef sqrt(x) -> int:\n    return x\ndef f(h) -> int:\n    return sqrt(h) + pi\n");
+            Assert.That(LoadClean().Disabled, Is.Empty);
         }
 
         // ---- 함수 본문의 이름 검사 (spec-gaps G108) ----
