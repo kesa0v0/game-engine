@@ -4,6 +4,8 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
 
 ## 쓰는 법
 
+새 게임은 `engine new <이름>`으로 템플릿(`hosts/unity/template`, 설명은 그 README)에서 만드는 것이 쉽다. 손으로 붙이려면:
+
 1. 저장소 루트에서 `dotnet build`를 한다. `hosts/unity/Kesa.Engine.Unity.Plugins.csproj`가 커널·경계·번역·UI 해석과 Linguini의 DLL을 이 패키지의 `Plugins/`로 복사한다. 복사본은 git에 올라가지 않는다.
 2. 게임 프로젝트의 `Packages/manifest.json`에 적는다:
    ```json
@@ -104,6 +106,10 @@ Unity.exe -batchmode -nographics -projectPath <패키지를 manifest에 적은 �
 ## 데모 프로젝트
 
 `hosts/unity/demo`는 이 패키지를 `file:`로 가져다 쓰는 Unity 프로젝트다(`.gitignore`는 Unity 프로젝트용 템플릿). 먼저 저장소 루트에서 `dotnet build`를 한 뒤 Unity 6000.3으로 열고 `Assets/Scenes/Demo.unity`를 재생하면 `samples/skirmish`가 같은 프로세스에서 돌며 UXML 화면이 뜬다(`KesaDemo`). 창 없이 확인: `-executeMethod KesaDemoSetup.Check`(편집 모드는 프레임이 돌지 않아 `KesaDemo.Pass(밀리초)`로 시간을 넘기고 `Finish()`로 staged가 다 따라잡게 한다). 연출을 눈으로 따라가려면 재생 중 `KesaDemo`의 Playback Speed를 내린다(0.25면 4배 느림). 카메라가 비춘 판을 PNG로 보려면 `-nographics` 없이 `-executeMethod KesaDemoSetup.Shot -kesaShot <png 경로>`(패널은 들어가지 않는다).
+
+## 새 게임 템플릿
+
+`hosts/unity/template`은 `engine new`가 복사하는 빈 게임 프로젝트다(모드 선언만 있고 `GameHost`가 판을 연다). 쓰는 법과 copy·link 방식은 그 폴더의 README에 있다.
 
 ## 아직 없는 것
 

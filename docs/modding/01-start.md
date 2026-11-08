@@ -71,6 +71,8 @@ dotnet run --project src/Kesa.Engine.Cli -- check samples/guide
 
 (빌드한 실행 파일 이름은 `engine`이다: `engine check samples/guide`.)
 
+새 Unity 게임을 처음부터 만들 때는 `engine new <이름>`이 빈 판의 프로젝트를 만든다(`hosts/unity/template/README.md`).
+
 ```
 samples/guide/lighthouse/defs/patches.py:11:1: info PAT002: mod 'smuggler' is not loaded, so 1 patch call was not applied
 

@@ -29,7 +29,8 @@ namespace Kesa.Engine.Cli
             "usage: engine check <mods-dir> [--host <file>] [--json] [--warnings-as-errors]\n" +
             "       engine dump <mods-dir> [--host <file>]\n" +
             "       engine stubs <mods-dir> [--host <file>]\n" +
-            "       engine stages <mods-dir> [--host <file>]";
+            "       engine stages <mods-dir> [--host <file>]\n" +
+            "       engine new <name> [--dir <path>] [--id <mod-id>] [--engine copy|link] [--no-git]";
 
         /// <param name="args">명령 이름까지 포함한 전체 인자</param>
         public static int Run(string[] args, TextWriter stdout, TextWriter stderr)
@@ -38,6 +39,7 @@ namespace Kesa.Engine.Cli
             if (args.Length >= 1 && args[0] == "dump") return Dump(args[1..], stdout, stderr);
             if (args.Length >= 1 && args[0] == "stubs") return Stubs(args[1..], stdout, stderr);
             if (args.Length >= 1 && args[0] == "stages") return Stages(args[1..], stdout, stderr);
+            if (args.Length >= 1 && args[0] == "new") return NewGame.Run(args[1..], stdout, stderr);
             stderr.WriteLine(Usage);
             return ExitUsage;
         }

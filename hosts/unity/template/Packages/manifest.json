@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "uk.kesa.engine.unity": "file:../../uk.kesa.engine.unity",
+    "com.unity.modules.imageconversion": "1.0.0",
+    "com.unity.modules.uielements": "1.0.0"
+  }
+}

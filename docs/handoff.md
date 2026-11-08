@@ -1,6 +1,6 @@
 # 인계 메모
 
-마지막 갱신: 2026-11-07. 브랜치 `spec-v0.5-scaffold`, 테스트 3112개 통과(커널 2596, CLI 80, 콘솔 호스트 102, 번역 65, 경계 87, UI 175, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
+마지막 갱신: 2026-11-08. 브랜치 `spec-v0.5-scaffold`, 테스트 3122개 통과(커널 2596, CLI 90, 콘솔 호스트 102, 번역 65, 경계 87, UI 175, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
 
 ## 상태
 
@@ -13,6 +13,7 @@
 - 경계 `src/Kesa.Engine.Bridge`(커널을 모름)와 같은 프로세스 구현 `Bridge.Local`. 콘솔 호스트도 이 경계만 쓴다.
 - 그리지 않는 해석 `src/Kesa.Engine.Ui`(경계만 참조): UXML 화면(`UiInterpreter`, 창 G348~G355, 런타임 USS G359~G365, 질문 창 G380~G386)과 판 위 그림(`LookLibrary`·`LookStage`·`LookBoard`·`LookKinds`, 입력 `InputLibrary`). 시험은 `tests/Kesa.Engine.Ui.Tests`(메모리 렌더러, 진짜 `LocalHost`, skirmish).
 - Unity 패키지 `hosts/unity/uk.kesa.engine.unity`(입구 `LoadedMods.Load`·`mods.NewMatch`, `UiToolkitRenderer`, `GameObjectLookRenderer`, `ModInputs`)와 데모 `hosts/unity/demo`(`KesaDemo`). 패키지는 Input System 1.18.0, glTFast 6.20.0, 내장 animation 모듈에 기댄다. 호스트 개발자용 설명은 패키지 README.
+- 새 게임 템플릿 `hosts/unity/template`(빈 판, `GameHost`·`GameCheck`)과 `engine new <이름> [--engine copy|link]`(`src/Kesa.Engine.Cli/NewGame.cs`). copy(기본)는 패키지·안내서·CLI를 게임 안에 넣고, 넣은 CLI는 패키지 `Plugins/`의 DLL을 쓴다. copy로 만든 게임을 Unity 배치 모드에서 열어 `GAME CHECK: OK`를 확인했다. copy 게임에 엔진을 다시 넣는 명령은 없다(README에 "다시 복사"). 기존 게임(Commander·Weimar·Coup)은 옮기지 않았다.
 
 **월드 표시(G388~G437)는 skirmish가 쓰는 만큼 끝났다.** 모드는 `look`·`where` 칸과 `look()`·`at()`·`mark()`·`fx()`로 그림 이름과 자리만 말하고, 호스트가 그림 정의 `.look.xml`과 공간 `.space.xml`로 그린다(설계 G390·G391·G392·G394·G396·G399). 입력은 `@world_input`과 `.input.xml`(G416~G424). 효과 `@world_fx`(G425~G428), 연출 방식 `Mod(presentation="instant"|"staged")`(G429), staged는 화면이 세계를 따라잡을 때까지 연결마다 붙잡는다(G430·G437: `LookStage`의 재생 목록 하나, 판은 종류를 묻지 않음, 누름은 건너뛰기). 퇴장 `exit`(G431), 옮기기 `move`(G432). 그림 요소는 `Sprite`·`Text`·`Group`·`Model`이고 모델은 애니메이션 상태 `State`·`Clip`(G434), 뼈에 붙이기 `Attach`(G435), 색 `tint`·`Paint`(G436). Unity는 glTFast legacy 클립을 손으로 샘플한다(Mecanim 클립은 빌드에서 만들어지지 않음). 모델 크기 `scale`(G438). 모더 문서는 8장 "월드 표시: 그림과 자리"와 10장 표.
 
@@ -82,6 +83,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 루트에서 `dotnet build`와 `dotnet test`로 3112개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다.
+1. `git pull` 후 루트에서 `dotnet build`와 `dotnet test`로 3122개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다.
 2. `CLAUDE.md`와 이 문서를 읽는다. 필요한 `docs/spine-spec.md` 절과 결정(`list --tag …`·`show 번호`)만 본다. 판 위 그림은 `src/Kesa.Engine.Ui/Look*.cs`, UI 해석은 `UiInterpreter*.cs`, 커널 쪽 월드 표시는 `Runtime/World.Look.cs`·`World.Fx.cs`다.
 3. 위 "다음 할 일"의 후보와 `docs/engine-improvements.md`에 새로 적힌 것을 보고 사용자와 정한다. 작업 방식(한국어, 허락 질문으로 멈추지 않기, push는 사용자가 말할 때만 등)은 CLAUDE.md에 있다.
