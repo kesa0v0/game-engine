@@ -129,6 +129,7 @@ namespace Kesa.Engine.Cli.Tests
             StringAssert.DoesNotContain(Read(Template, "ProjectSettings/ProjectSettings.asset").Split('\n').First(l => l.Contains("productGUID")).Trim(), settings);
             Assert.That(Directory.EnumerateFiles(game, "*.md", SearchOption.AllDirectories).Where(f => File.ReadAllText(f).Contains("{{")), Is.Empty);
             Assert.That(File.Exists(Path.Combine(game, "README.md")), Is.False, "the template README stays in the engine");
+            StringAssert.Contains("*.dll filter=lfs", Read(game, ".gitattributes"));
             StringAssert.Contains("errors: 0, warnings: 0", _out.ToString());
         }
 

@@ -140,7 +140,11 @@ namespace Kesa.Engine.Cli
 
             stdout.WriteLine("created " + game + " (mod '" + id + "', engine " + mode + ")");
             foreach (var w in warnings) stdout.WriteLine("warning: " + w);
-            if (git && !GitInit(game)) stdout.WriteLine("warning: 'git init' failed; run it yourself");
+            if (git)
+            {
+                if (!Git(game, "init -q")) stdout.WriteLine("warning: 'git init' failed; run it yourself");
+                else if (!Git(game, "lfs install --local")) stdout.WriteLine("warning: 'git lfs install --local' failed; install Git LFS before the first commit (.gitattributes puts *.dll and art in LFS)");
+            }
 
             string mods = Path.Combine(game, "Assets", "StreamingAssets", "mods");
             string host = Path.Combine(game, "host", "game.host.json");
@@ -255,11 +259,11 @@ namespace Kesa.Engine.Cli
 
         private static void WriteText(string path, string text) => File.WriteAllText(path, text, new UTF8Encoding(false));
 
-        private static bool GitInit(string dir)
+        private static bool Git(string dir, string arguments)
         {
             try
             {
-                var start = new ProcessStartInfo("git", "init -q") { WorkingDirectory = dir, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+                var start = new ProcessStartInfo("git", arguments) { WorkingDirectory = dir, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
                 using var p = Process.Start(start);
                 if (p == null) return false;
                 p.WaitForExit();
