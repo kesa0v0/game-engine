@@ -26,6 +26,7 @@ Kesa 엔진의 Unity 호스트 (spec-gaps G323·G328·G347). 모드의 UXML 화�
    // ESC: if (!await ui.Windows.Escape()) 게임의 메뉴를 연다
    // 화면을 여러 해석기로 나눠도 창을 함께 겹칠 것은 렌더러 하나에 올린다(그 렌더러의 해석기들은 창 목록 하나를 쓴다, G354)
    ```
+4. 호스트 함수나 묶음 API(`Parts`·`WriteColumn`)에서 `World.Member`로 받은 핸들은 받은 로드에서만 쓴다. 모드를 다시 불러오면 핸들도 다시 받는다. 다른 로드의 핸들은 읽기·쓰기 모두 `ArgumentException`이다(G479·G493).
 
 ## 화면이 갱신되는 방식
 
