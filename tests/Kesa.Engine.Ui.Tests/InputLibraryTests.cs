@@ -96,7 +96,7 @@ namespace Kesa.Engine.Ui.Tests
                 "<Look name=\"x\" />"));
             Assert.That(library.Problems.Select(p => p.ToString()), Has.Some.Contain("'primary' is a built-in input"));
             Assert.That(library.Problems.Select(p => p.ToString()), Has.Some.Contain("<Input> needs a key"));
-            Assert.That(library.Problems.Select(p => p.ToString()), Has.Some.Contain("takes only name and key, got 'when'"));
+            Assert.That(library.Problems.Select(p => p.ToString()), Has.Some.Contain("takes only name, key and kind, got 'when'"));
             Assert.That(library.Problems.Select(p => p.ToString()), Has.Some.Contain("got <Look>"));
             Assert.That(library.Inputs.Keys, Is.EqualTo(new[] { "turn" }));
         }

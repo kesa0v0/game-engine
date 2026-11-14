@@ -39,17 +39,25 @@ namespace Kesa.Engine.Ui
     /// <summary><c>&lt;Input name="…" key="…"/&gt;</c> 하나 (G417).</summary>
     public sealed class InputDeclaration
     {
-        public InputDeclaration(string name, string mod, string place, InputChord key)
+        public InputDeclaration(string name, string mod, string place, InputChord key, string? kind = null, GestureShape? shape = null)
         {
             Name = name;
             Mod = mod;
             Place = place;
             Key = key;
+            Kind = kind;
+            Shape = shape;
         }
 
         public string Name { get; }
         public string Mod { get; }
         public string Place { get; }
         public InputChord Key { get; }
+
+        /// <summary><c>kind=</c>의 이름 (G489). 없으면 누름 입력이다.</summary>
+        public string? Kind { get; }
+
+        /// <summary>그 모양. 모르는 종류를 받아 주는 도구에서는 <see cref="Kind"/>가 있어도 null이다.</summary>
+        public GestureShape? Shape { get; }
     }
 }

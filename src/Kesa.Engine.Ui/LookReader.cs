@@ -291,7 +291,7 @@ namespace Kesa.Engine.Ui
         public static string Place(string path, XObject node) =>
             path + ":" + (node is IXmlLineInfo info && info.HasLineInfo() ? info.LineNumber : 0);
 
-        private static UiProblem Unverified(string place, string written, string what, string contents, string name, IEnumerable<string> standard) =>
+        internal static UiProblem Unverified(string place, string written, string what, string contents, string name, IEnumerable<string> standard) =>
             new UiProblem(place, written + ": not a standard " + what + "; fine if the game registers it, but its " + contents + " are not checked" +
                 UiSuggest.Hint(name, standard) + " (standard: " + string.Join(", ", standard) + ")", unverified: true);
 

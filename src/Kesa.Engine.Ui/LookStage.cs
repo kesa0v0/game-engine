@@ -37,6 +37,12 @@ namespace Kesa.Engine.Ui
         /// <summary>그리다 난 문제(같은 것은 한 번). 판은 막지 않는다 (G364·G392).</summary>
         public IReadOnlyList<UiProblem> Problems => _problems;
 
+        /// <summary>입력 선언 (주었으면). 판이 누름과 끌기를 가를 때 쓴다 (G485).</summary>
+        public InputLibrary? Inputs => _declared;
+
+        /// <summary>그 이름의 공간. 없으면 null.</summary>
+        public SpaceLayout? LayoutOf(string space) => _library.Spaces.TryGetValue(space, out var declared) ? declared.Layout : null;
+
         /// <summary>보이는 물체의 열쇠. 표시는 <c>mark:</c>, 엔티티는 <c>entity:</c>가 앞에 붙는다.</summary>
         public IEnumerable<string> Keys => _shown.Keys;
 
@@ -573,7 +579,7 @@ namespace Kesa.Engine.Ui
             return slash < 0 ? markKey : markKey.Substring(0, slash);
         }
 
-        private void Report(string place, string message)
+        internal void Report(string place, string message)
         {
             if (!_problemTexts.Add(place + "\n" + message)) return;
             _problems.Add(new UiProblem(place, message));

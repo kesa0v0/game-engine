@@ -227,6 +227,19 @@ namespace Kesa.Engine.Ui
             place = null;
             return false;
         }
+
+        /// <summary>
+        /// 자리가 정수 칸 <c>(x, y)</c>인 공간이면 그 칸 (G482: <c>path</c>가 건너뛴 칸을 메우고 <c>lasso</c>가 안을 채운다). 아니면 false.
+        /// 이것이 참인 공간은 <see cref="Cell"/>도 준다.
+        /// </summary>
+        public virtual bool TryCell(BridgeValue place, out long x, out long y)
+        {
+            x = y = 0;
+            return false;
+        }
+
+        /// <summary>칸 <c>(x, y)</c>의 자리 값. <see cref="TryCell"/>이 참인 공간만 부른다.</summary>
+        public virtual BridgeValue Cell(long x, long y) => throw new NotSupportedException("this space has no cells");
     }
 
     /// <summary>게임 코드 없이는 만들 수 없는 공간의 자리 표시 (G480). 그리는 데 쓰지 않고 이름만 이어 준다.</summary>

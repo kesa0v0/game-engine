@@ -136,6 +136,19 @@ namespace Kesa.Engine.Ui
                 }
             }
 
+            // 바닥의 칸만: 높이가 있는 자리는 칸 모양(path 메우기·lasso)에 들지 않는다
+            public override bool TryCell(BridgeValue place, out long x, out long y)
+            {
+                x = y = 0;
+                if (!(place is BridgeList list) || list.Items.Count != 2 || !(list.Items[0] is BridgeInt a) || !(list.Items[1] is BridgeInt b))
+                    return false;
+                x = a.Value;
+                y = b.Value;
+                return true;
+            }
+
+            public override BridgeValue Cell(long x, long y) => new BridgeList(new BridgeValue[] { new BridgeInt(x), new BridgeInt(y) });
+
             /// <summary>가장 가까운 칸: <paramref name="d"/>/<paramref name="cell"/>을 반올림(음수도 아래로 내림한 뒤).</summary>
             private static long Nearest(long d, long cell)
             {

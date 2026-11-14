@@ -7,7 +7,7 @@ namespace Kesa.Engine.Ui
 {
     /// <summary>
     /// 그림 요소 종류, 공간 종류, 카메라 리그를 등록하는 자리 (G390·G394·G413·G442). <see cref="Standard"/>가 기본 종류(<c>Sprite</c>·<c>Text</c>·<c>Model</c>·<c>Group</c>·<c>grid</c>·<c>top</c>·<c>tilted</c>)를
-    /// 넣은 것을 주고 게임은 여기에 제 종류를 더한다. 해석기는 기본 종류를 따로 알지 않는다.
+    /// 넣은 것을 주고 게임은 여기에 제 종류를 더한다. 입력의 모양 종류(<c>path</c>·<c>lasso</c>, G482)도 여기다. 해석기는 기본 종류를 따로 알지 않는다.
     /// </summary>
     public sealed class LookKinds
     {
@@ -115,6 +115,8 @@ namespace Kesa.Engine.Ui
                 ["turn"] = LookAttributeType.Number,
             }, acceptsChildren: true));
             kinds.Add(new GridSpace());
+            kinds.Add(new PathGesture());
+            kinds.Add(new LassoGesture());
             kinds.Add(new ViewRig("top", new SortedDictionary<string, LookAttributeType>(StringComparer.Ordinal)
             {
                 ["size"] = LookAttributeType.Number,
@@ -277,5 +279,18 @@ namespace Kesa.Engine.Ui
         public bool TryGetElement(string name, out LookElementKind kind) => _elements.TryGetValue(name, out kind!);
 
         public bool TryGetSpace(string name, out SpaceKind kind) => _spaces.TryGetValue(name, out kind!);
+
+        private readonly SortedDictionary<string, GestureKind> _gestures = new SortedDictionary<string, GestureKind>(StringComparer.Ordinal);
+
+        /// <summary>입력의 모양 종류 (G482·G489, 기본 <c>path</c>·<c>lasso</c>).</summary>
+        public void Add(GestureKind kind)
+        {
+            if (_gestures.ContainsKey(kind.Name)) throw new ArgumentException("the input kind '" + kind.Name + "' is already registered");
+            _gestures.Add(kind.Name, kind);
+        }
+
+        public IEnumerable<string> GestureNames => _gestures.Keys;
+
+        public bool TryGetGesture(string name, out GestureKind kind) => _gestures.TryGetValue(name, out kind!);
     }
 }
