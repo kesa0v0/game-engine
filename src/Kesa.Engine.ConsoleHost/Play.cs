@@ -19,7 +19,7 @@ namespace Kesa.Engine.ConsoleHost
     /// </summary>
     public static class Play
     {
-        public const string Usage = "usage: kesa-play <mods-dir> --seat <connection>[=<Def>] [--seat <connection>[=<Def>]...] [--seed <n>] [--lang <tag>[,<tag>...]]";
+        public const string Usage = "usage: kesa-play <mods-dir> --seat <connection>[=<Def>] [--seat <connection>[=<Def>]...] [--seed <n>] [--lang <tag>[,<tag>...]] [--max-moves <n>]";
 
         public static int Run(string[] args, TextReader stdin, TextWriter stdout, TextWriter stderr)
         {
@@ -27,6 +27,7 @@ namespace Kesa.Engine.ConsoleHost
             var seats = new List<(string Connection, string? Def)>();
             int seed = 1;
             string[]? languages = null;
+            int maxMoves = ConsoleGame.DefaultMaxMoves;
             for (int i = 0; i < args.Length; i++)
             {
                 string? value = args[i] == "--seat" && i + 1 < args.Length ? args[i + 1] : null;
@@ -43,6 +44,8 @@ namespace Kesa.Engine.ConsoleHost
                 }
                 else if (args[i] == "--seed" && i + 1 < args.Length &&
                          int.TryParse(args[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out seed)) i++;
+                else if (args[i] == "--max-moves" && i + 1 < args.Length &&
+                         int.TryParse(args[i + 1], NumberStyles.None, CultureInfo.InvariantCulture, out maxMoves) && maxMoves > 0) i++;
                 else if (args[i] == "--lang" && i + 1 < args.Length && languages == null &&
                          Array.TrueForAll(args[i + 1].Split(','), LanguageTag.IsValid))
                     languages = args[++i].Split(',');
@@ -79,7 +82,7 @@ namespace Kesa.Engine.ConsoleHost
                 foreach (var line in wrong) stderr.WriteLine(line);
                 return 1;
             }
-            new ConsoleGame(host, seats, panels, Translator(content, languages ?? DefaultLanguages(), stderr), stdin, stdout).Run();
+            new ConsoleGame(host, seats, panels, Translator(content, languages ?? DefaultLanguages(), stderr), stdin, stdout, maxMoves).Run();
             return 0;
         }
 

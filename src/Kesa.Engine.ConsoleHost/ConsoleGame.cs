@@ -16,8 +16,10 @@ namespace Kesa.Engine.ConsoleHost
     /// </summary>
     public sealed class ConsoleGame
     {
-        /// <summary>커맨드 하나에서 보여 줄 합법 수의 상한.</summary>
-        public const int MaxMoves = 50;
+        /// <summary>커맨드 하나에서 보여 줄 합법 수의 기본 상한. <c>--max-moves</c>로 바꾼다 (G492).</summary>
+        public const int DefaultMaxMoves = 50;
+
+        private readonly int _maxMoves;
 
         private readonly IHostOperator _host;
         /// <summary>연결마다 앉힐 Def. 그 Def의 엔티티가 생기면 앉힌다. Def가 null이면 후보가 생길 때 고르게 묻는다.</summary>
@@ -42,9 +44,11 @@ namespace Kesa.Engine.ConsoleHost
         public const string MeParameter = "me";
 
         public ConsoleGame(IHostOperator host, IReadOnlyList<(string Connection, string? Def)> seats,
-            IReadOnlyList<ConsoleUi.Panel> panels, Translator translator, TextReader input, TextWriter output)
+            IReadOnlyList<ConsoleUi.Panel> panels, Translator translator, TextReader input, TextWriter output,
+            int maxMoves = DefaultMaxMoves)
         {
             _host = host;
+            _maxMoves = maxMoves;
             _wanted = seats;
             _panels = panels;
             _seats = seats.Select(s => s.Connection).Distinct().ToList();
@@ -115,6 +119,8 @@ namespace Kesa.Engine.ConsoleHost
                     if (int.TryParse(line.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int n) &&
                         n >= 1 && n <= options.Count)
                         picked = options[n - 1];
+                    else if (line.IndexOf('(') >= 0)
+                        picked = Typed(line);
                     else
                         _out.WriteLine(_text.Say("pick-number", ("n", Int(options.Count))));
                 }
@@ -307,7 +313,8 @@ namespace Kesa.Engine.ConsoleHost
                 foreach (var request in Wait(session.OpenRequests()))
                 {
                     // 선택지 답(engine.pick)과 응답 커맨드가 한 목록이고 어느 것이든 Respond로 낸다 (G272).
-                    var responses = Wait(session.LegalResponses(request.Id, MaxMoves));
+                    var responses = Wait(session.LegalResponses(request.Id, _maxMoves));
+                    if (responses.Truncated) Truncated(_text.Say("question-name", ("id", Int(request.Id))));
                     foreach (var move in responses.Moves)
                     {
                         string label = move.Command == BridgeNames.Pick
@@ -324,7 +331,7 @@ namespace Kesa.Engine.ConsoleHost
                 foreach (var command in Wait(session.Commands()))
                 {
                     if (!command.Free) continue;
-                    foreach (var move in Moves(command.Name, Wait(session.LegalMoves(command.Name, new Dictionary<string, BridgeValue>(), MaxMoves))))
+                    foreach (var move in Moves(command.Name, Wait(session.LegalMoves(command.Name, new Dictionary<string, BridgeValue>(), _maxMoves))))
                         options.Add(new Option(seat, Label(command.Name, move.Arguments),
                             () => Text(Wait(session.Submit(command.Name, move.Arguments)))));
                 }
@@ -349,7 +356,7 @@ namespace Kesa.Engine.ConsoleHost
                     : new[] { (IReadOnlyDictionary<string, BridgeValue>)new Dictionary<string, BridgeValue>() };
                 foreach (var given in givens)
                 {
-                    foreach (var move in Moves(action.Name, Wait(session.LegalUiMoves(action.Name, given, MaxMoves))))
+                    foreach (var move in Moves(action.Name, Wait(session.LegalUiMoves(action.Name, given, _maxMoves))))
                     {
                         var shown = move.Arguments.Where(p => !(takesMe && p.Key == MeParameter)).ToDictionary(p => p.Key, p => p.Value);
                         options.Add(new Option(seat, _text.Say("screen") + " " + Label(action.Name, shown),
@@ -357,6 +364,46 @@ namespace Kesa.Engine.ConsoleHost
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// 번호 대신 적은 <c>[연결:] 이름(인자=값)</c> (G492). 자유 커맨드면 <c>Submit</c>, 화면 동작이면 <c>Act</c>. 나열에 없는 수도 낸다.
+        /// 읽지 못하거나 낼 곳이 없으면 알리고 null.
+        /// </summary>
+        private Option? Typed(string line)
+        {
+            var typed = CommandText.Parse(line, out string error);
+            if (typed == null)
+            {
+                _out.WriteLine(_text.Say("typed-bad", ("why", Str(error))));
+                return null;
+            }
+            string? seat = typed.Seat ?? (_seats.Count == 1 ? _seats[0] : null);
+            if (seat == null || !_seats.Contains(seat))
+            {
+                _out.WriteLine(_text.Say("typed-seat", ("seats", Str(string.Join(", ", _seats)))));
+                return null;
+            }
+            var session = Session(seat);
+            string label = Label(typed.Name, typed.Arguments);
+            var answering = Wait(session.OpenRequests()).Where(r => r.Responses.Contains(typed.Name)).ToList();
+            if (answering.Count > 1)
+            {
+                _out.WriteLine(_text.Say("typed-many", ("command", Str(typed.Name)),
+                    ("ids", Str(string.Join(", ", answering.Select(r => r.Id.ToString(CultureInfo.InvariantCulture)))))));
+                return null;
+            }
+            if (answering.Count == 1)
+            {
+                long request = answering[0].Id;
+                return new Option(seat, label, () => Text(Wait(session.Respond(request, typed.Name, typed.Arguments))));
+            }
+            if (Wait(session.Commands()).Any(c => c.Free && c.Name == typed.Name))
+                return new Option(seat, label, () => Text(Wait(session.Submit(typed.Name, typed.Arguments))));
+            if (Wait(session.UiActions()).Any(a => a.Name == typed.Name))
+                return new Option(seat, label, () => Act(session, typed.Name, typed.Arguments));
+            _out.WriteLine(_text.Say("typed-unknown", ("command", Str(typed.Name))));
+            return null;
         }
 
         private string Act(IHostSession session, string action, IReadOnlyDictionary<string, BridgeValue> move)
@@ -378,8 +425,11 @@ namespace Kesa.Engine.ConsoleHost
                 if (problem.Kind != BridgeReasonKind.Error) continue;
                 _out.WriteLine(_text.Say("cannot-list", ("command", Str(command)), ("why", Str(problem.Message ?? ""))));
             }
+            if (list.Truncated) Truncated(command);
             return list.Moves;
         }
+
+        private void Truncated(string what) => _out.WriteLine(_text.Say("truncated", ("command", Str(what)), ("n", Int(_maxMoves))));
 
         private string Label(string command, IReadOnlyDictionary<string, BridgeValue> move) =>
             command + "(" + string.Join(", ", move.Select(p => p.Key + "=" + _text.Of(p.Value))) + ")";

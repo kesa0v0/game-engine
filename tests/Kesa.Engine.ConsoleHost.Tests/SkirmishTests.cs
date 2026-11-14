@@ -217,6 +217,33 @@ namespace Kesa.Engine.ConsoleHost.Tests
             Assert.That(Regex.Matches(screen.ToString(), "1부터 1 사이의 번호").Count, Is.EqualTo(2));
         }
 
+        // 번호 대신 커맨드를 적어 낸다. 자리가 여럿이면 연결을 앞에 적고, 열린 질문의 답이면 그 질문에 낸다 (G492)
+        [Test]
+        public void ATypedCommandIsSubmittedForItsSeat()
+        {
+            var screen = new StringWriter();
+            Play.Run(new[] { "--lang", "ko", Samples(), "--seat", "red=skirmish:Red", "--seat", "blue=skirmish:Blue" },
+                new StringReader("skirmish.Start()\nred: skirmish.Nope()\nred: skirmish.Start(x=\nred: skirmish.Start()\n" +
+                                 "red: skirmish.Move(dir=\"north\", party=#1, unit=#5)\n:q\n"), screen, new StringWriter());
+            string text = screen.ToString();
+            Assert.That(text, Does.Contain("앞에 연결을 적는다. 연결은 red, blue 중 하나"));
+            Assert.That(text, Does.Contain("skirmish.Nope는 자유 커맨드도, 열린 질문의 답도, 화면 동작도 아니다"));
+            Assert.That(text, Does.Contain("커맨드를 읽을 수 없다: a value is expected"));
+            Assert.That(Regex.Matches(text, @"> \[red\] ok").Count, Is.EqualTo(2));
+            Assert.That(text, Does.Contain("{unit: #5 궁수, x: 2, y: 3"));
+        }
+
+        [Test]
+        public void ACutListSaysSoAndTheLimitIsAnOption()
+        {
+            var screen = new StringWriter();
+            Play.Run(new[] { "--lang", "ko", Samples(), "--seat", "red=skirmish:Red", "--max-moves", "1" },
+                new StringReader("1\n:q\n"), screen, new StringWriter());
+            Assert.That(screen.ToString(), Does.Contain("의 수는 앞의 1개만 보인다"));
+            Assert.That(Play.Run(new[] { "--lang", "ko", Samples(), "--seat", "red", "--max-moves", "0" }, new StringReader(""),
+                new StringWriter(), new StringWriter()), Is.EqualTo(2));
+        }
+
         [Test]
         public void MissingSeatsOrFolderAreUsageErrors()
         {
