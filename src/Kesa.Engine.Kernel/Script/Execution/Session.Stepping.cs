@@ -458,6 +458,7 @@ namespace Kesa.Engine.Script
                     break;
                 case BinaryOp.Add:
                 case BinaryOp.Multiply:
+                case BinaryOp.Merge:
                     Charge(Size(result));
                     break;
                 case BinaryOp.Power:

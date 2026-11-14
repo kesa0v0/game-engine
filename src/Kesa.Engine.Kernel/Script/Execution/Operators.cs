@@ -15,6 +15,8 @@ namespace Kesa.Engine.Script
         FloorDivide,
         Modulo,
         Power,
+        /// <summary><c>|</c>: dict끼리 합치기만 된다 (G491). 비트 연산은 그대로 없다.</summary>
+        Merge,
         Equal,
         NotEqual,
         Less,
@@ -50,6 +52,7 @@ namespace Kesa.Engine.Script
                 case "//": return BinaryOp.FloorDivide;
                 case "%": return BinaryOp.Modulo;
                 case "**": return BinaryOp.Power;
+                case "|": return BinaryOp.Merge;
                 case "==": return BinaryOp.Equal;
                 case "!=": return BinaryOp.NotEqual;
                 case "<": return BinaryOp.Less;
@@ -95,6 +98,7 @@ namespace Kesa.Engine.Script
                 case BinaryOp.FloorDivide: return "//";
                 case BinaryOp.Modulo: return "%";
                 case BinaryOp.Power: return "**";
+                case BinaryOp.Merge: return "|";
                 case BinaryOp.Equal: return "==";
                 case BinaryOp.NotEqual: return "!=";
                 case BinaryOp.Less: return "<";

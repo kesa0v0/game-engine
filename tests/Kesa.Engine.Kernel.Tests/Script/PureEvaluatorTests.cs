@@ -416,6 +416,25 @@ namespace Kesa.Engine.Tests.Script
             Assert.That(Show(Call("def f():\n    s = \"a\"\n    s += \"b\"\n    return s\n", "f")), Is.EqualTo("ab"));
         }
 
+        // dict 합치기 a | b는 새 dict를 만든다: 왼쪽 순서, 같은 키는 그 자리에서 오른쪽 값, 새 키는 뒤 (파이썬, G491)
+        [Test]
+        public void MergingDictsKeepsTheLeftOrderAndTheRightValues()
+        {
+            const string source = "def f():\n    a = {\"x\": 1, \"y\": 2}\n    b = a\n    a = a | {\"z\": 3, \"x\": 9}\n" +
+                                  "    return [k for k in a] == [\"x\", \"y\", \"z\"] and a[\"x\"] == 9 and len(b) == 2 and b[\"x\"] == 1\n";
+            Assert.That(Show(Call(source, "f")), Is.EqualTo("True"));
+        }
+
+        [TestCase("{1: 2} | 3", "unsupported operand types for '|': dict and int", "only merges two dicts")]
+        [TestCase("True | False", "unsupported operand types for '|': bool and bool", "only merges two dicts")]
+        [TestCase("{1: 2} + {3: 4}", "unsupported operand types for '+': dict and dict", "a | b")]
+        public void PipeIsOnlyForDicts(string expression, string message, string hint)
+        {
+            var e = EvalFails(expression);
+            Assert.That(e.Message, Does.Contain(message));
+            Assert.That(e.Hint, Does.Contain(hint));
+        }
+
         // ---- 호스트 값 (G103) ----
 
         [Test]

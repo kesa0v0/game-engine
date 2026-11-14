@@ -88,8 +88,38 @@ namespace Kesa.Engine.Script
                     return Arithmetic(op, left, right);
                 case BinaryOp.Power:
                     return Power(left, right);
+                case BinaryOp.Merge:
+                    return Merge(left, right);
             }
             return null;
+        }
+
+        /// <summary>파이썬 <c>a | b</c>: 왼쪽 순서를 두고 같은 키는 그 자리에서 오른쪽 값, 새 키는 뒤에 (G491).</summary>
+        private static Value Merge(Value left, Value right)
+        {
+            if (!(left is DictValue a) || !(right is DictValue b))
+            {
+                throw TypeError("unsupported operand types for '|': " + left.KindName + " and " + right.KindName,
+                    "'|' only merges two dicts; bit operations are not supported (spec-gaps G491)");
+            }
+            var items = new List<DictItem>(a.Items.Count + b.Items.Count);
+            items.AddRange(a.Items);
+            int leftCount = items.Count;
+            foreach (var item in b.Items)
+            {
+                int at = -1;
+                for (int i = 0; i < leftCount; i++)
+                {
+                    if (ValuesEqual(items[i].Key, item.Key))
+                    {
+                        at = i;
+                        break;
+                    }
+                }
+                if (at < 0) items.Add(item);
+                else items[at] = new DictItem(items[at].Key, item.Value, items[at].Span);
+            }
+            return new DictValue(items);
         }
 
         private static Value Power(Value left, Value right)
@@ -129,7 +159,10 @@ namespace Kesa.Engine.Script
             if (!IsNumber(left) || !IsNumber(right))
             {
                 throw TypeError("unsupported operand types for '" + Operators.Symbol(op) + "': " + left.KindName + " and " +
-                                right.KindName, ListHint(left) ?? ListHint(right));
+                                right.KindName, ListHint(left) ?? ListHint(right) ??
+                                (op == BinaryOp.Add && left is DictValue && right is DictValue
+                                    ? "merge two dicts with a | b (spec-gaps G491)"
+                                    : null));
             }
 
             if (op == BinaryOp.Divide) return Divide(left, right);

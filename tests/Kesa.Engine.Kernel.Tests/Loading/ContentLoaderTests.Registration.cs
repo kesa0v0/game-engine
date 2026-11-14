@@ -197,7 +197,8 @@ namespace Kesa.Engine.Tests.Loading
         }
 
         // 로직에서 허용하지 않는 연산자·대입은 함수를 정의할 때 로드 오류다 (spec-gaps G96·G102). 재귀는 된다 (G452)
-        [TestCase("def f(h) -> int:\n    return 1 | 2\n")]
+        [TestCase("def f(h) -> int:\n    return 1 & 2\n")]
+        [TestCase("def f(h) -> int:\n    d = {}\n    d |= {\"a\": 1}\n    return 1\n")]
         [TestCase("def f(h) -> int:\n    return 1 << 2\n")]
         [TestCase("def f(h) -> int:\n    return ~1\n")]
         [TestCase("def f(h) -> int:\n    h[0] += 1\n    return 1\n")]

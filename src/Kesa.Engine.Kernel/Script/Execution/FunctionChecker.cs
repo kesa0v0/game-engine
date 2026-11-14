@@ -364,7 +364,6 @@ namespace Kesa.Engine.Script
                         switch (bin.Op)
                         {
                             case "&":
-                            case "|":
                             case "^":
                             case "<<":
                             case ">>":
