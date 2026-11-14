@@ -34,7 +34,6 @@
 
 - 끌기를 Unity 플레이 모드에서 진짜 마우스로: Coup처럼 `kind=` 입력이 있는 모드로 누름(뗄 때)·끌기·Shift/Alt·ESC 취소·미리 보기를 본다.
 - IL2CPP 실행: 이 컴퓨터에 모듈이 없다. 있으면 `hosts/unity/bulk-check`의 README대로 `-kesaIl2cpp`.
-- G480·G481의 "사용자 확인 전" 항목: `LOK002`를 따로 둔 것, CLI에 적은 `.glb`·`.gltf`, USS 문제를 오류로 낸 것.
 
 ### 성능 후보
 
