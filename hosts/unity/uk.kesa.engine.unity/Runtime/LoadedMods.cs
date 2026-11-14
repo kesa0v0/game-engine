@@ -85,8 +85,10 @@ namespace Kesa.Engine.Unity
             var folders = content.Mods.Select(m => Path.Combine(content.ModsRoot, m.Directory)).ToList();
             var assets = new ModFolderAssets(folders);
             var sources = HostSources(content).ToList();
-            var looks = LookLibrary.Load(sources, lookKinds ?? GameObjectLookRenderer.StandardKinds(), path => assets.Find(path) != null);
-            var inputs = InputLibrary.Load(sources, ModInputs.KeyNames);
+            var kinds = lookKinds ?? GameObjectLookRenderer.StandardKinds();
+            var looks = LookLibrary.Load(sources, kinds, path => assets.Find(path) != null);
+            // 입력의 모양 종류(kind=)도 같은 등록 자리에서 찾는다 (G489)
+            var inputs = InputLibrary.Load(sources, ModInputs.KeyNames, kinds);
             return new LoadedMods(content, translator, assets, folders, bag.ToSortedList(), looks, inputs);
         }
 

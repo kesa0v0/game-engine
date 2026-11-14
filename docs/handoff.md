@@ -1,6 +1,6 @@
 # 인계 메모
 
-마지막 갱신: 2026-11-08. 브랜치 `spec-v0.5-scaffold`, 테스트 3122개 통과(커널 2596, CLI 90, 콘솔 호스트 102, 번역 65, 경계 87, UI 175, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
+마지막 갱신: 2026-11-14. 브랜치 `spec-v0.5-scaffold`, 테스트 3149개 통과(커널 2596, CLI 90, 콘솔 호스트 102, 번역 65, 경계 94, UI 190, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
 
 ## 상태
 
@@ -19,6 +19,8 @@
 
 **방향과 카메라(G440~G447):** 공간 종류가 자리마다 틀(위·북·동·떠오름)을 주고 `offset`·`drift`는 동·북·위, `turn`은 위에서 본 시계 방향, `Sprite`·`Text`는 바닥에 눕고 `face="camera"`면 빌보드, `rise`는 공간이 푸는 지름길. 카메라는 `.view.xml`의 이름 있는 `<View rig>`이고(커널은 모름) 리그 속성 규칙은 `LookKinds`, 움직이는 것은 Unity `BoardCamera`(`top`·`tilted`, 가운데 단추 끌기·휠). 켤 모드 목록 `ModSorter.Sort(discovery, enabled, bag)`(G439). `samples/skirmish/fox`는 skirmish 위의 덧붙임 모드다(Khronos Fox 모델, 판을 3D 바닥 `xz`와 기울인 카메라로 덮음). 데모는 `enabledMods`가 비면 다 켜므로 여우가 보이고, `skirmish`만 켜면 전과 같은 2D다(바이트까지 같음을 Shot으로 확인).
 
+**판 위 끌기와 커서(G482~G490, Coup에서 나옴):** `.input.xml`의 `kind="path"|"lasso"`(모양 종류는 `LookKinds`에 공간 종류처럼 등록, `PathGesture`·`LassoGesture`), 핸들러는 공간 대상만 받고 모양의 값 하나를 받는다. 포인터 단추의 누름은 뗄 때, 문턱을 넘으면 끌기(문턱은 호스트, Unity 데모 `dragThreshold`). 수정 키는 누를 때 정한다. 읽기 내장 `drag("입력")`·`cursor("공간")`은 화면 쪽만이고, 경계 `IHostSession.Cursor`·`Drag`가 키마다 바뀐 때를 `UiState`에 두어 읽은 함수만 다시 부른다. 판 쪽은 `LookBoard`의 `PointAsync`·`PressedAsync`·`DragAsync`·`ReleaseAsync`. 모더 문서는 8장 "끌어 그리기와 커서". 30×30 잰 값은 G482. **Unity 플레이 모드에서 진짜 마우스로 끌어 본 적은 없다**(창 없는 `SmokeTest`·`KesaDemoSetup.Check`만 통과). skirmish에는 끌기 입력이 없다.
+
 **사용자가 플레이 모드에서 확인함:** 화면 카드·창·모달·USS, 고르기·정보창·이동·공격, 옮기기, 맞는 효과(고리·피해 숫자), 빗나감 글, staged(봇이 기다림, 미끄러지는 중 클릭은 건너뛰기), 퇴장, 여우(3D 바닥·기울인 카메라·끌기·휠·피해 숫자). 데모 `KesaDemo`의 Playback Speed로 연출을 느리게 볼 수 있다. **본 적 없는 것:** 질문 기본 창의 모양(`kesa-question`), IL2CPP 빌드.
 
 ## 다음 할 일
@@ -30,9 +32,9 @@
 
 ### 확인이 남은 것 (작음)
 
-- Unity 스모크 테스트: G481에서 `UiInterpreter`의 검사를 `UiChecker`로 옮긴 뒤 Unity에서 돌려 보지 않았다. UI 테스트와 Unity용 DLL 빌드만 통과했다(`SmokeTest.Run`, 아래 "참고").
+- 끌기를 Unity 플레이 모드에서 진짜 마우스로: Coup처럼 `kind=` 입력이 있는 모드로 누름(뗄 때)·끌기·Shift/Alt·ESC 취소·미리 보기를 본다.
+- G482의 "구현하며 정한 것 (사용자 확인 전)" 항목.
 - IL2CPP 실행: 이 컴퓨터에 모듈이 없다. 있으면 `hosts/unity/bulk-check`의 README대로 `-kesaIl2cpp`.
-- `KesaDemo`의 `Problems` 줄은 Unity에서 컴파일해 보지 않았다.
 - `Get`은 다른 로드의 핸들로 읽어도 이름으로 찾아 준다(쓰기만 거절, G479). 거절할지 미뤘다.
 - G480·G481의 "사용자 확인 전" 항목: `LOK002`를 따로 둔 것, CLI에 적은 `.glb`·`.gltf`, USS 문제를 오류로 낸 것.
 
@@ -58,7 +60,7 @@
 
 ### 쓸 곳이 생길 때 물을 것
 
-**쓸 곳이 생길 때 물을 계약(월드 표시):** `onto`·`between` 그리기(`onto`의 붙는 곳은 G435의 뼈 찾기를 다시 씀), 기본 공간(`at(값)`) 선언, 그림 파일 안의 `Include`, 다른 공간 종류(육각·연속·구역), 2D에서 z(지금은 경고하고 안 그림), 모델 `once` 애니메이션을 끝이 있는 재생으로 기다리기, 모델 색 마스크 텍스처, 모더가 고르는 글꼴, 커서·끌기 같은 입력 상태 읽기(G397), 멀티플레이에서 staged 단계가 쌓일 때 빨리 감기, 플레이어가 덮는 연출 설정(빠른 이동 등).
+**쓸 곳이 생길 때 물을 계약(월드 표시):** `onto`·`between` 그리기(`onto`의 붙는 곳은 G435의 뼈 찾기를 다시 씀), 기본 공간(`at(값)`) 선언, 그림 파일 안의 `Include`, 다른 공간 종류(육각·연속·구역), 2D에서 z(지금은 경고하고 안 그림), 모델 `once` 애니메이션을 끝이 있는 재생으로 기다리기, 모델 색 마스크 텍스처, 모더가 고르는 글꼴, 커서 아래 엔티티와 눌린 키 읽기(G397의 남은 것), 호스트가 그리는 기본 끌기 미리 보기(G487의 D), 멀티플레이에서 staged 단계가 쌓일 때 빨리 감기, 플레이어가 덮는 연출 설정(빠른 이동 등).
 카메라 쪽(G441에 적은 것): UXML 패널 안의 View(작은 지도·초상), View마다 다른 그림(지도 모드), 판과 따로인 무대, 모드가 카메라를 옮기거나 잠그라는 요청, View가 여럿일 때 빌보드가 어느 카메라를 볼지, 카메라 기울기 말고 롤, 키로 돌리기(생기면 `face="camera"` 피해 숫자가 돌려도 정면인지 플레이로 본다). 모든 여우가 북을 본다(진영마다 돌리려면 skirmish `unit_look`이 `turn` 값을 넘기고 그림이 `bind-turn`).
 
 **알려진 작은 어긋남:** 한 커맨드에서 물러나며 죽으면 고리는 물러난 자리, 퇴장은 붙잡힌 판이 마지막에 본 자리에서 날 수 있다(`SkirmishScreenTests.AFallenUnitShrinksAwayAfterTheStagedHit`). 모델 누르기는 메시의 경계 상자로 잰다. 모델은 미리 읽기에 들지 않는다.
@@ -83,6 +85,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 루트에서 `dotnet build`와 `dotnet test`로 3122개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다.
+1. `git pull` 후 루트에서 `dotnet build`와 `dotnet test`로 3149개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다.
 2. `CLAUDE.md`와 이 문서를 읽는다. 필요한 `docs/spine-spec.md` 절과 결정(`list --tag …`·`show 번호`)만 본다. 판 위 그림은 `src/Kesa.Engine.Ui/Look*.cs`, UI 해석은 `UiInterpreter*.cs`, 커널 쪽 월드 표시는 `Runtime/World.Look.cs`·`World.Fx.cs`다.
 3. 위 "다음 할 일"의 후보와 `docs/engine-improvements.md`에 새로 적힌 것을 보고 사용자와 정한다. 작업 방식(한국어, 허락 질문으로 멈추지 않기, push는 사용자가 말할 때만 등)은 CLAUDE.md에 있다.

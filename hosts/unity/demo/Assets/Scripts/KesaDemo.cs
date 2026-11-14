@@ -54,6 +54,11 @@ public sealed class KesaDemo : MonoBehaviour
 
     private float _playbackCarry;
 
+    [Tooltip("누른 채 이만큼(픽셀) 움직이면 누름이 아니라 끌기다 (G485). uGUI의 pixelDragThreshold와 같은 뜻")]
+    [SerializeField] private float dragThreshold = 10f;
+
+    private Vector2 _pressAt;
+
     [SerializeField] private string[] languages = { "ko", "en" };
 
     [Tooltip("판을 볼 View 이름 (모드의 .view.xml)")]
@@ -115,7 +120,7 @@ public sealed class KesaDemo : MonoBehaviour
         await game.Host.Seat(seat.Value, connection);
         var session = await game.Host.Open(connection);
         Session = session;
-        foreach (var p in mods.Inputs.CheckHandlers(await session.WorldInputs())) Debug.LogWarning("Kesa inputs: " + p);
+        foreach (var p in mods.Inputs.CheckHandlers(await session.WorldInputs(), mods.Looks.Spaces.Keys)) Debug.LogWarning("Kesa inputs: " + p);
 
         // 빈자리는 질문에 아무도 답하지 않아 판이 멈추므로 봇을 앉힌다 (G366)
         if (botSeatDef.Length > 0)
@@ -174,7 +179,10 @@ public sealed class KesaDemo : MonoBehaviour
         await RefreshBoard();
     }
 
-    /// <summary>패널 요소가 받지 않은 누름을 판에 넘긴다 (G395·G419·G422: 표시가 먼저, 다음 엔티티, 다음 빈 자리). 공개는 확인용.</summary>
+    /// <summary>
+    /// 패널 요소가 받지 않은 누름을 판에 넘긴다 (G395·G419·G422: 표시가 먼저, 다음 엔티티, 다음 빈 자리). 확인용: 누르고 그 자리에서 뗀 것과 같다
+    /// (플레이 중에는 <see cref="PointBoard"/>가 뗄 때 낸다, G485).
+    /// </summary>
     public async Task PressBoard(string input, Vector3 screenPoint)
     {
         var camera = Camera.main;
@@ -184,6 +192,34 @@ public sealed class KesaDemo : MonoBehaviour
         var result = await _board.InputAsync(input, _boardRenderer.KeysAt(ray), _boardRenderer.PlaceAt(_board.Stage, ray));
         if (result != null && !result.Succeeded) Debug.LogWarning("Kesa board press -> " + result);
         if (_ui != null) await _ui.RefreshAsync();
+    }
+
+    /// <summary>
+    /// 커서와 이번 프레임에 눌린 입력을 판에 넘긴다 (G485~G490). 키보드 입력은 바로 가고, 포인터 단추는 뗄 때 누름으로 가거나 문턱을 넘으면 끌기가 된다.
+    /// 패널 위는 판 밖으로 본다.
+    /// </summary>
+    private async Task PointBoard(IReadOnlyList<string> pressed, Vector2 screenPoint)
+    {
+        var camera = Camera.main;
+        if (_board == null || _boardRenderer == null || camera == null) return;
+        bool overPanel = OverPanel(screenPoint);
+        var ray = camera.ScreenPointToRay(screenPoint);
+        var place = overPanel ? null : _boardRenderer.PlaceAt(_board.Stage, ray);
+        await _board.PointAsync(place);
+        if (pressed.Count > 0 && !overPanel)
+        {
+            bool waiting = _board.Pressing;
+            foreach (var result in await _board.PressedAsync(pressed, _boardRenderer.KeysAt(ray), place)) Warn(result);
+            if (!waiting && _board.Pressing) _pressAt = screenPoint;
+        }
+        if (_board.Pressing && Vector2.Distance(_pressAt, screenPoint) > dragThreshold) await _board.DragAsync();
+        if ((_board.Pressing || _board.Dragging) && !ModInputs.PointerHeld)
+            foreach (var result in await _board.ReleaseAsync()) Warn(result);
+
+        static void Warn(BridgeResult result)
+        {
+            if (!result.Succeeded) Debug.LogWarning("Kesa board input -> " + result);
+        }
     }
 
     private async Task RefreshBoard()
@@ -302,12 +338,15 @@ public sealed class KesaDemo : MonoBehaviour
         _refreshing = true;
         try
         {
-            // 창이 ESC를 받지 않으면(거짓) 게임이 자기 메뉴를 열 자리다
-            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) await _ui.Windows.Escape();
+            // 끄는 중이면 ESC는 끌기를 그만둔다. 창이 ESC를 받지 않으면(거짓) 게임이 자기 메뉴를 열 자리다
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                if (_board != null && (_board.Pressing || _board.Dragging)) await _board.CancelPointerAsync();
+                else await _ui.Windows.Escape();
+            }
             MoveCamera();
             // 키 입력도 커서 아래로 간다 (G416: 가리킨 유닛에 F)
-            if (_inputs != null && Pointer.current != null)
-                foreach (var input in _inputs.PressedThisFrame()) await PressBoard(input, Pointer.current.position.ReadValue());
+            if (_inputs != null && Pointer.current != null) await PointBoard(_inputs.PressedThisFrame(), Pointer.current.position.ReadValue());
             // 연출을 붙잡는 동안 봇은 쉬고, 놓은 뒤에도 한 박자 쉰다 (G399)
             bool holding = _board?.Holding == true;
             if (_wasHolding && !holding) _botNext = Time.time + botDelay;

@@ -612,6 +612,66 @@ def press_square(cell: list[int]):
 - 커서 아래 엔티티가 그 입력을 받지 않으면(핸들러가 없거나 모두 막힘) 그 자리의 공간 핸들러가 받는다. 유닛이 선 칸도 그렇다.
 - `choose(cell, from_=[…])`로 갈 수 있는 칸을 적으면 콘솔도 수를 나열한다.
 
+마우스 단추(`primary`·`secondary`와 그 조합)의 누름은 **뗄 때** 간다. 누른 채 조금(호스트가 정한 거리) 움직이면 누름이 아니라 끌기가 되고, 그 누름은 가지 않는다.
+키보드 키는 누르는 순간 간다.
+
+### 끌어 그리기와 커서: `kind=`, `drag()`, `cursor()`
+
+판 위를 끌어 범위를 그리는 입력은 `.input.xml`에서 `kind=`로 모양을 고른다.
+
+```xml
+<Inputs>
+  <Input name="paint"        key="primary"         kind="lasso" />
+  <Input name="paint_add"    key="SHIFT + primary" kind="lasso" />
+  <Input name="paint_remove" key="ALT + primary"   kind="lasso" />
+  <Input name="route"        key="secondary"       kind="path" />
+</Inputs>
+```
+
+- `path`는 지나간 자리의 순서 목록이다. 바로 앞과 같은 자리는 넣지 않고, 칸 공간(`grid`)이면 빨리 움직여 건너뛴 칸도 메운다. 같은 칸을 다시 지나면 다시 들어간다.
+- `lasso`는 그린 고리(끝에서 시작까지 곧게 닫음)의 테두리와 안의 칸 목록이다. 위 줄부터, 줄 안에서는 왼쪽부터다. 칸 공간에서만 쓴다.
+- `kind=`가 붙은 입력의 키는 마우스 단추(`primary`·`secondary`)로 끝나야 한다. 모르는 종류는 "혹시 …?"와 함께 알리고 그 줄만 뺀다.
+  게임은 C#으로 제 종류를 더할 수 있다(공간 종류처럼).
+- 어느 입력인지는 단추를 **누를 때**의 수정 키로 정한다. 끌다가 Shift를 누르거나 떼도 바뀌지 않는다.
+- `kind=`가 붙은 입력은 끌기로만 간다. 누르고 바로 떼면 그 입력은 가지 않는다.
+
+끝난 끌기는 공간 핸들러가 받는다. 매개변수 하나에 그 모양의 값이 온다.
+
+```python
+@world_input("paint_add", "board")
+@ui_action
+def add_area(cells: list[list[int]]):
+    ...
+```
+
+- 대상은 공간 이름이어야 한다. 끌기를 시작한 칸에 유닛이 있어도 유닛 핸들러는 받지 않는다. 범위 안에 무엇이 있는지는 칸 목록으로 찾는다.
+- 끌기는 시작한 공간에서만 잰다. 다른 공간이나 판 밖을 지나는 동안의 자리는 빠진다.
+- 도구를 고르는 일(지역 칠하기 중인가 등)은 `ui.…`를 사전 조건으로 둔다. 막히면 다른 모드의 같은 핸들러로 넘어간다(위와 같은 규칙).
+- 대상이 공간 이름이 아니면 호스트가 로드 때 알린다.
+
+그리는 동안과 커서 아래는 읽기 내장으로 읽는다.
+
+```python
+@world_marks
+def paint_preview():
+    cells = drag("paint_add")          # 그 입력을 끄는 중이 아니면 None
+    if cells is None:
+        return []
+    return [mark("wash-green", at=at("board", c)) for c in cells]
+
+@world_marks
+def hover_hint():
+    cell = cursor("board")             # 커서가 board 위면 그 칸, 아니면 None
+    return [] if cell is None else [mark("hint", at=at("board", cell))]
+```
+
+- `drag("입력")`은 뗄 때 핸들러가 받을 값과 같은 모양의 지금까지 값이다(`lasso`면 지금까지 그린 것을 닫아 채운 칸들).
+- `cursor("공간")`은 그 공간의 자리 값만 준다. 커서 아래 유닛은 칸으로 찾는다.
+- 둘 다 `ui.…`처럼 화면 함수·칸 함수·`@world_marks`·`@ui_action`에서만 쓴다. 게임 코드와 `@bot`에서 쓰면 로드 오류다.
+- 읽은 함수만, 읽은 공간이나 입력의 값이 바뀔 때만 다시 불린다. 같은 칸 안에서 커서가 움직이면 다시 부르지 않는다.
+- 미리 보기는 칸이 바뀔 때마다 다시 계산된다. 30×30 판을 거의 다 덮는 올가미를 칸마다 표시 하나로 그리면 한 걸음에 수 ms가 든다.
+  넓은 범위는 테두리만 그리는 식으로 표시 수를 줄인다.
+
 ### 한 번 일어나는 효과: `@world_fx`와 `fx`
 
 맞는 순간의 숫자처럼 상태가 아닌 사건은 규칙이 신호를 내고(`emit(Hit(...))`), 화면 쪽 함수 `@world_fx(신호)`가 효과를 돌려준다.

@@ -41,6 +41,13 @@ namespace Kesa.Engine.Unity
                 .Select(i => i.Action.name).ToList();
         }
 
+        /// <summary>
+        /// 포인터 단추(<c>primary</c>·<c>secondary</c>)가 아직 눌려 있나. 판은 포인터 입력을 누를 때 붙잡아 두었다가 둘 다 떼면 낸다 (G485).
+        /// 수정 키 조합은 누를 때 이미 정했으므로(G486) 여기서는 단추만 본다.
+        /// </summary>
+        public static bool PointerHeld =>
+            Pointer.current != null && Pointer.current.press.isPressed || Mouse.current != null && Mouse.current.rightButton.isPressed;
+
         /// <summary>키 하나의 Input System 경로. <c>Digit1</c>은 <c>&lt;Keyboard&gt;/1</c>이다.</summary>
         public static string PathOf(string key)
         {

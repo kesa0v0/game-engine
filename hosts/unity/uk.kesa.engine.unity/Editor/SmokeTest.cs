@@ -488,7 +488,7 @@ namespace Kesa.Engine.Unity.Editor
         {
             Require(mods.Inputs.Problems.Count == 0, "input files read cleanly: " + string.Join("; ", mods.Inputs.Problems));
             var handlers = await session.WorldInputs();
-            var unknown = mods.Inputs.CheckHandlers(handlers);
+            var unknown = mods.Inputs.CheckHandlers(handlers, mods.Looks.Spaces.Keys);
             Require(handlers.Any(h => h.Input == "inspect") && unknown.Count == 0, "every skirmish handler has a key: " + string.Join("; ", unknown));
             Require(mods.Inputs.Inputs.TryGetValue("inspect", out var inspect) && inspect.Key.ToString() == "I", "skirmish declares inspect on I");
             var keyboard = InputSystem.AddDevice<Keyboard>();
