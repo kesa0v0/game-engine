@@ -26,7 +26,7 @@
 ## 다음 할 일
 
 **백본 전환의 세 단계를 마쳤다(G475~G478).** 값은 `World.Store.cs`의 Def 표(`DefTable`)와 곁표(`SideTable`)에 칼럼(`Column`)으로 있고, int·fixed·bool·Ref 칸은 `long` 배열이다. `Value` 클래스는 스크립트 쪽 표현으로 그대로 둔다. 호스트는 `World.Columns.cs`의 `Parts`와 `WriteColumn`으로 묶어 읽고 쓴다. Mono 플레이어와 Burst에서 도는 것은 `hosts/unity/bulk-check`로 확인했다(G478). 키 컴포넌트의 줄은 아직 사전이다(`KeyedRows`의 모양은 밖에 보인다). 저장 구조를 바꿀 때는 전체 테스트의 저장 해시를 전후로 비교한다(`SaveBytes`에 임시 훅, 커밋하지 않음).
-**엔진 작업은 사용자 말로 여기서 멈췄다(2026-11-07). 아래는 정한 일이 아니라 후보이고, 다시 시작할 때 사용자와 고른다.** Commander에서 나온 개선 후보는 대부분 끝났고(판 갱신 비용, 창구 읽기, `IHostOperator.Problems` G470, `heavy_warning_steps` G471, 수학 함수 G472, 걸음 합계 G473, `e.id` G474, 묶음 API G478, `engine check` 넓히기 G480·G481), 새로 만나는 것은 비워 둔 `docs/engine-improvements.md`에 적는다.
+**엔진 작업은 사용자 말로 여기서 멈췄다(2026-11-07, 개선 후보를 정리한 뒤 2026-11-15에 다시 멈추고 게임 쪽으로 감). 아래는 정한 일이 아니라 후보이고, 다시 시작할 때 사용자와 고른다.** Commander에서 나온 개선 후보는 대부분 끝났고(판 갱신 비용, 창구 읽기, `IHostOperator.Problems` G470, `heavy_warning_steps` G471, 수학 함수 G472, 걸음 합계 G473, `e.id` G474, 묶음 API G478, `engine check` 넓히기 G480·G481), 새로 만나는 것은 비워 둔 `docs/engine-improvements.md`에 적는다.
 
 봇 틀의 보완도 끝났다: 시험 두기, 로직 언어 속도의 잔손질, 큰 판 읽기. 점수 도우미는 공식으로 만들지 않고 모양만 `docs/std-ideas.md`에 뒀다(G469). 크기를 따르는 일은 그 양만큼 단계를 센다(G467). 긴 봇 생각이 화면을 막는 것은 호스트가 예산과 부르는 때로 다룬다(G468, Unity README "봇이 생각하는 시간").
 
