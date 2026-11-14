@@ -27,14 +27,18 @@ namespace Kesa.Engine.Numerics
         /// 블록 하나: 키 32바이트(<paramref name="key"/> 8워드), 블록 카운터, nonce 12바이트(<paramref name="nonce"/> 3워드)로
         /// 64바이트(<paramref name="output"/> 16워드, 리틀 엔디언 워드)를 낸다.
         /// </summary>
-        internal static void Block(uint[] key, uint counter, uint[] nonce, uint[] output)
+        internal static void Block(uint[] key, uint counter, uint[] nonce, uint[] output) => Block(key, counter, nonce[0], nonce[1], nonce[2], output);
+
+        internal static void Block(uint[] key, uint counter, uint nonce0, uint nonce1, uint nonce2, uint[] output)
         {
-            var s = new uint[16];
+            // 난수 뽑기마다 불리므로 힙에 만들지 않는다
+            System.Span<uint> s = stackalloc uint[16];
             s[0] = C0; s[1] = C1; s[2] = C2; s[3] = C3;
             for (int i = 0; i < 8; i++) s[4 + i] = key[i];
             s[12] = counter;
-            s[13] = nonce[0]; s[14] = nonce[1]; s[15] = nonce[2];
-            var x = (uint[])s.Clone();
+            s[13] = nonce0; s[14] = nonce1; s[15] = nonce2;
+            System.Span<uint> x = stackalloc uint[16];
+            s.CopyTo(x);
             for (int round = 0; round < 10; round++)
             {
                 // 열 라운드

@@ -529,13 +529,16 @@ namespace Kesa.Engine.Runtime
         {
             // 보이는 derived는 숨긴 칸으로 계산돼도 보인다 (G199): 계산은 실제 상태로
             if (member.Kind == MemberKind.Derived)
-                return _viewer == null ? ComputeDerived(entity, component, row, member)
-                    : Unviewed(() => ComputeDerived(entity, component, row, member));
+                return _viewer == null ? ComputeDerived(entity, component, row, member) : ComputeDerivedUnviewed(entity, component, row, member);
             if (row == null) return Read(null, component, member, DefMembers(entity, component), entity.Values);
             if (!FindRow(entity, component, row.Value, out var defRow, out var record))
                 throw NoRow(new EntityId(entity.Id), component, row.Value);
             return Read(row, component, member, defRow?.Members, record?.Values ?? ValueSlots.None);
         }
+
+        // 람다를 ReadMember 안에 두면 매개변수를 잡는 클로저가 모든 읽기마다 생긴다
+        private Value ComputeDerivedUnviewed(EntityRecord entity, ComponentType component, RowKey? row, MemberDecl member) =>
+            Unviewed(() => ComputeDerived(entity, component, row, member));
 
         // ---- 함수 본문이 보는 값 ----
 

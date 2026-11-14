@@ -61,6 +61,8 @@ namespace Kesa.Engine.Runtime
             _rand = new RandStream(id, before + 1, 0);
         }
 
+        [ThreadStatic] private static SHA256? _sha;
+
         private uint[] KeyOf(RandStream stream)
         {
             if (stream.Key != null) return stream.Key;
@@ -69,8 +71,9 @@ namespace Kesa.Engine.Runtime
             WriteLittleEndian(input, 0, _seed);
             WriteLittleEndian(input, 8, stream.Count);
             Array.Copy(id, 0, input, 16, id.Length);
-            byte[] digest;
-            using (var sha = SHA256.Create()) digest = sha.ComputeHash(input);
+            // Flow마다 새 키를 만들므로 해시 객체는 스레드마다 하나를 다시 쓴다
+            var sha = _sha ??= SHA256.Create();
+            byte[] digest = sha.ComputeHash(input);
             var key = new uint[8];
             for (int i = 0; i < 8; i++)
                 key[i] = digest[4 * i] | (uint)digest[4 * i + 1] << 8 | (uint)digest[4 * i + 2] << 16 | (uint)digest[4 * i + 3] << 24;
@@ -89,7 +92,7 @@ namespace Kesa.Engine.Runtime
         private sealed class Draws
         {
             private readonly uint[] _key;
-            private readonly uint[] _nonce;
+            private readonly long _n;
             private readonly uint[] _block = new uint[16];
             private int _blockNo = -1;
             private long _index;
@@ -97,7 +100,7 @@ namespace Kesa.Engine.Runtime
             public Draws(uint[] key, long n)
             {
                 _key = key;
-                _nonce = new[] { unchecked((uint)n), unchecked((uint)(n >> 32)), 0u };
+                _n = n;
             }
 
             public ulong Next()
@@ -105,7 +108,7 @@ namespace Kesa.Engine.Runtime
                 int block = checked((int)(_index / 8));
                 if (block != _blockNo)
                 {
-                    ChaCha20.Block(_key, (uint)block, _nonce, _block);
+                    ChaCha20.Block(_key, (uint)block, unchecked((uint)_n), unchecked((uint)(_n >> 32)), 0u, _block);
                     _blockNo = block;
                 }
                 int w = (int)(_index % 8);
