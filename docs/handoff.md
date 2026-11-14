@@ -1,6 +1,6 @@
 # 인계 메모
 
-마지막 갱신: 2026-11-14. 브랜치 `spec-v0.5-scaffold`, 테스트 3161개 통과(커널 2601, CLI 90, 콘솔 호스트 114, 번역 65, 경계 94, UI 190, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
+마지막 갱신: 2026-11-14. 브랜치 `spec-v0.5-scaffold`, 테스트 3163개 통과(커널 2603, CLI 90, 콘솔 호스트 114, 번역 65, 경계 94, UI 190, 결정 도구 7). 이 문서는 지금 상태와 다음 할 일만 둔다. 지난 기록은 커밋 메시지, 결정은 `docs/decisions/`(조회법은 CLAUDE.md "결정 기록")다.
 
 ## 상태
 
@@ -85,6 +85,6 @@
 
 ## 새 세션에서 시작하는 법
 
-1. `git pull` 후 루트에서 `dotnet build`와 `dotnet test`로 3161개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다.
+1. `git pull` 후 루트에서 `dotnet build`와 `dotnet test`로 3163개 통과를 확인한다. 클라우드 세션에서 .NET 9 SDK가 없으면 `apt-get install -y dotnet-sdk-10.0`으로 깔고 `cd /tmp && DOTNET_ROLL_FORWARD=Major dotnet test /home/user/game-engine/Kesa.Engine.slnx`로 돌린다. Unity 쪽 코드는 `dotnet test`에 안 들어간다.
 2. `CLAUDE.md`와 이 문서를 읽는다. 필요한 `docs/spine-spec.md` 절과 결정(`list --tag …`·`show 번호`)만 본다. 판 위 그림은 `src/Kesa.Engine.Ui/Look*.cs`, UI 해석은 `UiInterpreter*.cs`, 커널 쪽 월드 표시는 `Runtime/World.Look.cs`·`World.Fx.cs`다.
 3. 위 "다음 할 일"의 후보와 `docs/engine-improvements.md`에 새로 적힌 것을 보고 사용자와 정한다. 작업 방식(한국어, 허락 질문으로 멈추지 않기, push는 사용자가 말할 때만 등)은 CLAUDE.md에 있다.
