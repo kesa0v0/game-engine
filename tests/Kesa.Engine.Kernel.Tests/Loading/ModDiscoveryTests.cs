@@ -14,7 +14,7 @@ namespace Kesa.Engine.Tests.Loading
         [SetUp]
         public void SetUp()
         {
-            _root = Path.Combine(Path.GetTempPath(), "kesa-engine-tests", TestContext.CurrentContext.Test.ID);
+            _root = Path.Combine(Path.GetTempPath(), "kesa-engine-tests", System.Environment.ProcessId + "-" + TestContext.CurrentContext.Test.ID);
             if (Directory.Exists(_root)) Directory.Delete(_root, true);
             Directory.CreateDirectory(_root);
         }

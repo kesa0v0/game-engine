@@ -53,7 +53,7 @@ namespace Kesa.Engine.Bridge.Tests
         [SetUp]
         public async Task Open()
         {
-            _root = Path.Combine(Path.GetTempPath(), "kesa-engine-tests", TestContext.CurrentContext.Test.ID);
+            _root = Path.Combine(Path.GetTempPath(), "kesa-engine-tests", System.Environment.ProcessId + "-" + TestContext.CurrentContext.Test.ID);
             if (Directory.Exists(_root)) Directory.Delete(_root, true);
             Write("arena/schema/types.py", Schema);
             Write("arena/defs/defs.py", Defs);

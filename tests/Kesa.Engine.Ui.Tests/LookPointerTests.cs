@@ -37,7 +37,7 @@ namespace Kesa.Engine.Ui.Tests
         [SetUp]
         public async Task Open()
         {
-            _root = Path.Combine(Path.GetTempPath(), "kesa-engine-tests", TestContext.CurrentContext.Test.ID);
+            _root = Path.Combine(Path.GetTempPath(), "kesa-engine-tests", System.Environment.ProcessId + "-" + TestContext.CurrentContext.Test.ID);
             if (Directory.Exists(_root)) Directory.Delete(_root, true);
             Write("coup/schema/types.py",
                 "ui_state(\"Sel\", picked=field(int, default=0), painted=field(int, default=0), traced=field(int, default=0))\n");
