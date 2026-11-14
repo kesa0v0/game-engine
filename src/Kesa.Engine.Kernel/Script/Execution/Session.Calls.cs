@@ -330,8 +330,14 @@ namespace Kesa.Engine.Script
         /// <summary>끝나서 스택에서 내린 프레임을 다시 쓰도록 돌려준다.</summary>
         private void Recycle(Frame frame)
         {
+            var locals = frame.Locals;
             frame.Release();
             _spareFrames.Push(frame);
+            if (!locals.Captured)
+            {
+                locals.Reset(locals.Layout);
+                _spareTables.Push(locals);
+            }
         }
 
         /// <summary>
@@ -340,12 +346,23 @@ namespace Kesa.Engine.Script
         /// </summary>
         private LocalTable NewLocals(FunctionValue fn, LocalTable? captured)
         {
-            if (fn.Definition != null) return new LocalTable(PureEvaluator.LayoutOf(fn.Definition));
+            if (fn.Definition != null) return RentTable(PureEvaluator.LayoutOf(fn.Definition));
             var lambda = fn.Lambda!;
-            if (captured == null) return new LocalTable(PureEvaluator.BareLambdaLayout(lambda));
+            if (captured == null) return RentTable(PureEvaluator.BareLambdaLayout(lambda));
             if (!captured.Layout.TryChild(lambda, out var layout))
                 layout = captured.Layout.Child(lambda, ParameterNames(lambda.Parameters));
-            return captured.ChildTable(layout);
+            return captured.ChildTable(RentTable(layout));
+        }
+
+        /// <summary>끝난 프레임의 표 중 람다가 잡지 않은 것. 멈춘 실행의 표는 끝나지 않았으니 여기 오지 않는다.</summary>
+        private readonly Stack<LocalTable> _spareTables = new Stack<LocalTable>();
+
+        private LocalTable RentTable(FrameLayout layout)
+        {
+            if (_spareTables.Count == 0) return new LocalTable(layout);
+            var table = _spareTables.Pop();
+            table.Reset(layout);
+            return table;
         }
 
         private static List<string> ParameterNames(IReadOnlyList<Parameter> parameters)

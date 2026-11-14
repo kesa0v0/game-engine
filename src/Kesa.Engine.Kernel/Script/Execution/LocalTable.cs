@@ -33,7 +33,19 @@ namespace Kesa.Engine.Script
             _values = new Slot[Math.Max(layout.Count, 1)];
         }
 
-        public FrameLayout Layout { get; }
+        public FrameLayout Layout { get; private set; }
+
+        /// <summary>람다가 이 표를 잡았다: 프레임이 끝나도 다시 쓰지 않는다.</summary>
+        public bool Captured { get; set; }
+
+        /// <summary>끝난 프레임의 표를 비워 새 배치의 빈 표로 다시 쓴다(값을 놓아 붙잡지 않게).</summary>
+        public void Reset(FrameLayout layout)
+        {
+            Array.Clear(_values, 0, _values.Length);
+            _count = 0;
+            Layout = layout;
+            if (_values.Length < layout.Count) _values = new Slot[layout.Count];
+        }
 
         /// <summary>같은 배치·이름·값을 가진 새 표 (값은 불변이라 나눠 쓴다, G104).</summary>
         public LocalTable Clone()
@@ -48,10 +60,12 @@ namespace Kesa.Engine.Script
         /// <summary>
         /// 자식 배치(<see cref="FrameLayout.Child"/>)의 새 표에 이 표의 값을 옮긴다 (람다 호출, 컴프리헨션의 이름 공간).
         /// </summary>
-        public LocalTable ChildTable(FrameLayout child)
+        public LocalTable ChildTable(FrameLayout child) => ChildTable(new LocalTable(child));
+
+        /// <summary><see cref="ChildTable(FrameLayout)"/>을 빈 표 <paramref name="table"/>(자식 배치)에 채운다.</summary>
+        public LocalTable ChildTable(LocalTable table)
         {
-            var table = new LocalTable(child);
-            var map = child.ParentSlots!;
+            var map = table.Layout.ParentSlots!;
             int n = Math.Min(map.Length, _values.Length);
             for (int i = 0; i < n; i++)
             {

@@ -43,6 +43,7 @@ namespace Kesa.Engine.Script
             _answerTo = null;
             _suspended = null;
             _meter = null!;
+            AllowsRandom = false;
         }
 
         // ---- 멈춤 ----

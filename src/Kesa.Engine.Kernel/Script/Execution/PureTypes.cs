@@ -207,6 +207,7 @@ namespace Kesa.Engine.Script
         {
             Function = function;
             Captured = captured;
+            captured.Captured = true;
         }
 
         public FunctionValue Function { get; }

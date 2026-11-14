@@ -81,10 +81,25 @@ namespace Kesa.Engine.Script
         private void Leave() => _active.RemoveAt(_active.Count - 1);
 
         /// <summary>
-        /// <see cref="Run"/>이 다 쓰고 돌려준 세션. <c>derived</c> 읽기마다 세션과 그 목록들을 새로 만들지 않는다(규모 벤치).
-        /// 실행 중에 다시 불린 <see cref="Run"/>(다른 <c>derived</c> 읽기)은 다른 세션을 꺼내므로 겹치지 않는다.
+        /// 다 쓰고 돌려준 세션. 실행마다 세션과 그 프레임·블록 풀을 새로 만들지 않는다(규모 벤치).
+        /// 실행 중에 다시 불린 실행(다른 <c>derived</c> 읽기)은 다른 세션을 꺼내므로 겹치지 않는다. 멈춘 실행은 스택을 떼어 가므로 세션을 붙잡지 않는다.
         /// </summary>
         private readonly Stack<Session> _spareSessions = new Stack<Session>();
+
+        private Session Rent(StepMeter meter)
+        {
+            var session = _spareSessions.Count > 0 ? _spareSessions.Pop() : new Session(this, null);
+            session.Begin(meter);
+            Enter(session);
+            return session;
+        }
+
+        private void Return(Session session)
+        {
+            Leave();
+            session.Clear();
+            _spareSessions.Push(session);
+        }
 
         public PureEvaluator(IScriptGlobals globals, IReadOnlyDictionary<string, Value> builtins,
             int stepBudget = DefaultStepBudget, int maxCallDepth = Schema.EngineRules.DefaultMaxCallDepth)
@@ -101,9 +116,7 @@ namespace Kesa.Engine.Script
         /// </summary>
         public Value Run(Value function, IReadOnlyList<Value> args, SourceSpan callSite = default, StepMeter? meter = null)
         {
-            var session = _spareSessions.Count > 0 ? _spareSessions.Pop() : new Session(this, null);
-            session.Begin(meter ?? new StepMeter(_budget));
-            Enter(session);
+            var session = Rent(meter ?? new StepMeter(_budget));
             try
             {
                 return session.Invoke(function, args, EmptyKeywords, callSite);
@@ -115,9 +128,7 @@ namespace Kesa.Engine.Script
             }
             finally
             {
-                Leave();
-                session.Clear();
-                _spareSessions.Push(session);
+                Return(session);
             }
         }
 
@@ -128,8 +139,7 @@ namespace Kesa.Engine.Script
         public List<RequireOutcome> RunPreconditions(FunctionValue command, IReadOnlyDictionary<string, Value> args,
             SourceSpan callSite = default, StepMeter? meter = null)
         {
-            var session = new Session(this, meter ?? new StepMeter(_budget));
-            Enter(session);
+            var session = Rent(meter ?? new StepMeter(_budget));
             try
             {
                 return session.Preconditions(command, args, callSite);
@@ -141,7 +151,7 @@ namespace Kesa.Engine.Script
             }
             finally
             {
-                Leave();
+                Return(session);
             }
         }
 
@@ -153,8 +163,7 @@ namespace Kesa.Engine.Script
         public Value RunChooseOption(FunctionValue command, IReadOnlyDictionary<string, Value> args, ChooseInfo choose,
             SourceSpan callSite = default, StepMeter? meter = null)
         {
-            var session = new Session(this, meter ?? new StepMeter(_budget));
-            Enter(session);
+            var session = Rent(meter ?? new StepMeter(_budget));
             try
             {
                 return session.ChooseOption(command, args, choose, callSite);
@@ -166,7 +175,7 @@ namespace Kesa.Engine.Script
             }
             finally
             {
-                Leave();
+                Return(session);
             }
         }
 
@@ -185,8 +194,7 @@ namespace Kesa.Engine.Script
         public List<RequireOutcome> RunCommand(FunctionValue command, IReadOnlyDictionary<string, Value> args,
             out Suspended? suspended, SourceSpan callSite = default, StepMeter? meter = null, Action? bodyStarts = null)
         {
-            var session = new Session(this, meter ?? new StepMeter(_budget));
-            Enter(session);
+            var session = Rent(meter ?? new StepMeter(_budget));
             try
             {
                 var results = session.Command(command, args, callSite, runBody: true, bodyStarts);
@@ -200,7 +208,7 @@ namespace Kesa.Engine.Script
             }
             finally
             {
-                Leave();
+                Return(session);
             }
         }
 
@@ -211,8 +219,7 @@ namespace Kesa.Engine.Script
         public List<RequireOutcome> RunUiAction(FunctionValue action, IReadOnlyDictionary<string, Value> args,
             SourceSpan callSite = default, StepMeter? meter = null)
         {
-            var session = new Session(this, meter ?? new StepMeter(_budget));
-            Enter(session);
+            var session = Rent(meter ?? new StepMeter(_budget));
             try
             {
                 return session.Command(action, args, callSite, runBody: true, uiAction: true);
@@ -224,7 +231,7 @@ namespace Kesa.Engine.Script
             }
             finally
             {
-                Leave();
+                Return(session);
             }
         }
 
@@ -233,8 +240,8 @@ namespace Kesa.Engine.Script
         /// </summary>
         public void RunBot(FunctionValue bot, IReadOnlyDictionary<string, Value> args, SourceSpan callSite, StepMeter meter)
         {
-            var session = new Session(this, meter) { AllowsRandom = true };
-            Enter(session);
+            var session = Rent(meter);
+            session.AllowsRandom = true;
             try
             {
                 session.Command(bot, args, callSite, runBody: true, uiAction: true);
@@ -246,7 +253,7 @@ namespace Kesa.Engine.Script
             }
             finally
             {
-                Leave();
+                Return(session);
             }
         }
 
@@ -256,18 +263,17 @@ namespace Kesa.Engine.Script
         /// </summary>
         public Suspended? Resume(Suspended from, Value answer, StepMeter? meter = null)
         {
-            var session = new Session(this, meter ?? new StepMeter(_budget));
-            session.Restore(from, answer);
-            Enter(session);
+            var session = Rent(meter ?? new StepMeter(_budget));
             try
             {
+                session.Restore(from, answer);
                 session.RunToEnd();
+                return session.TakeSuspended();
             }
             finally
             {
-                Leave();
+                Return(session);
             }
-            return session.TakeSuspended();
         }
 
         /// <summary>

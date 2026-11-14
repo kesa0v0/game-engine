@@ -425,6 +425,17 @@ namespace Kesa.Engine.Tests.Script
             Assert.That(Show(Call(source, "f")), Is.EqualTo("True"));
         }
 
+        [Test]
+        public void ALambdaKeepsItsLocalsWhileLaterCallsReuseFinishedOnes()
+        {
+            const string source = "def make(n):\n    k = n * 10\n    return lambda x: x + k\n" +
+                                   "def noise(a):\n    b = a + 1\n    c = b + 1\n    return c\n" +
+                                   "def f():\n    g = make(3)\n    h = make(5)\n    s = noise(100) + noise(200)\n" +
+                                   "    t = sum([(lambda y: y * 2)(i) for i in range(3)])\n" +
+                                   "    return [g(1), h(1), s, t, noise(7)] == [31, 51, 304, 6, 9]\n";
+            Assert.That(Show(Call(source, "f")), Is.EqualTo("True"));
+        }
+
         [TestCase("{1: 2} | 3", "unsupported operand types for '|': dict and int", "only merges two dicts")]
         [TestCase("True | False", "unsupported operand types for '|': bool and bool", "only merges two dicts")]
         [TestCase("{1: 2} + {3: 4}", "unsupported operand types for '+': dict and dict", "a | b")]
