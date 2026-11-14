@@ -166,6 +166,26 @@ namespace Kesa.Engine.Runtime
                 if (!_rows.TryGetValue(component.Name, out var rows)) _rows.Add(component.Name, rows = new KeyedRows());
                 return rows;
             }
+
+            // ---- 스크립트가 보는 컴포넌트 뷰 ----
+
+            private ComponentView[]? _views;
+            private int _viewCount;
+
+            /// <summary>
+            /// <c>u.Health</c>의 뷰. 뷰는 (월드, id, 컴포넌트)만 들고 읽을 때마다 지금 상태를 보므로, 떼고 다시 붙여도 같은 것을 다시 준다.
+            /// 스크립트가 컴포넌트에 닿을 때마다 새로 만들면 틱의 할당에서 가장 큰 몫이었다.
+            /// </summary>
+            public ComponentView View(World world, ComponentType component)
+            {
+                for (int i = 0; i < _viewCount; i++)
+                    if (ReferenceEquals(_views![i].Component, component)) return _views[i];
+                var view = new ComponentView(world, new EntityId(Id), component, null);
+                if (_views == null) _views = new ComponentView[4];
+                else if (_viewCount == _views.Length) Array.Resize(ref _views, _viewCount * 2);
+                _views[_viewCount++] = view;
+                return view;
+            }
         }
 
         private sealed class KeyedRows

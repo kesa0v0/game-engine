@@ -346,7 +346,7 @@ namespace Kesa.Engine.Runtime
             _computing.Add(computing);
             try
             {
-                var self = new ComponentView(this, new EntityId(entity.Id), component, row);
+                var self = row == null ? entity.View(this, component) : new ComponentView(this, new EntityId(entity.Id), component, row);
                 var result = OutsideAct(() => RunFunction(function, self));
                 return CheckDerivedResult(member.Display, member, result);
             }
@@ -849,7 +849,7 @@ namespace Kesa.Engine.Runtime
             if (_viewer != null && HiddenFromViewer(entity.Id, component.Name)) return NoneValue.Instance; // 못 보는 컴포넌트는 붙지 않은 것 (G198)
             var id = new EntityId(entity.Id);
             if (component.IsKeyed) return new RowsView(this, id, component);
-            return new ComponentView(this, id, component, null);
+            return entity.View(this, component);
         }
 
         private Value ComponentAttribute(ComponentView view, string name)
