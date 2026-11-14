@@ -160,6 +160,8 @@ namespace Kesa.Engine.Stubs
             "    who: list[Any]\n" +
             "def questions(name: str = ..., /) -> list[Question]: ...\n" +
             "def seats(of: Any = ..., /) -> list[Any]: ...\n" +
+            "def cursor(space: str, /) -> Any: ...\n" +
+            "def drag(input: str, /) -> Any: ...\n" +
             "def respond(question: Question, command: str, /, **args: Any) -> None: ...\n" +
             "class _Imagine:\n" +
             "    def __enter__(self) -> None: ...\n" +

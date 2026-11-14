@@ -43,6 +43,39 @@ namespace Kesa.Engine.Runtime
         /// <summary>기록이 바뀐 횟수: 화면 함수의 영수증이 이것으로 다시 읽을지 본다 (G279, 엔티티 도장 G235와 같은 방식).</summary>
         public long Version { get; private set; }
 
+        // ---- 커서와 끌기 (G487·G488·G490) ----
+
+        private const string CursorKey = "cursor:";
+        private const string DragKey = "drag:";
+
+        /// <summary>키(<c>cursor:공간</c>·<c>drag:입력</c>) → 값과 바뀐 때. 기록(<see cref="Version"/>)과 따로 세어 커서가 움직여도 <c>ui.…</c>를 읽는 함수는 다시 불리지 않는다.</summary>
+        private readonly SortedDictionary<string, KeyValuePair<Value, long>> _pointer =
+            new SortedDictionary<string, KeyValuePair<Value, long>>(StringComparer.Ordinal);
+
+        /// <summary>커서·끌기 값이 바뀐 횟수 (모든 키를 합쳐).</summary>
+        public long PointerVersion { get; private set; }
+
+        /// <summary>커서 아래 그 공간의 자리 값. null은 그 공간 밖이다.</summary>
+        public void SetCursor(string space, Value? place) => SetPointer(CursorKey + space, place);
+
+        /// <summary>그 입력의 끌기가 지금까지 낸 값. null은 끌기 중이 아님(끝났거나 취소됨)이다.</summary>
+        public void SetDrag(string input, Value? value) => SetPointer(DragKey + input, value);
+
+        private void SetPointer(string key, Value? value)
+        {
+            var now = value ?? NoneValue.Instance;
+            bool had = _pointer.TryGetValue(key, out var old);
+            if (had ? PureOps.ValuesEqual(old.Key, now) : now is NoneValue) return;
+            _pointer[key] = new KeyValuePair<Value, long>(now, ++PointerVersion);
+        }
+
+        internal static string CursorOf(string space) => CursorKey + space;
+        internal static string DragOf(string input) => DragKey + input;
+
+        /// <summary>키의 값(없으면 <c>None</c>)과 그 값이 들어온 때(없으면 0).</summary>
+        internal KeyValuePair<Value, long> Pointer(string key) =>
+            _pointer.TryGetValue(key, out var held) ? held : new KeyValuePair<Value, long>(NoneValue.Instance, 0);
+
         /// <summary>
         /// 적힌 그대로의 값 (없어진 엔티티도 그대로, 호스트의 디버그용). 화면에 쓸 값은 모드의 화면 함수가 읽는다.
         /// 없는 기록·칸은 <see cref="ArgumentException"/>이다.

@@ -32,7 +32,7 @@ namespace Kesa.Engine.Bridge.Local
         private World? _objectsWorld;
 
         private (long Clock, long Tick, long Seats, long Requests) _objectsMoment;
-        private long _objectsUi;
+        private (long Records, long Pointer) _objectsUi;
 
         /// <summary>표시 함수마다 지난 영수증과 낸 열쇠(G395). 영수증이 null이면 다시 부른다.</summary>
         private readonly SortedDictionary<string, MarkSet> _markSets = new SortedDictionary<string, MarkSet>(StringComparer.Ordinal);
@@ -120,7 +120,7 @@ namespace Kesa.Engine.Bridge.Local
         {
             var world = World;
             var moment = world.ReceiptMoment();
-            long uiVersion = _ui.Version;
+            var uiVersion = (_ui.Version, _ui.PointerVersion);
             if (!ReferenceEquals(world, _objectsWorld) || moment != _objectsMoment || uiVersion != _objectsUi)
             {
                 bool failed = RefreshObjects();
@@ -518,6 +518,18 @@ namespace Kesa.Engine.Bridge.Local
             var acted = view.Act(_ui, action, KernelValues.ToKernel(arguments));
             if (acted.Error != null) _host.Log.Note(World.Tick, action, acted.Error);
             return Done(Delivered(view, view.Show(acted)));
+        }
+
+        public ValueTask Cursor(string space, BridgeValue? place)
+        {
+            _ui.SetCursor(space, place == null ? null : KernelValues.ToKernel(place));
+            return default;
+        }
+
+        public ValueTask Drag(string input, BridgeValue? value)
+        {
+            _ui.SetDrag(input, value == null ? null : KernelValues.ToKernel(value));
+            return default;
         }
 
         public ValueTask<BridgeResult?> WorldInput(string input, IReadOnlyList<long> entities, BridgeWhere? place = null)

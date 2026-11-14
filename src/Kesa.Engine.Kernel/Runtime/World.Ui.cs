@@ -20,13 +20,21 @@ namespace Kesa.Engine.Runtime
 
         private sealed class ActRun
         {
-            public ActRun(SortedDictionary<string, SortedDictionary<string, Value>> draft) => Draft = draft;
+            public ActRun(UiState ui)
+            {
+                Ui = ui;
+                Draft = ui.Draft();
+            }
 
+            public UiState Ui { get; }
             public SortedDictionary<string, SortedDictionary<string, Value>> Draft { get; }
             public List<UiSubmission> Submissions { get; } = new List<UiSubmission>();
 
             /// <summary>본문이 <c>ui.…</c>를 읽었나 (화면 함수의 영수증, G279).</summary>
             public bool ReadUi { get; set; }
+
+            /// <summary>본문이 읽은 커서·끌기 키와 그때의 바뀐 때 (G487·G488).</summary>
+            public SortedDictionary<string, long>? PointerReads { get; set; }
         }
 
         /// <summary>UI 동작 id들 (<c>모드id.함수이름</c>, 이름순).</summary>
@@ -51,7 +59,7 @@ namespace Kesa.Engine.Runtime
             var decl = FindUiAction(action);
             if (_act != null) throw new InvalidOperationException("World.Act cannot be called while another UI action runs");
 
-            var run = new ActRun(ui.Draft());
+            var run = new ActRun(ui);
             var savedViewer = _viewer;
             _viewer = viewer; // 인자 검사도 보는 쪽으로: 숨긴 엔티티는 죽은 것과 같다 (G198)
             _act = run;
@@ -123,7 +131,7 @@ namespace Kesa.Engine.Runtime
             if (_act != null) throw new InvalidOperationException("a UI action cannot be checked while another UI action runs");
             var savedViewer = _viewer;
             _viewer = viewer;
-            _act = new ActRun(ui.Draft());
+            _act = new ActRun(ui);
             try
             {
                 return run(decl);
@@ -143,7 +151,7 @@ namespace Kesa.Engine.Runtime
         {
             if (!ui.Belongs(_schema)) throw new ArgumentException("this UiState was made by another world", nameof(ui));
             if (_act != null) throw new InvalidOperationException("a view function cannot be called while a UI action runs");
-            var run = new ActRun(ui.Draft());
+            var run = new ActRun(ui);
             long version = ui.Version;
             var savedViewer = _viewer;
             _viewer = viewer;
@@ -151,6 +159,7 @@ namespace Kesa.Engine.Runtime
             try
             {
                 var result = call();
+                if (run.PointerReads != null) result.WithPointer(ui, run.PointerReads);
                 return run.ReadUi ? result.WithUi(ui, version) : result;
             }
             finally
@@ -384,6 +393,10 @@ namespace Kesa.Engine.Runtime
             table.Add(PureBuiltins.BotName, new UiRoot(this, bot: true));
             table.Add(PureBuiltins.QuestionsName, new PureBuiltin(PureBuiltins.QuestionsName, QuestionsBuiltin));
             table.Add(PureBuiltins.SeatsName, new PureBuiltin(PureBuiltins.SeatsName, (p, k) => SeatsBuiltin(p, k)));
+            table.Add(PureBuiltins.CursorName,
+                new PureBuiltin(PureBuiltins.CursorName, (p, k) => PointerBuiltin(PureBuiltins.CursorName, "space", p, k)));
+            table.Add(PureBuiltins.DragName,
+                new PureBuiltin(PureBuiltins.DragName, (p, k) => PointerBuiltin(PureBuiltins.DragName, "input", p, k)));
             table.Add(PureBuiltins.RespondName,
                 new PureBuiltin(PureBuiltins.RespondName, (p, k) => RespondBuiltin(_evaluator?.ScriptMod ?? "", p, k))
                 {
@@ -397,6 +410,22 @@ namespace Kesa.Engine.Runtime
                     CallerBody = SubmitBuiltin,
                 });
             AddLookBuiltins(table);
+        }
+
+        /// <summary>
+        /// <c>cursor("공간")</c>·<c>drag("입력")</c> (G487·G488): 호스트가 세션에 알린 값, 없으면 <c>None</c>. 읽은 키만 영수증에 든다.
+        /// </summary>
+        private Value PointerBuiltin(string name, string noun, IReadOnlyList<Value> positional, IReadOnlyDictionary<string, Value> keywords)
+        {
+            if (keywords.Count > 0 || positional.Count != 1 || !(positional[0] is StrValue key))
+                throw new ScriptRuntimeException(Codes.RunType, name + "() takes one " + noun + " name",
+                    name == PureBuiltins.CursorName ? "write cursor(\"board\") (spec-gaps G488)" : "write drag(\"paint\") (spec-gaps G487)");
+            if (_act == null) throw OutsideUi(name + "()");
+            string full = name == PureBuiltins.CursorName ? UiState.CursorOf(key.Value) : UiState.DragOf(key.Value);
+            var held = _act.Ui.Pointer(full);
+            var reads = _act.PointerReads ??= new SortedDictionary<string, long>(StringComparer.Ordinal);
+            reads[full] = held.Value;
+            return UiRead(held.Key);
         }
 
         private static ScriptRuntimeException OutsideUi(string what) =>

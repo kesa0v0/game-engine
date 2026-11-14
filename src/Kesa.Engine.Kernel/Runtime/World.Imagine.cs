@@ -251,7 +251,7 @@ namespace Kesa.Engine.Runtime
         private static readonly string[] StaysWithBot =
         {
             PureBuiltins.UiName, PureBuiltins.BotName, PureBuiltins.SubmitName, PureBuiltins.RespondName, PureBuiltins.SeatsName,
-            PureBuiltins.PlayName,
+            PureBuiltins.PlayName, PureBuiltins.CursorName, PureBuiltins.DragName,
         };
 
         /// <summary>판을 읽고 쓰는 내장을 부를 때마다 <see cref="Current"/>의 같은 내장으로 넘긴다 (G454). 값만 다루는 내장은 그대로 둔다.</summary>

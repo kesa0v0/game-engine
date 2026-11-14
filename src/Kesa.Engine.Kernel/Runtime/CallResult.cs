@@ -23,6 +23,17 @@ namespace Kesa.Engine.Runtime
         private UiState? _ui;
         private long _uiVersion;
 
+        private UiState? _pointerUi;
+        private KeyValuePair<string, long>[]? _pointerReads;
+
+        /// <summary>함수가 <c>cursor()</c>·<c>drag()</c>로 읽은 키와 그때의 바뀐 때를 붙인다 (G487·G488).</summary>
+        internal CallResult WithPointer(UiState ui, IReadOnlyDictionary<string, long> reads)
+        {
+            _pointerUi = ui;
+            _pointerReads = reads.ToArray();
+            return this;
+        }
+
         /// <summary>함수가 <c>ui.…</c>를 읽었으면 그 기록과 그때의 바뀐 횟수를 붙인다 (G279).</summary>
         internal CallResult WithUi(UiState ui, long version)
         {
@@ -62,11 +73,15 @@ namespace Kesa.Engine.Runtime
         /// 그 뒤 바뀌었다. 같은 엔티티의 읽지 않은 컴포넌트가 바뀌어도 거짓이다 (G290). Def와 그 <c>const</c>, Ref가 가리키는 대상은
         /// 죽었는지만 본다. 보는 쪽으로 불렀으면 보기 정책이 읽은 것도 들고, 배정 표가 바뀌어도 참이다 (G248). 다른 월드(불러온 월드 포함)면
         /// 늘 참이다. <c>questions()</c>를 읽었으면 열린 질문이 바뀌어도 참이다(G383). UI 기록과 함께 불렀고 <c>ui.…</c>를 읽었으면 그 기록이 바뀌어도 참이다(기록 단위, G279).
+        /// <c>cursor()</c>·<c>drag()</c>로 읽은 키의 값이 바뀌어도 참이다(키 단위, G487·G488).
         /// </summary>
         public bool Changed(World world)
         {
             if (!ReferenceEquals(world, _world)) return true;
             if (_ui != null && _ui.Version != _uiVersion) return true;
+            if (_pointerReads != null)
+                foreach (var read in _pointerReads)
+                    if (_pointerUi!.Pointer(read.Key).Value != read.Value) return true;
             if (_tick != null && world.Tick != _tick.Value) return true;
             if (_seats != null && world.SeatsVersion != _seats.Value) return true;
             if (_requests != null && world.RequestsVersion != _requests.Value) return true;

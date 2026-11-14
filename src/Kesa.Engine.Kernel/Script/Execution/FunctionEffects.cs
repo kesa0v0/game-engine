@@ -641,6 +641,10 @@ namespace Kesa.Engine.Script
 
             private bool Plays(Expr expr, SortedSet<string> locals) => IsRuntime(expr, PureBuiltins.PlayName, locals);
 
+            /// <summary><c>cursor()</c>·<c>drag()</c>: 연결의 입력 상태라 <c>ui.…</c> 읽기와 같다 (G487·G488).</summary>
+            private bool ReadsPointer(Expr expr, SortedSet<string> locals) =>
+                IsRuntime(expr, PureBuiltins.CursorName, locals) || IsRuntime(expr, PureBuiltins.DragName, locals);
+
             private bool LookMaker(Expr expr, SortedSet<string> locals) =>
                 IsRuntime(expr, PureBuiltins.LookName, locals) || IsRuntime(expr, PureBuiltins.AtName, locals) ||
                 IsRuntime(expr, PureBuiltins.OntoName, locals) || IsRuntime(expr, PureBuiltins.BetweenName, locals) ||
@@ -730,7 +734,7 @@ namespace Kesa.Engine.Script
                     if (_body.FirstWrite == null && _imagining == 0) _body.FirstWrite = call.Span;
                 }
                 else if (!IsNamed(call.Callee, locals) || ReadsConnection(call.Callee, locals) || LookMaker(call.Callee, locals) ||
-                         Plays(call.Callee, locals))
+                         Plays(call.Callee, locals) || ReadsPointer(call.Callee, locals))
                     Expr(call.Callee, locals);
                 foreach (var arg in call.Arguments) Expr(arg.Value, locals);
             }
@@ -822,7 +826,7 @@ namespace Kesa.Engine.Script
                         else if (builtin != null)
                             _body.BuiltinExpressionCalls.Add(new KeyValuePair<string, SourceSpan>(builtin, call.Span));
                         else if (!IsNamed(call.Callee, locals) || ReadsConnection(call.Callee, locals) ||
-                                 LookMaker(call.Callee, locals) || Plays(call.Callee, locals))
+                                 LookMaker(call.Callee, locals) || Plays(call.Callee, locals) || ReadsPointer(call.Callee, locals))
                             Expr(call.Callee, locals);
                         foreach (var arg in call.Arguments) Expr(arg.Value, locals);
                         break;
@@ -836,6 +840,9 @@ namespace Kesa.Engine.Script
                     case NameExpr name when SubmitKind(name, locals) is string kind:
                         _body.TouchUi(name.Span);
                         _ui.SubmitValue(kind, name.Span);
+                        break;
+                    case NameExpr name when ReadsPointer(name, locals):
+                        _body.Touch(false, name.Span);
                         break;
                     case NameExpr name when ReadsConnection(name, locals):
                         if (_body.FirstQuestions == null) _body.FirstQuestions = name.Span;

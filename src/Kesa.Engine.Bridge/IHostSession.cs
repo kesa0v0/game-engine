@@ -70,6 +70,18 @@ namespace Kesa.Engine.Bridge
         /// </summary>
         ValueTask<BridgeResult?> WorldInput(string input, IReadOnlyList<long> entities, BridgeWhere? place = null);
 
+        /// <summary>
+        /// 커서 아래 그 공간의 자리 (G488·G490). null은 그 공간 밖이다. 바뀔 때만 보내면 되고, 같은 값이면 아무 일도 없다.
+        /// <c>cursor("공간")</c>을 읽은 영수증만 바뀐다. 부르지 않은 공간은 <c>None</c>이다.
+        /// </summary>
+        ValueTask Cursor(string space, BridgeValue? place);
+
+        /// <summary>
+        /// 진행 중인 <paramref name="input"/> 끌기의 모양 종류가 지금까지 낸 값 (G487·G490). null은 끌기가 끝났거나 취소됨이다.
+        /// <c>drag("입력")</c>을 읽은 영수증만 바뀐다. 끝난 끌기는 <see cref="WorldInput"/>에 엔티티 없이 <c>at(공간, 값)</c>으로 낸다(G484).
+        /// </summary>
+        ValueTask Drag(string input, BridgeValue? value);
+
         /// <summary>판 위 입력 핸들러(<c>@world_input</c>), 로드 순서대로 (G424). 선언에 없는 입력 이름을 알리거나 키 도움말에 쓴다.</summary>
         ValueTask<IReadOnlyList<BridgeWorldInput>> WorldInputs();
 

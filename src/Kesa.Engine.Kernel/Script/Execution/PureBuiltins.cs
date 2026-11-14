@@ -96,6 +96,12 @@ namespace Kesa.Engine.Script
         /// <summary>이 연결이 앉은 엔티티 목록 (G421). <c>questions()</c>와 자리 규칙이 같다.</summary>
         public const string SeatsName = "seats";
 
+        /// <summary>커서 아래 그 공간의 자리 (G488). <c>ui.…</c> 읽기와 자리 규칙이 같다.</summary>
+        public const string CursorName = "cursor";
+
+        /// <summary>진행 중인 그 입력의 끌기가 지금까지 낸 값 (G487). <c>ui.…</c> 읽기와 자리 규칙이 같다.</summary>
+        public const string DragName = "drag";
+
         /// <summary><c>questions()</c>가 준 질문 하나에 답을 내 달라고 적어 두는 내장 (G384). <c>submit</c>과 자리 규칙이 같다.</summary>
         public const string RespondName = "respond";
 
@@ -144,7 +150,7 @@ namespace Kesa.Engine.Script
 
         private static SortedSet<string> NameSet()
         {
-            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, DefDataName, DefsName, UiName, BotName, SubmitName, QuestionsName, SeatsName, RespondName, PlayName, LookName, AtName, OntoName, BetweenName, MarkName, FxName };
+            var set = new SortedSet<string>(Create().Keys, StringComparer.Ordinal) { ContribsName, NowName, QueryName, ControllerName, RandomName, DefIdName, DefDataName, DefsName, UiName, BotName, SubmitName, QuestionsName, SeatsName, CursorName, DragName, RespondName, PlayName, LookName, AtName, OntoName, BetweenName, MarkName, FxName };
             set.UnionWith(WritingNameArray);
             return set;
         }
