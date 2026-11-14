@@ -66,21 +66,22 @@ namespace Kesa.Engine.Runtime
         private uint[] KeyOf(RandStream stream)
         {
             if (stream.Key != null) return stream.Key;
-            var id = Encoding.UTF8.GetBytes(stream.Id);
-            var input = new byte[16 + id.Length];
+            // Flow마다 새 키를 만들므로 입력과 해시는 스택에, 해시 객체는 스레드마다 하나를 다시 쓴다
+            int idLength = Encoding.UTF8.GetByteCount(stream.Id);
+            Span<byte> input = 16 + idLength <= 512 ? stackalloc byte[16 + idLength] : new byte[16 + idLength];
             WriteLittleEndian(input, 0, _seed);
             WriteLittleEndian(input, 8, stream.Count);
-            Array.Copy(id, 0, input, 16, id.Length);
-            // Flow마다 새 키를 만들므로 해시 객체는 스레드마다 하나를 다시 쓴다
+            Encoding.UTF8.GetBytes(stream.Id.AsSpan(), input.Slice(16));
             var sha = _sha ??= SHA256.Create();
-            byte[] digest = sha.ComputeHash(input);
+            Span<byte> digest = stackalloc byte[32];
+            if (!sha.TryComputeHash(input, digest, out _)) throw new InvalidOperationException("SHA-256 did not fit 32 bytes");
             var key = new uint[8];
             for (int i = 0; i < 8; i++)
                 key[i] = digest[4 * i] | (uint)digest[4 * i + 1] << 8 | (uint)digest[4 * i + 2] << 16 | (uint)digest[4 * i + 3] << 24;
             return stream.Key = key;
         }
 
-        private static void WriteLittleEndian(byte[] buffer, int at, long value)
+        private static void WriteLittleEndian(Span<byte> buffer, int at, long value)
         {
             for (int i = 0; i < 8; i++) buffer[at + i] = unchecked((byte)(value >> (8 * i)));
         }
@@ -91,16 +92,19 @@ namespace Kesa.Engine.Runtime
         /// </summary>
         private sealed class Draws
         {
-            private readonly uint[] _key;
-            private readonly long _n;
+            private uint[] _key = Array.Empty<uint>();
+            private long _n;
             private readonly uint[] _block = new uint[16];
             private int _blockNo = -1;
             private long _index;
 
-            public Draws(uint[] key, long n)
+            public Draws Reset(uint[] key, long n)
             {
                 _key = key;
                 _n = n;
+                _blockNo = -1;
+                _index = 0;
+                return this;
             }
 
             public ulong Next()
@@ -132,12 +136,15 @@ namespace Kesa.Engine.Runtime
             public long Between(long lo, long hi) => unchecked(lo + (long)Below((ulong)(hi - lo) + 1));
         }
 
+        // 난수 내장은 뽑는 동안 스크립트를 부르지 않으므로(목록·range만 읽음) 한 월드에 뽑기 하나를 다시 쓴다
+        private readonly Draws _draws = new Draws();
+
         private Draws BeginDraws()
         {
             var stream = _rand ?? throw new InvalidOperationException("a random function ran outside a flow body");
             long n = stream.Calls;
             stream.Calls = n + 1;
-            return new Draws(KeyOf(stream), n);
+            return _draws.Reset(KeyOf(stream), n);
         }
 
         // ---- 저장 (G182) ----

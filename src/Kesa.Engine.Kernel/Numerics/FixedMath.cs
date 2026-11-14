@@ -102,6 +102,16 @@ namespace Kesa.Engine.Numerics
         {
             result = default;
             if (b.Raw == 0) return false;
+            if (a.Raw <= long.MaxValue / Fixed.Scale && a.Raw >= -(long.MaxValue / Fixed.Scale))
+            {
+                // 흔한 크기는 64비트로 끝낸다 (BigInteger는 매번 할당한다). 몫의 크기는 분자 이하라 넘치지 않는다
+                long n = a.Raw * Fixed.Scale;
+                long q = n / b.Raw;
+                long r = n % b.Raw;
+                if (r != 0 && Magnitude(r) >= Magnitude(b.Raw) - Magnitude(r)) q += (n < 0) == (b.Raw < 0) ? 1 : -1;
+                result = Fixed.FromRaw(q);
+                return true;
+            }
             var numerator = new BigInteger(a.Raw) * Fixed.Scale;
             var denominator = new BigInteger(b.Raw);
             var quotient = BigInteger.DivRem(numerator, denominator, out var remainder);
@@ -181,26 +191,53 @@ namespace Kesa.Engine.Numerics
         public static int Compare(Fixed a, Fixed b) => a.Raw.CompareTo(b.Raw);
 
         /// <summary><c>int</c>와 <c>fixed</c>의 비교. 승격하면 넘칠 수 있으므로 큰 정수로 비교한다.</summary>
-        public static int Compare(long a, Fixed b) => (new BigInteger(a) * Fixed.Scale).CompareTo(new BigInteger(b.Raw));
+        public static int Compare(long a, Fixed b)
+        {
+            if (a > long.MaxValue / Fixed.Scale) return 1;
+            if (a < long.MinValue / Fixed.Scale) return -1;
+            return (a * Fixed.Scale).CompareTo(b.Raw);
+        }
 
-        /// <summary>두 <c>fixed</c>의 곱. 중간값은 <see cref="BigInteger"/>이고 반올림은 0에서 먼 쪽이다.</summary>
+        /// <summary>
+        /// 두 <c>fixed</c>의 곱. 중간값은 128비트(크기를 32비트 네 조각으로)이고 반올림은 0에서 먼 쪽이다. 스크립트의 곱마다 불리므로
+        /// 할당하지 않는다.
+        /// </summary>
         public static bool TryMultiply(Fixed a, Fixed b, out Fixed result)
         {
-            var product = new BigInteger(a.Raw) * new BigInteger(b.Raw);
-            var scale = new BigInteger(Fixed.Scale);
-            var quotient = BigInteger.DivRem(product, scale, out var remainder);
-            if (!remainder.IsZero)
+            result = default;
+            ulong x = Magnitude(a.Raw), y = Magnitude(b.Raw);
+            // 크기 곱 x * y = hi:lo (128비트)
+            ulong x0 = x & 0xFFFFFFFF, x1 = x >> 32, y0 = y & 0xFFFFFFFF, y1 = y >> 32;
+            ulong p00 = x0 * y0, p01 = x0 * y1, p10 = x1 * y0, p11 = x1 * y1;
+            ulong middle = (p00 >> 32) + (p01 & 0xFFFFFFFF) + (p10 & 0xFFFFFFFF);
+            ulong lo = (middle << 32) | (p00 & 0xFFFFFFFF);
+            ulong hi = p11 + (p01 >> 32) + (p10 >> 32) + (middle >> 32);
+
+            // 스케일(10^6 < 2^32)로 나누기: 위 조각부터 32비트씩
+            const ulong scale = (ulong)Fixed.Scale;
+            ulong rest = 0;
+            ulong q3 = Step(hi >> 32, ref rest), q2 = Step(hi & 0xFFFFFFFF, ref rest);
+            ulong q1 = Step(lo >> 32, ref rest), q0 = Step(lo & 0xFFFFFFFF, ref rest);
+            ulong Step(ulong limb, ref ulong r)
             {
-                // |나머지| * 2 >= 스케일 이면 0에서 먼 쪽으로 올린다
-                if (BigInteger.Abs(remainder) * 2 >= scale) quotient += product.Sign;
+                ulong current = (r << 32) | limb;
+                r = current % scale;
+                return current / scale;
             }
-            if (quotient < long.MinValue || quotient > long.MaxValue)
+            if (q3 != 0 || q2 != 0) return false;
+            ulong q = (q1 << 32) | q0;
+            if (rest * 2 >= scale)
             {
-                result = default;
-                return false;
+                if (q == ulong.MaxValue) return false;
+                q++;
             }
-            result = Fixed.FromRaw((long)quotient);
+            bool negative = (a.Raw < 0) != (b.Raw < 0);
+            if (q > (negative ? 1UL << 63 : (ulong)long.MaxValue)) return false;
+            result = Fixed.FromRaw(negative ? unchecked(-(long)q) : (long)q);
             return true;
         }
+
+        /// <summary>부호 없는 크기. <c>long.MinValue</c>도 2^63으로.</summary>
+        private static ulong Magnitude(long v) => v < 0 ? unchecked((ulong)-v) : (ulong)v;
     }
 }

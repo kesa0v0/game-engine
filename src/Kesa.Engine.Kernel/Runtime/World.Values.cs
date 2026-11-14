@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Numerics;
 using Kesa.Engine.Diagnostics;
 using Kesa.Engine.Loading;
 using Kesa.Engine.Numerics;
@@ -218,13 +217,16 @@ namespace Kesa.Engine.Runtime
             }
         }
 
-        private static BigInteger Scaled(Value value) =>
-            value is IntValue i ? new BigInteger(i.Value) * Fixed.Scale : new BigInteger(((FixedValue)value).Value.Raw);
+        private static System.Numerics.BigInteger Scaled(Value value) =>
+            value is IntValue i ? new System.Numerics.BigInteger(i.Value) * Fixed.Scale : new System.Numerics.BigInteger(((FixedValue)value).Value.Raw);
 
         /// <summary>숫자는 값으로, 문자열은 서수로, bool은 False 먼저 (order_by와 범위 검사).</summary>
         private static int CompareValues(Value a, Value b)
         {
-            if ((a is IntValue || a is FixedValue) && (b is IntValue || b is FixedValue)) return Scaled(a).CompareTo(Scaled(b));
+            if (a is IntValue ia && b is IntValue ib) return ia.Value.CompareTo(ib.Value);
+            if (a is FixedValue fa && b is FixedValue fb) return fa.Value.Raw.CompareTo(fb.Value.Raw);
+            if (a is IntValue ia2 && b is FixedValue fb2) return FixedMath.Compare(ia2.Value, fb2.Value);
+            if (a is FixedValue fa2 && b is IntValue ib2) return -FixedMath.Compare(ib2.Value, fa2.Value);
             if (a is StrValue sa && b is StrValue sb) return string.CompareOrdinal(sa.Value, sb.Value);
             if (a is BoolValue ba && b is BoolValue bb) return ba.Value.CompareTo(bb.Value);
             return 0;
