@@ -268,6 +268,7 @@ namespace Kesa.Engine.Runtime
 
         public Value Get(EntityId id, MemberHandle member)
         {
+            OwnHandle(member);
             var entity = Record(id, member.Component?.Name ?? AliveRead);
             if (member.Component == null)
             {

@@ -91,6 +91,7 @@ namespace Kesa.Engine.Runtime
 
         private Value GetRow(EntityId id, MemberHandle member, RowKey key)
         {
+            OwnHandle(member);
             var entity = Record(id, member.Component?.Name);
             var component = KeyedMember(member);
             var row = FindRow(entity, component, key, out var defRow, out var record);

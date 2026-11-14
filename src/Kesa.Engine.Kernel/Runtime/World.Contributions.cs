@@ -65,6 +65,7 @@ namespace Kesa.Engine.Runtime
         private long AddContribution(EntityId target, MemberHandle member, RowKey? key, string op, Value value, EntityId? source)
         {
             NoHostWrites("AddContribution");
+            OwnHandle(member);
             var entity = Record(target);
             if (member.Component == null || member.Kind != MemberKind.Derived)
                 throw new WorldException(Codes.RunNotWritable,

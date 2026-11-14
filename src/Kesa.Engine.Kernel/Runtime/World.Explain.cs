@@ -18,6 +18,7 @@ namespace Kesa.Engine.Runtime
 
         private ExplainNode ExplainCore(EntityId id, MemberHandle member, RowKey? key)
         {
+            OwnHandle(member);
             var entity = Record(id);
             if (member.Component == null)
                 throw new WorldException(Diagnostics.Codes.RunNotComputed, "'" + member.Display + "' is a const of the Def type, not a derived value");

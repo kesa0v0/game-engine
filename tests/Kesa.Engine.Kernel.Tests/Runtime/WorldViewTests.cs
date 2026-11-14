@@ -322,12 +322,12 @@ namespace Kesa.Engine.Tests.Runtime
         {
             var one = ThreatWorld((4, true), (3, false));
             var two = ThreatWorld((4, true), (3, false), (0, true));
-            var threat = one.Member("Defense", "threat");
-            Assert.That(two.Explain(new EntityId(1), threat).Render(), Is.Not.EqualTo(one.Explain(new EntityId(1), threat).Render()));
-            Assert.That(two.ViewAs("B").Explain(new EntityId(1), threat).Render(),
-                Is.EqualTo(one.ViewAs("B").Explain(new EntityId(1), threat).Render()));
+            MemberHandle Threat(World w) => w.Member("Defense", "threat");
+            Assert.That(two.Explain(new EntityId(1), Threat(two)).Render(), Is.Not.EqualTo(one.Explain(new EntityId(1), Threat(one)).Render()));
+            Assert.That(two.ViewAs("B").Explain(new EntityId(1), Threat(two)).Render(),
+                Is.EqualTo(one.ViewAs("B").Explain(new EntityId(1), Threat(one)).Render()));
             var nothing = ThreatWorld((3, false));
-            Assert.That(nothing.ViewAs("B").Explain(new EntityId(1), threat).Render(), Does.Not.Contain("hidden"));
+            Assert.That(nothing.ViewAs("B").Explain(new EntityId(1), Threat(nothing)).Render(), Does.Not.Contain("hidden"));
         }
 
         // ---- 합법 수와 후보 (G202) ----
