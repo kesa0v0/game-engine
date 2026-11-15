@@ -22,8 +22,8 @@
 ## 콘솔 호스트가 호스트 함수를 받지 않는다
 
 - 어디서: Coup(2026-11-16). 모드 `coup`가 게임 C#의 호스트 함수 `geom.*`에 의존하게 됐다. 대본으로 판을 돌리는 Coup의 `tools/night.py`는 엔진의 콘솔 호스트(`kesa-play`, `src/Kesa.Engine.ConsoleHost`의 `Play.cs`)를 부르는데, 그 호스트에는 게임의 `HostFunctions`를 넘길 길이 없다. `engine check`·`stubs`는 `--host 선언파일`로 이름과 서명만 받으니 검사는 되지만, 판을 실제로 돌리지는 못한다.
-- 지금: 모드가 `geom.*`을 아직 부르지 않아 `night.py`는 돈다. 부르기 시작하면 멈춘다. Commander는 같은 까닭으로 자기 `tools/RuleRunner`(Assets의 C#을 링크하고 Kernel을 참조)를 만들었다. Coup도 `tools/CoupTool`에 같은 길을 붙일 생각이다.
-- 후보: 콘솔 호스트가 호스트 함수를 등록하는 어셈블리를 받는다(예: `--host-assembly 경로` 와 정해진 등록 진입점). 아니면 게임마다 러너를 만드는 것을 표준 길로 정하고, 러너가 쓸 대본 실행부를 라이브러리로 내놓는다. 게임 둘이 같은 러너를 따로 만들고 있다.
+- 지금: Commander는 같은 까닭으로 자기 `tools/RuleRunner`(Assets의 C#을 링크하고 Kernel을 참조)를 만들었다. Coup는 `tools/CoupTool`의 `play`를 만들었다: 콘솔 호스트 프로젝트를 참조해 `Play.Run`의 불러오기 약 60줄과 번역 읽기(`Play.Translator`가 private이라)를 베끼고, `ContentLoader.Load`에 호스트 함수를 넘긴 뒤 공개된 `ConsoleGame`·`ConsoleUi`를 그대로 쓴다. 대본 여덟의 출력이 `kesa-play`와 같았다. 베낀 부분은 `Play.Run`이 바뀌면 따라 고쳐야 한다.
+- 후보: 가장 작은 것은 `Play.Run`이 `HostFunctions?`를 더 받는 겹침이다(그러면 Coup의 베낀 부분이 한 줄이 된다). 더 나가면 콘솔 호스트가 호스트 함수를 등록하는 어셈블리를 받는다(예: `--host-assembly 경로` 와 정해진 등록 진입점). 아니면 게임마다 러너를 만드는 것을 표준 길로 정하고, 러너가 쓸 대본 실행부를 라이브러리로 내놓는다. 게임 둘이 같은 러너를 따로 만들고 있다.
 
 ## 표준 호스트 함수 후보: 다각형 지역(`geom`)
 
