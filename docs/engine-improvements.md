@@ -38,8 +38,15 @@
 - 어디서: Coup가 도시 지도(강, 길, 건물, 담과 정문)를 판 위 그림으로 그린다. 게임이 C#으로 그림 요소 `Shape`(채우기 색, 선 색, 폭, 닫힘)를 더했다(`Assets/Scripts/Looks/ShapeLooks.cs`).
 - 수의 목록을 받는 속성 종류가 없다(`LookAttributeType`은 수 하나, 2~3개짜리 벡터까지). 그래서 꼭짓점을 자식 요소 `Vertex` 하나씩으로 받는다: `<Shape for="p in ring"><Vertex bind-offset="p" /></Shape>`. 반복의 차례(`SetSiblingIndex`)와 `offset`이 맞아 그려지지만, 꼭짓점마다 GameObject 하나다. 지금 지도는 모양 약 200개, 꼭짓점 GameObject 약 1000개다. `offset`이 바뀐 것을 부모 요소가 알 길이 없어(`ILookParentView`는 internal) 모양은 프레임마다 자식의 자리를 견준다. 다음 단계에서 끄는 동안 지역의 미리 보기를 이 길로 그리면 꼭짓점이 끌 때마다 생기고 지워진다(위의 풀링 항목과 겹친다).
   - 후보: 수 목록 속성 종류(`bind-ring="ring"`에 `[[x, y], ...]`나 평평한 목록), 또는 부모 뷰가 자식의 `offset` 바뀜을 받는 공개 인터페이스.
-- `engine check`가 게임이 더한 그림 요소를 모른다. `Shape`·`Vertex`를 쓰는 곳마다 경고 `LOK002`가 나와 지금 Coup는 경고 50개다. 진짜 경고가 그 사이에 묻힌다. Commander의 `continuous` 공간도 같은 경고를 하나 낸다.
+- `engine check`가 게임이 더한 그림 요소를 모른다. `Shape`·`Vertex`를 쓰는 곳마다 경고 `LOK002`가 나와 지금 Coup는 경고 60개다. 진짜 경고가 그 사이에 묻힌다. Commander의 `continuous` 공간도 같은 경고를 하나 낸다.
   - 후보: 호스트 함수의 `--host 선언파일`처럼 게임이 그림 요소·공간·리그의 이름과 속성을 선언 파일로 내보내고 `check`가 읽는다. 그러면 속성 오타도 잡힌다.
 - `Text`의 `size`가 공간 단위라 지도를 확대하면 이름표가 함께 커진다(화면 높이 40 m에서 30 m 글자). 화면 픽셀로 크기를 지키는 글(또는 확대에 따라 숨기는 법)이 있으면 좋겠다. 아직 막히지는 않았다.
 - 끌기 모양 `lasso`는 칸을 채운 목록이라 1 m 칸 지도에서는 쓸 수 없다(한 구역에 칸 수십만). Coup는 지나간 자리를 꼭짓점 목록으로 주는 모양 `outline`을 C#으로 더했다(`Assets/Scripts/Looks/OutlineGesture.cs`, 설정 `spacing`). 칸 없는 공간에서도 된다. 위의 `geom`과 함께 표준 후보다. `.input.xml`은 `check`가 보지 않아 경고는 없다.
 - `top` 리그의 `Zoom`은 화면 가운데를 축으로 한다. 지도 게임은 보통 커서 아래를 축으로 확대한다. Coup의 지도는 패널 사이 가운데 칸이 화면 가운데보다 왼쪽이라 휠을 굴리면 보던 곳이 옆으로 밀린다. 엔진으로 올리면 `std`의 이름으로 옮기고 Coup는 의존을 지운다. 시험은 Coup의 `tools/GeomTests`에 있다.
+
+## 상태에 목록을 둘 수 없다: 다각형 하나를 꼭짓점 줄로 적는다 (Coup, 2026-11-16)
+
+- 어디서: Coup의 결행 밤. 부대가 맡은 지역(지도에 그린 다각형, 층 목록 `[[연산, x0, y0, ...], ...]`)을 부대의 상태로 들어야 한다. `field(list[list[fixed]])`는 `SCH004`("runtime fields cannot hold lists or maps")다. `ui_state`의 칸에는 목록을 둘 수 있어 3단계의 화면 초안은 그렇게 들었지만, 명령이 되면 게임 상태여야 한다.
+- 지금: 키 int 줄 컴포넌트에 꼭짓점 하나를 한 줄로 적는다: `component("Outline", key=int, op=field(int), x=field(fixed), y=field(fixed))`. `op`가 1/-1인 줄에서 새 층이 시작하고 0이면 앞 층에 잇는다. 쓸 때는 `replace_rows`로 통째로 바꾸고, 읽을 때마다 줄을 훑어 층 목록으로 다시 모은다(`defs/rules.py`의 `region_of`·`set_region`). 호스트 함수 `geom.region.*`이 층 목록을 받으므로 부를 때마다 모은다. 그린 선을 3 m 안에서 솎아(`geom.ring.simplify`) 줄 수를 줄였다.
+- 불편: 값 하나인 다각형이 줄 수십 개로 흩어지고, 읽는 쪽이 매번 다시 모으는 비용(목록을 잇는 걸음 수)을 낸다. 층의 연산을 첫 꼭짓점 줄에 얹는 꼴은 게임이 정한 약속이라 다른 게임과 나눌 수 없다.
+- 후보: 바뀌지 않는(불변) 값 목록을 `field`에 허용하기(통째로 바꾸기만 하고 안을 고치지 않는다면 저장·되감기·`@when`의 바뀜 감지가 값 하나와 같아 보인다). 아니면 `geom` 같은 표준 호스트 함수가 쓸 "도형" 값 종류를 따로 두기.
